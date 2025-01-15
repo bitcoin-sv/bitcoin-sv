@@ -27,7 +27,7 @@
 #include "test/test_bitcoin.h"
 #include "utilstrencodings.h"
 #include "config.h"
-#include <optional>
+
 
 #if defined(HAVE_CONSENSUS_LIB)
 #include "script/bitcoinconsensus.h"
@@ -37,6 +37,7 @@
 #include <bitset>
 #include <chrono>
 #include <cstdint>
+#include <numeric>
 #include <optional>
 #include <string>
 #include <tuple>
@@ -3836,7 +3837,7 @@ BOOST_AUTO_TEST_CASE(VerifyScript_lows)
     }
 }
 
-BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid)
+BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid_relax)
 {
     using namespace std;
 
@@ -3933,6 +3934,18 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid)
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
          std::make_optional<malleability::status>(malleability::disallowed)},
+       
+        // relax flag
+        // Pre-Chronicle
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
+         SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
+         { SCRIPT_ERR_ILLEGAL_RELAX },
+         {}},
+        // Post-Chronicle
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
+         SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
+         {},
+         std::make_optional<malleability::status>()},
     };
     for(const auto& [flags, sighash, exp_error, exp_mall] : test_data)
     {
@@ -3968,7 +3981,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid)
     }
 }
 
-BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid)
+BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid_relax)
 {
     using namespace std;
 
@@ -4065,6 +4078,18 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid)
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
          std::make_optional<malleability::status>(malleability::disallowed)},
+        
+        // relax flag
+        // Pre-Chronicle
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
+         SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
+         { SCRIPT_ERR_ILLEGAL_RELAX },
+         {}},
+        // Post-Chronicle
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
+         SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
+         {},
+         std::make_optional<malleability::status>()},
     };
     for(const auto& [flags, sighash, exp_error, exp_mall] : test_data)
     {
@@ -4100,76 +4125,115 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid)
     }
 }
 
-BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_multiple_forkids)
+BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checksig_forkid_relax)
 {
     using namespace std;
-
+        
     const Config& config = GlobalConfig::GetConfig();
     auto source = task::CCancellationSource::Make();
-    LimitedStack stack(UINT32_MAX);
-    const auto script{[]
+    
+    using test_args = tuple<vector<int>,   // sighashes
+                            malleability::status>;
+    const vector<test_args> test_data
     {
-        auto script{make_op_checksig_script(SIGHASH_ALL, low_s_max())};
-        const auto script_2{
-                   make_op_checksig_script(SIGHASH_ALL | SIGHASH_FORKID,
-                                           low_s_max())};
-        script.insert(script.end(), script_2.begin(), script_2.end());
-        return script;
-    }()};
-
-    const uint32_t flags{SCRIPT_ENABLE_SIGHASH_FORKID
-                         | SCRIPT_VERIFY_STRICTENC
-                         | SCRIPT_CHRONICLE
-                         };
-    const auto status = EvalScript(config,
-                                    false,
-                                    source->GetToken(),
-                                    stack,
-                                    CScript{script.begin(), script.end()},
-                                    flags,
-                                    BaseSignatureChecker{});
-    BOOST_CHECK(status.has_value());
-    const auto v{status.value()};
-    BOOST_CHECK(std::holds_alternative<malleability::status>(v));
-    malleability::status exp_mall{malleability::non_malleable
-                                 | malleability::disallowed};
-    BOOST_CHECK_EQUAL(exp_mall, std::get<malleability::status>(v));
+        {{SIGHASH_ALL,
+          SIGHASH_ALL | SIGHASH_FORKID},
+          malleability::disallowed},
+        {{SIGHASH_ALL | SIGHASH_FORKID,
+          SIGHASH_ALL | SIGHASH_FORKID},
+          malleability::disallowed},
+        {{SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
+          SIGHASH_ALL | SIGHASH_FORKID},
+          malleability::disallowed},
+        {{SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
+          SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX},
+         {}}
+    };
+    for(const auto& [sighashes, exp_mall] : test_data)
+    {
+        LimitedStack stack(UINT32_MAX);
+        
+        const auto s{accumulate(sighashes.begin(), sighashes.end(), 
+                                vector<uint8_t>{}, 
+                                [](auto acc, const auto sighash)
+                                {
+                                    const auto s{make_op_checksig_script(sighash,
+                                                                         low_s_max())};
+                                    acc.insert(acc.end(), s.begin(), s.end());
+                                    return acc;
+                                })};
+        const uint32_t flags{SCRIPT_ENABLE_SIGHASH_FORKID
+                            | SCRIPT_VERIFY_STRICTENC
+                            | SCRIPT_CHRONICLE
+                            };
+        const auto status = EvalScript(config,
+                                        false,
+                                        source->GetToken(),
+                                        stack,
+                                        CScript{s.begin(), s.end()},
+                                        flags,
+                                        BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+        BOOST_CHECK_EQUAL(exp_mall, std::get<malleability::status>(v));
+    }
 }
 
-BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_multiple_forkids)
+BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checkmultisig_forkid_relax)
 {
     using namespace std;
 
     const Config& config = GlobalConfig::GetConfig();
     auto source = task::CCancellationSource::Make();
-    LimitedStack stack(UINT32_MAX);
-    const auto script{[]
+    
+    using test_args = tuple<vector<int>,   // sighashes
+                            malleability::status>;
+    const vector<test_args> test_data
     {
-        auto script{make_op_check_multi_sig_script(SIGHASH_ALL, low_s_max())};
-        const auto script_2{
-                    make_op_check_multi_sig_script(SIGHASH_ALL | SIGHASH_FORKID,
-                                                   low_s_max())};
-        script.insert(script.end(), script_2.begin(), script_2.end());
-        return script;
-    }()};
+        {{SIGHASH_ALL,
+          SIGHASH_ALL | SIGHASH_FORKID},
+          malleability::disallowed},
+        {{SIGHASH_ALL | SIGHASH_FORKID,
+          SIGHASH_ALL | SIGHASH_FORKID},
+          malleability::disallowed},
+        {{SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
+          SIGHASH_ALL | SIGHASH_FORKID},
+          malleability::disallowed},
+        {{SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX,
+          SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX},
+         {}}
+    };
+    for(const auto& [sighashes, exp_mall] : test_data)
+    {
+        LimitedStack stack(UINT32_MAX);
 
-    const uint32_t flags{SCRIPT_ENABLE_SIGHASH_FORKID
-                         | SCRIPT_VERIFY_STRICTENC
-                         | SCRIPT_CHRONICLE
-                         };
-    const auto status = EvalScript(config,
-                                    false,
-                                    source->GetToken(),
-                                    stack,
-                                    CScript{script.begin(), script.end()},
-                                    flags,
-                                    BaseSignatureChecker{});
-    BOOST_CHECK(status.has_value());
-    const auto v{status.value()};
-    BOOST_CHECK(std::holds_alternative<malleability::status>(v));
-    malleability::status exp_mall{malleability::non_malleable
-                                 | malleability::disallowed};
-    BOOST_CHECK_EQUAL(exp_mall, std::get<malleability::status>(v));
+        const auto s{accumulate(sighashes.begin(), sighashes.end(), 
+                                vector<uint8_t>{}, 
+                                [](auto acc, const auto sighash)
+                                {
+                                    const auto s{make_op_check_multi_sig_script(sighash,
+                                                                                low_s_max())};
+                                    acc.insert(acc.end(), s.begin(), s.end());
+                                    return acc;
+                                })};
+
+        const uint32_t flags{SCRIPT_ENABLE_SIGHASH_FORKID
+                            | SCRIPT_VERIFY_STRICTENC
+                            | SCRIPT_CHRONICLE
+                            };
+        const auto status = EvalScript(config,
+                                        false,
+                                        source->GetToken(),
+                                        stack,
+                                        CScript{s.begin(), s.end()},
+                                        flags,
+                                        BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        const auto v{status.value()};
+        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+        BOOST_CHECK_EQUAL(exp_mall, std::get<malleability::status>(v));
+    }
 }
 
 BOOST_AUTO_TEST_CASE(EvalScript_minimal_encoding)
