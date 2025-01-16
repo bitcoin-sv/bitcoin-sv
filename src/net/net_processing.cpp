@@ -5674,13 +5674,21 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
     if (pto->nVersion >= FEEFILTER_VERSION && config.GetFeeFilter() &&
         !(pto->fWhitelisted && config.GetWhitelistForceRelay()))
     {
-        MempoolSizeLimits limits = MempoolSizeLimits::FromConfig();
-        Amount currentFilter =
-            mempool
-                .GetMinFee(limits.Total())
-                .GetFeePerK();
+        Amount currentFilter {};
+        if(IsInitialBlockDownload())
+        {
+            // Rate limit INVs during IBD with high fee filter
+            currentFilter = COIN;
+        }
+        else
+        {
+            MempoolSizeLimits limits { MempoolSizeLimits::FromConfig() };
+            currentFilter = mempool.GetMinFee(limits.Total()).GetFeePerK();
+        }
+
         int64_t timeNow = GetTimeMicros();
-        if (timeNow > pto->nextSendTimeFeeFilter) {
+        if (timeNow > pto->nextSendTimeFeeFilter)
+        {
             static CFeeRate default_feerate =
                 CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
             static FeeFilterRounder filterRounder(default_feerate);
@@ -5689,7 +5697,8 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
             // filter of at least minRelayTxFee
             filterToSend = std::max(filterToSend, config.GetMinFeePerKB().GetFeePerK());
 
-            if (filterToSend != pto->lastSentFeeFilter) {
+            if (filterToSend != pto->lastSentFeeFilter)
+            {
                 connman.PushMessage(
                     pto, msgMaker.Make(NetMsgType::FEEFILTER, filterToSend));
                 pto->lastSentFeeFilter = filterToSend;
@@ -5703,7 +5712,8 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
         else if (timeNow + MAX_FEEFILTER_CHANGE_DELAY * 1000000 <
                      pto->nextSendTimeFeeFilter &&
                  (currentFilter < 3 * pto->lastSentFeeFilter / 4 ||
-                  currentFilter > 4 * pto->lastSentFeeFilter / 3)) {
+                  currentFilter > 4 * pto->lastSentFeeFilter / 3))
+        {
             pto->nextSendTimeFeeFilter =
                 timeNow + GetRandInt(MAX_FEEFILTER_CHANGE_DELAY) * 1000000;
         }

@@ -1032,7 +1032,7 @@ public:
     Amount minFeeFilter {0};
     CCriticalSection cs_feeFilter {};
     Amount lastSentFeeFilter {0};
-    int64_t nextSendTimeFeeFilter {0};
+    std::atomic<int64_t> nextSendTimeFeeFilter {0};
 
     /** Maximum number of CInv elements this peers is willing to accept */
     uint32_t maxInvElements {CInv::estimateMaxInvElements(LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)};

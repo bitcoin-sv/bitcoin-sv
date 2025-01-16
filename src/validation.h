@@ -181,7 +181,7 @@ static const unsigned int INVENTORY_BROADCAST_MAX_PER_MB = 7 * INVENTORY_BROADCA
 /** Average delay between feefilter broadcasts in seconds. */
 static const unsigned int AVG_FEEFILTER_BROADCAST_INTERVAL = 10 * 60;
 /** Maximum feefilter broadcast delay after significant change. */
-static const unsigned int MAX_FEEFILTER_CHANGE_DELAY = 5 * 60;
+static const unsigned int MAX_FEEFILTER_CHANGE_DELAY = 1 * 60;
 /** Block download timeout base, expressed as percentage of the block interval
  * (i.e. 10 min) */
 static const int64_t DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE = 100;  // percent

@@ -2284,29 +2284,42 @@ bool IsInitialBlockDownload() {
 
     static std::mutex mutexLatchToFalse;
 
-    std::lock_guard lock{ mutexLatchToFalse };
-
-    if (latchToFalse.load(std::memory_order_relaxed)) {
-        return false;
-    }
-
-    auto tip = chainActive.Tip();
-
-    if (fImporting || fReindex) {
-        return true;
-    }
-    if (tip == nullptr) {
-        return true;
-    }
-    if (tip->GetChainWork() < nMinimumChainWork)
     {
-        return true;
+        std::lock_guard lock{ mutexLatchToFalse };
+
+        if (latchToFalse.load(std::memory_order_relaxed)) {
+            return false;
+        }
+
+        auto tip = chainActive.Tip();
+
+        if (fImporting || fReindex) {
+            return true;
+        }
+        if (tip == nullptr) {
+            return true;
+        }
+        if (tip->GetChainWork() < nMinimumChainWork)
+        {
+            return true;
+        }
+        if (tip->GetBlockTime() < (GetTime() - nMaxTipAge)) {
+            return true;
+        }
+        LogPrintf("Leaving InitialBlockDownload (latching to false)\n");
+        latchToFalse.store(true, std::memory_order_relaxed);
     }
-    if (tip->GetBlockTime() < (GetTime() - nMaxTipAge)) {
-        return true;
+
+    if(g_connman)
+    {
+        // On exit from IBD, trigger a send of an updated feefilter to all our peers
+        g_connman->ForEachNode([](const CNodePtr& node)
+            {
+                node->nextSendTimeFeeFilter = 0;
+            }
+        );
     }
-    LogPrintf("Leaving InitialBlockDownload (latching to false)\n");
-    latchToFalse.store(true, std::memory_order_relaxed);
+
     return false;
 }
 
