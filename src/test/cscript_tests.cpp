@@ -75,7 +75,7 @@ BOOST_AUTO_TEST_CASE(OpCount_tests)
     BOOST_CHECK_EQUAL(1U, CountOp(a, OP_1));
     BOOST_CHECK_EQUAL(2U, CountOp(a, OP_2));
 
-    array<uint8_t, 3> arr; // NOLINT(cppcoreguidelines-pro-type-member-init)
+    array<uint8_t, 3> arr{};
     copy(begin(a), end(a), begin(arr));
     BOOST_CHECK_EQUAL(0U, CountOp(arr, OP_0));
     BOOST_CHECK_EQUAL(1U, CountOp(arr, OP_1));

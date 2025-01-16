@@ -35,22 +35,29 @@ namespace
 
 BOOST_FIXTURE_TEST_SUITE(serialize_tests, BasicTestingSetup)
 
-class CSerializeMethodsTestSingle { // NOLINT(cppcoreguidelines-pro-type-member-init)
+class CSerializeMethodsTestSingle
+{
 protected:
-    int intval;
-    bool boolval;
+    int intval{};
+    bool boolval{};
     std::string stringval;
     const char *charstrval;
     CTransactionRef txval;
 
 public:
-    CSerializeMethodsTestSingle() = default; // NOLINT(cppcoreguidelines-pro-type-member-init)
-    CSerializeMethodsTestSingle(int intvalin, bool boolvalin,
+    CSerializeMethodsTestSingle() = default;
+    CSerializeMethodsTestSingle(int intvalin,
+                                bool boolvalin,
                                 std::string stringvalin,
-                                const char *charstrvalin, CTransaction txvalin) // NOLINT(performance-unnecessary-value-param)
-        : intval(intvalin), boolval(boolvalin),
-          stringval(std::move(stringvalin)), charstrval(charstrvalin),
-          txval(MakeTransactionRef(txvalin)) {}
+                                const char* charstrvalin,
+                                CTransaction txvalin)
+        : intval(intvalin),
+          boolval(boolvalin),
+          stringval(std::move(stringvalin)),
+          charstrval(charstrvalin),
+          txval(MakeTransactionRef(txvalin))
+    {}
+
     ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>

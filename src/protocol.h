@@ -610,9 +610,9 @@ public:
     std::string streamPolicies {};
 public:
     CProtoconf() = default;
-    CProtoconf(unsigned int maxRecvPayloadLengthIn, const std::string& streamPoliciesIn)
-    // NOLINTNEXTLINE(cppcoreguidelines-use-default-member-init)
-    : numberOfFields{2}, maxRecvPayloadLength{maxRecvPayloadLengthIn}, streamPolicies{streamPoliciesIn}
+    CProtoconf(unsigned int maxRecvPayloadLengthIn, const std::string& streamPoliciesIn):
+        maxRecvPayloadLength{maxRecvPayloadLengthIn},
+        streamPolicies{streamPoliciesIn}
     {}
 
     ADD_SERIALIZE_METHODS

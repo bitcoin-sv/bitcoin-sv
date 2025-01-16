@@ -101,7 +101,7 @@ class CTxIn {
 public:
     COutPoint prevout;
     CScript scriptSig;
-    uint32_t nSequence;
+    uint32_t nSequence{SEQUENCE_FINAL};
 
     /**
      * Setting nSequence to this value for every input in a transaction disables
@@ -139,8 +139,7 @@ public:
      */
     static inline constexpr int SEQUENCE_LOCKTIME_GRANULARITY = 9;
 
-    // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-    CTxIn() { nSequence = SEQUENCE_FINAL; }
+    CTxIn() = default;
 
     explicit CTxIn(COutPoint prevoutIn, CScript scriptSigIn = CScript(),
                    uint32_t nSequenceIn = SEQUENCE_FINAL)

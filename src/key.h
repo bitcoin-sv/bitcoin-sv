@@ -38,11 +38,11 @@ private:
     //! Whether this private key is valid. We check for correctness when
     //! modifying the key data, so fValid should always correspond to the actual
     //! state.
-    bool fValid; // NOLINT(cppcoreguidelines-use-default-member-init)
+    bool fValid{};
 
     //! Whether the public key corresponding to this private key is (to be)
     //! compressed.
-    bool fCompressed; // NOLINT(cppcoreguidelines-use-default-member-init)
+    bool fCompressed{};
 
     //! The actual byte data
     std::vector<uint8_t, secure_allocator<uint8_t>> keydata;
@@ -52,7 +52,8 @@ private:
 
 public:
     //! Construct an invalid private key.
-    CKey() : fValid(false), fCompressed(false) {
+    CKey() 
+    {
         // Important: vch must be 32 bytes in length to not break serialization
         keydata.resize(32);
     }

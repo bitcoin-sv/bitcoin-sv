@@ -14,10 +14,11 @@
 #include <string>
 #include <vector>
 
-struct TestDerivation { // NOLINT(cppcoreguidelines-pro-type-member-init)
+struct TestDerivation
+{
     std::string pub;
     std::string prv;
-    unsigned int nChild;
+    unsigned int nChild{};
 };
 
 struct TestVector {

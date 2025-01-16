@@ -60,14 +60,12 @@ struct LockPoints {
     // Will be set to the blockchain height and median time past values that
     // would be necessary to satisfy all relative locktime constraints (BIP68)
     // of this tx given our view of block chain history
-    int32_t height; // NOLINT(cppcoreguidelines-use-default-member-init)
-    int64_t time; // NOLINT(cppcoreguidelines-use-default-member-init)
+    int32_t height{};
+    int64_t time{};
     // As long as the current chain descends from the highest height block
     // containing one of the inputs used in the calculation, then the cached
     // values are still valid even after a reorg.
-    const CBlockIndex *maxInputBlock; // NOLINT(cppcoreguidelines-use-default-member-init)
-
-    LockPoints() : height(0), time(0), maxInputBlock(nullptr) {}
+    const CBlockIndex* maxInputBlock{nullptr};
 };
 
 class CTxMemPool;
@@ -1373,10 +1371,9 @@ public:
     // NOLINTNEXTLINE(performance-unnecessary-value-param)
         : evaluationParams{evalParams}
         , transactions{txs}
+        , payingTxId{transactions.back()->GetTxId()}
         , groupId{counter++}
     {
-        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-        payingTxId = transactions.back()->GetTxId();
     }
 
     const TxId& PayingTransactionId() const { return payingTxId; }

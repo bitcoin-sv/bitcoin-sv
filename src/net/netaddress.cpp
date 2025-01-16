@@ -39,11 +39,11 @@ CNetAddr::CNetAddr(const struct in_addr &ipv4Addr) {
     SetRaw(NET_IPV4, (const uint8_t *)&ipv4Addr);
 }
 
-CNetAddr::CNetAddr(const struct in6_addr &ipv6Addr, const uint32_t scope) {
+CNetAddr::CNetAddr(const struct in6_addr &ipv6Addr, const uint32_t scope):
+    scopeId{scope}
+{
     // NOLINTNEXTLINE (cppcoreguidelines-pro-type-cstyle-cast)
     SetRaw(NET_IPV6, (const uint8_t *)&ipv6Addr);
-    // NOLINTNEXTLINE (cppcoreguidelines-prefer-member-initializer)
-    scopeId = scope;
 }
 
 unsigned int CNetAddr::GetByte(int n) const {
@@ -488,15 +488,14 @@ void CService::SetPort(unsigned short portIn) {
     port = portIn;
 }
 
-// NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
-CSubNet::CSubNet() : valid(false) {
+CSubNet::CSubNet() : valid{false} {
     memset(netmask, 0, sizeof(netmask));
 }
 
-// NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
-CSubNet::CSubNet(const CNetAddr &addr, int32_t mask) {
-    valid = true; // NOLINT (cppcoreguidelines-prefer-member-initializer)
-    network = addr; // NOLINT (cppcoreguidelines-prefer-member-initializer)
+CSubNet::CSubNet(const CNetAddr &addr, int32_t mask):
+    network{addr},
+    valid{true}
+{
     // Default to /32 (IPv4) or /128 (IPv6), i.e. match single address
     memset(netmask, 255, sizeof(netmask));
 
@@ -524,9 +523,10 @@ CSubNet::CSubNet(const CNetAddr &addr, int32_t mask) {
 }
 
 // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
-CSubNet::CSubNet(const CNetAddr &addr, const CNetAddr &mask) {
-    valid = true; // NOLINT (cppcoreguidelines-prefer-member-initializer)
-    network = addr; // NOLINT (cppcoreguidelines-prefer-member-initializer)
+CSubNet::CSubNet(const CNetAddr &addr, const CNetAddr &mask):
+    network{addr},
+    valid{true}
+{
     // Default to /32 (IPv4) or /128 (IPv6), i.e. match single address
     memset(netmask, 255, sizeof(netmask));
 
@@ -545,9 +545,11 @@ CSubNet::CSubNet(const CNetAddr &addr, const CNetAddr &mask) {
 }
 
 // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
-CSubNet::CSubNet(const CNetAddr &addr) : valid(addr.IsValid()) {
+CSubNet::CSubNet(const CNetAddr &addr):
+    network{addr},
+    valid(addr.IsValid())
+{
     memset(netmask, 255, sizeof(netmask));
-    network = addr; // NOLINT (cppcoreguidelines-prefer-member-initializer)
 }
 
 bool CSubNet::Match(const CNetAddr &addr) const {

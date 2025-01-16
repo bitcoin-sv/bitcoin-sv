@@ -12,11 +12,9 @@
 #include "random.h"
 
 class CAddrManTest : public CAddrMan { // NOLINT(cppcoreguidelines-virtual-class-destructor)
-    uint64_t state;
+    uint64_t state{1};
 
 public:
-    CAddrManTest() { state = 1; } // NOLINT(cppcoreguidelines-prefer-member-initializer)
-
     //! Ensure that bucket placement is always the same for testing purposes.
     void MakeDeterministic() {
         nKey.SetNull();

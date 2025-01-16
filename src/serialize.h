@@ -440,19 +440,19 @@ public:
     CFlatData(void *pbeginIn, void *pendIn)
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         : pbegin((char *)pbeginIn), pend((char *)pendIn) {}
-    template <class T, class TAl> explicit CFlatData(std::vector<T, TAl> &v) {
-        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-        pbegin = (char *)v.data();
-        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-        pend = (char *)(v.data() + v.size());
-    }
+
+    template<class T, class TAl>
+    explicit CFlatData(std::vector<T, TAl>& v):
+        pbegin{(char *)v.data()},
+        pend{(char *)(v.data() + v.size())}
+    {}
+
     template <unsigned int N, typename T, typename S, typename D>
-    explicit CFlatData(prevector<N, T, S, D> &v) {
-        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-        pbegin = (char *)v.data();
-        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-        pend = (char *)(v.data() + v.size());
-    }
+    explicit CFlatData(prevector<N, T, S, D>& v):
+        pbegin{(char *)v.data()},
+        pend{(char *)(v.data() + v.size())}
+    {}
+
     char *begin() { return pbegin; }
     const char *begin() const { return pbegin; }
     char *end() { return pend; }
@@ -1093,7 +1093,7 @@ inline void SerReadWriteEnum(Stream& s, E& e, CSerActionUnserialize) {
  */
 class CSizeComputer {
 protected:
-    size_t nSize; // NOLINT(cppcoreguidelines-use-default-member-init)
+    size_t nSize{};
 
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nType;
@@ -1101,8 +1101,10 @@ protected:
     const int nVersion;
 
 public:
-    CSizeComputer(int nTypeIn, int nVersionIn)
-        : nSize(0), nType(nTypeIn), nVersion(nVersionIn) {}
+    CSizeComputer(int nTypeIn, int nVersionIn):
+        nType(nTypeIn),
+        nVersion(nVersionIn)
+    {}
 
     void write(const char *psz, size_t _nSize) { this->nSize += _nSize; }
 

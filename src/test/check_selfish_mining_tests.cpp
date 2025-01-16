@@ -12,7 +12,6 @@ namespace
 {
     std::vector<CMutableTransaction> GetMutableTransactions(int howMany, int baseValue)
     {
-        TestMemPoolEntryHelper entry;
         std::vector<CMutableTransaction> result;
         for (int i = 0; i < howMany; i++) {
             CMutableTransaction mtx;

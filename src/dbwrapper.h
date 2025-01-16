@@ -58,8 +58,7 @@ class CDataStreamInput
     std::string_view buf;
     // NOLINTNEXTLINE (cppcoreguidelines-avoid-const-or-ref-data-members)
     const std::vector<std::uint8_t>& obfuscate_key;
-    // NOLINTNEXTLINE (cppcoreguidelines-use-default-member-init)
-    unsigned int nReadPos;
+    unsigned int nReadPos{};
 
 public:
     typedef std::string_view::size_type size_type;
@@ -197,16 +196,17 @@ private:
     CDataStream ssKey;
     CDataStream ssValue;
 
-    // NOLINTNEXTLINE (cppcoreguidelines-use-default-member-init)
-    size_t size_estimate;
+    size_t size_estimate{};
 
 public:
     /**
      * @param[in] _parent   CDBWrapper that this batch is to be submitted to
      */
-    CDBBatch(const CDBWrapper &_parent)
-        : parent(_parent), ssKey(SER_DISK, CLIENT_VERSION),
-          ssValue(SER_DISK, CLIENT_VERSION), size_estimate(0){};
+    CDBBatch(const CDBWrapper& _parent)
+        : parent(_parent),
+          ssKey(SER_DISK, CLIENT_VERSION),
+          ssValue(SER_DISK, CLIENT_VERSION)
+    {};
 
     void Clear() {
         batch.Clear();

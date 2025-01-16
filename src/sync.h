@@ -256,8 +256,8 @@ public:
     CSemaphoreGrant() = default;
 
     CSemaphoreGrant(const std::shared_ptr<CSemaphore>& sema, bool fTry = false)
-        // NOLINTNEXTLINE(cppcoreguidelines-use-default-member-init)
-        : sem(sema), fHaveGrant(false) {
+        : sem(sema)
+    {
         if (fTry)
             TryAcquire();
         else

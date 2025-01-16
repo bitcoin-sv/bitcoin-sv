@@ -151,8 +151,8 @@ typedef enum ReadStatus_t {
 
 class CBlockHeaderAndShortTxIDs {
 private:
-    mutable uint64_t shorttxidk0, shorttxidk1;
-    uint64_t nonce;
+    mutable uint64_t shorttxidk0{}, shorttxidk1{};
+    uint64_t nonce{};
 
     void FillShortTxIDSelector() const;
 
@@ -168,8 +168,7 @@ public:
     CBlockHeader header;
 
     // Dummy for deserialization
-    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
-    CBlockHeaderAndShortTxIDs() {}
+    CBlockHeaderAndShortTxIDs() = default;
 
     CBlockHeaderAndShortTxIDs(const CBlock &block);
     CBlockHeaderAndShortTxIDs(CBlockStreamReader<CFileReader>& stream);

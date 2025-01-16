@@ -106,31 +106,29 @@ public:
 
 protected:
     friend void ResetNetMagic(CChainParams& chainParam, const std::string& hexcode);
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    CChainParams() {}
 
     Consensus::Params consensus;
-    CMessageHeader::MessageMagic diskMagic;
-    CMessageHeader::MessageMagic netMagic;
-    int nDefaultPort;
-    int32_t nPruneAfterHeight;
+    CMessageHeader::MessageMagic diskMagic{};
+    CMessageHeader::MessageMagic netMagic{};
+    int nDefaultPort{};
+    int32_t nPruneAfterHeight{};
     std::vector<CDNSSeedData> vSeeds;
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     std::vector<uint8_t> base58Prefixes[MAX_BASE58_TYPES];
     std::string strNetworkID;
     CBlock genesis;
     std::vector<SeedSpec6> vFixedSeeds;
-    bool fMiningRequiresPeers;
-    bool fDefaultConsistencyChecks;
-    bool fRequireStandard;
-    bool fMineBlocksOnDemand;
-    bool fTestBlockCandidateValidity;
-    bool fDisableBIP30Checks;
-    bool fCanDisableBIP30Checks;
-    bool fIsRegTest;
+    bool fMiningRequiresPeers{};
+    bool fDefaultConsistencyChecks{};
+    bool fRequireStandard{};
+    bool fMineBlocksOnDemand{};
+    bool fTestBlockCandidateValidity{};
+    bool fDisableBIP30Checks{};
+    bool fCanDisableBIP30Checks{};
+    bool fIsRegTest{};
     CCheckpointData checkpointData;
-    ChainTxData chainTxData;
-    DefaultBlockSizeParams defaultBlockSizeParams;
+    ChainTxData chainTxData{};
+    DefaultBlockSizeParams defaultBlockSizeParams{};
 };
 
 /**

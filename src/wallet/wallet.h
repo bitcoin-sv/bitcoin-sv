@@ -144,10 +144,7 @@ public:
 class CAddressBookData {
 public:
     std::string name;
-    std::string purpose;
-
-    // NOLINTNEXTLINE (cppcoreguidelines-prefer-member-initializer)
-    CAddressBookData() { purpose = "unknown"; }
+    std::string purpose{"unknown"};
 
     typedef std::map<std::string, std::string> StringMap;
     StringMap destdata;
@@ -489,16 +486,19 @@ public:
      */
     bool fSafe;
 
-    COutput(const CWalletTx *txIn, int iIn, int nDepthIn, bool fSpendableIn,
-            bool fSolvableIn, bool fSafeIn) {
-        // NOLINTBEGIN (cppcoreguidelines-prefer-member-initializer)
-        tx = txIn;
-        i = iIn;
-        nDepth = nDepthIn;
-        fSpendable = fSpendableIn;
-        fSolvable = fSolvableIn;
-        fSafe = fSafeIn;
-        // NOLINTEND
+    COutput(const CWalletTx* txIn,
+            int iIn,
+            int nDepthIn,
+            bool fSpendableIn,
+            bool fSolvableIn,
+            bool fSafeIn)
+        : tx{txIn},
+          i{iIn},
+          nDepth{nDepthIn},
+          fSpendable{fSpendableIn},
+          fSolvable{fSolvableIn},
+          fSafe{fSafeIn}
+    {
     }
 
     std::string ToString() const;
@@ -1171,18 +1171,13 @@ public:
 class CReserveKey final : public CReserveScript {
 protected:
     CWallet *pwallet;
-    int64_t nIndex;
+    int64_t nIndex{-1};
     CPubKey vchPubKey;
-    bool fInternal;
+    bool fInternal{};
 
 public:
-    CReserveKey(CWallet *pwalletIn) {
-        // NOLINTBEGIN (cppcoreguidelines-prefer-member-initializer)
-        nIndex = -1;
-        pwallet = pwalletIn;
-        fInternal = false;
-        // NOLINTEND
-    }
+    CReserveKey(CWallet* pwalletIn):pwallet{pwalletIn}
+    {}
 
     // NOLINTNEXTLINE (cppcoreguidelines-explicit-virtual-functions)
     ~CReserveKey() { ReturnKey(); }

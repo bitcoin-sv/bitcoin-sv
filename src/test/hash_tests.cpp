@@ -157,10 +157,9 @@ BOOST_AUTO_TEST_CASE(siphash) {
 
 namespace {
 class CDummyObject {
-    uint32_t value; // NOLINT(cppcoreguidelines-use-default-member-init)
+    uint32_t value{0};
 
 public:
-    CDummyObject() : value(0) {}
 
     uint32_t GetValue() { return value; }
 

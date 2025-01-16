@@ -142,7 +142,7 @@ template <>
 struct CoinsDB::UnitTestAccess<coins_tests_uid> : public CoinsDB
 {
 public:
-    UnitTestAccess( std::size_t cacheSize ) // NOLINT (cppcoreguidelines-pro-type-member-init)
+    UnitTestAccess(std::size_t cacheSize)
         : CoinsDB{ cacheSize, 0, CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE, CoinsDB::MaxFiles::Default(), false, false }
     {}
 
@@ -240,7 +240,7 @@ protected:
     using CoinsDB::ReadLock;
 
 private:
-    mutable uint64_t mLatestRequestedScriptSize;
+    mutable uint64_t mLatestRequestedScriptSize{};
     mutable std::optional<CoinImpl> mLatestGetCoin;
     std::optional<uint64_t> mOverrideSize;
 

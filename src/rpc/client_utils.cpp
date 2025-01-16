@@ -17,11 +17,10 @@
 #include <univalue.h>
 #include <event2/buffer.h>
 
-// NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
 class CRPCConvertParam {
 public:
     std::string methodName; //!< method whose params want conversion
-    int paramIdx;           //!< 0-based idx of param to convert
+    int paramIdx{};           //!< 0-based idx of param to convert
     std::string paramName;  //!< parameter name
 };
 
@@ -172,7 +171,6 @@ public:
     }
 };
 
-// NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
 CRPCConvertTable::CRPCConvertTable() {
     const unsigned int n_elem =
         (sizeof(vRPCConvertParams) / sizeof(vRPCConvertParams[0]));

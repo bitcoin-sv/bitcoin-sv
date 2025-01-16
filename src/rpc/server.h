@@ -36,25 +36,20 @@ class CNetAddr;
  * Used to denote don't care type. Only used by RPCTypeCheckObj */
 struct UniValueType {
     UniValueType(UniValue::VType _type) : typeAny(false), type(_type) {}
-    UniValueType() : typeAny(true) {} // NOLINT(cppcoreguidelines-pro-type-member-init)
-    bool typeAny;
-    UniValue::VType type;
+    UniValueType() = default;
+
+    bool typeAny{true};
+    UniValue::VType type{UniValue::VNULL};
 };
 
 class JSONRPCRequest {
 public:
-    UniValue id;
+    UniValue id{NullUniValue};
     std::string strMethod;
-    UniValue params;
-    bool fHelp;
+    UniValue params{NullUniValue};
+    bool fHelp{};
     std::string URI;
     std::string authUser;
-
-    JSONRPCRequest() {
-        id = NullUniValue; // NOLINT(cppcoreguidelines-prefer-member-initializer)
-        params = NullUniValue; // NOLINT(cppcoreguidelines-prefer-member-initializer)
-        fHelp = false; // NOLINT(cppcoreguidelines-prefer-member-initializer)
-    }
 
     void parse(const UniValue &valRequest);
 };
