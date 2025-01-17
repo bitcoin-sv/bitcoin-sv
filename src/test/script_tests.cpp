@@ -393,11 +393,11 @@ private:
     CScript redeemscript;
     CTransactionRef creditTx;
     CMutableTransaction spendTx;
-    bool havePush; // NOLINT(cppcoreguidelines-use-default-member-init)
+    bool havePush{};
     std::vector<uint8_t> push;
     std::string comment;
     int flags;
-    int scriptError; // NOLINT(cppcoreguidelines-use-default-member-init)
+    int scriptError{SCRIPT_ERR_OK};
     std::optional<malleability::status> expected_malleability {std::nullopt};
     Amount nValue;
 
@@ -441,19 +441,24 @@ private:
     }
 
 public:
-    TestBuilder(const CScript &script_, const std::string &comment_, int flags_,
-                bool P2SH = false, Amount nValue_ = Amount(0)) // NOLINT(performance-unnecessary-value-param)
-        : script(script_), havePush(false), comment(comment_), flags(flags_),
-          scriptError(SCRIPT_ERR_OK), nValue(nValue_) {
+    TestBuilder(const CScript& script_,
+                const std::string& comment_,
+                int flags_,
+                bool P2SH = false,
+                Amount nValue_ = Amount(0)) // NOLINT(performance-unnecessary-value-param)
+        : script(script_),
+          comment(comment_),
+          flags(flags_),
+          nValue(nValue_)
+    {
         CScript scriptPubKey = script;
-        if (P2SH) {
+        if(P2SH)
+        {
             redeemscript = scriptPubKey;
-            scriptPubKey = CScript()
-                           << OP_HASH160
-                           << ToByteVector(CScriptID(redeemscript)) << OP_EQUAL;
+            scriptPubKey = CScript() << OP_HASH160
+                                     << ToByteVector(CScriptID(redeemscript)) << OP_EQUAL;
         }
-        creditTx =
-            MakeTransactionRef(BuildCreditingTransaction(scriptPubKey, nValue));
+        creditTx = MakeTransactionRef(BuildCreditingTransaction(scriptPubKey, nValue));
         spendTx = BuildSpendingTransaction(CScript(), *creditTx);
     }
 
