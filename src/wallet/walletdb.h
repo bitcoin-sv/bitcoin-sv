@@ -94,22 +94,20 @@ public:
     static const int VERSION_BASIC = 1;
     static const int VERSION_WITH_HDDATA = 10;
     static const int CURRENT_VERSION = VERSION_WITH_HDDATA;
-    int nVersion;
+    int nVersion{CKeyMetadata::CURRENT_VERSION};
     // 0 means unknown.
-    int64_t nCreateTime;
+    int64_t nCreateTime{};
     // optional HD/bip32 keypath.
     std::string hdKeypath;
     // Id of the HD masterkey used to derive this key.
     CKeyID hdMasterKeyID;
 
-    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
-    CKeyMetadata() { SetNull(); }
-    // NOLINTBEGIN (cppcoreguidelines-prefer-member-initializer)
-    CKeyMetadata(int64_t nCreateTime_) {
-        SetNull();
-        nCreateTime = nCreateTime_;
+    CKeyMetadata() { hdMasterKeyID.SetNull(); }
+
+    CKeyMetadata(int64_t nCreateTime_):nCreateTime{nCreateTime_}
+    {
+        hdMasterKeyID.SetNull();
     }
-    // NOLINTEND
 
     ADD_SERIALIZE_METHODS
 
@@ -121,13 +119,6 @@ public:
             READWRITE(hdKeypath);
             READWRITE(hdMasterKeyID);
         }
-    }
-
-    void SetNull() {
-        nVersion = CKeyMetadata::CURRENT_VERSION;
-        nCreateTime = 0;
-        hdKeypath.clear();
-        hdMasterKeyID.SetNull();
     }
 };
 
