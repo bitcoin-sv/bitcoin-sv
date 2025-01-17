@@ -187,7 +187,7 @@ private:
     static const uint256 ABANDON_HASH;
 
 public:
-    CTransactionRef tx;
+    std::shared_ptr<const CTransaction> tx;
     uint256 hashBlock;
 
     /**
@@ -196,19 +196,13 @@ public:
      * with. Older clients interpret nIndex == -1 as unconfirmed for backward
      * compatibility.
      */
-    int nIndex;
+    int nIndex{-1};
 
-    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
-    CMerkleTx() {
-        SetTx(MakeTransactionRef());
-        Init();
-    }
+    CMerkleTx():tx{std::make_shared<const CTransaction>()}
+    {}
 
-    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init
-    CMerkleTx(CTransactionRef arg) {
-        SetTx(std::move(arg));
-        Init();
-    }
+    CMerkleTx(std::shared_ptr<const CTransaction> arg): tx(std::move(arg))
+    {}
 
     /**
      * Helper conversion operator to allow passing CMerkleTx where CTransaction
@@ -216,11 +210,6 @@ public:
      * TODO: adapt callers and remove this operator.
      */
     operator const CTransaction &() const { return *tx; }
-
-    void Init() {
-        hashBlock = uint256();
-        nIndex = -1;
-    }
 
     void SetTx(CTransactionRef arg) { tx = std::move(arg); }
 
