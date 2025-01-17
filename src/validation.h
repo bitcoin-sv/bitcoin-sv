@@ -366,18 +366,15 @@ bool CheckBlockTTOROrder(const CBlock& block);
 
 class BlockValidationOptions {
 private:
-    bool checkPoW : 1; // NOLINT(cppcoreguidelines-use-default-member-init)
-    bool checkMerkleRoot : 1; // NOLINT(cppcoreguidelines-use-default-member-init)
+    bool checkPoW : 1{true};
+    bool checkMerkleRoot : 1{true};
 
     // If true; force block to be flagged as checked
-    bool markChecked : 1; // NOLINT(cppcoreguidelines-use-default-member-init)
+    bool markChecked : 1{};
     // If false, check for max block size is skipped in CheckBlock().
-    bool checkMaxBlockSize : 1; // NOLINT(cppcoreguidelines-use-default-member-init)
+    bool checkMaxBlockSize : 1{true};
 
 public:
-    BlockValidationOptions() : checkPoW{true}, checkMerkleRoot{true}, markChecked{false}, checkMaxBlockSize{true}
-    {}
-
     bool shouldValidatePoW() const { return checkPoW; }
     bool shouldValidateMerkleRoot() const { return checkMerkleRoot; }
     bool shouldMarkChecked() const { return markChecked; }
