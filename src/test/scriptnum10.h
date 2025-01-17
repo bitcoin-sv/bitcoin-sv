@@ -26,7 +26,8 @@ class CScriptNum10 {
      * cross-comparison.
      */
 public:
-    explicit CScriptNum10(const int64_t &n) { m_value = n; } // NOLINT(cppcoreguidelines-prefer-member-initializer)
+    explicit CScriptNum10(const int64_t& n):m_value{n}
+    {}
 
     static const size_t nDefaultMaxNumSize = 4;
 

@@ -26,20 +26,15 @@ typedef enum BanReason {
 class CBanEntry {
 public:
     static const int CURRENT_VERSION = 1;
-    int nVersion;
-    int64_t nCreateTime;
-    int64_t nBanUntil;
-    uint8_t banReason;
+    int nVersion{CBanEntry::CURRENT_VERSION};
+    int64_t nCreateTime{};
+    int64_t nBanUntil{};
+    uint8_t banReason{BanReasonUnknown};
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    CBanEntry() { SetNull(); }
+    CBanEntry() = default;
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    CBanEntry(int64_t nCreateTimeIn) {
-        SetNull();
-        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-        nCreateTime = nCreateTimeIn;
-    }
+    CBanEntry(int64_t nCreateTimeIn):nCreateTime{nCreateTimeIn}
+    {}
 
     ADD_SERIALIZE_METHODS
 
@@ -49,13 +44,6 @@ public:
         READWRITE(nCreateTime);
         READWRITE(nBanUntil);
         READWRITE(banReason);
-    }
-
-    void SetNull() {
-        nVersion = CBanEntry::CURRENT_VERSION;
-        nCreateTime = 0;
-        nBanUntil = 0;
-        banReason = BanReasonUnknown;
     }
 
     std::string banReasonToString() {
