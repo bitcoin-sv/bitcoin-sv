@@ -72,7 +72,7 @@ CTxMemPoolEntry MakeEntry(
 
     for(size_t i = 0; i < nOutputs; i++)
     {
-        CScript script; // NOLINT(cppcoreguidelines-pro-type-member-init)
+        CScript script;
         script << OP_TRUE;
         tx.vout.push_back(CTxOut(Amount{1}, script));
     }

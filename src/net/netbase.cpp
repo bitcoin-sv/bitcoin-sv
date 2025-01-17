@@ -555,7 +555,6 @@ static bool ConnectThroughProxy(const proxyType &proxy,
     }
     // do socks negotiation
     if (proxy.randomize_credentials) {
-        // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
         ProxyCredentials random_auth;
         static std::atomic_int counter;
         random_auth.username = random_auth.password =

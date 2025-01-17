@@ -40,7 +40,7 @@ void hash_sha256(const string_view msg, O o)
 
 bool sign(const string_view msg, const CKey& key, vector<uint8_t>& signature)
 {
-    array<uint8_t, CSHA256::OUTPUT_SIZE> hash; // NOLINT(cppcoreguidelines-pro-type-member-init)
+    array<uint8_t, CSHA256::OUTPUT_SIZE> hash;
     hash_sha256(msg, hash.data());
 
     return key.Sign(uint256(vector<uint8_t>{begin(hash), end(hash)}),

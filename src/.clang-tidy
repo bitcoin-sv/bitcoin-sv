@@ -26,6 +26,8 @@ HeaderFilterRegex: '.*'
 CheckOptions:    
   - key:             cppcoreguidelines-avoid-do-while.IgnoreMacros
     value:           'true'
+  - key:             cppcoreguidelines-pro-type-member-init.IgnoreArrays
+    value:           'true'
   - key:             cppcoreguidelines-virtual-class-destructor.IgnoreDestructors
     value:           'true'
 ...

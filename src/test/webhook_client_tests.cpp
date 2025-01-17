@@ -18,7 +18,7 @@ namespace
     class Session : public std::enable_shared_from_this<Session>
     {
       public:
-        Session(tcp::socket&& socket) : mSocket{std::move(socket)} // NOLINT(cppcoreguidelines-pro-type-member-init)
+        Session(tcp::socket&& socket) : mSocket{std::move(socket)}
         {}
 
         void start()

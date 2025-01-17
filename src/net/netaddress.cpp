@@ -522,7 +522,6 @@ CSubNet::CSubNet(const CNetAddr &addr, int32_t mask):
     }
 }
 
-// NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
 CSubNet::CSubNet(const CNetAddr &addr, const CNetAddr &mask):
     network{addr},
     valid{true}
@@ -544,7 +543,6 @@ CSubNet::CSubNet(const CNetAddr &addr, const CNetAddr &mask):
         network.ip[x] &= netmask[x];
 }
 
-// NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
 CSubNet::CSubNet(const CNetAddr &addr):
     network{addr},
     valid(addr.IsValid())
