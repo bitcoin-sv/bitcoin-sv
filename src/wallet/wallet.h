@@ -537,26 +537,13 @@ class CAccountingEntry {
 public:
     std::string strAccount;
     Amount nCreditDebit;
-    int64_t nTime;
+    int64_t nTime{};
     std::string strOtherAccount;
     std::string strComment;
     mapValue_t mapValue;
     //!< position in ordered transaction list
-    int64_t nOrderPos;
-    uint64_t nEntryNo;
-
-    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
-    CAccountingEntry() { SetNull(); }
-
-    void SetNull() {
-        nCreditDebit = Amount(0);
-        nTime = 0;
-        strAccount.clear();
-        strOtherAccount.clear();
-        strComment.clear();
-        nOrderPos = -1;
-        nEntryNo = 0;
-    }
+    int64_t nOrderPos{-1};
+    uint64_t nEntryNo{};
 
     ADD_SERIALIZE_METHODS
 
