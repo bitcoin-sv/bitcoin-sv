@@ -18,7 +18,7 @@ namespace
     };
 
     // WrittenData holds information of Merkle Tree we want to use in later checks.
-    struct WrittenData // NOLINT(cppcoreguidelines-pro-type-member-init)
+    struct WrittenData
     {
         // blockHash is needed to read Merkle Tree from the disk
         uint256 blockHash; 
