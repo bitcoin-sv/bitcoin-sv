@@ -86,7 +86,6 @@ class LEVELDB_EXPORT Status {
   };
 
   Code code() const {
-    // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-pointer-arithmetic)
     return (state_ == nullptr) ? kOk : static_cast<Code>(state_[4]);
   }
 
@@ -102,10 +101,8 @@ class LEVELDB_EXPORT Status {
 };
 
 inline Status::Status(const Status& rhs) {
-  // NOLINTNEXTLINE (cppcoreguidelines-prefer-member-initializer)
   state_ = (rhs.state_ == nullptr) ? nullptr : CopyState(rhs.state_);
 }
-// NOLINTNEXTLINE (bugprone-unhandled-self-assignment)
 inline Status& Status::operator=(const Status& rhs) {
   // The following condition catches both aliasing (when this == &rhs),
   // and the common case where both rhs and *this are ok.
