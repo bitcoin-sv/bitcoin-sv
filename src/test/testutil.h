@@ -38,7 +38,7 @@ namespace std
 {
     // Serialisation for std::optional
     template<typename T>
-    ostream& operator<<(ostream& os, const optional<T>& o) // NOLINT (cert-dcl58-cpp)
+    ostream& operator<<(ostream& os, const optional<T>& o) // NOLINT(cert-dcl58-cpp)
     {
         os << (o ? o.value() : "nullopt");
         return os;

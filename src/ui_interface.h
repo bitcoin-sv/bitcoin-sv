@@ -141,7 +141,7 @@ std::string AmountHighWarn(const std::string &optname);
 std::string AmountErrMsg(const char *const optname,
                          const std::string &strValue);
 
-// NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern CClientUIInterface uiInterface;
 
 #endif // BITCOIN_UI_INTERFACE_H

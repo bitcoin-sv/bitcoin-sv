@@ -90,7 +90,7 @@ namespace bsv
         static_assert(sizeof(unique_bn_ptr) == sizeof(bignum_st*));
         unique_bn_ptr value_;
     };
-    // NOLINTNEXTLINE (performance-noexcept-swap)
+    // NOLINTNEXTLINE(performance-noexcept-swap)
     inline void swap(bint& a, bint& b) { a.swap(b);}
 
     bool operator<(const bint&, const bint&);
@@ -151,13 +151,13 @@ namespace bsv
     inline bool operator>(const bint& a, int64_t b) { return a > bint(b); }
     inline bool operator>=(const bint& a, int64_t b) { return a >= bint(b); }
 
-    // NOLINTBEGIN (performance-unnecessary-value-param)
+    // NOLINTBEGIN(performance-unnecessary-value-param)
     inline bint operator+(bint a, const int64_t b) { return a + bint(b); }
     inline bint operator-(bint a, const int64_t b) { return a - bint(b); }
     inline bint operator*(bint a, const int64_t b) { return a * bint(b); }
     inline bint operator/(bint a, const int64_t b) { return a / bint(b); }
     inline bint operator%(bint a, const int64_t b) { return a % bint(b); }
-    // NOLINTEND
+    // NOLINTEND(performance-unnecessary-value-param)
 
     // size_t overloads
     inline bool operator==(const bint& a, const size_t b) { return a == bint{b}; } 

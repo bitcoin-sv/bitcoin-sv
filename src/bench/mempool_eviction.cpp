@@ -9,7 +9,7 @@
 
 namespace
 {
-    // NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     mining::CJournalChangeSetPtr nullChangeSet {nullptr};
 }
 
@@ -123,4 +123,4 @@ static void MempoolEviction(benchmark::State &state) {
     }
 }
 
-BENCHMARK(MempoolEviction) // NOLINT (cert-err58-cpp)
+BENCHMARK(MempoolEviction) // NOLINT(cert-err58-cpp)

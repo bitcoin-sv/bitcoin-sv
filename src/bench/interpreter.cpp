@@ -30,7 +30,7 @@ static void interpreter_lshift_int32_max_minus_1(benchmark::State& state)
                    BaseSignatureChecker{});
     }
 }
-BENCHMARK(interpreter_lshift_int32_max_minus_1) // NOLINT (cert-err58-cpp)
+BENCHMARK(interpreter_lshift_int32_max_minus_1) // NOLINT(cert-err58-cpp)
 
 static void interpreter_rshift_int32_max_minus_1(benchmark::State& state)
 {
@@ -50,7 +50,7 @@ static void interpreter_rshift_int32_max_minus_1(benchmark::State& state)
                    BaseSignatureChecker{});
     }
 }
-BENCHMARK(interpreter_rshift_int32_max_minus_1) // NOLINT (cert-err58-cpp)
+BENCHMARK(interpreter_rshift_int32_max_minus_1) // NOLINT(cert-err58-cpp)
 
 static void interpreter_lshift_6m_minus_1(benchmark::State& state)
 {
@@ -71,7 +71,7 @@ static void interpreter_lshift_6m_minus_1(benchmark::State& state)
                    BaseSignatureChecker{});
     }
 }
-BENCHMARK(interpreter_lshift_6m_minus_1) // NOLINT (cert-err58-cpp)
+BENCHMARK(interpreter_lshift_6m_minus_1) // NOLINT(cert-err58-cpp)
 
 static void interpreter_rshift_6m_minus_1(benchmark::State& state)
 {
@@ -92,4 +92,4 @@ static void interpreter_rshift_6m_minus_1(benchmark::State& state)
                    BaseSignatureChecker{});
     }
 }
-BENCHMARK(interpreter_rshift_6m_minus_1) // NOLINT (cert-err58-cpp)
+BENCHMARK(interpreter_rshift_6m_minus_1) // NOLINT(cert-err58-cpp)

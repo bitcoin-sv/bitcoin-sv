@@ -19,7 +19,7 @@
 #include <boost/thread.hpp>
 
 // install boost test formatters for the popular durations
-namespace std { namespace chrono { // NOLINT (cert-dcl58-cpp)
+namespace std { namespace chrono { // NOLINT(cert-dcl58-cpp)
     inline std::ostream& boost_test_print_type(std::ostream& ostr, std::chrono::microseconds const& us) {
         return ostr << us.count() << "us";
     }
@@ -31,7 +31,7 @@ namespace std { namespace chrono { // NOLINT (cert-dcl58-cpp)
 
 
 extern const uint256 insecure_rand_seed;
-// NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern FastRandomContext insecure_rand_ctx;
 
 static inline uint32_t insecure_rand() {
@@ -63,9 +63,9 @@ void ResetGlobalRandomContext();
  * Basic testing setup.
  * This just configures logging and chain parameters.
  */
-// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct BasicTestingSetup {
-    // NOLINTNEXTLINE (cppcoreguidelines-avoid-const-or-ref-data-members)
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     ConfigInit& testConfig;
     fs::path pathTemp;
 
@@ -77,7 +77,7 @@ struct BasicTestingSetup {
  * Included are data directory, coins database, script check threads setup.
  */
 class CConnman;
-// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct TestingSetup : public BasicTestingSetup {
     boost::thread_group threadGroup;
     CConnman *connman = nullptr;
@@ -95,7 +95,7 @@ class CScript;
 // Testing fixture that pre-creates a
 // 100-block REGTEST-mode block chain
 //
-// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct TestChain100Setup : public TestingSetup {
     TestChain100Setup();
 
@@ -138,7 +138,7 @@ struct TestMemPoolEntryHelper {
     CTxMemPoolEntry FromTx(const CTransaction &tx, CTxMemPool *pool = nullptr);
 
     // Change the default value
-    // NOLINTNEXTLINE (performance-unnecessary-value-param)
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     TestMemPoolEntryHelper &Fee(Amount _fee) {
         nFee = _fee;
         return *this;

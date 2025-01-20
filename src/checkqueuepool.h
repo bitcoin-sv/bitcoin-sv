@@ -76,7 +76,7 @@ public:
         CCheckQueueScopeGuard(const CCheckQueueScopeGuard&) = delete;
         CCheckQueueScopeGuard& operator=(const CCheckQueueScopeGuard&) = delete;
 
-        ~CCheckQueueScopeGuard() // NOLINT (bugprone-exception-escape)
+        ~CCheckQueueScopeGuard() // NOLINT(bugprone-exception-escape)
         {
             if(mPool)
             {
@@ -144,7 +144,7 @@ public:
         CCheckQueueScopeGuard(
             CCheckQueuePool* pool,
             CCheckQueue<T>* queue,
-            task::CCancellationToken&& token) // NOLINT (cppcoreguidelines-rvalue-reference-param-not-moved)
+            task::CCancellationToken&& token) // NOLINT(cppcoreguidelines-rvalue-reference-param-not-moved)
             : mScopeExitedSource{task::CCancellationSource::Make()}
             , mPool{pool, CNullDestructor<CCheckQueuePool>{}}
             , mQueue{queue, CNullDestructor<CCheckQueue<T>>{}}
@@ -251,7 +251,7 @@ public:
             auto itWorst = mRunningCheckers.begin();
             for(auto it = mRunningCheckers.begin() + 1; it != mRunningCheckers.end(); ++it)
             {
-                // NOLINTBEGIN (bugprone-branch-clone)
+                // NOLINTBEGIN(bugprone-branch-clone)
                 if(itWorst->mValue > it->mValue)
                 {
                     itWorst = it;
@@ -261,7 +261,7 @@ public:
                 {
                     itWorst = it;
                 }
-                // NOLINTEND
+                // NOLINTEND(bugprone-branch-clone)
             }
 
             // only kill off checker if it's value is less than what we wish

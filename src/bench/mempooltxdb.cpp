@@ -27,7 +27,7 @@ static void do_WriteToFileDataTx() {
     // std::vector<uint8_t> data100MB(100000000);
     // std::vector<uint8_t> data1GB(1000000000);
     // std::vector<uint8_t> data2GB(2000000000);
-    for (std::vector<uint8_t> data : // NOLINT (performance-for-range-copy)
+    for (std::vector<uint8_t> data : // NOLINT(performance-for-range-copy)
          {data1MB, data10MB}) //, data100MB, data1GB, data2GB})
     {
         CScript opFalseOpReturnScript = CScript()
@@ -58,7 +58,7 @@ static void do_WriteToSeparateFilesDatatx() {
     // std::vector<uint8_t> data1GB(1000000000);
     // std::vector<uint8_t> data2GB(2000000000);
     uint64_t i = 0;
-    for (std::vector<uint8_t> data : // NOLINT (performance-for-range-copy)
+    for (std::vector<uint8_t> data : // NOLINT(performance-for-range-copy)
          {data1MB, data10MB}) //, data100MB, data1GB, data2GB})
     {
         CScript opFalseOpReturnScript = CScript()
@@ -91,7 +91,7 @@ static void WriteToSeparateFilesDatatx(benchmark::State &state) {
     }
 }
 
-// NOLINTBEGIN (cert-err58-cpp)
+// NOLINTBEGIN(cert-err58-cpp)
 BENCHMARK(WriteToFileDataTx);
 BENCHMARK(WriteToSeparateFilesDatatx);
-// NOLINTEND
+// NOLINTEND(cert-err58-cpp)

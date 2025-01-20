@@ -15,7 +15,7 @@
 #include <vector>
 
 namespace {
-    mining::CJournalChangeSetPtr nullChangeSet{nullptr}; // NOLINT (cppcoreguidelines-avoid-non-const-global-variables)
+    mining::CJournalChangeSetPtr nullChangeSet{nullptr}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
     // large enough count to control integer rounding errors in fractions
     constexpr unsigned N_PRIMARY = 50;

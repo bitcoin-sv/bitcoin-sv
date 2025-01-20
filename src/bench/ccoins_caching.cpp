@@ -31,12 +31,12 @@ SetupDummyInputs(CBasicKeyStore &keystoreRet, CCoinsViewCache &coinsRet) {
     dummyTransactions.resize(2);
 
     // Add some keys to the keystore:
-    CKey key[4]; // NOLINT (cppcoreguidelines-avoid-c-arrays)
+    CKey key[4]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     for (int i = 0; i < 4; i++) {
-        // NOLINTBEGIN (cppcoreguidelines-pro-bounds-constant-array-index)
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
         key[i].MakeNewKey(i % 2);
         keystoreRet.AddKey(key[i]);
-        // NOLINTEND
+        // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 
     // Create some dummy input transactions
@@ -92,7 +92,7 @@ static void CCoinsCaching(benchmark::State &state) {
     while (state.KeepRunning()) {
         CTransaction t(t1);
         bool success =
-            // NOLINTNEXTLINE (bugprone-unchecked-optional-access)
+            // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
             AreInputsStandard(
                 task::CCancellationSource::Make()->GetToken(),
                 GlobalConfig::GetConfig(),
@@ -234,7 +234,7 @@ protected:
         mLatestRequestedScriptSize = (mOverrideSize.has_value() ? mOverrideSize.value() : maxScriptSize);
         mLatestGetCoin = CoinsDB::GetCoin(outpoint, mLatestRequestedScriptSize);
 
-        return mLatestGetCoin->MakeNonOwning(); // NOLINT (bugprone-unchecked-optional-access)
+        return mLatestGetCoin->MakeNonOwning(); // NOLINT(bugprone-unchecked-optional-access)
     }
 
     using CoinsDB::ReadLock;
@@ -288,7 +288,7 @@ static void CCoinsInsertion(benchmark::State &state, bool V1) {
         std::thread spawner([&]() {
             std::vector<std::thread> threads;
             for(int i = 0; i < NumTxns; ++i) {
-                threads.emplace_back([&]() { // NOLINT (performance-inefficient-vector-operation)
+                threads.emplace_back([&]() { // NOLINT(performance-inefficient-vector-operation)
                     // Cache them all (Except the first in the list, which the function expects to be coinbase)
                     provider.DBCacheAllInputs(txns, V1);
                 });
@@ -311,8 +311,8 @@ static void CCoinsInsertionV2(benchmark::State &state) {
     CCoinsInsertion(state, /* V1 */ false);
 }
 
-// NOLINTBEGIN (cert-err58-cpp)
+// NOLINTBEGIN(cert-err58-cpp)
 BENCHMARK(CCoinsCaching)
 BENCHMARK(CCoinsInsertionV1)
 BENCHMARK(CCoinsInsertionV2)
-// NOLINTEND
+// NOLINTEND(cert-err58-cpp)

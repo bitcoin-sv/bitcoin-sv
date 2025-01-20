@@ -46,7 +46,7 @@ static const int64_t nMaxBlockDBAndTxIndexCache = 1024;
 static const int64_t nMaxCoinsDBCache = 256;
 
 /** Iterate over coins in DB */
-// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CCoinsViewDBCursor {
 public:
     ~CCoinsViewDBCursor() {}
@@ -85,7 +85,7 @@ private:
  * full only coins without script are stored in it while coins with script are
  * re-requested from base on every call to GetCoin() that requires a script.
  */
-// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CoinsDB {
 private:
     friend class CoinsDBView; // NOLINT(cppcoreguidelines-virtual-class-destructor)
@@ -297,7 +297,7 @@ private:
  * Class automatically obtains CoinsDB read lock on construction and
  * releases it on destruction.
  */
-// NOLINTNEXTLINE (cppcoreguidelines-virtual-class-destructor)
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
 class CoinsDBView : public ICoinsView
 {
 public:
@@ -359,7 +359,7 @@ private:
         return mDB.GetCoin(outpoint, maxScriptSize);
     }
 
-    const CoinsDB& mDB; // NOLINT (cppcoreguidelines-avoid-const-or-ref-data-members)
+    const CoinsDB& mDB; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 
     // This variable enforces read only access to mDB
     WPUSMutex::Lock mLock;
@@ -435,7 +435,7 @@ private:
 };
 
 /** Access to the block database (blocks/index/) */
-// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CBlockTreeDB : public CDBWrapper {
 public:
     CBlockTreeDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);

@@ -9,7 +9,7 @@
 
 #include <set>
 
-// NOLINTNEXTLINE (performance-unnecessary-value-param)
+// NOLINTNEXTLINE(performance-unnecessary-value-param)
 static void addCoin(const Amount nValue, const CWallet &wallet,
                     std::vector<COutput> &vCoins) {
     int nInput = 0;
@@ -44,7 +44,7 @@ static void CoinSelection(benchmark::State &state) {
 
     auto ClearCoins = [&vCoins]() {
         for (auto& output : vCoins) {
-            // NOLINTNEXTLINE (cppcoreguidelines-owning-memory)
+            // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
             delete output.tx;
         }
         vCoins.clear();
@@ -71,4 +71,4 @@ static void CoinSelection(benchmark::State &state) {
     ClearCoins();
 }
 
-BENCHMARK(CoinSelection) // NOLINT (cert-err58-cpp)
+BENCHMARK(CoinSelection) // NOLINT(cert-err58-cpp)

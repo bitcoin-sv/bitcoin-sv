@@ -5,7 +5,7 @@ def hexhdr(source, output, name):
   with open(source, "rb") as src:
     with open(output, "w+t") as dst:
       print("hexhdr: processing {0}".format(source))
-      dst.write("// NOLINTNEXTLINE (cppcoreguidelines-avoid-c-arrays)\n")
+      dst.write("// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)\n")
       dst.write("static unsigned const char {0}[] = {{\n".format(name))
       dst.writelines(starmap("{0}0x{1:02x}".format, zip(separators, src.read())))
       dst.write("\n};\n")

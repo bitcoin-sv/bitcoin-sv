@@ -28,7 +28,7 @@ protected:
     uint8_t data[WIDTH];
 
 public:
-    // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     base_blob() { memset(data, 0, sizeof(data)); }
     
     template<typename T>
@@ -40,7 +40,7 @@ public:
 
     explicit base_blob(const std::vector<uint8_t> &vch) {
         assert(vch.size() == sizeof(data));
-        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         memcpy(data, &vch[0], sizeof(data));
     }
 
@@ -51,11 +51,11 @@ public:
         return true;
     }
 
-    // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     void SetNull() { memset(data, 0, sizeof(data)); }
 
     inline int Compare(const base_blob &other) const {
-        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         return memcmp(data, other.data, sizeof(data));
     }
 
@@ -83,7 +83,7 @@ public:
     }
 
     void SetHex(const char *psz) {
-        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         memset(data, 0, sizeof(data));
         // skip leading spaces
         // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
@@ -100,7 +100,7 @@ public:
             ++psz;
 
         --psz;
-        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         uint8_t *p1 = data;
         uint8_t *pend = p1 + WIDTH;
         while (psz >= pbegin && p1 < pend) {
@@ -181,7 +181,7 @@ public:
      * appropriate when the value can easily be influenced from outside as e.g.
      * a network adversary could provide values to trigger worst-case behavior.
      */
-    // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     uint64_t GetCheapHash() const { return ReadLE64(data); }
 };
 

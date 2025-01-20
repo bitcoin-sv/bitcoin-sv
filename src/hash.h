@@ -60,9 +60,9 @@ public:
         uint8_t buf[CSHA256::OUTPUT_SIZE];
 
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         sha.Finalize(buf);
-        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         CRIPEMD160().Write(buf, CSHA256::OUTPUT_SIZE).Finalize(hash);
     }
 
@@ -84,7 +84,7 @@ template <typename T1> inline uint256 Hash(const T1 pbegin, const T1 pend) {
     uint256 result;
     CHash256()
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         .Write(pbegin == pend ? pblank : (const uint8_t *)&pbegin[0],
                static_cast<size_t>(pend - pbegin) * sizeof(pbegin[0]))
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
@@ -135,7 +135,7 @@ template <typename T1> inline uint160 Hash160(const T1 pbegin, const T1 pend) {
     uint160 result;
     CHash160()
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         .Write(pbegin == pend ? pblank : (const uint8_t *)&pbegin[0],
                static_cast<size_t>(pend - pbegin) * sizeof(pbegin[0]))
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)

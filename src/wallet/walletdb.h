@@ -129,7 +129,7 @@ public:
  * scope.
  * Optionally (on by default) it will flush to disk as well.
  */
-// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CWalletDB {
 private:
     template <typename K, typename T>
@@ -255,7 +255,7 @@ public:
 
 private:
     CDB batch;
-    // NOLINTNEXTLINE (cppcoreguidelines-avoid-const-or-ref-data-members)
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     CWalletDBWrapper &m_dbw;
 
     CWalletDB(const CWalletDB &);

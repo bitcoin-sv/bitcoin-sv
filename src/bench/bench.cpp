@@ -12,7 +12,7 @@ benchmark::BenchRunner::BenchmarkMap &benchmark::BenchRunner::benchmarks() {
     return benchmarks_map;
 }
 
-// NOLINTNEXTLINE (performance-unnecessary-value-param)
+// NOLINTNEXTLINE(performance-unnecessary-value-param)
 benchmark::BenchRunner::BenchRunner(std::string name, benchmark::BenchFunction func)
 {
     benchmarks().insert(std::make_pair(name, func));
@@ -51,7 +51,7 @@ bool benchmark::State::KeepRunning() {
     }
     time_point now;
 
-    // NOLINTNEXTLINE (cppcoreguidelines-init-variables)
+    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
     uint64_t nowCycles;
     if (count == 0) {
         lastTime = beginTime = now = clock::now();
@@ -104,7 +104,7 @@ bool benchmark::State::KeepRunning() {
     int64_t min_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(minTime).count();
     int64_t max_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(maxTime).count();
     int64_t avg_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>((now-beginTime)/count).count();
-    int64_t averageCycles = (nowCycles-beginCycles)/count; // NOLINT (bugprone-narrowing-conversions)
+    int64_t averageCycles = (nowCycles-beginCycles)/count; // NOLINT(*-narrowing-conversions)
     std::cout << std::fixed << std::setprecision(15) << name << "," << count << "," << min_elapsed << "," << max_elapsed << "," << avg_elapsed << ","
               << minCycles << "," << maxCycles << "," << averageCycles << "\n";
 

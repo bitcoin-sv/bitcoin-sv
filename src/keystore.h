@@ -15,7 +15,7 @@
 #include <boost/variant.hpp>
 
 /** A virtual base class for key stores */
-// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CKeyStore {
 protected:
     mutable CCriticalSection cs_KeyStore;
@@ -66,7 +66,7 @@ public:
     bool AddKeyPubKey(const CKey &key, const CPubKey &pubkey) override;
     bool GetPubKey(const CKeyID &address, CPubKey &vchPubKeyOut) const override;
     bool HaveKey(const CKeyID &address) const override {
-        bool result; // NOLINT (cppcoreguidelines-init-variables)
+        bool result; // NOLINT(cppcoreguidelines-init-variables)
         {
             LOCK(cs_KeyStore);
             result = (mapKeys.count(address) > 0);
@@ -95,17 +95,16 @@ public:
         }
         return false;
     }
-    // NOLINTBEGIN (cppcoreguidelines-explicit-virtual-functions)
-    virtual bool AddCScript(const CScript &redeemScript) override;
-    virtual bool HaveCScript(const CScriptID &hash) const override;
-    virtual bool GetCScript(const CScriptID &hash,
-                            CScript &redeemScriptOut) const override;
 
-    virtual bool AddWatchOnly(const CScript &dest) override;
-    virtual bool RemoveWatchOnly(const CScript &dest) override;
-    virtual bool HaveWatchOnly(const CScript &dest) const override;
-    virtual bool HaveWatchOnly() const override;
-    // NOLINTEND
+    bool AddCScript(const CScript& redeemScript) override;
+    bool HaveCScript(const CScriptID& hash) const override;
+    bool GetCScript(const CScriptID& hash,
+                    CScript& redeemScriptOut) const override;
+
+    bool AddWatchOnly(const CScript& dest) override;
+    bool RemoveWatchOnly(const CScript& dest) override;
+    bool HaveWatchOnly(const CScript& dest) const override;
+    bool HaveWatchOnly() const override;
 };
 
 typedef std::vector<uint8_t, secure_allocator<uint8_t>> CKeyingMaterial;

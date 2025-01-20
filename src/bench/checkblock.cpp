@@ -20,13 +20,13 @@ namespace block_bench {
 // compact block relay.
 
 static void DeserializeBlockTest(benchmark::State &state) {
-    // NOLINTBEGIN (cppcoreguidelines-pro-type-cstyle-cast)
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-cstyle-cast)
     CDataStream stream((const char *)block_bench::block413567,
                        (const char *)&block_bench::block413567[sizeof(
                            block_bench::block413567)],
                        SER_NETWORK, PROTOCOL_VERSION);
-    // NOLINTEND
-    char a; // NOLINT (cppcoreguidelines-init-variables)
+    // NOLINTEND(cppcoreguidelines-pro-type-cstyle-cast)
+    char a; // NOLINT(cppcoreguidelines-init-variables)
     stream.write(&a, 1); // Prevent compaction
 
     while (state.KeepRunning()) {
@@ -37,13 +37,13 @@ static void DeserializeBlockTest(benchmark::State &state) {
 }
 
 static void DeserializeAndCheckBlockTest(benchmark::State &state) {
-    // NOLINTBEGIN (cppcoreguidelines-pro-type-cstyle-cast)
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-cstyle-cast)
     CDataStream stream((const char *)block_bench::block413567,
                        (const char *)&block_bench::block413567[sizeof(
                            block_bench::block413567)],
                        SER_NETWORK, PROTOCOL_VERSION);
-    // NOLINTEND
-    char a; // NOLINT (cppcoreguidelines-init-variables)
+    // NOLINTEND(cppcoreguidelines-pro-type-cstyle-cast)
+    char a; // NOLINT(cppcoreguidelines-init-variables)
     stream.write(&a, 1); // Prevent compaction
 
     SelectParams(CBaseChainParams::MAIN);
@@ -64,5 +64,5 @@ static void DeserializeAndCheckBlockTest(benchmark::State &state) {
     }
 }
 
-BENCHMARK(DeserializeBlockTest) // NOLINT (cert-err58-cpp)
-BENCHMARK(DeserializeAndCheckBlockTest) // NOLINT (cert-err58-cpp)
+BENCHMARK(DeserializeBlockTest) // NOLINT(cert-err58-cpp)
+BENCHMARK(DeserializeAndCheckBlockTest) // NOLINT(cert-err58-cpp)

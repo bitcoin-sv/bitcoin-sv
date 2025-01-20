@@ -64,7 +64,7 @@ public:
         auto len = pend == pbegin ? 0u : GetLen(pbegin[0]);
         if (len && len == (pend - pbegin))
             // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-            // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
             memcpy(vch, (uint8_t *)&pbegin[0], len);
         else
             Invalidate();
@@ -82,17 +82,16 @@ public:
     //! Simple read-only vector-like interface to the pubkey data.
     unsigned int size() const { return GetLen(vch[0]); }
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     const uint8_t *begin() const { return vch; }
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-*)
     const uint8_t *end() const { return vch + size(); }
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-*)
     const uint8_t &operator[](unsigned int pos) const { return vch[pos]; }
 
     //! Comparator implementation.
     friend bool operator==(const CPubKey &a, const CPubKey &b) {
-        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         return a.vch[0] == b.vch[0] && memcmp(a.vch, b.vch, a.size()) == 0;
     }
     friend bool operator!=(const CPubKey &a, const CPubKey &b) {
@@ -100,7 +99,7 @@ public:
     }
     friend bool operator<(const CPubKey &a, const CPubKey &b) {
         return a.vch[0] < b.vch[0] ||
-               // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+               // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
                (a.vch[0] == b.vch[0] && memcmp(a.vch, b.vch, a.size()) < 0);
     }
 
@@ -126,11 +125,11 @@ public:
     }
 
     //! Get the KeyID of this public key (hash of its serialization)
-    // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-*)
     CKeyID GetID() const { return CKeyID(Hash160(vch, vch + size())); }
 
     //! Get the 256-bit hash of this public key.
-    // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-*)
     uint256 GetHash() const { return Hash(vch, vch + size()); }
 
     /*
@@ -204,7 +203,7 @@ struct CExtPubKey {
         ::WriteCompactSize(s, len);
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         uint8_t code[BIP32_EXTKEY_SIZE];
-        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         Encode(code);
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         s.write((const char *)&code[0], len);
@@ -217,7 +216,7 @@ struct CExtPubKey {
             throw std::runtime_error("Invalid extended key size\n");
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         s.read((char *)&code[0], len);
-        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         Decode(code);
     }
 };

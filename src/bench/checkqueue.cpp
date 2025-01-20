@@ -24,7 +24,7 @@ static void CCheckQueueSpeed(benchmark::State &state) {
         {
             return true;
         }
-        // NOLINTNEXTLINE (performance-noexcept-swap)
+        // NOLINTNEXTLINE(*-noexcept-swap)
         void swap(FakeJobNoWork &x){};
     };
     boost::thread_group tg;
@@ -66,14 +66,14 @@ static void CCheckQueueSpeedPrevectorJob(benchmark::State &state) {
         prevector<PREVECTOR_SIZE, uint8_t> p;
         PrevectorJob() {}
         PrevectorJob(FastRandomContext &insecure_rand) {
-            // NOLINTNEXTLINE (bugprone-implicit-widening-of-multiplication-result)
+            // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
             p.resize(insecure_rand.randrange(PREVECTOR_SIZE * 2));
         }
         std::optional<bool> operator()(const task::CCancellationToken&)
         {
             return true;
         }
-        // NOLINTNEXTLINE (performance-noexcept-swap)
+        // NOLINTNEXTLINE(*-noexcept-swap)
         void swap(PrevectorJob &x) { p.swap(x.p); };
     };
     boost::thread_group tg;
@@ -102,5 +102,5 @@ static void CCheckQueueSpeedPrevectorJob(benchmark::State &state) {
     tg.join_all();
 }
 
-BENCHMARK(CCheckQueueSpeed) // NOLINT (cert-err58-cpp)
-BENCHMARK(CCheckQueueSpeedPrevectorJob) // NOLINT (cert-err58-cpp)
+BENCHMARK(CCheckQueueSpeed) // NOLINT(cert-err58-cpp)
+BENCHMARK(CCheckQueueSpeedPrevectorJob) // NOLINT(cert-err58-cpp)

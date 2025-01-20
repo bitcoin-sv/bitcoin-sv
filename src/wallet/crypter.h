@@ -63,7 +63,7 @@ class TestCrypter;
 }
 
 /** Encryption/decryption context with key information */
-// NOLINTNEXTLINE (cppcoreguidelines-special-member-functions)
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CCrypter {
     // for test access to chKey/chIV
     friend class wallet_crypto::TestCrypter;
@@ -134,7 +134,7 @@ public:
 
     bool IsLocked() const {
         if (!IsCrypted()) return false;
-        bool result; // NOLINT (cppcoreguidelines-init-variables)
+        bool result; // NOLINT(cppcoreguidelines-init-variables)
         {
             LOCK(cs_KeyStore);
             result = vMasterKey.empty();

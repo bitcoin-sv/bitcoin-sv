@@ -10,7 +10,7 @@
 
 namespace 
 {
-    const std::vector<uint8_t> v // NOLINT ([cert-err58-cpp)
+    const std::vector<uint8_t> v // NOLINT(cert-err58-cpp)
     {
         OP_DUP, 
         OP_HASH160, 
@@ -29,7 +29,7 @@ static void cscript_GetSigOpCount(benchmark::State& state)
         script.GetSigOpCount(true, ProtocolEra::PostGenesis, b);
     }
 }
-BENCHMARK(cscript_GetSigOpCount); // NOLINT (cert-err58-cpp)
+BENCHMARK(cscript_GetSigOpCount); // NOLINT(cert-err58-cpp)
 
 static void cscript_GetSigOpCount_p2sh_multisig_locking_20(benchmark::State& state)
 {
@@ -44,4 +44,4 @@ static void cscript_GetSigOpCount_p2sh_multisig_locking_20(benchmark::State& sta
     }
 }
 
-BENCHMARK(cscript_GetSigOpCount_p2sh_multisig_locking_20); // NOLINT (cert-err58-cpp)
+BENCHMARK(cscript_GetSigOpCount_p2sh_multisig_locking_20); // NOLINT(cert-err58-cpp)

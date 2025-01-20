@@ -46,7 +46,7 @@ struct CMessageHeader::UnitTestAccess<protocol_tests_id>
     template <typename... Args>
     static CMessageHeader Make(Args&&... args)
     {
-        return CMessageHeader { std::forward<Args>(args)... }; // NOLINT (cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+        return CMessageHeader { std::forward<Args>(args)... }; // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     }
 
     // Get modifiable reference to command

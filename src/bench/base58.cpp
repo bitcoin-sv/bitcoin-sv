@@ -8,24 +8,24 @@
 #include <vector>
 
 static void Base58Encode(benchmark::State &state) {
-    // NOLINTNEXTLINE (cppcoreguidelines-avoid-c-arrays,-warnings-as-errors)
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,-warnings-as-errors)
     uint8_t buff[32] = {17,  79,  8,   99,  150, 189, 208, 162, 22,  23, 203,
                         163, 36,  58,  147, 227, 139, 2,   215, 100, 91, 38,
                         11,  141, 253, 40,  117, 21,  16,  90,  200, 24};
-    uint8_t *b = buff; // NOLINT (cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    uint8_t *b = buff; // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     while (state.KeepRunning()) {
-        EncodeBase58(b, b + 32); // NOLINT (cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        EncodeBase58(b, b + 32); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 }
 
 static void Base58CheckEncode(benchmark::State &state) {
-    // NOLINTNEXTLINE (cppcoreguidelines-avoid-c-arrays,-warnings-as-errors)
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,-warnings-as-errors)
     uint8_t buff[32] = {17,  79,  8,   99,  150, 189, 208, 162, 22,  23, 203,
                         163, 36,  58,  147, 227, 139, 2,   215, 100, 91, 38,
                         11,  141, 253, 40,  117, 21,  16,  90,  200, 24};
-    uint8_t *b = buff; // NOLINT (cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    uint8_t *b = buff; // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     std::vector<uint8_t> vch;
-    vch.assign(b, b + 32); // NOLINT (cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    vch.assign(b, b + 32); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     while (state.KeepRunning()) {
         EncodeBase58Check(vch);
     }
@@ -39,8 +39,8 @@ static void Base58Decode(benchmark::State &state) {
     }
 }
 
-// NOLINTBEGIN (cert-err58-cpp)
+// NOLINTBEGIN(cert-err58-cpp)
 BENCHMARK(Base58Encode)
 BENCHMARK(Base58CheckEncode)
 BENCHMARK(Base58Decode)
-// NOLINTEND
+// NOLINTEND(cert-err58-cpp)

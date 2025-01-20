@@ -18,7 +18,7 @@ class CBlockStreamReader;
 // Dumb helper to handle CTransaction compression at serialize-time
 struct TransactionCompressor {
 private:
-    // NOLINTNEXTLINE (cppcoreguidelines-avoid-const-or-ref-data-members)
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     CTransactionRef &tx;
 
 public:

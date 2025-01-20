@@ -124,7 +124,7 @@ template <typename K, int Size, CChainParams::Base58Type Type>
 class CBitcoinExtKeyBase : public CBase58Data {
 public:
     void SetKey(const K &key) {
-        uint8_t vch[Size]; // NOLINT (cppcoreguidelines-avoid-c-arrays)
+        uint8_t vch[Size]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
         key.Encode(vch);
         SetData(Params().Base58Prefix(Type), vch, vch + Size);
     }

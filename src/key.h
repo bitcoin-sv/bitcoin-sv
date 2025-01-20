@@ -173,7 +173,7 @@ struct CExtKey {
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         uint8_t code[BIP32_EXTKEY_SIZE];
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         Encode(code);
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         s.write((const char *)&code[0], len);
@@ -187,7 +187,7 @@ struct CExtKey {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         s.read((char *)&code[0], len);
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-        // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         Decode(code);
     }
 };

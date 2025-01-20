@@ -17,7 +17,7 @@
 #include <string>
 #include <vector>
 
-// NOLINTBEGIN (cppcoreguidelines-avoid-non-const-global-variable)
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variable)
 extern int nConnectTimeout;
 extern bool fNameLookup;
 // NOLINTEND (cppcoreguidelines-avoid-non-const-global-variable)

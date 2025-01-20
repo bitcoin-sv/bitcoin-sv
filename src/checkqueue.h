@@ -91,7 +91,7 @@ private:
             , mCounter{counter}
         {/**/}
 
-        ~CTotalScopeGuard() // NOLINT (bugprone-exception-escape)
+        ~CTotalScopeGuard() // NOLINT(bugprone-exception-escape)
         {
             if(mRunning)
             {
@@ -188,7 +188,7 @@ private:
         std::optional<bool> fOk = true;
         CTotalScopeGuard guard{mutex, nTotal};
 
-        do { // NOLINT (cppcoreguidelines-avoid-do-while)
+        do { // NOLINT(cppcoreguidelines-avoid-do-while)
             {
                 boost::unique_lock<boost::mutex> lock(mutex);
                 auto subguard = guard.GetSubGuardNL();
@@ -337,7 +337,7 @@ public:
         }
     }
 
-    ~CCheckQueue() // NOLINT (bugprone-exception-escape)
+    ~CCheckQueue() // NOLINT(bugprone-exception-escape)
     {
         {
             boost::unique_lock lock{mutex};
@@ -442,7 +442,7 @@ public:
      *       be called from the same thread or the caller should make sure to
      *       handle thread synchronization.
      */
-    // NOLINTNEXTLINE (cppcoreguidelines-rvalue-reference-param-not-moved)
+    // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
     void StartCheckingSession(task::CCancellationToken&& token)
     {
         if(!mWaitCalled || !IsIdle())
