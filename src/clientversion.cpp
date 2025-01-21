@@ -87,7 +87,9 @@ const std::string CLIENT_NAME("Bitcoin SV");
 const std::string CLIENT_BUILD(BUILD_DESC CLIENT_VERSION_SUFFIX);
 
 static std::string FormatVersion(int shiftedVersion) {
-	const int nVersion = shiftedVersion>_SV_VERSION_SHIFT ? shiftedVersion-_SV_VERSION_SHIFT : shiftedVersion;
+    const int nVersion = shiftedVersion > SV_VERSION_SHIFT
+                             ? shiftedVersion - SV_VERSION_SHIFT
+                             : shiftedVersion;
     if (nVersion % 100 == 0)
         return strprintf("%d.%d.%d", nVersion / 1000000,
                          (nVersion / 10000) % 100, (nVersion / 100) % 100);

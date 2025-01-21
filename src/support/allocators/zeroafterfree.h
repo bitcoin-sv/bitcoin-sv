@@ -22,9 +22,8 @@ struct zero_after_free_allocator : public std::allocator<T> {
     zero_after_free_allocator(const zero_after_free_allocator<U> &a) throw()
         : base(a) {}
     ~zero_after_free_allocator() throw() {}
-    // NOLINTNEXTLINE(bugprone-reserved-identifier)
-    template <typename _Other> struct rebind {
-        typedef zero_after_free_allocator<_Other> other;
+    template <typename Other> struct rebind {
+        typedef zero_after_free_allocator<Other> other;
     };
 
     void deallocate(T *p, std::size_t n) {
