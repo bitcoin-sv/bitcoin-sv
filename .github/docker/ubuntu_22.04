@@ -33,18 +33,20 @@ RUN set -xeu \
 
 RUN set -xeu && pip install flake8
 
+ARG clang_version=19
+
 RUN set -xeu \
     && apt-get update \
     && apt-get install -y lsb-release software-properties-common gnupg \
     && wget https://apt.llvm.org/llvm.sh \
     && chmod +x llvm.sh \
-    && ./llvm.sh 18
+    && ./llvm.sh $clang_version
     
 RUN set -xeu \
     && apt-get update \
     && apt-get install -y \
-    clang-tidy-18 \
-    libfuzzer-18-dev
+    clang-tidy-$clang_version \
+    libfuzzer-${clang_version}-dev
 
 RUN set -xeu \
     && apt-get update \
@@ -53,7 +55,8 @@ RUN set -xeu \
     zstd
 
 RUN update-alternatives \
-    --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-18 18
+    --install /usr/bin/clang-tidy clang-tidy \
+    /usr/bin/clang-tidy-$clang_version $clang_version
 
 RUN set -xeu \
     && git clone https://github.com/brendangregg/FlameGraph.git
