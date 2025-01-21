@@ -340,7 +340,7 @@ static void MutateTxAddOutPubKey(CMutableTransaction &tx,
     // Extract and validate FLAGS
     bool bScriptHash = false;
     if (vStrInputParts.size() == 3) {
-        std::string flags = vStrInputParts[2];
+        const std::string& flags = vStrInputParts[2];
         // NOLINTNEXTLINE(performance-faster-string-find)
         bScriptHash = (flags.find("S") != std::string::npos);
     }
@@ -400,7 +400,7 @@ static void MutateTxAddOutMultiSig(CMutableTransaction &tx,
     // Extract FLAGS
     bool bScriptHash = false;
     if (vStrInputParts.size() == numkeys + 4) {
-        std::string flags = vStrInputParts.back();
+        const std::string& flags = vStrInputParts.back();
         // NOLINTNEXTLINE(performance-faster-string-find)
         bScriptHash = (flags.find("S") != std::string::npos);
     } else if (vStrInputParts.size() > numkeys + 4) {
@@ -467,7 +467,7 @@ static void MutateTxAddOutScript(CMutableTransaction &tx,
     // Extract FLAGS
     bool bScriptHash = false;
     if (vStrInputParts.size() == 3) {
-        std::string flags = vStrInputParts.back();
+        const std::string& flags = vStrInputParts.back();
         // NOLINTNEXTLINE(performance-faster-string-find)
         bScriptHash = (flags.find("S") != std::string::npos);
     }
