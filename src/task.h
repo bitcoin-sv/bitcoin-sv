@@ -72,13 +72,22 @@ class CTask
     auto injectTask(Callable&& call, Args&&... args)
         -> std::future<std::invoke_result_t<Callable, Args...>>
     {
-        // Use packaged_task with bind to get us a task we can easily call
+        // Use packaged_task with a lambda to get us a task we can easily call
         // without needing to remember all its args.
         // FIXME: Once we get generalised lambda capture & C++14 we could use
         // make_unique here instead of make_shared.
         using returnType = std::invoke_result_t<Callable, Args...>;
-        auto task { std::make_shared<std::packaged_task<returnType()>>(
-            std::bind(std::forward<Callable>(call), std::forward<Args>(args)...))
+        auto task 
+        {   
+            std::make_shared<std::packaged_task<returnType()>>
+            (
+                [call=std::forward<Callable>(call),
+                 ...args=std::forward<Args>(args) ]
+                () mutable
+                {
+                    return std::invoke(call, args...);
+                }
+            )
         };
 
         mTask = [task](){ (*task)(); };
