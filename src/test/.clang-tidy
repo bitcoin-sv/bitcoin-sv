@@ -1,10 +1,35 @@
-Checks: '-clang-analyzer-core.NullDereference,
-         -clang-analyzer-cplusplus.NewDelete,
-         -clang-analyzer-cplusplus.NewDeleteLeaks,
+Checks: '-clang-analyzer-*,
 
-         -clang-diagnostic-deprecated-declarations
+         -bugprone-empty-catch,
+         -bugprone-implicit-widening-of-multiplication-result,
+         -bugprone-narrowing-conversions,
+         -bugprone-reserved-identifier,
+         -bugprone-unused-local-non-trivial-variable,
+         -bugprone-use-after-move,
+         
+         -cert-err58-cpp,
+          
+         -cppcoreguidelines-avoid-c-arrays,
+         -cppcoreguidelines-avoid-const-or-ref-data-members,
+         -cppcoreguidelines-avoid-non-const-global-variables,
+         -cppcoreguidelines-init-variables,
+         -cppcoreguidelines-narrowing-conversions,
+         -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+         -cppcoreguidelines-pro-bounds-constant-array-index,
+         -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+         -cppcoreguidelines-pro-type-member-init,
+         -cppcoreguidelines-pro-type-reinterpret-cast,
+         -cppcoreguidelines-special-member-functions,
+
+         -performance-enum-size,
+         -performance-for-range-copy,
+         -performance-inefficient-vector-operation,
+         -performance-move-const-arg,
+         -performance-unnecessary-copy-initialization,
+         -performance-unnecessary-value-param,
       '
 
+InheritParentConfig: true
 WarningsAsErrors: '*'
 HeaderFilterRegex: '.*'
 ...
