@@ -53,7 +53,7 @@ static void CheckStackSize(const std::vector<valtype> &original_stack_elements, 
                               script,
                               flagset[0] | 0,
                               sigchecker);
-    BOOST_CHECK(r.has_value());
+    assert(r);
     if(const auto v=r.value(); expected_error == SCRIPT_ERR_OK)
     {
         LimitedStack expected = LimitedStack(expected_stack_elements, maxStackSize);
@@ -90,9 +90,8 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
                             script,
                             flags | upgradeFlag,
                             sigchecker);
-        BOOST_CHECK(r.has_value());
-        const auto v{r.value()};
-        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+        assert(r);
+        BOOST_CHECK(std::holds_alternative<malleability::status>(*r));
         BOOST_CHECK(stack == expectedStack);
 
         // Make sure that if we do not pass the upgrade flag, we get the same result
@@ -106,9 +105,8 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
                            script,
                            flags,
                            sigchecker);
-            BOOST_CHECK(r.has_value());
-            const auto v{r.value()};
-            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+            assert(r);
+            BOOST_CHECK(std::holds_alternative<malleability::status>(*r));
             BOOST_CHECK(stack == expectedStack);
         }
     }
@@ -128,20 +126,19 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
                         script,
                         flags | upgradeFlag,
                         sigchecker);
-    BOOST_CHECK(r.has_value());
-    const auto v{r.value()};
+    assert(r);
     if(flags & SCRIPT_CHRONICLE)
     {
         if(expected_error != SCRIPT_ERR_SCRIPTNUM_MINENCODE)
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-            BOOST_CHECK_EQUAL(expected_error, std::get<ScriptError>(v));
+            BOOST_CHECK(std::holds_alternative<ScriptError>(*r));
+            BOOST_CHECK_EQUAL(expected_error, std::get<ScriptError>(*r));
         }
     }
     else
     {
-        BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-        BOOST_CHECK_EQUAL(expected_error, std::get<ScriptError>(v));
+        BOOST_CHECK(std::holds_alternative<ScriptError>(*r));
+        BOOST_CHECK_EQUAL(expected_error, std::get<ScriptError>(*r));
     }
 
     // Make sure that if we do not pass the opcodes flags, we get the same result
@@ -155,10 +152,9 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
                        script,
                        flags,
                        sigchecker);
-        BOOST_CHECK(r.has_value());
-        const auto v{r.value()};
-        BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-        BOOST_CHECK_EQUAL(expected_error, std::get<ScriptError>(v));
+        assert(r);
+        BOOST_CHECK(std::holds_alternative<ScriptError>(*r));
+        BOOST_CHECK_EQUAL(expected_error, std::get<ScriptError>(*r));
     }
 }
 
@@ -704,16 +700,15 @@ BOOST_AUTO_TEST_CASE(rshift_big_int)
     auto source = task::CCancellationSource::Make();
 
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
-    const auto r = EvalScript(config,
+    const auto o = EvalScript(config,
                               true,
                               source->GetToken(),
                               stack,
                               CScript() << 1 << OP_RSHIFT,
                               flagset[0] | SCRIPT_UTXO_AFTER_GENESIS,
                               sigchecker);
-    BOOST_CHECK(r.has_value());
-    const auto v{r.value()};
-    BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+    assert(o);
+    BOOST_CHECK(std::holds_alternative<malleability::status>(*o));
     BOOST_CHECK(stack.front().GetElement()[0] == 0x40);
 }
 
@@ -728,16 +723,15 @@ BOOST_AUTO_TEST_CASE(lshift_big_int)
     auto source = task::CCancellationSource::Make();
 
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
-    const auto r = EvalScript(config,
+    const auto o = EvalScript(config,
                               true,
                               source->GetToken(),
                               stack,
                               CScript() << 1 << OP_LSHIFT,
                               flagset[0] | SCRIPT_UTXO_AFTER_GENESIS,
                               sigchecker);
-    BOOST_CHECK(r.has_value());
-    const auto v{r.value()};
-    BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+    assert(o);
+    BOOST_CHECK(std::holds_alternative<malleability::status>(*o));
     BOOST_CHECK(stack.front().GetElement()[0] == 0x80);
 }
 
@@ -1232,7 +1226,7 @@ static void CheckTestForOpCodeLimit(const CScript &script,
     for(uint32_t flags : flagset)
     {
         LimitedStack stack(UINT32_MAX);
-        const auto r = EvalScript(config,
+        const auto o = EvalScript(config,
                                   true,
                                   task::CCancellationSource::Make(),
                                   stack,
@@ -1243,15 +1237,14 @@ static void CheckTestForOpCodeLimit(const CScript &script,
 
         // flagset does not contain SCRIPT_UTXO_AFTER_GENESIS flag, so we will test with isGenesisEnabled=false in if
         BOOST_REQUIRE(!(flags & SCRIPT_UTXO_AFTER_GENESIS));
-        BOOST_CHECK(r.has_value());
-        const auto v{r.value()};
-        if (nonPushOpcodeCount > config.GetMaxOpsPerScript(false, true))
+        assert(o);
+        if(nonPushOpcodeCount > config.GetMaxOpsPerScript(false, true))
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
+            BOOST_CHECK(std::holds_alternative<ScriptError>(*o));
         }
         else
         {
-            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(*o));
         }
         BOOST_CHECK(nonPushOpcodeCount == expNonPushOpcodeCount);
     }
@@ -1330,17 +1323,16 @@ BOOST_AUTO_TEST_CASE(op_ver_pre_chronicle)
     const auto flags{SCRIPT_GENESIS};
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
-    const auto status = EvalScript(config,
-                                   false,
-                                   source->GetToken(),
-                                   stack,
-                                   script,
-                                   flags,
-                                   BaseSignatureChecker{});
-    BOOST_CHECK(status.has_value());
-    const auto v{status.value()};
-    BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-    BOOST_CHECK_EQUAL(SCRIPT_ERR_BAD_OPCODE, std::get<ScriptError>(v));
+    const auto o = EvalScript(config,
+                              false,
+                              source->GetToken(),
+                              stack,
+                              script,
+                              flags,
+                              BaseSignatureChecker{});
+    assert(o);
+    BOOST_CHECK(std::holds_alternative<ScriptError>(*o));
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_BAD_OPCODE, std::get<ScriptError>(*o));
     BOOST_CHECK(stack.empty());
 }
 
@@ -1376,16 +1368,15 @@ BOOST_AUTO_TEST_CASE(op_ver_post_chronicle)
         mtx.nVersion = tx_version;
         MutableTransactionSignatureChecker checker{&mtx, 0, Amount{0}};
 
-        const auto status = EvalScript(config,
-                                       false,
-                                       source->GetToken(),
-                                       stack,
-                                       CScript{script.begin(), script.end()},
-                                       flags,
-                                       checker);
-        const auto v{status.value()};
-        BOOST_CHECK(status.has_value());
-        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+        const auto o = EvalScript(config,
+                                  false,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  checker);
+        assert(o);
+        BOOST_CHECK(std::holds_alternative<malleability::status>(*o));
         BOOST_CHECK_EQUAL(1U, stack.size());
         const auto& actual{stack.stacktop(-1)};
         BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top.begin(), exp_stack_top.end(),
@@ -1426,21 +1417,20 @@ BOOST_AUTO_TEST_CASE(op_verif_pre_chronicle)
     {
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const auto status = EvalScript(config,
-                                       false,
-                                       source->GetToken(),
-                                       stack,
-                                       CScript{script.begin(), script.end()},
-                                       flags,
-                                       BaseSignatureChecker{});
-        BOOST_CHECK(status.has_value());
-        const auto v{status.value()};
+        const auto o = EvalScript(config,
+                                  false,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  BaseSignatureChecker{});
+        assert(o);
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(*o));
         else
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(v));
+            BOOST_CHECK(std::holds_alternative<ScriptError>(*o));
+            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(*o));
         }
         BOOST_CHECK(stack.empty());
     }
@@ -1618,19 +1608,18 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        checker);
-        BOOST_CHECK(status.has_value());
-        const auto v{status.value()};
+        assert(status);
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
         else
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(v));
+            BOOST_CHECK(std::holds_alternative<ScriptError>(*status));
+            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(*status));
         }
 
         BOOST_CHECK_EQUAL(exp_stack_size, stack.size());
         BOOST_CHECK_EQUAL(exp_stack_size!=0, exp_stack_top.has_value());
-        if(exp_stack_top.has_value())
+        if(exp_stack_top)
         {
             const auto& actual{stack.stacktop(-1)};
             BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top->begin(), exp_stack_top->end(),
@@ -1672,21 +1661,20 @@ BOOST_AUTO_TEST_CASE(op_vernotif_pre_chronicle)
     {
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const auto status = EvalScript(config,
-                                       false,
-                                       source->GetToken(),
-                                       stack,
-                                       CScript{script.begin(), script.end()},
-                                       flags,
-                                       BaseSignatureChecker{});
-        BOOST_CHECK(status.has_value());
-        const auto v{status.value()};
+        const auto o = EvalScript(config,
+                                  false,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  BaseSignatureChecker{});
+        assert(o);
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(*o));
         else
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(v));
+            BOOST_CHECK(std::holds_alternative<ScriptError>(*o));
+            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(*o));
         }
         BOOST_CHECK(stack.empty());
     }
@@ -1862,18 +1850,17 @@ BOOST_AUTO_TEST_CASE(op_vernotif_post_chronicle)
                                     CScript{script.begin(), script.end()},
                                     flags,
                                     checker);
-        BOOST_CHECK(status.has_value());
-        const auto v{status.value()};
+        assert(status);
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
         else
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(v));
+            BOOST_CHECK(std::holds_alternative<ScriptError>(*status));
+            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(*status));
         }
         BOOST_CHECK_EQUAL(exp_stack_size, stack.size());
         BOOST_CHECK_EQUAL(exp_stack_size!=0, exp_stack_top.has_value());
-        if(exp_stack_top.has_value())
+        if(exp_stack_top)
         {
             const auto& actual{stack.stacktop(-1)};
             BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top->begin(), exp_stack_top->end(),
@@ -1904,21 +1891,20 @@ BOOST_AUTO_TEST_CASE(op_substr_pre_chronicle)
     {
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const auto status = EvalScript(config,
-                                       false,
-                                       source->GetToken(),
-                                       stack,
-                                       CScript{script.begin(), script.end()},
-                                       flags,
-                                       BaseSignatureChecker{});
-        BOOST_CHECK(status.has_value());
-        const auto v{status.value()};
+        const auto o = EvalScript(config,
+                                  false,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  BaseSignatureChecker{});
+        assert(o);
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(*o));
         else
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(v));
+            BOOST_CHECK(std::holds_alternative<ScriptError>(*o));
+            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(*o));
         }
     }
 }
@@ -2041,21 +2027,20 @@ BOOST_AUTO_TEST_CASE(op_left_pre_chronicle)
     {
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const auto status = EvalScript(config,
-                                       false,
-                                       source->GetToken(),
-                                       stack,
-                                       CScript{script.begin(), script.end()},
-                                       flags,
-                                       BaseSignatureChecker{});
-        BOOST_CHECK(status.has_value());
-        const auto v{status.value()};
+        const auto o = EvalScript(config,
+                                  false,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  BaseSignatureChecker{});
+        assert(o);
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(*o));
         else
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(v));
+            BOOST_CHECK(std::holds_alternative<ScriptError>(*o));
+            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(*o));
         }
     }
 }
@@ -2165,21 +2150,20 @@ BOOST_AUTO_TEST_CASE(op_right_pre_chronicle)
     {
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const auto status = EvalScript(config,
-                                       false,
-                                       source->GetToken(),
-                                       stack,
-                                       CScript{script.begin(), script.end()},
-                                       flags,
-                                       BaseSignatureChecker{});
-        BOOST_CHECK(status.has_value());
-        const auto v{status.value()};
+        const auto o = EvalScript(config,
+                                  false,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  BaseSignatureChecker{});
+        assert(o);
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(*o));
         else
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(v));
+            BOOST_CHECK(std::holds_alternative<ScriptError>(*o));
+            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(*o));
         }
     }
 }
@@ -2296,21 +2280,20 @@ BOOST_AUTO_TEST_CASE(op_2mul_pre_chronicle)
     {
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const auto status = EvalScript(config,
-                                       false,
-                                       source->GetToken(),
-                                       stack,
-                                       CScript{script.begin(), script.end()},
-                                       flags,
-                                       BaseSignatureChecker{});
-        BOOST_CHECK(status.has_value());
-        const auto v{status.value()};
+        const auto o = EvalScript(config,
+                                  false,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  BaseSignatureChecker{});
+        assert(o);
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(*o));
         else
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(v));
+            BOOST_CHECK(std::holds_alternative<ScriptError>(*o));
+            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(*o));
         }
     }
 }
@@ -2438,21 +2421,20 @@ BOOST_AUTO_TEST_CASE(op_2div_pre_chronicle)
     {
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const auto status = EvalScript(config,
-                                       false,
-                                       source->GetToken(),
-                                       stack,
-                                       CScript{script.begin(), script.end()},
-                                       flags,
-                                       BaseSignatureChecker{});
-        BOOST_CHECK(status.has_value());
-        const auto v{status.value()};
+        const auto o = EvalScript(config,
+                                  false,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  BaseSignatureChecker{});
+        assert(o);
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(*o));
         else
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(v));
+            BOOST_CHECK(std::holds_alternative<ScriptError>(*o));
+            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(*o));
         }
     }
 }
@@ -2560,16 +2542,15 @@ BOOST_AUTO_TEST_CASE(EvalScript_flag_check_post_chronicle)
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
     const uint32_t flags{SCRIPT_UTXO_AFTER_CHRONICLE}; // <- NO SCRIPT_UTXO_AFTER_GENESIS
-    const auto status = EvalScript(config,
-                                   false,
-                                   source->GetToken(),
-                                   stack,
-                                   CScript{},
-                                   flags,
-                                   BaseSignatureChecker{});
-    BOOST_CHECK(status.has_value());
-    const auto v{status.value()};
-    BOOST_CHECK_EQUAL(ScriptError::SCRIPT_ERR_INVALID_FLAGS, std::get<ScriptError>(v));
+    const auto o = EvalScript(config,
+                              false,
+                              source->GetToken(),
+                              stack,
+                              CScript{},
+                              flags,
+                              BaseSignatureChecker{});
+    assert(o);
+    BOOST_CHECK_EQUAL(ScriptError::SCRIPT_ERR_INVALID_FLAGS, std::get<ScriptError>(*o));
     BOOST_CHECK_EQUAL(0U, stack.size());
 }
 
@@ -2601,21 +2582,20 @@ BOOST_AUTO_TEST_CASE(op_2rot)
     {
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const auto status = EvalScript(config,
-                                       false,
-                                       source->GetToken(),
-                                       stack,
-                                       CScript{script.begin(), script.end()},
-                                       flags,
-                                       BaseSignatureChecker{});
-        BOOST_CHECK(status.has_value());
-        const auto v{status.value()};
+        const auto o = EvalScript(config,
+                                  false,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  BaseSignatureChecker{});
+        assert(o);
         if(exp_error == SCRIPT_ERR_OK)
-            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(*o));
         else
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(v));
+            BOOST_CHECK(std::holds_alternative<ScriptError>(*o));
+            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(*o));
         }
 
         for(auto i=1u; i <= exp_stack.size(); ++i)

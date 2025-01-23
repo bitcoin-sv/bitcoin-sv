@@ -195,6 +195,7 @@ BOOST_AUTO_TEST_CASE(publish_enough_space_for_info)
     std::unique_lock lock{ mutex };
     using namespace std::chrono_literals;
     BOOST_CHECK( processPublish.wait_for(lock, 200ms, [&received]{return received.has_value();}) );
+    assert(received);
     BOOST_CHECK_EQUAL( InvalidTxnInfoToJson(received.value()), expectedJson );
 }
 
@@ -225,6 +226,7 @@ BOOST_AUTO_TEST_CASE(publish_missing_some_space_for_info)
     std::unique_lock lock{ mutex };
     using namespace std::chrono_literals;
     BOOST_CHECK( processPublish.wait_for(lock, 200ms, [&received]{return received.has_value();}) );
+    assert(received);
     BOOST_CHECK_EQUAL( InvalidTxnInfoToJson(received.value()), InvalidTxnInfoToJson(expected) );
 }
 

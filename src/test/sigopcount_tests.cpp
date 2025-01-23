@@ -229,7 +229,7 @@ ScriptError VerifyWithFlag(const CTransaction &output,
             flags,
             TransactionSignatureChecker(&inputi, 0, output.vout[0].nValue),
             ms);
-    BOOST_CHECK(ret.has_value());
+    assert(ret.has_value());
     BOOST_CHECK(!ret->first);
     return ret->second;
 }

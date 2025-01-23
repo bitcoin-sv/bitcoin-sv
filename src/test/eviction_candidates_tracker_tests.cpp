@@ -222,6 +222,7 @@ BOOST_AUTO_TEST_CASE(single_long_chain) {
         std::deque<uint256> removedTransactions;
         for(int i = 0; i < 100; i++)
         {
+            assert(mempool.tracker);
             auto txToRemove = mempool.tracker->GetMostWorthless();
             auto txId = txToRemove->GetSharedTx()->GetId();
             removedTransactions.push_front(txId);

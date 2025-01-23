@@ -183,6 +183,7 @@ BOOST_AUTO_TEST_CASE(premature_implicit_cancellation_and_reusing_the_worst_check
             1,
             source->GetToken(),
             &worstCancellationToken);
+    assert(worstCancellationToken);
 
     auto checker2 = scriptCheckQueuePool.GetChecker(2, source->GetToken());
     auto checker3 = scriptCheckQueuePool.GetChecker(3, source->GetToken());
@@ -216,10 +217,22 @@ BOOST_AUTO_TEST_CASE(premature_implicit_cancellation_and_reusing_the_worst_check
         std::lock_guard lock{worstWaitSyncLock};
         BOOST_CHECK(!checkerWorst.Wait().has_value());
     }
-    BOOST_CHECK(checker2.Wait().value());
-    BOOST_CHECK(checker3.Wait().value());
-    BOOST_CHECK(checker4.Wait().value());
-    BOOST_CHECK(checkerBest.Wait().value());
+
+    const auto o2{checker2.Wait()};
+    assert(o2);
+    BOOST_CHECK(*o2);
+
+    const auto o3{checker3.Wait()};
+    assert(o3);
+    BOOST_CHECK(*o3);
+
+    const auto o4{checker4.Wait()};
+    assert(o4);
+    BOOST_CHECK(*o4);
+
+    const auto oBest{checkerBest.Wait()};
+    assert(oBest);
+    BOOST_CHECK(*oBest);
 
     threadGroup.interrupt_all();
     threadGroup.join_all();

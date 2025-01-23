@@ -83,7 +83,7 @@ protected:
     {
         mLatestRequestedScriptSize = (mOverrideSize.has_value() ? mOverrideSize.value() : maxScriptSize);
         mLatestGetCoin = CoinsDB::GetCoin(outpoint, mLatestRequestedScriptSize);
-
+        assert(mLatestGetCoin);
         return mLatestGetCoin->MakeNonOwning();
     }
 
@@ -729,7 +729,7 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
     {
         // Get output 0 from DB
         auto c0 = CTestCoinsView{ provider }.GetCoinWithScript(COutPoint(txId, 0));
-        BOOST_TEST(c0.has_value());
+        assert(c0);
         BOOST_TEST(c0->GetTxOut().nValue == Amount(123)); // check that we got the correct output
         BOOST_TEST(!c0->IsConfiscation());
         BOOST_TEST(c0->GetTxOut().scriptPubKey.size()==script_small_size);
@@ -738,7 +738,7 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
     {
         // Get output 1 from DB
         auto c1 = CTestCoinsView{ provider }.GetCoinWithScript(COutPoint(txId, 1));
-        BOOST_TEST(c1.has_value());
+        assert(c1);
         BOOST_TEST(c1->GetTxOut().nValue == Amount(456)); // check that we got the correct output
         BOOST_TEST(!c1->IsConfiscation());
         BOOST_TEST(c1->GetTxOut().scriptPubKey.size()==script_big_size);
@@ -747,7 +747,7 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
     {
         // Get output 2 from DB
         auto c2 = CTestCoinsView{ provider }.GetCoinWithScript(COutPoint(txId, 2));
-        BOOST_TEST(c2.has_value());
+        assert(c2);
         BOOST_TEST(c2->GetTxOut().nValue == Amount(123)); // check that we got the correct output
         BOOST_TEST(c2->IsConfiscation());
         BOOST_TEST(c2->GetTxOut().scriptPubKey.size()==script_small_size);
@@ -756,7 +756,7 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
     {
         // Get output 3 from DB
         auto c3 = CTestCoinsView{ provider }.GetCoinWithScript(COutPoint(txId, 3));
-        BOOST_TEST(c3.has_value());
+        assert(c3);
         BOOST_TEST(c3->GetTxOut().nValue == Amount(456)); // check that we got the correct output
         BOOST_TEST(c3->IsConfiscation());
         BOOST_TEST(c3->GetTxOut().scriptPubKey.size()==script_big_size);
@@ -769,96 +769,112 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
         // Get output 0 from DB with script regardless of its size
         provider.SizeOverride(script_small_size);
         auto c0 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 0));
-        BOOST_TEST(c0.has_value());
+        assert(c0);
         BOOST_TEST(c0->GetAmount() == Amount(123)); // check that we got the correct output
         BOOST_TEST(!c0->IsConfiscation());
         BOOST_TEST(provider.GetLatestRequestedScriptSize()==script_small_size);
-        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==script_small_size);
-        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_small_size);
+        const auto& o{provider.GetLatestCoin()};
+        assert(o);
+        BOOST_TEST(o->GetTxOut().scriptPubKey.size()==script_small_size);
+        BOOST_TEST(o->GetScriptSize()==script_small_size);
     }
 
     {
         // Get output 2 from DB with script regardless of its size
         provider.SizeOverride(script_small_size);
         auto c2 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 2));
-        BOOST_TEST(c2.has_value());
+        assert(c2);
         BOOST_TEST(c2->GetAmount() == Amount(123)); // check that we got the correct output
         BOOST_TEST(c2->IsConfiscation());
         BOOST_TEST(provider.GetLatestRequestedScriptSize()==script_small_size);
-        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==script_small_size);
-        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_small_size);
+        const auto& o{provider.GetLatestCoin()};
+        assert(o);
+        BOOST_TEST(o->GetTxOut().scriptPubKey.size()==script_small_size);
+        BOOST_TEST(o->GetScriptSize()==script_small_size);
     }
 
     {
         // Get output 0 from DB without script (even if it is a very small one)
         provider.SizeOverride( {} );
         auto c0 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 0));
-        BOOST_TEST(c0.has_value());
+        assert(c0);
         BOOST_TEST(c0->GetAmount() == Amount(123)); // check that we got the correct output
         BOOST_TEST(!c0->IsConfiscation());
         BOOST_TEST(provider.GetLatestRequestedScriptSize()==0U);
-        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0U);
-        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_small_size);
+        const auto& o{provider.GetLatestCoin()};
+        assert(o);
+        BOOST_TEST(o->GetTxOut().scriptPubKey.size()==0U);
+        BOOST_TEST(o->GetScriptSize()==script_small_size);
     }
 
     {
         // Get output 2 from DB without script (even if it is a very small one)
         provider.SizeOverride( {} );
         auto c2 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 2));
-        BOOST_TEST(c2.has_value());
+        assert(c2);
         BOOST_TEST(c2->GetAmount() == Amount(123)); // check that we got the correct output
         BOOST_TEST(c2->IsConfiscation());
         BOOST_TEST(provider.GetLatestRequestedScriptSize()==0U);
-        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0U);
-        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_small_size);
+        const auto& o{provider.GetLatestCoin()};
+        assert(o);
+        BOOST_TEST(o->GetTxOut().scriptPubKey.size()==0U);
+        BOOST_TEST(o->GetScriptSize()==script_small_size);
     }
 
     {
         // Get output 1 from DB with script regardless of its size
         provider.SizeOverride(script_big_size);
         auto c1 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 1));
-        BOOST_TEST(c1.has_value());
+        assert(c1);
         BOOST_TEST(c1->GetAmount() == Amount(456)); // check that we got the correct output
         BOOST_TEST(!c1->IsConfiscation());
         BOOST_TEST(provider.GetLatestRequestedScriptSize()==script_big_size);
-        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==script_big_size);
-        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_big_size);
+        const auto& o{provider.GetLatestCoin()};
+        assert(o);
+        BOOST_TEST(o->GetTxOut().scriptPubKey.size()==script_big_size);
+        BOOST_TEST(o->GetScriptSize()==script_big_size);
     }
 
     {
         // Get output 3 from DB with script regardless of its size
         provider.SizeOverride(script_big_size);
         auto c3 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 3));
-        BOOST_TEST(c3.has_value());
+        assert(c3);
         BOOST_TEST(c3->GetAmount() == Amount(456)); // check that we got the correct output
         BOOST_TEST(c3->IsConfiscation());
         BOOST_TEST(provider.GetLatestRequestedScriptSize()==script_big_size);
-        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==script_big_size);
-        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_big_size);
+        const auto& o{provider.GetLatestCoin()};
+        assert(o);
+        BOOST_TEST(o->GetTxOut().scriptPubKey.size()==script_big_size);
+        BOOST_TEST(o->GetScriptSize()==script_big_size);
     }
 
     {
         // Get output 1 from DB without script
         provider.SizeOverride( {} );
         auto c1 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 1));
-        BOOST_TEST(c1.has_value());
+        assert(c1);
         BOOST_TEST(c1->GetAmount() == Amount(456)); // check that we got the correct output
         BOOST_TEST(!c1->IsConfiscation());
         BOOST_TEST(provider.GetLatestRequestedScriptSize()==0U);
-        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0U);
-        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_big_size);
+        const auto& o{provider.GetLatestCoin()};
+        assert(o);
+        BOOST_TEST(o->GetTxOut().scriptPubKey.size()==0U);
+        BOOST_TEST(o->GetScriptSize()==script_big_size);
     }
 
     {
         // Get output 3 from DB without script
         provider.SizeOverride( {} );
         auto c3 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 3));
-        BOOST_TEST(c3.has_value());
+        assert(c3);
         BOOST_TEST(c3->GetAmount() == Amount(456)); // check that we got the correct output
         BOOST_TEST(c3->IsConfiscation());
         BOOST_TEST(provider.GetLatestRequestedScriptSize()==0U);
-        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0U);
-        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_big_size);
+        const auto& o{provider.GetLatestCoin()};
+        assert(o);
+        BOOST_TEST(o->GetTxOut().scriptPubKey.size()==0U);
+        BOOST_TEST(o->GetScriptSize()==script_big_size);
     }
 }
 
@@ -1089,7 +1105,7 @@ BOOST_FIXTURE_TEST_CASE(no_coins_caching, TestingSetup)
         auto coin_with_script = view.GetCoinWithScript(first_coin_outpoint);
 
         // Cache contains only coin without script
-        BOOST_TEST(coin_with_script.has_value());
+        assert(coin_with_script);
         BOOST_TEST(coin_with_script->IsStorageOwner());
         BOOST_TEST(coin_with_script->IsSpent() == false);
         BOOST_TEST(coin_with_script->GetTxOut().scriptPubKey == script_template);
@@ -1115,7 +1131,7 @@ BOOST_FIXTURE_TEST_CASE(no_coins_caching, TestingSetup)
         auto coin_with_script = secondary.GetCoinWithScript(first_coin_outpoint);
 
         // Cache contains only coin without script
-        BOOST_TEST(coin_with_script.has_value());
+        assert(coin_with_script);
         BOOST_TEST(coin_with_script->IsStorageOwner());
         BOOST_TEST(coin_with_script->IsSpent() == false);
         BOOST_TEST(coin_with_script->GetTxOut().scriptPubKey == script_template);
@@ -1131,10 +1147,10 @@ BOOST_FIXTURE_TEST_CASE(no_coins_caching, TestingSetup)
 
         // Reading spent coin from secondary cache returns a spent coin
         coin = secondary.GetCoin(first_coin_outpoint);
-        BOOST_TEST(coin.has_value());
+        assert(coin);
         BOOST_TEST(coin->IsSpent() == true);
         auto coin_with_script_2 = secondary.GetCoinWithScript(first_coin_outpoint);
-        BOOST_TEST(coin_with_script_2.has_value());
+        assert(coin_with_script_2);
         BOOST_TEST(!coin_with_script_2->IsStorageOwner());
         BOOST_TEST(coin_with_script_2->IsSpent() == true);
 
@@ -1270,7 +1286,7 @@ BOOST_FIXTURE_TEST_CASE(coins_caching, TestingSetup)
         auto coin_with_script = view.GetCoinWithScript(first_coin_outpoint);
 
         // Cache contains coin with script
-        BOOST_TEST(coin_with_script.has_value());
+        assert(coin_with_script);
         BOOST_TEST(!coin_with_script->IsStorageOwner());
         BOOST_TEST(coin_with_script->IsSpent() == false);
         BOOST_TEST(coin_with_script->GetTxOut().scriptPubKey == script_template);
@@ -1281,7 +1297,7 @@ BOOST_FIXTURE_TEST_CASE(coins_caching, TestingSetup)
 
         // Cache contains two coins with script
         auto coin_with_script_2 = view.GetCoinWithScript(COutPoint{txId, 1});
-        BOOST_TEST(coin_with_script_2.has_value());
+        assert(coin_with_script_2);
         BOOST_TEST(!coin_with_script_2->IsStorageOwner());
         BOOST_TEST(coin_with_script_2->IsSpent() == false);
         BOOST_TEST(coin_with_script_2->GetTxOut().scriptPubKey == script_template);
@@ -1291,7 +1307,7 @@ BOOST_FIXTURE_TEST_CASE(coins_caching, TestingSetup)
 
         // Three was no more space for the third script
         auto coin_with_script_3 = view.GetCoinWithScript(COutPoint{txId, 2});
-        BOOST_TEST(coin_with_script_3.has_value());
+        assert(coin_with_script_3);
         BOOST_TEST(coin_with_script_3->IsStorageOwner());
         BOOST_TEST(coin_with_script_3->IsSpent() == false);
         BOOST_TEST(coin_with_script_3->GetTxOut().scriptPubKey == script_template);
@@ -1312,7 +1328,7 @@ BOOST_FIXTURE_TEST_CASE(coins_caching, TestingSetup)
 
         // Cache contains two coins with script
         auto coin_with_script_2 = view.GetCoinWithScript(COutPoint{txId, 3});
-        BOOST_TEST(coin_with_script_2.has_value());
+        assert(coin_with_script_2);
         BOOST_TEST(!coin_with_script_2->IsStorageOwner());
         BOOST_TEST(coin_with_script_2->IsSpent() == false);
         BOOST_TEST(coin_with_script_2->GetTxOut().scriptPubKey == script_template);
@@ -1322,7 +1338,7 @@ BOOST_FIXTURE_TEST_CASE(coins_caching, TestingSetup)
 
         // Three was no more space for the third script
         auto coin_with_script_3 = view.GetCoinWithScript(COutPoint{txId, 4});
-        BOOST_TEST(coin_with_script_3.has_value());
+        assert(coin_with_script_3);
         BOOST_TEST(coin_with_script_3->IsStorageOwner());
         BOOST_TEST(coin_with_script_3->IsSpent() == false);
         BOOST_TEST(coin_with_script_3->GetTxOut().scriptPubKey == script_template);
@@ -1353,7 +1369,7 @@ BOOST_FIXTURE_TEST_CASE(coins_caching, TestingSetup)
 
         // Cache doesn't change as there was enough space to load the script to
         // cache while asking only for the coin
-        BOOST_TEST(coin_with_script.has_value());
+        assert(coin_with_script);
         BOOST_TEST(!coin_with_script->IsStorageOwner());
         BOOST_TEST(coin_with_script->IsSpent() == false);
         BOOST_TEST(memory_usage_before_coin_with_script_load == secondary.DynamicMemoryUsage());
@@ -1369,10 +1385,10 @@ BOOST_FIXTURE_TEST_CASE(coins_caching, TestingSetup)
 
         // Reading spent coin from secondary cache returns a spent coin
         coin = secondary.GetCoin(first_coin_outpoint);
-        BOOST_TEST(coin.has_value());
+        assert(coin);
         BOOST_TEST(coin->IsSpent() == true);
         auto coin_with_script_2 = secondary.GetCoinWithScript(first_coin_outpoint);
-        BOOST_TEST(coin_with_script_2.has_value());
+        assert(coin_with_script_2);
         BOOST_TEST(!coin_with_script_2->IsStorageOwner());
         BOOST_TEST(coin_with_script_2->IsSpent() == true);
 
@@ -1516,10 +1532,13 @@ BOOST_FIXTURE_TEST_CASE(sharding, TestingSetup)
         }
         for(const auto& txid : newTxIds)
         {
-            BOOST_REQUIRE(span.GetCoin({txid, 0}));
-            BOOST_CHECK(! span.GetCoin({txid, 0})->IsSpent());
-            BOOST_REQUIRE(span.GetCoin({txid, 1}));
-            BOOST_CHECK(! span.GetCoin({txid, 1})->IsSpent());
+            const auto o0{span.GetCoin({txid, 0})};
+            assert(o0);
+            BOOST_CHECK(!o0->IsSpent());
+
+            const auto o1{span.GetCoin({txid, 1})};
+            assert(o1);
+            BOOST_CHECK(!o1->IsSpent());
         }
     }
 }

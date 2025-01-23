@@ -609,24 +609,30 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolStatsTest) {
 
     CTestTxMemPoolEntry testTx1(const_cast<CTxMemPoolEntry&>(*tx1it)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
     BOOST_CHECK(!tx1it->IsInPrimaryMempool());
-    BOOST_CHECK_EQUAL(testTx1.groupingData()->fee, tx1it->GetFee());
-    BOOST_CHECK_EQUAL(testTx1.groupingData()->feeDelta, tx1it->GetFeeDelta());
-    BOOST_CHECK_EQUAL(testTx1.groupingData()->size, tx1it->GetTxSize());
-    BOOST_CHECK_EQUAL(testTx1.groupingData()->ancestorsCount, 0U);
+    const auto group1data{testTx1.groupingData()};
+    assert(group1data);
+    BOOST_CHECK_EQUAL(group1data->fee, tx1it->GetFee());
+    BOOST_CHECK_EQUAL(group1data->feeDelta, tx1it->GetFeeDelta());
+    BOOST_CHECK_EQUAL(group1data->size, tx1it->GetTxSize());
+    BOOST_CHECK_EQUAL(group1data->ancestorsCount, 0U);
 
     CTestTxMemPoolEntry testTx2(const_cast<CTxMemPoolEntry&>(*tx2it)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
     BOOST_CHECK(!tx2it->IsInPrimaryMempool());
-    BOOST_CHECK_EQUAL(testTx2.groupingData()->fee, tx2it->GetFee());
-    BOOST_CHECK_EQUAL(testTx2.groupingData()->feeDelta, tx2it->GetFeeDelta());
-    BOOST_CHECK_EQUAL(testTx2.groupingData()->size, tx2it->GetTxSize());
-    BOOST_CHECK_EQUAL(testTx2.groupingData()->ancestorsCount, 0U);
+    const auto group2data{testTx2.groupingData()};
+    assert(group2data);
+    BOOST_CHECK_EQUAL(group2data->fee, tx2it->GetFee());
+    BOOST_CHECK_EQUAL(group2data->feeDelta, tx2it->GetFeeDelta());
+    BOOST_CHECK_EQUAL(group2data->size, tx2it->GetTxSize());
+    BOOST_CHECK_EQUAL(group2data->ancestorsCount, 0U);
 
     CTestTxMemPoolEntry testTx3(const_cast<CTxMemPoolEntry&>(*tx3it)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
     BOOST_CHECK(!tx3it->IsInPrimaryMempool());
-    BOOST_CHECK_EQUAL(testTx3.groupingData()->fee, tx1it->GetFee() + tx2it->GetFee() + tx3it->GetFee());
-    BOOST_CHECK_EQUAL(testTx3.groupingData()->feeDelta, tx1it->GetFeeDelta() + tx2it->GetFeeDelta() + tx3it->GetFeeDelta());
-    BOOST_CHECK_EQUAL(testTx3.groupingData()->size, tx1it->GetTxSize() + tx2it->GetTxSize() + tx3it->GetTxSize());
-    BOOST_CHECK_EQUAL(testTx3.groupingData()->ancestorsCount, 2U);
+    const auto group3data{testTx3.groupingData()};
+    assert(group3data);
+    BOOST_CHECK_EQUAL(group3data->fee, tx1it->GetFee() + tx2it->GetFee() + tx3it->GetFee());
+    BOOST_CHECK_EQUAL(group3data->feeDelta, tx1it->GetFeeDelta() + tx2it->GetFeeDelta() + tx3it->GetFeeDelta());
+    BOOST_CHECK_EQUAL(group3data->size, tx1it->GetTxSize() + tx2it->GetTxSize() + tx3it->GetTxSize());
+    BOOST_CHECK_EQUAL(group3data->ancestorsCount, 2U);
 }
 
 BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
@@ -658,6 +664,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     BOOST_CHECK(!tx1it->IsInPrimaryMempool());
     CTestTxMemPoolEntry entry1access(const_cast<CTxMemPoolEntry&>(*tx1it)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
     const auto& group1data = entry1access.groupingData();
+    assert(group1data);
     BOOST_REQUIRE(group1data.has_value());
     BOOST_CHECK_EQUAL(group1data->ancestorsCount, 0U); // exact
 
@@ -675,6 +682,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     CTestTxMemPoolEntry entry2access(const_cast<CTxMemPoolEntry&>(*tx2it)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
     const auto& group2data = entry2access.groupingData();
     BOOST_REQUIRE(group2data.has_value());
+    assert(group2data);
     BOOST_CHECK_EQUAL(group2data->ancestorsCount, 1U); // exact
 
     CMutableTransaction tx3 = CMutableTransaction();
@@ -691,6 +699,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     CTestTxMemPoolEntry entry3access(const_cast<CTxMemPoolEntry&>(*tx3it)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
     const auto& group3data = entry3access.groupingData();
     BOOST_REQUIRE(group3data.has_value());
+    assert(group3data);
     BOOST_CHECK_EQUAL(group3data->ancestorsCount, 1U); // exact
 
     CMutableTransaction tx4 = CMutableTransaction();
@@ -715,6 +724,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     CTestTxMemPoolEntry entry4access(const_cast<CTxMemPoolEntry&>(*tx4it)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
     const auto& group4data = entry4access.groupingData();
     BOOST_REQUIRE(group4data.has_value());
+    assert(group4data);
     BOOST_CHECK_EQUAL(group4data->ancestorsCount, 5U); // not exact
 
     // Pull everything into the primary mempool as a group.

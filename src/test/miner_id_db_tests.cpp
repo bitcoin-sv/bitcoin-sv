@@ -305,6 +305,7 @@ namespace
             {
                 // Update coinbase to include miner ID
                 CMutableTransaction txCoinbase { *(block.vtx[0]) };
+                assert(signature);
                 CreateMinerIDInTxn(*baseDocument, *signature, txCoinbase, invalid);
                 block.vtx[0] = MakeTransactionRef(std::move(txCoinbase));
                 block.hashMerkleRoot = BlockMerkleRoot(block);
@@ -405,7 +406,7 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests_id>
         CBlock block {};
         BOOST_REQUIRE(blockindex->ReadBlockFromDisk(block, GlobalConfig::GetConfig()));
         std::optional<MinerId> minerId { FindMinerId(block, blockindex->GetHeight()) };
-        BOOST_REQUIRE(minerId);
+        assert(minerId);
         return *minerId;
     }
 

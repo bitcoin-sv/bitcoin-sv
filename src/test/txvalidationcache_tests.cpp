@@ -126,21 +126,21 @@ namespace {
 
             CValidationState state;
 
-            bool ret =
-                CheckInputs(
-                    source->GetToken(),
-                    config,
-                    true,
-                    tx,
-                    state,
-                    tipView,
-                    true,
-                    test_flags,
-                    true,
-                    add_to_cache,
-                    txdata,
-                    frozenTXOCheckTransaction,
-                    nullptr).value();
+            const auto o = CheckInputs(source->GetToken(),
+                                         config,
+                                         true,
+                                         tx,
+                                         state,
+                                         tipView,
+                                         true,
+                                         test_flags,
+                                         true,
+                                         add_to_cache,
+                                         txdata,
+                                         frozenTXOCheckTransaction,
+                                         nullptr);
+            assert(o);
+            const bool ret{o.value()};
 
             // find out if we should pass or fail based on flags.
             bool expected_return_value = expectedResultBasedOnFlags(test_flags);
@@ -155,44 +155,47 @@ namespace {
             BOOST_CHECK_EQUAL(ret, expected_return_value);
 
             // Test the caching
-            if (ret && add_to_cache) {
+            if(ret && add_to_cache)
+            {
                 // Check that we get a cache hit if the tx was valid
                 std::vector<CScriptCheck> scriptchecks;
-                BOOST_CHECK(
-                    CheckInputs(
-                        source->GetToken(),
-                        config,
-                        true,
-                        tx,
-                        state,
-                        tipView,
-                        true,
-                        test_flags,
-                        true,
-                        add_to_cache,
-                        txdata,
-                        frozenTXOCheckTransaction,
-                        &scriptchecks).value());
+                const auto o{CheckInputs(source->GetToken(),
+                                         config,
+                                         true,
+                                         tx,
+                                         state,
+                                         tipView,
+                                         true,
+                                         test_flags,
+                                         true,
+                                         add_to_cache,
+                                         txdata,
+                                         frozenTXOCheckTransaction,
+                                         &scriptchecks)};
+                assert(o);
+                BOOST_CHECK(o.value());
                 BOOST_CHECK(scriptchecks.empty());
-            } else {
+            }
+            else
+            {
                 // Check that we get script executions to check, if the transaction
                 // was invalid, or we didn't add to cache.
                 std::vector<CScriptCheck> scriptchecks;
-                BOOST_CHECK(
-                    CheckInputs(
-                        source->GetToken(),
-                        config,
-                        true,
-                        tx,
-                        state,
-                        tipView,
-                        true,
-                        test_flags,
-                        true,
-                        add_to_cache,
-                        txdata,
-                        frozenTXOCheckTransaction,
-                        &scriptchecks).value());
+                const auto o{CheckInputs(source->GetToken(),
+                                         config,
+                                         true,
+                                         tx,
+                                         state,
+                                         tipView,
+                                         true,
+                                         test_flags,
+                                         true,
+                                         add_to_cache,
+                                         txdata,
+                                         frozenTXOCheckTransaction,
+                                         &scriptchecks)};
+                assert(o);
+                BOOST_CHECK(o.value());
                 BOOST_CHECK_EQUAL(scriptchecks.size(), tx.vin.size());
             }
         }
@@ -335,44 +338,43 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
 
         {
             CoinsDBSpan cache{*pcoinsTip};
-            BOOST_CHECK(
-                !CheckInputs(
-                    source->GetToken(),
-                    config,
-                    true,
-                    spend_tx,
-                    state,
-                    cache,
-                    true,
-                    PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
-                        SCRIPT_VERIFY_CLEANSTACK | SCRIPT_GENESIS,
-                    true,
-                    true,
-                    ptd_spend_tx,
-                    frozenTXOCheckTransaction,
-                    nullptr).value());
+            const auto o{CheckInputs(source->GetToken(),
+                                     config,
+                                     true,
+                                     spend_tx,
+                                     state,
+                                     cache,
+                                     true,
+                                     PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
+                                         SCRIPT_VERIFY_CLEANSTACK | SCRIPT_GENESIS,
+                                     true,
+                                     true,
+                                     ptd_spend_tx,
+                                     frozenTXOCheckTransaction,
+                                     nullptr)};
+            assert(o);
+            BOOST_CHECK(!o.value());
 
             // If we call again asking for scriptchecks (as happens in
             // ConnectBlock), we should add a script check object for this -- we're
             // not caching invalidity (if that changes, delete this test case).
             std::vector<CScriptCheck> scriptchecks;
-            BOOST_CHECK(
-                CheckInputs(
-                    source->GetToken(),
-                    config,
-                    true,
-                    spend_tx,
-                    state,
-                    cache,
-                    true,
-                    PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
-                        SCRIPT_VERIFY_CLEANSTACK | SCRIPT_GENESIS,
-                    true,
-                    true,
-                    ptd_spend_tx,
-                    frozenTXOCheckTransaction,
-                    &scriptchecks).value());
-
+            const auto o2{CheckInputs(source->GetToken(),
+                                     config,
+                                     true,
+                                     spend_tx,
+                                     state,
+                                     cache,
+                                     true,
+                                     PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
+                                         SCRIPT_VERIFY_CLEANSTACK | SCRIPT_GENESIS,
+                                     true,
+                                     true,
+                                     ptd_spend_tx,
+                                     frozenTXOCheckTransaction,
+                                     &scriptchecks)};
+            assert(o2);
+            BOOST_CHECK(o2.value());
             BOOST_CHECK_EQUAL(scriptchecks.size(), 1U);
 
             // Test that CheckInputs returns true iff cleanstack-enforcing flags are
@@ -450,22 +452,22 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
         CTransaction transaction(invalid_with_cltv_tx);
         PrecomputedTransactionData txdata(transaction);
 
-        BOOST_CHECK(
-            CheckInputs(
-                source->GetToken(),
-                config,
-                true,
-                transaction,
-                state,
-                cache,
-                true,
-                PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
-                    SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY | SCRIPT_GENESIS,
-                true,
-                true,
-                txdata,
-                frozenTXOCheckTransaction,
-                nullptr).value());
+        const auto o{CheckInputs(source->GetToken(),
+                                 config,
+                                 true,
+                                 transaction,
+                                 state,
+                                 cache,
+                                 true,
+                                 PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
+                                     SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY | SCRIPT_GENESIS,
+                                 true,
+                                 true,
+                                 txdata,
+                                 frozenTXOCheckTransaction,
+                                 nullptr)};
+        assert(o);
+        BOOST_CHECK(o.value());
     }
 
     // TEST CHECKSEQUENCEVERIFY
@@ -502,22 +504,22 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
         CTransaction transaction(invalid_with_csv_tx);
         PrecomputedTransactionData txdata(transaction);
 
-        BOOST_CHECK(
-            CheckInputs(
-                source->GetToken(),
-                config,
-                true,
-                transaction,
-                state,
-                cache,
-                true,
-                PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
-                    SCRIPT_VERIFY_CHECKSEQUENCEVERIFY | SCRIPT_GENESIS,
-                true,
-                true,
-                txdata,
-                frozenTXOCheckTransaction,
-                nullptr).value());
+        const auto o{CheckInputs(source->GetToken(),
+                                 config,
+                                 true,
+                                 transaction,
+                                 state,
+                                 cache,
+                                 true,
+                                 PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
+                                     SCRIPT_VERIFY_CHECKSEQUENCEVERIFY | SCRIPT_GENESIS,
+                                 true,
+                                 true,
+                                 txdata,
+                                 frozenTXOCheckTransaction,
+                                 nullptr)};
+        assert(o);
+        BOOST_CHECK(o.value());
     }
 
     // TODO: add tests for remaining script flags
@@ -586,40 +588,42 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
 
         // This transaction is now invalid because the second signature is
         // missing.
-        BOOST_CHECK(
-            !CheckInputs(
-                source->GetToken(),
-                config,
-                true,
-                transaction,
-                state,
-                cache,
-                true,
-                PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS | SCRIPT_GENESIS,
-                true,
-                true,
-                txdata,
-                frozenTXOCheckTransaction,
-                nullptr).value());
+        const auto o{
+            CheckInputs(source->GetToken(),
+                        config,
+                        true,
+                        transaction,
+                        state,
+                        cache,
+                        true,
+                        PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS | SCRIPT_GENESIS,
+                        true,
+                        true,
+                        txdata,
+                        frozenTXOCheckTransaction,
+                        nullptr)};
+        assert(o);
+        BOOST_CHECK(!o.value());
 
         // Make sure this transaction was not cached (ie becausethe first input
         // was valid)
         std::vector<CScriptCheck> scriptchecks;
-        BOOST_CHECK(
-            CheckInputs(
-                source->GetToken(),
-                config,
-                true,
-                transaction,
-                state,
-                cache,
-                true,
-                PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS | SCRIPT_GENESIS,
-                true,
-                true,
-                txdata,
-                frozenTXOCheckTransaction,
-                &scriptchecks).value());
+        const auto o2{
+            CheckInputs(source->GetToken(),
+                        config,
+                        true,
+                        transaction,
+                        state,
+                        cache,
+                        true,
+                        PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS | SCRIPT_GENESIS,
+                        true,
+                        true,
+                        txdata,
+                        frozenTXOCheckTransaction,
+                        &scriptchecks)};
+        assert(o2);
+        BOOST_CHECK(o2.value());
         // Should get 2 script checks back -- caching is on a whole-transaction
         // basis.
         BOOST_CHECK_EQUAL(scriptchecks.size(), 2U);

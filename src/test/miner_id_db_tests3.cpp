@@ -195,8 +195,10 @@ namespace
                 UniValue revocationMessage { UniValue::VOBJ };
                 revocationMessage.push_back(Pair("compromised_minerId", v3Params.revocationMessage->mCompromisedId));
                 document.push_back(Pair("revocationMessage", revocationMessage));
+                // NOLINTBEGIN(bugprone-unchecked-optional-access)
                 document.push_back(Pair("revocationMessageSig", CreateSignatureRevocationMessage(
                     v3Params.revocationMessage.value(), v3Params.revocationKey, v3Params.revocationCurrentMinerIdKey.value())));
+                // NOLINTEND(bugprone-unchecked-optional-access)
             }
         }
         else
@@ -216,6 +218,7 @@ namespace
         {
             UniValue dataRefsJson { UniValue::VOBJ };
             UniValue dataRefsArray { UniValue::VARR };
+
             for(const auto& ref : *dataRefs)
             {
                 UniValue dataRefJson { UniValue::VOBJ };
@@ -566,6 +569,7 @@ namespace
             if(baseDocument)
             {
                 // Sign base document
+                assert(minerKey);
                 std::vector<uint8_t> signature { CreateSignatureOverDocument(*minerKey, baseDocument->write()) };
 
                 // Update coinbase to include miner ID or miner-info reference
@@ -692,7 +696,7 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests3_id>
         CBlock block {};
         BOOST_REQUIRE(blockindex->ReadBlockFromDisk(block, GlobalConfig::GetConfig()));
         std::optional<MinerId> minerId { FindMinerId(block, blockindex->GetHeight()) };
-        BOOST_REQUIRE(minerId);
+        assert(minerId);
         return *minerId;
     }
 
@@ -714,12 +718,12 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests3_id>
             CBlock block {};
             BOOST_REQUIRE(blockindex->ReadBlockFromDisk(block, GlobalConfig::GetConfig()));
             std::optional<MinerId> minerID { FindMinerId(block, blockindex->GetHeight()) };
-            BOOST_REQUIRE(minerID);
+            assert(minerID);
 
             // Check for matching minerContact
             const CoinbaseDocument& cbd { minerID->GetCoinbaseDocument() };
             std::optional<UniValue> minerContact { cbd.GetMinerContact() };
-            BOOST_REQUIRE(minerContact);
+            assert(minerContact);
             const auto& minerName { (*minerContact)["name"] };
             BOOST_REQUIRE(minerName.isStr());
             if(minerName.get_str() == name)
@@ -1430,7 +1434,9 @@ BOOST_FIXTURE_TEST_CASE(InvalidBlock, SetupMinerIDChain)
     // Reputation should now be voided
     minerUUIdEntry = UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second;
     BOOST_CHECK(minerUUIdEntry.mReputation.mVoid);
-    BOOST_CHECK_EQUAL(minerUUIdEntry.mReputation.mVoidingId->GetHash(), miner1IdPubKey2.GetHash());
+    const auto o{minerUUIdEntry.mReputation.mVoidingId};
+    assert(o);
+    BOOST_CHECK_EQUAL(o->GetHash(), miner1IdPubKey2.GetHash());
     BOOST_CHECK(! MinerHasGoodReputation(minerid_db, UnitTestAccess::GetLatestMinerIdByName(minerid_db, mapBlockIndex, "Miner1")));
 }
 
@@ -1561,7 +1567,9 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocation, SetupMinerIDChain)
         BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key2Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash(), miner1IdPubKey2.GetHash());
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash(), miner1IdPubKey2.GetHash());
     }
 
     // Perform a partial revocation of key2 (and key3), rolling it to a new key4
@@ -1584,7 +1592,9 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocation, SetupMinerIDChain)
         BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key3Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key4Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash(), key4.GetPubKey().GetHash());
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash(), key4.GetPubKey().GetHash());
     }
 
     // Duplicate partial revocation of key2 is handled correctly
@@ -1603,7 +1613,9 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocation, SetupMinerIDChain)
         BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key3Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key4Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash(), key4.GetPubKey().GetHash());
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash(), key4.GetPubKey().GetHash());
         BOOST_CHECK_EQUAL(miner1Key4Details.mCoinbaseDoc.GetHeight(), chainActive.Height());
     }
 
@@ -1747,7 +1759,9 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocationFork, SetupMinerIDChain)
         BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash(), key3.GetPubKey().GetHash());
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash(), key3.GetPubKey().GetHash());
     }
 
     // Reorg back to the main chain
@@ -1776,7 +1790,9 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocationFork, SetupMinerIDChain)
         BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash(), key3.GetPubKey().GetHash());
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash(), key3.GetPubKey().GetHash());
         BOOST_CHECK_EQUAL(miner1Key3Details.mCreationBlock, chainActive.Tip()->GetBlockHash());
         BOOST_CHECK_EQUAL(miner1Key3Details.mCoinbaseDoc.GetHeight(), chainActive.Height());
     }
@@ -1798,7 +1814,9 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocationFork, SetupMinerIDChain)
         BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash(), key3.GetPubKey().GetHash());
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash(), key3.GetPubKey().GetHash());
         BOOST_CHECK_EQUAL(miner1Key3Details.mCreationBlock, chainActive.Tip()->GetBlockHash());
         BOOST_CHECK_EQUAL(miner1Key3Details.mCoinbaseDoc.GetHeight(), chainActive.Height());
     }
@@ -1900,7 +1918,9 @@ BOOST_FIXTURE_TEST_CASE(RevokemidRevocation, SetupMinerIDChain)
         BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key2Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
     }
 
     // Send a revokemid message with the wrong revocation key
@@ -1917,7 +1937,9 @@ BOOST_FIXTURE_TEST_CASE(RevokemidRevocation, SetupMinerIDChain)
         BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key2Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
     }
 
     // Send a revokemid message with a bad signature
@@ -1933,7 +1955,9 @@ BOOST_FIXTURE_TEST_CASE(RevokemidRevocation, SetupMinerIDChain)
         BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key2Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
     }
 
     // Perform a partial revocation of key2 (and key3) via a revokemid msg
@@ -1949,7 +1973,9 @@ BOOST_FIXTURE_TEST_CASE(RevokemidRevocation, SetupMinerIDChain)
         BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
     }
 
     // Check we can't now use revoked ID
@@ -1979,7 +2005,9 @@ BOOST_FIXTURE_TEST_CASE(RevokemidRevocation, SetupMinerIDChain)
         BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key3Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key4Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash().ToString(), key4.GetPubKey().GetHash().ToString());
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash().ToString(), key4.GetPubKey().GetHash().ToString());
     }
 }
 
@@ -2014,6 +2042,7 @@ BOOST_FIXTURE_TEST_CASE(RecoverReputation, SetupMinerIDChain)
 
     // Check if GetMinerCoinbaseDocInfo function returns expected results.
     const auto& result { GetMinerCoinbaseDocInfo(minerid_db, miner1IdPubKey2) };
+    assert(result);
     const CoinbaseDocument& coinbaseDoc { result->first };
     BOOST_CHECK_EQUAL(coinbaseDoc.GetMinerId(), HexStr(miner1IdPubKey2));
     BOOST_CHECK_EQUAL(coinbaseDoc.GetPrevMinerId(), HexStr(miner1IdPubKey2));
@@ -2028,7 +2057,9 @@ BOOST_FIXTURE_TEST_CASE(RecoverReputation, SetupMinerIDChain)
     BOOST_CHECK(! MinerHasGoodReputation(minerid_db, miner1IdPubKey2));
     auto minerEntry { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second };
     BOOST_CHECK(minerEntry.mReputation.mVoid);
-    BOOST_CHECK_EQUAL(minerEntry.mReputation.mVoidingId->GetHash(), miner1IdPubKey2.GetHash());
+    const auto o{minerEntry.mReputation.mVoidingId};
+    assert(o);
+    BOOST_CHECK_EQUAL(o->GetHash(), miner1IdPubKey2.GetHash());
 
     // Revoke ID that produced bad block and rotate to new clean ID
     CKey key3 {};
@@ -2132,7 +2163,9 @@ BOOST_FIXTURE_TEST_CASE(FullRevocation, SetupMinerIDChain)
         BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key2Details));
         BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash(), miner1IdPubKey2.GetHash());
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash(), miner1IdPubKey2.GetHash());
     }
 
     // Check a full revocation attempt using a wrong (completely unknown) revocation key is rejected

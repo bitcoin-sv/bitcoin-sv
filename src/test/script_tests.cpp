@@ -287,7 +287,7 @@ static void DoTest(const CScript &scriptPubKey, const CScript &scriptSig,
                                                                      txCredit.vout[0]
                                                                          .nValue),
                                   ms);
-    BOOST_CHECK(res.has_value());
+    assert(res);
     if(scriptError == SCRIPT_ERR_OK)
     {
         BOOST_CHECK_MESSAGE(res->first, std::string(FormatScriptError(res->second)) + " where " +
@@ -1933,8 +1933,8 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                           CScript(&direct[0], &direct[sizeof(direct)]),
                           SCRIPT_VERIFY_P2SH,
                           BaseSignatureChecker());
-    BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<malleability::status>(res.value()));
+    assert(res);
+    BOOST_CHECK(std::holds_alternative<malleability::status>(*res));
 
     LimitedStack pushdata1Stack(UINT32_MAX);
     res = EvalScript(testConfig,
@@ -1944,8 +1944,8 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                      CScript(&pushdata1[0], &pushdata1[sizeof(pushdata1)]),
                      SCRIPT_VERIFY_P2SH,
                      BaseSignatureChecker());
-    BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<malleability::status>(res.value()));
+    assert(res);
+    BOOST_CHECK(std::holds_alternative<malleability::status>(*res));
     BOOST_CHECK(pushdata1Stack == directStack);
 
     LimitedStack pushdata2Stack(UINT32_MAX);
@@ -1956,8 +1956,8 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                      CScript(&pushdata2[0], &pushdata2[sizeof(pushdata2)]),
                      SCRIPT_VERIFY_P2SH,
                      BaseSignatureChecker());
-    BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<malleability::status>(res.value()));
+    assert(res);
+    BOOST_CHECK(std::holds_alternative<malleability::status>(*res));
     BOOST_CHECK(pushdata2Stack == directStack);
 
     LimitedStack pushdata4Stack(UINT32_MAX);
@@ -1968,8 +1968,8 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                      CScript(&pushdata4[0], &pushdata4[sizeof(pushdata4)]),
                      SCRIPT_VERIFY_P2SH,
                      BaseSignatureChecker());
-    BOOST_CHECK(res.has_value());
-    BOOST_CHECK(std::holds_alternative<malleability::status>(res.value()));
+    assert(res);
+    BOOST_CHECK(std::holds_alternative<malleability::status>(*res));
     BOOST_CHECK(pushdata4Stack == directStack);
 }
 
@@ -1999,8 +1999,8 @@ BOOST_AUTO_TEST_CASE(op_pushdata1_op_size)
                                    script,
                                    flags,
                                    BaseSignatureChecker{});
-    BOOST_CHECK(status.has_value()); // NOLINT(bugprone-unchecked-optional-access)
-    BOOST_CHECK(std::holds_alternative<malleability::status>(status.value()));
+    assert(status);
+    BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
     BOOST_CHECK_EQUAL(1U, stack.size());
 }
 
@@ -2030,8 +2030,8 @@ BOOST_AUTO_TEST_CASE(op_pushdata2_op_size)
                                    script,
                                    flags,
                                    BaseSignatureChecker{});
-    BOOST_CHECK(status.has_value()); // NOLINT(bugprone-unchecked-optional-access)
-    BOOST_CHECK(std::holds_alternative<malleability::status>(status.value()));
+    assert(status);
+    BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
     BOOST_CHECK_EQUAL(1U, stack.size());
 }
         
@@ -2065,8 +2065,8 @@ BOOST_AUTO_TEST_CASE(op_pushdata4_op_size)
                                    script,
                                    flags,
                                    BaseSignatureChecker{});
-    BOOST_CHECK(status.has_value()); // NOLINT(bugprone-unchecked-optional-access)
-    BOOST_CHECK(std::holds_alternative<malleability::status>(status.value()));
+    assert(status);
+    BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
     BOOST_CHECK_EQUAL(1U, stack.size());
 }
 
@@ -2130,7 +2130,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
             flags,
             MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
             ms);
-    BOOST_CHECK(res.has_value());
+    assert(res);
     BOOST_CHECK(res->first);
     txTo12.vout[0].nValue = Amount(2);
     res =
@@ -2142,7 +2142,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
             flags,
             MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
             ms);
-    BOOST_CHECK(res.has_value());
+    assert(res);
     BOOST_CHECK(!res->first);
     err = res->second;
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
@@ -2158,7 +2158,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
             flags,
             MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
             ms);
-    BOOST_CHECK(res.has_value());
+    assert(res);
     BOOST_CHECK(res->first);
 
     CScript badsig1 = sign_multisig(scriptPubKey12, key3, CTransaction(txTo12));
@@ -2171,7 +2171,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
             flags,
             MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
             ms);
-    BOOST_CHECK(res.has_value());
+    assert(res);
     BOOST_CHECK(!res->first);
     err = res->second;
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE, ScriptErrorString(err));
@@ -2219,7 +2219,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
             ms);
-    BOOST_CHECK(res.has_value());
+    assert(res);
     BOOST_CHECK(res->first);
 
     keys.clear();
@@ -2235,7 +2235,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
             ms);
-    BOOST_CHECK(res.has_value());
+    assert(res);
     BOOST_CHECK(res->first);
 
     keys.clear();
@@ -2251,7 +2251,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
             ms);
-    BOOST_CHECK(res.has_value());
+    assert(res);
     BOOST_CHECK(res->first);
 
     keys.clear();
@@ -2267,7 +2267,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
             ms);
-    BOOST_CHECK(res.has_value());
+    assert(res);
     BOOST_CHECK(!res->first);
     BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, res->second);
 
@@ -2284,7 +2284,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
             ms);
-    BOOST_CHECK(res.has_value());
+    assert(res);
     BOOST_CHECK(!res->first);
     BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, res->second);
 
@@ -2301,7 +2301,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
             ms);
-    BOOST_CHECK(res.has_value());
+    assert(res);
     BOOST_CHECK(!res->first);
     BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, res->second);
 
@@ -2318,7 +2318,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
             ms);
-    BOOST_CHECK(res.has_value());
+    assert(res);
     BOOST_CHECK(!res->first);
     BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, res->second);
 
@@ -2335,7 +2335,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
             ms);
-    BOOST_CHECK(res.has_value());
+    assert(res);
     BOOST_CHECK(!res->first);
     BOOST_CHECK_EQUAL(SCRIPT_ERR_EVAL_FALSE, res->second);
 
@@ -2350,7 +2350,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
             flags,
             TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
             ms);
-    BOOST_CHECK(res.has_value());
+    assert(res);
     BOOST_CHECK(!res->first);
     BOOST_CHECK_EQUAL(SCRIPT_ERR_INVALID_STACK_OPERATION, res->second);
 }
@@ -2701,7 +2701,7 @@ BOOST_AUTO_TEST_CASE(script_standard_push)
                 SCRIPT_VERIFY_MINIMALDATA,
                 BaseSignatureChecker(),
                 ms);
-        BOOST_CHECK(res.has_value());
+        assert(res);
         BOOST_CHECK_MESSAGE(res->first,
                             "Number " << i << " push is not minimal data.");
     }
@@ -2722,7 +2722,7 @@ BOOST_AUTO_TEST_CASE(script_standard_push)
                 SCRIPT_VERIFY_MINIMALDATA,
                 BaseSignatureChecker(),
                 ms);
-        BOOST_CHECK(res.has_value());
+        assert(res);
         BOOST_CHECK_MESSAGE(res->first,
                             "Length " << i << " push is not minimal data.");
     }
@@ -3357,7 +3357,7 @@ BOOST_AUTO_TEST_CASE(caching_invalid_signatures)
         auto stop_noncached = std::chrono::steady_clock::now();
 
         // check if script successfully verified
-        BOOST_CHECK(res.has_value());
+        assert(res);
         BOOST_CHECK(res->first);
 
         auto start_cached = std::chrono::steady_clock::now();
@@ -3375,7 +3375,7 @@ BOOST_AUTO_TEST_CASE(caching_invalid_signatures)
          auto stop_cached = std::chrono::steady_clock::now();
 
          // check if script successfully verified
-        BOOST_CHECK(res2.has_value());
+        assert(res2);
         BOOST_CHECK(res2->first);
 
         duration_total_noncached += std::chrono::duration_cast<std::chrono::microseconds>(
@@ -3421,8 +3421,8 @@ BOOST_AUTO_TEST_CASE(mt_2_plus_2)
                                        script,
                                        flags,
                                        BaseSignatureChecker{});
-        assert(true == status.has_value());
-        assert(std::holds_alternative<malleability::status>(status.value()));
+        assert(status);
+        assert(std::holds_alternative<malleability::status>(*status));
         assert(n == stack.size());
         const auto frame = stack.front();
         const auto actual = frame.GetElement(); // NOLINT(performance-unnecessary-copy-initialization)
@@ -3545,8 +3545,8 @@ BOOST_AUTO_TEST_CASE(mt_p2pkh)
                                        script,
                                        flags,
                                        sig_checker);
-        assert(true == status.has_value());
-        assert(std::holds_alternative<malleability::status>(status.value()));
+        assert(status);
+        assert(std::holds_alternative<malleability::status>(*status));
         assert(0 == stack.size());
     };
 
@@ -3812,18 +3812,17 @@ BOOST_AUTO_TEST_CASE(EvalScript_lows)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{});
-        BOOST_CHECK(status.has_value());
-        const auto v{status.value()};
+        assert(status);
         if(!exp_error && exp_mall)
         {
-            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
-            BOOST_CHECK_EQUAL(malleability::status{exp_mall.value()},
-                              std::get<malleability::status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+            BOOST_CHECK_EQUAL(malleability::status{*exp_mall},
+                              std::get<malleability::status>(*status));
         }
         else if(exp_error && !exp_mall)
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-            BOOST_CHECK_EQUAL(exp_error.value(), std::get<ScriptError>(v));
+            BOOST_CHECK(std::holds_alternative<ScriptError>(*status));
+            BOOST_CHECK_EQUAL(*exp_error, std::get<ScriptError>(*status));
         }
         else
             assert(false);
@@ -3900,10 +3899,9 @@ BOOST_AUTO_TEST_CASE(VerifyScript_lows)
                                          flags,
                                          always_true_sig_checker{},
                                          ms);
-        BOOST_CHECK(status.has_value());
-        const auto p{status.value()};
-        BOOST_CHECK_EQUAL(exp_error == SCRIPT_ERR_OK, p.first);
-        BOOST_CHECK_EQUAL(exp_error, p.second);
+        assert(status);
+        BOOST_CHECK_EQUAL(exp_error == SCRIPT_ERR_OK, status->first);
+        BOOST_CHECK_EQUAL(exp_error, status->second);
         BOOST_CHECK_EQUAL(exp_mall, malleability::status{ms});
     }
 }
@@ -4031,21 +4029,20 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid_relax)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{});
-        BOOST_CHECK(status.has_value());
-        const auto v{status.value()};
+        assert(status);
         if(!exp_error && exp_mall)
         {
-            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
             
-            BOOST_CHECK_EQUAL(malleability::status{exp_mall.value()},
-                              std::get<malleability::status>(v));
-            const auto ms{std::get<malleability::status>(v)};
-            BOOST_CHECK_EQUAL(exp_mall.value(), ms);
+            BOOST_CHECK_EQUAL(malleability::status{*exp_mall},
+                              std::get<malleability::status>(*status));
+            const auto ms{std::get<malleability::status>(*status)};
+            BOOST_CHECK_EQUAL(*exp_mall, ms);
         }
         else if(exp_error && !exp_mall)
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-            BOOST_CHECK_EQUAL(exp_error.value(), std::get<ScriptError>(v));
+            BOOST_CHECK(std::holds_alternative<ScriptError>(*status));
+            BOOST_CHECK_EQUAL(*exp_error, std::get<ScriptError>(*status));
         }
         else
             BOOST_CHECK(false);
@@ -4175,21 +4172,20 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid_relax)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{});
-        BOOST_CHECK(status.has_value());
-        const auto v{status.value()};
+        assert(status);
         if(!exp_error && exp_mall)
         {
-            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
             
-            BOOST_CHECK_EQUAL(malleability::status{exp_mall.value()},
-                              std::get<malleability::status>(v));
-            const auto ms{std::get<malleability::status>(v)};
-            BOOST_CHECK_EQUAL(exp_mall.value(), ms);
+            BOOST_CHECK_EQUAL(malleability::status{*exp_mall},
+                              std::get<malleability::status>(*status));
+            const auto ms{std::get<malleability::status>(*status)};
+            BOOST_CHECK_EQUAL(*exp_mall, ms);
         }
         else if(exp_error && !exp_mall)
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-            BOOST_CHECK_EQUAL(exp_error.value(), std::get<ScriptError>(v));
+            BOOST_CHECK(std::holds_alternative<ScriptError>(*status));
+            BOOST_CHECK_EQUAL(*exp_error, std::get<ScriptError>(*status));
         }
         else
             BOOST_CHECK(false);
@@ -4244,10 +4240,9 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checksig_forkid_relax)
                                         CScript{s.begin(), s.end()},
                                         flags,
                                         BaseSignatureChecker{});
-        BOOST_CHECK(status.has_value());
-        const auto v{status.value()};
-        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
-        BOOST_CHECK_EQUAL(exp_mall, std::get<malleability::status>(v));
+        assert(status);
+        BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+        BOOST_CHECK_EQUAL(exp_mall, std::get<malleability::status>(*status));
     }
 }
 
@@ -4300,10 +4295,9 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checkmultisig_forkid_relax)
                                         CScript{s.begin(), s.end()},
                                         flags,
                                         BaseSignatureChecker{});
-        BOOST_CHECK(status.has_value());
-        const auto v{status.value()};
-        BOOST_CHECK(std::holds_alternative<malleability::status>(v));
-        BOOST_CHECK_EQUAL(exp_mall, std::get<malleability::status>(v));
+        assert(status);
+        BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+        BOOST_CHECK_EQUAL(exp_mall, std::get<malleability::status>(*status));
     }
 }
 
@@ -4408,18 +4402,17 @@ BOOST_AUTO_TEST_CASE(EvalScript_minimal_encoding)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{});
-        BOOST_CHECK(status.has_value());
-        const auto v{status.value()};
+        assert(status);
         if(!exp_error && exp_mall)
         {
-            BOOST_CHECK(std::holds_alternative<malleability::status>(v));
-            BOOST_CHECK_EQUAL(malleability::status{exp_mall.value()},
-                              std::get<malleability::status>(v));
+            BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+            BOOST_CHECK_EQUAL(malleability::status{*exp_mall},
+                              std::get<malleability::status>(*status));
         }
         else if(exp_error && !exp_mall)
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(v));
-            BOOST_CHECK_EQUAL(exp_error.value(), std::get<ScriptError>(v));
+            BOOST_CHECK(std::holds_alternative<ScriptError>(*status));
+            BOOST_CHECK_EQUAL(*exp_error, std::get<ScriptError>(*status));
         }
         else
             assert(false);
@@ -4491,10 +4484,9 @@ BOOST_AUTO_TEST_CASE(VerifyScript_minimal_encoding)
                                          flags,
                                          BaseSignatureChecker{},
                                          ms);
-        BOOST_CHECK(status.has_value());
-        const auto p{status.value()};
-        BOOST_CHECK_EQUAL(exp_error == SCRIPT_ERR_OK, p.first);
-        BOOST_CHECK_EQUAL(exp_error, p.second);
+        assert(status);
+        BOOST_CHECK_EQUAL(exp_error == SCRIPT_ERR_OK, status->first);
+        BOOST_CHECK_EQUAL(exp_error, status->second);
         BOOST_CHECK_EQUAL(exp_mall, malleability::status{ms});
     }
 }

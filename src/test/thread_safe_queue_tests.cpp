@@ -113,7 +113,9 @@ BOOST_AUTO_TEST_CASE(multiple_inputs_full_queue) {
     BOOST_CHECK(CheckNumberOfRunningThreads(pushers, 2));
 
     // popping one value
-    outValues.insert(theQueue.PopWait().value());
+    const auto o{theQueue.PopWait()};
+    assert(o);
+    outValues.insert(*o);
 
     // the queue is still full
     BOOST_CHECK(WaitFor(
@@ -134,8 +136,8 @@ BOOST_AUTO_TEST_CASE(multiple_inputs_full_queue) {
 
     // take all values from queue, there should be 6 different integers
     const auto contents = theQueue.PopAllWait();
-    BOOST_REQUIRE(contents.has_value());
-    for (const auto& v : contents.value())
+    assert(contents);
+    for(const auto& v : *contents)
     {
         outValues.insert(v);
     }
@@ -188,8 +190,8 @@ BOOST_AUTO_TEST_CASE(fill_replace)
     theQueue.Close();
     BOOST_CHECK(theQueue.IsClosed());
     const auto contents = theQueue.PopAllNoWait();
-    BOOST_REQUIRE(contents.has_value());
-    BOOST_CHECK(contents.value().size() == 5);
+    assert(contents);
+    BOOST_CHECK(contents->size() == 5);
 }
 
 BOOST_AUTO_TEST_CASE(fill_replace_dynamic)
@@ -236,8 +238,8 @@ BOOST_AUTO_TEST_CASE(fill_replace_dynamic)
     theQueue.Close();
     BOOST_CHECK(theQueue.IsClosed());
     const auto contents = theQueue.PopAllNoWait();
-    BOOST_REQUIRE(contents.has_value());
-    BOOST_CHECK(contents.value().size() == 3);
+    assert(contents);
+    BOOST_CHECK(contents->size() == 3);
 }
 
 BOOST_AUTO_TEST_CASE(multiple_outputs)
@@ -462,6 +464,7 @@ BOOST_AUTO_TEST_CASE(nowait) {
     // can pop three values
     BOOST_CHECK(theQueue.PopNoWait().has_value());
     const auto contents = theQueue.PopAllNoWait();
+    assert(contents);
     BOOST_CHECK(contents.has_value());
     BOOST_CHECK(contents.value().size() == 2);
 

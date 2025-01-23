@@ -56,7 +56,7 @@ static bool Verify(const CScript &scriptSig, const CScript &scriptPubKey,
                 SCRIPT_ENABLE_SIGHASH_FORKID,
             MutableTransactionSignatureChecker(&txTo, 0, txFrom.vout[0].nValue),
             ms);
-
+    assert(res);
     err = res->second;
     return res->first;
 }
@@ -163,6 +163,7 @@ BOOST_AUTO_TEST_CASE(sign) {
                 SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC |
                     SCRIPT_ENABLE_SIGHASH_FORKID,
                 false, txdata, std::make_shared<std::atomic<malleability::status>>())(source->GetToken());
+            assert(sigOK);
             if (i == j) {
                 BOOST_CHECK_MESSAGE(sigOK.value(),
                                     strprintf("VerifySignature %d %d", i, j));
@@ -497,11 +498,15 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
 
     bool sigOpCountError;
     activateGenesis();
-    BOOST_CHECK(!::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txTo), coins, 0).value());
+    const auto o{::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txTo), coins, 0)};
+    assert(o);
+    BOOST_CHECK(!o.value());
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txTo), coins, sigOpCountError), 0U);
     
     deactivateGenesis();
-    BOOST_CHECK(::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txTo), coins, 0).value());
+    const auto o2{::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txTo), coins, 0)};
+    assert(o2);
+    BOOST_CHECK(o2.value());
     // 22 P2SH sigops for all inputs (1 for vin[0], 6 for vin[3], 15 for vin[4]
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txTo), coins, sigOpCountError), 22U);
 
@@ -516,11 +521,15 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
         << std::vector<uint8_t>(sixteenSigops.begin(), sixteenSigops.end());
 
     activateGenesis();
-    BOOST_CHECK(!::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd1), coins, 0).value());
+    const auto o3{::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd1), coins, 0)};
+    assert(o3);
+    BOOST_CHECK(!o3.value());
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd1), coins, sigOpCountError), 0U);
     
     deactivateGenesis();
-    BOOST_CHECK(!::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd1), coins, 0).value());
+    const auto o4{::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd1), coins, 0)};
+    assert(o4);
+    BOOST_CHECK(!o4.value());
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd1), coins, sigOpCountError), 16U);
 
     CMutableTransaction txToNonStd2;
@@ -534,11 +543,15 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
         << std::vector<uint8_t>(twentySigops.begin(), twentySigops.end());
 
     activateGenesis();
-    BOOST_CHECK(!::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd2), coins, 0).value());
+    const auto o5{::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd2), coins, 0)};
+    assert(o5);
+    BOOST_CHECK(!o5.value());
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd2), coins, sigOpCountError), 0U);
 
     deactivateGenesis();
-    BOOST_CHECK(!::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd2), coins, 0).value());
+    const auto o6{::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd2), coins, 0)};
+    assert(o6);
+    BOOST_CHECK(!o6.value());
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd2), coins, sigOpCountError), 20U);
 }
 

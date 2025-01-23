@@ -150,6 +150,7 @@ void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
                             verify_flags,
                             TransactionSignatureChecker(&tx, i, amount, txdata),
                             malleability);
+                    assert(o);
                     if(o->first)
                     {
                         err = SCRIPT_ERR_OK;
@@ -584,6 +585,7 @@ void CheckWithFlag(const CheckFlagParams& params)
                 flags.first | SCRIPT_ENABLE_SIGHASH_FORKID,
                 TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue),
                 ms);
+        assert(o);
         const bool ret = o->first;
         BOOST_CHECK_MESSAGE(ret == flags.second, std::string("failed result: ") + (ret? "true":"false"));
     }
@@ -1260,7 +1262,7 @@ BOOST_AUTO_TEST_CASE(test_IsDustReturnTransaction) {
         CTransaction tx = CTransaction(t);
         AnnotatedType<bool> isFree = IsFreeConsolidationTxn(testConfig, tx, coins, 1);
         BOOST_CHECK(isFree.value);
-        BOOST_CHECK(isFree.hint.has_value());
+        assert(isFree.hint);
         BOOST_CHECK(isFree.hint.value() == strprintf("free donation transaction: %s", tx.GetId().ToString()));
     }
 
@@ -1327,7 +1329,7 @@ BOOST_AUTO_TEST_CASE(test_IsConsolidationTransactionStandard) {
         CTransaction tx = CTransaction(t);
         AnnotatedType<bool> isFree = IsFreeConsolidationTxn(testConfig, tx, coins, tipHeight);
         BOOST_CHECK(isFree.value);
-        BOOST_CHECK(isFree.hint.has_value());
+        assert(isFree.hint);
         BOOST_CHECK(isFree.hint.value() == strprintf("free consolidation transaction: %s", tx.GetId().ToString()));
     }
 
@@ -1347,7 +1349,7 @@ BOOST_AUTO_TEST_CASE(test_IsConsolidationTransactionStandard) {
         CTransaction tx = CTransaction(t);
         AnnotatedType<bool> isFree = IsFreeConsolidationTxn(testConfig, tx, coins, tipHeight - 1);
         BOOST_CHECK(!isFree.value);
-        BOOST_CHECK(isFree.hint.has_value());
+        assert(isFree.hint);
         BOOST_CHECK(boost::algorithm::contains(isFree.hint.value(), "minconsolidationinputmaturity"));
     }
 
@@ -1368,7 +1370,7 @@ BOOST_AUTO_TEST_CASE(test_IsConsolidationTransactionStandard) {
         CTransaction tx = CTransaction(t);
         AnnotatedType<bool> isFree = IsFreeConsolidationTxn(testConfig, tx, coins, tipHeight);
         BOOST_CHECK(!isFree.value);
-        BOOST_CHECK(isFree.hint.has_value());
+        assert(isFree.hint);
         BOOST_CHECK(boost::algorithm::contains(isFree.hint.value(), "minconsolidationfactor"));
     }
 
@@ -1378,7 +1380,7 @@ BOOST_AUTO_TEST_CASE(test_IsConsolidationTransactionStandard) {
         CTransaction tx = CTransaction(t);
         AnnotatedType<bool> isFree = IsFreeConsolidationTxn(testConfig, tx, coins, tipHeight);
         BOOST_CHECK(!isFree.value);
-        BOOST_CHECK(isFree.hint.has_value());
+        assert(isFree.hint);
         BOOST_CHECK(boost::algorithm::contains(isFree.hint.value(), "too large scriptSig"));
         BOOST_CHECK(boost::algorithm::contains(isFree.hint.value(), "maxconsolidationinputscriptsize"));
     }
@@ -1403,7 +1405,7 @@ BOOST_AUTO_TEST_CASE(test_IsConsolidationTransactionNonStandard) {
         CTransaction tx = CTransaction(t);
         AnnotatedType<bool> isFree = IsFreeConsolidationTxn(testConfig, tx, coins, tipHeight);
         BOOST_CHECK(isFree.value);
-        BOOST_CHECK(isFree.hint.has_value());
+        assert(isFree.hint);
         BOOST_CHECK(isFree.hint.value() == strprintf("free consolidation transaction: %s", tx.GetId().ToString()));
     }
 
@@ -1414,7 +1416,7 @@ BOOST_AUTO_TEST_CASE(test_IsConsolidationTransactionNonStandard) {
         CTransaction tx = CTransaction(t);
         AnnotatedType<bool> isFree = IsFreeConsolidationTxn(testConfig, tx, coins, tipHeight);
         BOOST_CHECK(!isFree.value);
-        BOOST_CHECK(isFree.hint.has_value());
+        assert(isFree.hint);
         BOOST_CHECK(boost::algorithm::contains(isFree.hint.value(), "acceptnonstdconsolidationinput"));
     }
 }
