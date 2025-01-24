@@ -62,7 +62,7 @@ namespace
         std::vector<CTxMemPoolEntry> contents {};
         for(const auto& entry : mempool.GetSnapshot())
         {
-            contents.push_back(std::move(entry));
+            contents.push_back(entry);
         }
         mempool.Clear();
 
