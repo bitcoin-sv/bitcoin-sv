@@ -430,7 +430,7 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_miner_id_sig)
 }
 
 BOOST_AUTO_TEST_CASE(
-    parse_miner_info_doc__prevMinerIDSig_verification_fail)
+    parse_miner_info_doc_prevMinerIDSig_verification_fail)
 {
     vector<string> values{required_values};
 

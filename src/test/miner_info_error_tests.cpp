@@ -15,7 +15,7 @@ using namespace std;
 
 BOOST_AUTO_TEST_SUITE(miner_info_error_tests)
 
-BOOST_AUTO_TEST_CASE(miner_info_error__op_insertion)
+BOOST_AUTO_TEST_CASE(miner_info_error_op_insertion)
 {
     const array<string, 46> expected{
         "miner info ref not found",

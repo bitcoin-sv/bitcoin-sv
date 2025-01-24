@@ -238,7 +238,7 @@ BOOST_AUTO_TEST_CASE(premature_implicit_cancellation_and_reusing_the_worst_check
     threadGroup.join_all();
 }
 
-BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_wait_before_session)
+BOOST_AUTO_TEST_CASE(checkqueue_invalid_use_call_wait_before_session)
 {
     CCheckQueue<CDummyValidator> scriptCheckQueue{128};
 
@@ -248,7 +248,7 @@ BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_wait_before_session)
     scriptCheckQueue.Wait();
 }
 
-BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_add_before_session)
+BOOST_AUTO_TEST_CASE(checkqueue_invalid_use_call_add_before_session)
 {
     CCheckQueue<CDummyValidator> scriptCheckQueue{128};
 
@@ -261,7 +261,7 @@ BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_add_before_session)
     scriptCheckQueue.Wait();
 }
 
-BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_add_after_wait)
+BOOST_AUTO_TEST_CASE(checkqueue_invalid_use_call_add_after_wait)
 {
     CCheckQueue<CDummyValidator> scriptCheckQueue{128};
 
@@ -275,7 +275,7 @@ BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_add_after_wait)
     BOOST_CHECK_THROW(scriptCheckQueue.Add(check), std::runtime_error);
 }
 
-BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_second_session_before_wait)
+BOOST_AUTO_TEST_CASE(checkqueue_invalid_use_call_second_session_before_wait)
 {
     CCheckQueue<CDummyValidator> scriptCheckQueue{128};
 
