@@ -105,14 +105,14 @@ class CTestCoinsView
 {
 public:
     CTestCoinsView(CCoinsProviderTest& providerIn)
-        : provider{providerIn}
+        : provider{&providerIn}
     {
-        provider.ReadLock( mLock );
+        provider->ReadLock( mLock );
     }
 
     std::optional<Coin> GetCoin(const COutPoint& outpoint) const
     {
-        auto coinData = provider.GetCoin(outpoint, 0);
+        auto coinData = provider->GetCoin(outpoint, 0);
         if(coinData.has_value())
         {
             return Coin{coinData.value()};
@@ -122,7 +122,7 @@ public:
     }
     std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const
     {
-        auto coinData = provider.GetCoin(outpoint, std::numeric_limits<size_t>::max());
+        auto coinData = provider->GetCoin(outpoint, std::numeric_limits<size_t>::max());
         if(coinData.has_value())
         {
             assert(coinData->HasScript());
@@ -134,7 +134,7 @@ public:
     }
 
 private:
-    CCoinsProviderTest& provider;
+    CCoinsProviderTest* provider;
     WPUSMutex::Lock mLock;
 };
 

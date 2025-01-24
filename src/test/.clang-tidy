@@ -8,7 +8,6 @@ Checks: '-clang-analyzer-*,
          -cert-err58-cpp,
           
          -cppcoreguidelines-avoid-c-arrays,
-         -cppcoreguidelines-avoid-const-or-ref-data-members,
          -cppcoreguidelines-avoid-non-const-global-variables,
          -cppcoreguidelines-narrowing-conversions,
          -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
