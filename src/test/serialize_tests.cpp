@@ -50,7 +50,7 @@ public:
                                 bool boolvalin,
                                 std::string stringvalin,
                                 const char* charstrvalin,
-                                CTransaction txvalin)
+                                const CTransaction& txvalin)
         : intval(intvalin),
           boolval(boolvalin),
           stringval(std::move(stringvalin)),

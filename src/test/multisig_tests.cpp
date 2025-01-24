@@ -26,8 +26,11 @@ typedef std::vector<uint8_t> valtype;
 
 BOOST_FIXTURE_TEST_SUITE(multisig_tests, BasicTestingSetup)
 
-CScript sign_multisig(CScript scriptPubKey, std::vector<CKey> keys,
-                      CMutableTransaction mutableTransaction, int whichIn) {
+CScript sign_multisig(const CScript& scriptPubKey,
+                      const std::vector<CKey>& keys,
+                      const CMutableTransaction& mutableTransaction,
+                      int whichIn)
+{
     uint256 hash = SignatureHash(scriptPubKey, CTransaction(mutableTransaction),
                                  whichIn, SigHashType(), Amount(0));
 

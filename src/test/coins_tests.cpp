@@ -282,7 +282,7 @@ static const auto FLAGS = {char(0), FRESH, DIRTY, char(DIRTY | FRESH)};
 static const auto CLEAN_FLAGS = {char(0), FRESH};
 static const auto ABSENT_FLAGS = {NO_ENTRY};
 
-static void SetCoinValue(const Amount value, CCoinsCacheEntry &coin, char flags) {
+static void SetCoinValue(const Amount& value, CCoinsCacheEntry &coin, char flags) {
     assert(value != ABSENT);
     coin = {CoinImpl{}, static_cast<uint8_t>(flags)};
     assert(coin.GetCoin().IsSpent());
@@ -298,7 +298,7 @@ static void SetCoinValue(const Amount value, CCoinsCacheEntry &coin, char flags)
     }
 }
 
-size_t InsertCoinMapEntry(CCoinsMap &map, const Amount value, char flags) {
+size_t InsertCoinMapEntry(CCoinsMap &map, const Amount& value, char flags) {
     if (value == ABSENT) {
         assert(flags == NO_ENTRY);
         return 0;
@@ -329,7 +329,7 @@ void GetCoinMapEntry(const CCoinsMap &map, Amount &value, char &flags) {
     }
 }
 
-void WriteCoinViewEntry(TestCoinsSpanCache& span, const Amount value, char flags) {
+void WriteCoinViewEntry(TestCoinsSpanCache& span, const Amount& value, char flags) {
     CCoinsMap map;
     InsertCoinMapEntry(map, value, flags);
     span.BatchWrite(map, uint256S("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"));
@@ -337,8 +337,10 @@ void WriteCoinViewEntry(TestCoinsSpanCache& span, const Amount value, char flags
 
 class SingleEntryCacheTest {
 public:
-    SingleEntryCacheTest(const Amount base_value, const Amount cache_value,
-                         char cache_flags){
+    SingleEntryCacheTest(const Amount& base_value,
+                         const Amount& cache_value,
+                         char cache_flags)
+    {
         {
             TestCoinsSpanCache span{base};
             WriteCoinViewEntry(span, base_value,
@@ -357,9 +359,12 @@ public:
     std::unique_ptr<CCoinsViewCacheTest> cache;
 };
 
-void CheckAccessCoin(const Amount base_value, const Amount cache_value,
-                     const Amount expected_value, char cache_flags,
-                     char expected_flags) {
+void CheckAccessCoin(const Amount& base_value,
+                     const Amount& cache_value,
+                     const Amount& expected_value,
+                     char cache_flags,
+                     char expected_flags)
+{
     SingleEntryCacheTest test(base_value, cache_value, cache_flags);
     test.cache->GetCoin(OUTPOINT);
     test.cache->SelfTest();
@@ -408,9 +413,12 @@ BOOST_AUTO_TEST_CASE(coin_access) {
     CheckAccessCoin(VALUE1, VALUE2, VALUE2, DIRTY | FRESH, DIRTY | FRESH);
 }
 
-void CheckSpendCoin(Amount base_value, Amount cache_value,
-                    Amount expected_value, char cache_flags,
-                    char expected_flags) {
+void CheckSpendCoin(const Amount& base_value,
+                    const Amount& cache_value,
+                    const Amount& expected_value,
+                    char cache_flags,
+                    char expected_flags)
+{
     SingleEntryCacheTest test(base_value, cache_value, cache_flags);
     test.cache->SpendCoin(OUTPOINT);
     test.cache->SelfTest();
@@ -460,9 +468,15 @@ BOOST_AUTO_TEST_CASE(coin_spend) {
     CheckSpendCoin(VALUE1, VALUE2, ABSENT, DIRTY | FRESH, NO_ENTRY);
 }
 
-void CheckAddCoinBase(Amount base_value, Amount cache_value,
-                      Amount modify_value, Amount expected_value,
-                      char cache_flags, char expected_flags, bool coinbase, bool confiscation=false) {
+void CheckAddCoinBase(const Amount& base_value,
+                      const Amount& cache_value,
+                      const Amount& modify_value,
+                      const Amount& expected_value,
+                      char cache_flags,
+                      char expected_flags,
+                      bool coinbase,
+                      bool confiscation = false)
+{
     SingleEntryCacheTest test(base_value, cache_value, cache_flags);
 
     Amount result_value;
@@ -548,9 +562,13 @@ BOOST_AUTO_TEST_CASE(coin_add) {
     CheckAddCoin(VALUE2, VALUE3, VALUE3, DIRTY | FRESH, DIRTY | FRESH, true);
 }
 
-void CheckWriteCoin(Amount parent_value, Amount child_value,
-                    Amount expected_value, char parent_flags, char child_flags,
-                    char expected_flags) {
+void CheckWriteCoin(const Amount& parent_value,
+                    const Amount& child_value,
+                    const Amount& expected_value,
+                    char parent_flags,
+                    char child_flags,
+                    char expected_flags)
+{
     SingleEntryCacheTest test(ABSENT, parent_value, parent_flags);
 
     Amount result_value;

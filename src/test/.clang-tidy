@@ -20,7 +20,6 @@ Checks: '-clang-analyzer-*,
          -cppcoreguidelines-special-member-functions,
 
          -performance-unnecessary-copy-initialization,
-         -performance-unnecessary-value-param,
       '
 
 InheritParentConfig: true
