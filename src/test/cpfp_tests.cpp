@@ -114,6 +114,7 @@ std::vector<std::tuple<TxId, size_t, Amount>> MakeConfirmedInputs(size_t count, 
 {
     static uint16_t nextTxid = 1;
     std::vector<std::tuple<TxId, size_t, Amount>> inputs;
+    inputs.reserve(count);
     for (size_t i = 0; i < count; i++)
     {
         inputs.push_back(std::make_tuple(MakeId(nextTxid++), i, value));

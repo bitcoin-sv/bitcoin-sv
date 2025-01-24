@@ -167,9 +167,10 @@ BOOST_AUTO_TEST_CASE(protocol_estimate_inv_elements)
     GlobalConfig config;
     config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
     const CNetMsgMaker msgMaker(INIT_PROTO_VERSION);
-    std::vector<CInv> vInv;
     uint32_t maxRecvPayloadLength = CInv::estimateMaxInvElements(config.GetMaxProtocolRecvPayloadLength());
 
+    std::vector<CInv> vInv;
+    vInv.reserve(maxRecvPayloadLength);
     for (uint32_t i = 0; i < maxRecvPayloadLength - 1; i++) {
         vInv.emplace_back(1, uint256());
     }

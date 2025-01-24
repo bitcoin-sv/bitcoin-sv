@@ -1622,6 +1622,7 @@ BOOST_FIXTURE_TEST_CASE(cache_all_inputs, TestingSetup)
 
         std::thread spawner([&]() {
             std::vector<std::thread> threads;
+            threads.reserve(NumTxns);
             for(int i = 0; i < NumTxns; ++i) {
                 threads.emplace_back([&]() {
                     // Cache them all (Except the first in the list, which the function expects to be coinbase)

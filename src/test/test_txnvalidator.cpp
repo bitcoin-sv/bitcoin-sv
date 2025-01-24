@@ -106,8 +106,10 @@ namespace {
                                                       CKey& key,
                                                       CScript& scriptPubKey) {
         // Create txns spending the same coinbase txn.
-        std::vector<CMutableTransaction> spends {};
-        for (size_t i=0; i<nSpendTxns; i++) {
+        std::vector<CMutableTransaction> spends{};
+        spends.reserve(nSpendTxns);
+        for(size_t i=0; i<nSpendTxns; i++)
+        {
             spends.emplace_back(CreateDoubleSpendTxn(fundTxn, key, scriptPubKey));
         };
         return spends;

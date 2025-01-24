@@ -95,8 +95,9 @@ BOOST_AUTO_TEST_CASE(empty)
 // Simple case where no transactions share any dependencies
 BOOST_AUTO_TEST_CASE(independent_groups)
 {
-    std::vector<CTransactionRef> vtx {};
     constexpr size_t NumTxns {10};
+    std::vector<CTransactionRef> vtx{};
+    vtx.reserve(NumTxns);
     for(size_t i = 0; i < NumTxns; ++i)
     {
         vtx.push_back(CreateRandomTransaction({}));
@@ -141,8 +142,9 @@ BOOST_AUTO_TEST_CASE(independent_groups)
 // Some transactions share a single dependency
 BOOST_AUTO_TEST_CASE(single_dependency)
 {
-    std::vector<CTransactionRef> vtx {};
     constexpr size_t NumBaseTxns {10};
+    std::vector<CTransactionRef> vtx{};
+    vtx.reserve(NumBaseTxns);
     for(size_t i = 0; i < NumBaseTxns; ++i)
     {
         vtx.push_back(CreateRandomTransaction({}));
@@ -173,8 +175,9 @@ BOOST_AUTO_TEST_CASE(single_dependency)
 // Some transactions have multiple dependencies requiring groups to be combined
 BOOST_AUTO_TEST_CASE(multi_dependency)
 {
-    std::vector<CTransactionRef> vtx {};
     constexpr size_t NumBaseTxns {10};
+    std::vector<CTransactionRef> vtx{};
+    vtx.reserve(NumBaseTxns);
     for(size_t i = 0; i < NumBaseTxns; ++i)
     {
         vtx.push_back(CreateRandomTransaction({}));

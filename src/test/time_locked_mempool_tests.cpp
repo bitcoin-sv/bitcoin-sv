@@ -95,8 +95,8 @@ namespace
     // Create some transactions to use in tests
     std::vector<CMutableTransaction> CreateTransactions()
     {
-        std::vector<CMutableTransaction> txns {};
-
+        std::vector<CMutableTransaction> txns{};
+        txns.reserve(NumTxns);
         for(unsigned i = 0; i < NumTxns; ++i)
         {
             txns.emplace_back(CreateRandomTransaction(i));

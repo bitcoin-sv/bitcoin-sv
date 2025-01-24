@@ -381,11 +381,13 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
     CCoinsViewCache coins(coinsDummy);
     CBasicKeyStore keystore;
     CKey key[6];
-    std::vector<CPubKey> keys;
     for (int i = 0; i < 6; i++) {
         key[i].MakeNewKey(true);
         keystore.AddKey(key[i]);
     }
+    
+    std::vector<CPubKey> keys;
+    keys.reserve(3);
     for (int i = 0; i < 3; i++)
         keys.push_back(key[i].GetPubKey());
 
