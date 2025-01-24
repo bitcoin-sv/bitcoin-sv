@@ -411,7 +411,6 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
 
 BOOST_AUTO_TEST_CASE(test_sigops_limits) {
     Config& config = GlobalConfig::GetConfig();
-    std::string error;
     uint64_t expected_res = MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS;
 
     BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(1), expected_res);

@@ -1432,7 +1432,6 @@ std::string getVoutTypeForScriptPubKey(const CScript& scriptPubKey, ProtocolEra 
     t.vout.resize(1);
     t.vout[0].nValue = 90 * CENT;
 
-    std::string reason;    
     t.vout[0].scriptPubKey = scriptPubKey;
     CTransaction t2 { t };
     

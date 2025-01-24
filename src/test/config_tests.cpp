@@ -755,7 +755,6 @@ BOOST_AUTO_TEST_CASE(banned_clientua_test)
 BOOST_AUTO_TEST_CASE(prune_config_test)
 {
     GlobalConfig config {};
-    std::string err {};
 
     BOOST_CHECK_EQUAL(config.GetMinBlocksToKeep(), DEFAULT_MIN_BLOCKS_TO_KEEP);
     BOOST_CHECK(config.SetMinBlocksToKeep(MIN_MIN_BLOCKS_TO_KEEP));

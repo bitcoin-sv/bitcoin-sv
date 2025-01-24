@@ -208,6 +208,7 @@ BOOST_AUTO_TEST_CASE(premature_implicit_cancellation_and_reusing_the_worst_check
                 std::lock_guard lock{worstWaitSyncLock};
                 BOOST_CHECK(!checkerWorst.Wait().has_value());
             });
+    assert(future.valid());
 
     // since we do not have any idle checkers left in the pool checkerWorst
     // should be terminated by the pool without blocking
