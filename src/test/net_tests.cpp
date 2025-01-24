@@ -150,7 +150,7 @@ BOOST_AUTO_TEST_CASE(cnode_simple_test) {
     NodeId id = 0;
     int32_t height = 0;
 
-    in_addr ipv4Addr;
+    in_addr ipv4Addr; // NOLINT(cppcoreguidelines-pro-type-member-init)
     ipv4Addr.s_addr = 0xa0b0c001;
 
     CAddress addr = CAddress(CService(ipv4Addr, 7777), NODE_NETWORK);

@@ -41,7 +41,7 @@ protected:
     int intval{};
     bool boolval{};
     std::string stringval;
-    const char *charstrval;
+    const char* charstrval{nullptr};
     CTransactionRef txval;
 
 public:

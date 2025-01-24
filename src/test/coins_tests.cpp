@@ -93,7 +93,7 @@ protected:
     }
 
 private:
-    mutable uint64_t mLatestRequestedScriptSize;
+    mutable uint64_t mLatestRequestedScriptSize{};
     mutable std::optional<CoinImpl> mLatestGetCoin;
     std::optional<uint64_t> mOverrideSize;
 

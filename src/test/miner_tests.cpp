@@ -328,7 +328,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     mempool.Clear();
 
     // Invalid (pre-p2sh) txn in mempool, template creation fails.
-    std::array<int64_t, CBlockIndex::nMedianTimeSpan> times;
+    std::array<int64_t, CBlockIndex::nMedianTimeSpan> times{};
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Trick the MedianTimePast.
         times[i] = chainActive.Tip() // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)

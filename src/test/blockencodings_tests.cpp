@@ -153,6 +153,7 @@ public:
     std::vector<uint64_t> shorttxids;
     std::vector<PrefilledTransaction> prefilledtxn;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     TestHeaderAndShortIDs(const CBlockHeaderAndShortTxIDs &orig) {
         CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
         stream << orig;
