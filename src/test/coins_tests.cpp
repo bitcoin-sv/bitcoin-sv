@@ -370,7 +370,7 @@ void CheckAccessCoin(const Amount& base_value,
     test.cache->SelfTest();
 
     Amount result_value;
-    char result_flags;
+    char result_flags{};
     GetCoinMapEntry(test.cache->GetRawCacheCoins(), result_value, result_flags);
     BOOST_CHECK_EQUAL(result_value, expected_value);
     BOOST_CHECK_EQUAL(result_flags, expected_flags);
@@ -424,7 +424,7 @@ void CheckSpendCoin(const Amount& base_value,
     test.cache->SelfTest();
 
     Amount result_value;
-    char result_flags;
+    char result_flags{};
     GetCoinMapEntry(test.cache->GetRawCacheCoins(), result_value, result_flags);
     BOOST_CHECK_EQUAL(result_value, expected_value);
     BOOST_CHECK_EQUAL(result_flags, expected_flags);
@@ -480,7 +480,7 @@ void CheckAddCoinBase(const Amount& base_value,
     SingleEntryCacheTest test(base_value, cache_value, cache_flags);
 
     Amount result_value;
-    char result_flags;
+    char result_flags{};
     try {
         CTxOut output;
         output.nValue = modify_value;
@@ -572,7 +572,7 @@ void CheckWriteCoin(const Amount& parent_value,
     SingleEntryCacheTest test(ABSENT, parent_value, parent_flags);
 
     Amount result_value;
-    char result_flags;
+    char result_flags{};
     try {
         WriteCoinViewEntry(*test.cache, child_value, child_flags);
         test.cache->SelfTest();

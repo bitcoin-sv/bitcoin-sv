@@ -49,7 +49,7 @@ CScript sign_multisig(const CScript& scriptPubKey,
 BOOST_AUTO_TEST_CASE(multisig_verify) {
     uint32_t flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC;
 
-    ScriptError err;
+    ScriptError err{};
     CKey key[4];
     Amount amount(0);
     for (int i = 0; i < 4; i++) {
@@ -235,7 +235,7 @@ BOOST_AUTO_TEST_CASE(multisig_IsStandard) {
     for (int i = 0; i < 4; i++)
         key[i].MakeNewKey(true);
 
-    txnouttype whichType;
+    txnouttype whichType{};
 
     CScript a_and_b;
     a_and_b << OP_2 << ToByteVector(key[0].GetPubKey())
@@ -304,7 +304,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
 
     { // P2PK
         std::vector<valtype> solutions;
-        txnouttype whichType;
+        txnouttype whichType{};
         CScript s;
         s << ToByteVector(key[0].GetPubKey()) << OP_CHECKSIG;
         for(ProtocolEra genesisEnabled : {ProtocolEra::PostGenesis, ProtocolEra::PreGenesis}){
@@ -319,7 +319,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
     }
     { // P2PKH
         std::vector<valtype> solutions;
-        txnouttype whichType;
+        txnouttype whichType{};
         CScript s;
         s << OP_DUP << OP_HASH160 << ToByteVector(key[0].GetPubKey().GetID())
           << OP_EQUALVERIFY << OP_CHECKSIG;
@@ -351,7 +351,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
     }
     { // Multisig
         std::vector<valtype> solutions;
-        txnouttype whichType;
+        txnouttype whichType{};
         CScript s;
         s << OP_2 << ToByteVector(key[0].GetPubKey())
           << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
@@ -367,7 +367,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
     }
     { // Multisig
         std::vector<valtype> solutions;
-        txnouttype whichType;
+        txnouttype whichType{};
         CScript s;
         s << OP_1 << ToByteVector(key[0].GetPubKey())
           << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
@@ -377,7 +377,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
             BOOST_CHECK_EQUAL(solutions.size(), 4U);
             
             std::vector<CTxDestination> addrs;
-            int nRequired;        
+            int nRequired{};        
             BOOST_CHECK(ExtractDestinations(s, genesisEnabled, whichType, addrs, nRequired));
             BOOST_CHECK(addrs[0] == keyaddr[0]);
             BOOST_CHECK(addrs[1] == keyaddr[1]);
@@ -391,7 +391,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
     }
     { // Multisig
         std::vector<valtype> solutions;
-        txnouttype whichType;
+        txnouttype whichType{};
         CScript s;
         s << OP_2 << ToByteVector(key[0].GetPubKey())
           << ToByteVector(key[1].GetPubKey())

@@ -177,7 +177,7 @@ BOOST_AUTO_TEST_CASE(sign) {
 }
 
 BOOST_AUTO_TEST_CASE(norecurse) {
-    ScriptError err;
+    ScriptError err{};
     // Make sure only the outer pay-to-script-hash does the
     // extra-validation thing:
     CScript invalidAsScript;
@@ -360,7 +360,7 @@ BOOST_AUTO_TEST_CASE(is) {
 BOOST_AUTO_TEST_CASE(switchover) {
     // Test switch over code
     CScript notValid;
-    ScriptError err;
+    ScriptError err{};
     notValid << OP_11 << OP_12 << OP_EQUALVERIFY;
     CScript scriptSig;
     scriptSig << Serialize(notValid);
@@ -498,7 +498,7 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
 
     auto source = task::CCancellationSource::Make();
 
-    bool sigOpCountError;
+    bool sigOpCountError{};
     activateGenesis();
     const auto o{::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txTo), coins, 0)};
     assert(o);
