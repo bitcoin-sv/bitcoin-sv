@@ -274,7 +274,7 @@ static void DoTest(const CScript &scriptPubKey, const CScript &scriptSig,
     CMutableTransaction txCredit =
         BuildCreditingTransaction(scriptPubKey, nValue);
     CMutableTransaction tx = BuildSpendingTransaction(scriptSig, txCredit);
-    CMutableTransaction tx2 = tx;
+    CMutableTransaction tx2 = tx; // NOLINT(performance-unnecessary-copy-initialization)
     std::atomic<malleability::status> ms {};
     const auto res = VerifyScript(config,
                                   true,

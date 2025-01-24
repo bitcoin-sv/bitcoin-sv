@@ -103,7 +103,7 @@ namespace
         for (auto iter = std::next(vtx.begin(), 1); transactionsToDrop > 0;
              ++iter, --transactionsToDrop)
         {
-            auto txn = *iter;
+            const auto& txn = *iter;
             const auto tx = MakeTransactionRef(*txn);
             CJournalEntry entry { JournalEntryAccess::Make(
                 std::make_shared<CTransactionWrapper>(tx, nullptr),

@@ -1181,7 +1181,7 @@ BOOST_FIXTURE_TEST_CASE(KeyRotation, SetupMinerIDChain)
 
     // Check we reject an attempt to re-roll an already rotated miner ID
     {
-        CKey oldKey { keys[keys.size() - 2] };
+        const CKey& oldKey { keys[keys.size() - 2] };
         const auto& oldMinerIdDetails { UnitTestAccess::GetMinerIdEntry(minerid_db, oldKey.GetPubKey().GetHash()) };
         BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(oldMinerIdDetails));
         const auto& oldMinerIds { UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner2") };

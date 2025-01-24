@@ -39,14 +39,14 @@ BOOST_AUTO_TEST_CASE(CallbackMsg)
         BOOST_CHECK_EQUAL(ipv4_callback.GetVersionByte(), 0x01);
         BOOST_CHECK_EQUAL(ipv4_callback.GetProtocolVersion(), 1U);
 
-        auto addrs { ipv4_callback.GetAddresses() };
+        const auto& addrs { ipv4_callback.GetAddresses() };
         BOOST_REQUIRE_EQUAL(addrs.size(), 1U);
         CNetAddr addr {};
         addr.SetRaw(NET_IPV4, addrs[0].data());
         BOOST_CHECK_EQUAL(addr.ToStringIP(), ip);
         BOOST_CHECK_EQUAL(DSCallbackMsg::IPAddrToString(addrs[0]), ip);
 
-        auto inputs { ipv4_callback.GetInputs() };
+        const auto& inputs { ipv4_callback.GetInputs() };
         BOOST_REQUIRE_EQUAL(inputs.size(), 2U);
         BOOST_CHECK_EQUAL(inputs[0], 0U);
         BOOST_CHECK_EQUAL(inputs[1], 3U);
@@ -59,7 +59,7 @@ BOOST_AUTO_TEST_CASE(CallbackMsg)
         BOOST_CHECK_EQUAL(ipv6_callback.GetVersionByte(), 0x81);
         BOOST_CHECK_EQUAL(ipv6_callback.GetProtocolVersion(), 1U);
 
-        auto addrs { ipv6_callback.GetAddresses() };
+        const auto& addrs { ipv6_callback.GetAddresses() };
         BOOST_REQUIRE_EQUAL(addrs.size(), 1U);
         CNetAddr addr {};
         addr.SetRaw(NET_IPV6, addrs[0].data());
