@@ -493,9 +493,10 @@ BOOST_AUTO_TEST_CASE(merkle_proof)
 
         // Return nodes list
         vector<MerkleProof::Node> nodes{};
+        nodes.reserve(treeProof.merkleTreeHashes.size());
         for(const auto& node : treeProof.merkleTreeHashes)
         {
-            nodes.push_back(MerkleProof::Node{node}); // NOLINT(performance-inefficient-vector-operation)
+            nodes.push_back(MerkleProof::Node{node});
         }
 
         return make_tuple(nodes, checkRoot, treeProof);

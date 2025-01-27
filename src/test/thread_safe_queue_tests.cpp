@@ -92,12 +92,13 @@ BOOST_AUTO_TEST_CASE(multiple_inputs_full_queue) {
     BOOST_CHECK(theQueue.MaximalSize() == 5);
 
     std::vector<std::future<void>> pushers;
+    pushers.reserve(7);
     std::set<int> outValues;
 
     // adding 7 integers in queue of capacity of 5
     for(int i = 0; i < 7; i++)
     {
-        pushers.push_back(std::async(std::launch::async, // NOLINT(performance-inefficient-vector-operation)
+        pushers.push_back(std::async(std::launch::async,
             [&theQueue, i](){ 
                 theQueue.PushWait(i);
             }));

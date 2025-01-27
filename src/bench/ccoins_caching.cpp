@@ -287,8 +287,9 @@ static void CCoinsInsertion(benchmark::State &state, bool V1) {
 
         std::thread spawner([&]() {
             std::vector<std::thread> threads;
+            threads.reserve(NumTxns);
             for(int i = 0; i < NumTxns; ++i) {
-                threads.emplace_back([&]() { // NOLINT(performance-inefficient-vector-operation)
+                threads.emplace_back([&]() {
                     // Cache them all (Except the first in the list, which the function expects to be coinbase)
                     provider.DBCacheAllInputs(txns, V1);
                 });

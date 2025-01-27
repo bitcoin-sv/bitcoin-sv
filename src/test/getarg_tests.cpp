@@ -24,8 +24,9 @@ static void ResetArgs(const std::string &strArg) {
 
     // Convert to char*:
     std::vector<const char *> vecChar;
+    vecChar.reserve(vecArg.size());
     for (std::string &s : vecArg) {
-        vecChar.push_back(s.c_str()); // NOLINT(performance-inefficient-vector-operation)
+        vecChar.push_back(s.c_str());
     }
 
     gArgs.ParseParameters(vecChar.size(), &vecChar[0]); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)

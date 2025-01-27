@@ -70,7 +70,7 @@ BOOST_AUTO_TEST_CASE(dbwrapper_batch) {
     for (int i = 0; i < 2; i++) {
         bool obfuscate = (bool)i;
         fs::path ph = fs::temp_directory_path() / fs::unique_path();
-        CDBWrapper dbw(ph, (1 << 20), true, false, obfuscate); // NOLINT(performance-inefficient-vector-operation)
+        CDBWrapper dbw(ph, (1 << 20), true, false, obfuscate);
 
         char key = 'i';
         uint256 in = InsecureRand256();

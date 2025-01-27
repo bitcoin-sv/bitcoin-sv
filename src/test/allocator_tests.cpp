@@ -75,8 +75,9 @@ BOOST_AUTO_TEST_CASE(arena_tests) {
     b.walk();
 #endif
     // Sweeping allocate all memory
+    addr.reserve(1024);
     for (int x = 0; x < 1024; ++x)
-        addr.push_back(b.alloc(1024)); // NOLINT(performance-inefficient-vector-operation)
+        addr.push_back(b.alloc(1024));
     BOOST_CHECK(b.stats().free == 0);
     // memory is full, this must return nullptr
     BOOST_CHECK(b.alloc(1024) == nullptr);

@@ -15,8 +15,9 @@ namespace{
                                                 std::shared_ptr<CNode> pNode = nullptr, // NOLINT(performance-unnecessary-value-param)
                                                 TxValidationPriority priority = TxValidationPriority::normal) {
         std::vector<TxInputDataSPtr> vTxInputData {};
+        vTxInputData.reserve(spends.size());
         for (auto& elem : spends) {
-            vTxInputData. // NOLINT(performance-inefficient-vector-operation)
+            vTxInputData.
                     emplace_back(
                     std::make_shared<CTxInputData>(
                             TxIdTrackerWPtr{}, // a pointer to the TxIdTracker

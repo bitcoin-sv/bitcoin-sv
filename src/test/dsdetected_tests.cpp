@@ -68,9 +68,10 @@ namespace
                                         treeProof.transactionIndex)};
 
         std::vector<MerkleProof::Node> nodes{};
+        nodes.reserve(treeProof.merkleTreeHashes.size());
         for(const auto& node : treeProof.merkleTreeHashes)
         {
-            nodes.push_back(MerkleProof::Node{node}); // NOLINT(performance-inefficient-vector-operation)
+            nodes.push_back(MerkleProof::Node{node});
         }
 
         return {txn, 1, checkRoot, nodes};
