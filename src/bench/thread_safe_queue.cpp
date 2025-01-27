@@ -36,8 +36,7 @@ namespace {
             {
                 for (const auto& [method, count] : counters)
                     std::cout << "Blocked in " << method << " " << count
-                    // NOLINTNEXTLINE(performance-avoid-endl)
-                              << " times in " << thread_name << std::endl;
+                              << " times in " << thread_name << '\n';
             }
         }
 

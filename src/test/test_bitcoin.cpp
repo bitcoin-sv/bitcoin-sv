@@ -282,7 +282,7 @@ Init::Init() {
                 }
                 if (!(++ctr % 79)) {
                     // newline once in a while to keep travis happy
-                    std::cerr << std::endl; // NOLINT(performance-avoid-endl)
+                    std::cerr << '\n'; 
                 }
                 p->cond.wait_for(lock, std::chrono::milliseconds(1000));
             }
