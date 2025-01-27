@@ -316,14 +316,14 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     changeSet->clear();
 
     // entries which we have removed, they should removed from mempool and also from the journal
-    for(auto entry: {entryNotPaying4, entryPayingFor3And4}) // NOLINT(performance-for-range-copy)
+    for(const auto& entry: {entryNotPaying4, entryPayingFor3And4})
     {
         BOOST_ASSERT(testAccess.mapTx().find(entry.GetTxId()) == testAccess.mapTx().end());
         BOOST_ASSERT(!JournalTester(journal).checkTxnExists(JournalEntry{entry}));
     }
 
     // unaffected entries, they should stay in the mempool and journal
-    for(auto entry: {entryNotPaying, entryPayForItself, entryPayForGroup}) // NOLINT(performance-for-range-copy)
+    for(const auto& entry: {entryNotPaying, entryPayForItself, entryPayForGroup})
     {
         BOOST_ASSERT(testAccess.mapTx().find(entry.GetTxId()) != testAccess.mapTx().end());
         BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{entry}));
@@ -343,7 +343,12 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     BOOST_ASSERT(payFor3And4It->IsInPrimaryMempool());
 
     // things should be as before removal
-    for(auto entry: {entryNotPaying, entryPayForItself, entryPayForGroup, entryNotPaying3, entryNotPaying4, entryPayingFor3And4}) // NOLINT(performance-for-range-copy)
+    for(const auto& entry : {entryNotPaying,
+                             entryPayForItself,
+                             entryPayForGroup,
+                             entryNotPaying3,
+                             entryNotPaying4,
+                             entryPayingFor3And4})
     {
         BOOST_ASSERT(testAccess.mapTx().find(entry.GetTxId()) != testAccess.mapTx().end());
         BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{entry}));

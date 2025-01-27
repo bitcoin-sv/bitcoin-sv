@@ -48,7 +48,8 @@ namespace
     {
         static uint32_t lockTime {0}; // separate counter is OK as we have an input
         CMutableTransaction txn {};
-        for (auto prev: other) { // NOLINT(performance-for-range-copy)
+        for(const auto& prev: other)
+        {
             txn.vin.emplace_back(CTxIn{COutPoint(prev->GetId(), 0), CScript()});
         }
         txn.nLockTime = lockTime++;

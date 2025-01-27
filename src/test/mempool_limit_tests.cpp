@@ -150,7 +150,8 @@ namespace {
         testPoolAccess.SetBlockMinTxFee(A_BLOCK_MIN_FEE);
 
         std::vector<std::vector<CTxMemPoolEntry>> all_txns;
-        for (auto d: demand) { // NOLINT(performance-for-range-copy)
+        for(const auto& d: demand)
+        {
             all_txns.push_back(GetABunchOfEntries(d));
         }
         Entries entries {pool};

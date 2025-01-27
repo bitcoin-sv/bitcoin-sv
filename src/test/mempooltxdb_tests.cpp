@@ -608,7 +608,8 @@ BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrimDoesNotConfuseJBA)
     BOOST_CHECK_EQUAL(vtx1.size(), vtx2.size());
     // check that both blocks share all the memory used by transactions
     auto set1 = std::set<CTransactionRef>(vtx1.cbegin(), vtx1.cend());
-    for(auto tx: vtx2) { // NOLINT(performance-for-range-copy)
+    for(const auto& tx: vtx2)
+    {
         auto erased = set1.erase(tx);
         BOOST_CHECK(erased == 1);
     }

@@ -22,12 +22,12 @@ static void do_WriteToFileDataTx() {
     t.vout.resize(1);
     t.vout[0].nValue = CENT;
 
-    std::vector<uint8_t> data1MB(1000000);
-    std::vector<uint8_t> data10MB(10000000);
-    // std::vector<uint8_t> data100MB(100000000);
-    // std::vector<uint8_t> data1GB(1000000000);
-    // std::vector<uint8_t> data2GB(2000000000);
-    for (std::vector<uint8_t> data : // NOLINT(performance-for-range-copy)
+    std::vector<uint8_t> data1MB(1'000'000);
+    std::vector<uint8_t> data10MB(10'000'000);
+    // std::vector<uint8_t> data100MB(100'000'000);
+    // std::vector<uint8_t> data1GB(1'000'000'000);
+    // std::vector<uint8_t> data2GB(2'000'000'000);
+    for(const std::vector<uint8_t>& data :
          {data1MB, data10MB}) //, data100MB, data1GB, data2GB})
     {
         CScript opFalseOpReturnScript = CScript()
@@ -58,7 +58,7 @@ static void do_WriteToSeparateFilesDatatx() {
     // std::vector<uint8_t> data1GB(1000000000);
     // std::vector<uint8_t> data2GB(2000000000);
     uint64_t i = 0;
-    for (std::vector<uint8_t> data : // NOLINT(performance-for-range-copy)
+    for(const std::vector<uint8_t>& data :
          {data1MB, data10MB}) //, data100MB, data1GB, data2GB})
     {
         CScript opFalseOpReturnScript = CScript()
