@@ -637,8 +637,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                 coin.has_value() && !coin->IsSpent() &&
                 coin->GetTxOut().scriptPubKey != scriptPubKey) {
                 std::string err("Previous output scriptPubKey mismatch:\n");
-                // NOLINTNEXTLINE(performance-inefficient-string-concatenation)
-                err = err + ScriptToAsmStr(coin->GetTxOut().scriptPubKey) +
+                err += ScriptToAsmStr(coin->GetTxOut().scriptPubKey) +
                       "\nvs:\n" + ScriptToAsmStr(scriptPubKey);
                 throw std::runtime_error(err);
             }
