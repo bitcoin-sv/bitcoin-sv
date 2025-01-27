@@ -706,7 +706,7 @@ BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig1_key)
     const string doc = to_json(fields.cbegin(), fields.cend());
     const auto var_mi_doc = ParseMinerInfoDoc(doc);   
     BOOST_CHECK_EQUAL(miner_info_error::doc_parse_error_rev_msg_sig1_key,
-                      std::get<miner_info_error>(var_mi_doc)); // NOLINT(performance-unnecessary-copy-initialization)
+                      std::get<miner_info_error>(var_mi_doc));
 }
 
 BOOST_AUTO_TEST_CASE(parse_revocation_msg_invalid_sig2)

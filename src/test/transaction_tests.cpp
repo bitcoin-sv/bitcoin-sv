@@ -43,7 +43,7 @@ BOOST_FIXTURE_TEST_SUITE(transaction_tests, BasicTestingSetup)
 
 void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
     for (size_t idx = 0; idx < tests.size(); idx++) {
-        UniValue test = tests[idx]; // NOLINT(performance-unnecessary-copy-initialization)
+        const UniValue& test = tests[idx];
         std::string strTest = test.write();
         if (test[0].isArray()) {
             
@@ -85,7 +85,7 @@ void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
                     fValid = false;
                     break;
                 }
-                UniValue vinput = input.get_array(); // NOLINT(performance-unnecessary-copy-initialization)
+                const UniValue& vinput = input.get_array();
                 if (vinput.size() < 3 || vinput.size() > 4) {
                     fValid = false;
                     break;

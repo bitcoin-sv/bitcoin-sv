@@ -607,7 +607,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
     UniValue prevtxsObj = registers["prevtxs"];
 
     for (unsigned int previdx = 0; previdx < prevtxsObj.size(); previdx++) {
-        UniValue prevOut = prevtxsObj[previdx]; // NOLINT(performance-unnecessary-copy-initialization)
+        const UniValue& prevOut = prevtxsObj[previdx];
         if (!prevOut.isObject()) {
             throw std::runtime_error("expected prevtxs internal object");
         }

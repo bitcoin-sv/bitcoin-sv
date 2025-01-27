@@ -274,7 +274,7 @@ static void DoTest(const CScript &scriptPubKey, const CScript &scriptSig,
     CMutableTransaction txCredit =
         BuildCreditingTransaction(scriptPubKey, nValue);
     CMutableTransaction tx = BuildSpendingTransaction(scriptSig, txCredit);
-    CMutableTransaction tx2 = tx; // NOLINT(performance-unnecessary-copy-initialization)
+    const CMutableTransaction& tx2 = tx;
     std::atomic<malleability::status> ms {};
     const auto res = VerifyScript(config,
                                   true,
@@ -1420,7 +1420,7 @@ BOOST_AUTO_TEST_CASE(script_json_test) {
         json_tests::script_tests + sizeof(json_tests::script_tests))); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
-        UniValue test = tests[idx]; // NOLINT(performance-unnecessary-copy-initialization)
+        const UniValue& test = tests[idx];
         std::string strTest = test.write();
         Amount nValue(0);
         unsigned int pos = 0;
@@ -3425,7 +3425,7 @@ BOOST_AUTO_TEST_CASE(mt_2_plus_2)
         assert(std::holds_alternative<malleability::status>(*status));
         assert(n == stack.size());
         const auto frame = stack.front();
-        const auto actual = frame.GetElement(); // NOLINT(performance-unnecessary-copy-initialization)
+        const auto& actual = frame.GetElement();
         assert(1 == actual.size());
         assert(4 == actual[0]);
     };

@@ -28,7 +28,7 @@ BOOST_AUTO_TEST_CASE(base58_EncodeBase58) {
                               json_tests::base58_encode_decode + // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
                                   sizeof(json_tests::base58_encode_decode)));
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
-        UniValue test = tests[idx]; // NOLINT(performance-unnecessary-copy-initialization)
+        const UniValue& test = tests[idx];
         std::string strTest = test.write();
         // Allow for extra stuff (useful for comments)
         if (test.size() < 2) {
@@ -53,7 +53,7 @@ BOOST_AUTO_TEST_CASE(base58_DecodeBase58) {
     std::vector<uint8_t> result;
 
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
-        UniValue test = tests[idx]; // NOLINT(performance-unnecessary-copy-initialization)
+        const UniValue& test = tests[idx];
         std::string strTest = test.write();
         // Allow for extra stuff (useful for comments)
         if (test.size() < 2) {
@@ -130,7 +130,7 @@ BOOST_AUTO_TEST_CASE(base58_keys_valid_parse) {
     SelectParams(CBaseChainParams::MAIN);
 
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
-        UniValue test = tests[idx]; // NOLINT(performance-unnecessary-copy-initialization)
+        const UniValue& test = tests[idx];
         std::string strTest = test.write();
         // Allow for extra stuff (useful for comments)
         if (test.size() < 3) {
@@ -195,7 +195,7 @@ BOOST_AUTO_TEST_CASE(base58_keys_valid_gen) {
         json_tests::base58_keys_valid + sizeof(json_tests::base58_keys_valid))); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
-        UniValue test = tests[idx]; // NOLINT(performance-unnecessary-copy-initialization)
+        const UniValue& test = tests[idx];
         std::string strTest = test.write();
         // Allow for extra stuff (useful for comments)
         if (test.size() < 3) {
@@ -255,7 +255,7 @@ BOOST_AUTO_TEST_CASE(base58_keys_invalid) {
     CTxDestination destination;
 
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
-        UniValue test = tests[idx]; // NOLINT(performance-unnecessary-copy-initialization)
+        const UniValue& test = tests[idx];
         std::string strTest = test.write();
         // Allow for extra stuff (useful for comments)
         if (test.size() < 1) {
