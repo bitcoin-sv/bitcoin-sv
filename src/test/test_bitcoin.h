@@ -138,7 +138,6 @@ struct TestMemPoolEntryHelper {
     CTxMemPoolEntry FromTx(const CTransaction &tx, CTxMemPool *pool = nullptr);
 
     // Change the default value
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     TestMemPoolEntryHelper &Fee(Amount _fee) {
         nFee = _fee;
         return *this;

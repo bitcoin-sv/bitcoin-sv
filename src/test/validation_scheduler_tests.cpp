@@ -12,7 +12,7 @@ namespace{
     // Create a vector with input data for a given txn and source
     std::vector<TxInputDataSPtr> TxInputDataVec(TxSource source,
                                                 const std::vector<CMutableTransaction>& spends,
-                                                std::shared_ptr<CNode> pNode = nullptr, // NOLINT(performance-unnecessary-value-param)
+                                                const std::shared_ptr<CNode>& pNode = nullptr,
                                                 TxValidationPriority priority = TxValidationPriority::normal) {
         std::vector<TxInputDataSPtr> vTxInputData {};
         vTxInputData.reserve(spends.size());

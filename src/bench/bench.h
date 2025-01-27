@@ -77,7 +77,8 @@ class BenchRunner {
     static BenchmarkMap &benchmarks();
 
 public:
-    BenchRunner(std::string name, BenchFunction func);
+    BenchRunner(const std::string& name,
+                const BenchFunction& func);
 
     static void RunAll(duration elapsedTimeForOne = std::chrono::seconds(1));
 };

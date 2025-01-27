@@ -72,10 +72,14 @@ namespace
     CJournalChangeSetPtr reorg(CJournalBuilder* builder, std::initializer_list<std::pair<CJournalChangeSet::Operation, CJournalEntry>> ops) {
         return changeSet(builder, JournalUpdateReason::REORG, ops);
     }
-    std::pair<CJournalChangeSet::Operation, CJournalEntry> add(CJournalEntry entry) { // NOLINT(performance-unnecessary-value-param)
+
+    std::pair<CJournalChangeSet::Operation, CJournalEntry> add(const CJournalEntry& entry)
+    {
         return std::make_pair(CJournalChangeSet::Operation::ADD, entry);
     }
-    std::pair<CJournalChangeSet::Operation, CJournalEntry> remove(CJournalEntry entry) { // NOLINT(performance-unnecessary-value-param)
+
+    std::pair<CJournalChangeSet::Operation, CJournalEntry> remove(const CJournalEntry& entry)
+    {
         return std::make_pair(CJournalChangeSet::Operation::REMOVE, entry);
     }
 }

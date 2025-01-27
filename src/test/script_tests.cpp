@@ -230,7 +230,8 @@ std::vector<uint8_t> make_op_check_multi_sig_script(const int sighash,
 BOOST_FIXTURE_TEST_SUITE(script_tests, BasicTestingSetup)
 
 static CMutableTransaction
-BuildCreditingTransaction(const CScript &scriptPubKey, const Amount nValue) { // NOLINT(performance-unnecessary-value-param)
+BuildCreditingTransaction(const CScript &scriptPubKey, const Amount& nValue)
+{
     CMutableTransaction txCredit;
     txCredit.nVersion = 1;
     txCredit.nLockTime = 0;
@@ -262,10 +263,14 @@ BuildSpendingTransaction(const CScript &scriptSig,
     return txSpend;
 }
 
-static void DoTest(const CScript &scriptPubKey, const CScript &scriptSig,
-                   int flags, const std::string &message, int scriptError,
+static void DoTest(const CScript& scriptPubKey,
+                   const CScript& scriptSig,
+                   int flags,
+                   const std::string& message,
+                   int scriptError,
                    const std::optional<malleability::status>& expected_malleability,
-                   const Amount nValue) { // NOLINT(performance-unnecessary-value-param)
+                   const Amount& nValue)
+{
     const Config& config = GlobalConfig::GetConfig();
     if (flags & SCRIPT_VERIFY_CLEANSTACK) {
         flags |= SCRIPT_VERIFY_P2SH;
@@ -274,7 +279,8 @@ static void DoTest(const CScript &scriptPubKey, const CScript &scriptSig,
     CMutableTransaction txCredit =
         BuildCreditingTransaction(scriptPubKey, nValue);
     CMutableTransaction tx = BuildSpendingTransaction(scriptSig, txCredit);
-    const CMutableTransaction& tx2 = tx;
+    const CMutableTransaction& tx2 = tx; 
+    std::ignore = tx2; // suppress unused variable warning
     std::atomic<malleability::status> ms {};
     const auto res = VerifyScript(config,
                                   true,
@@ -414,11 +420,15 @@ private:
         havePush = true;
     }
 
-    std::vector<uint8_t> MakeSig(CScript& script, const CKey &key,
-                         SigHashType sigHashType = SigHashType(),
-                         unsigned int lenR = 32, unsigned int lenS = 32,
-                         Amount amount = Amount(0), // NOLINT(performance-unnecessary-value-param)
-                         uint32_t flags = SCRIPT_ENABLE_SIGHASH_FORKID) {
+    std::vector<uint8_t> MakeSig(
+        CScript& script,
+        const CKey& key,
+        SigHashType sigHashType = SigHashType(),
+        unsigned int lenR = 32,
+        unsigned int lenS = 32,
+        const Amount& amount = Amount(0),
+        uint32_t flags = SCRIPT_ENABLE_SIGHASH_FORKID)
+    {
         uint256 hash = SignatureHash(script, CTransaction(spendTx), 0,
                                      sigHashType, amount, nullptr, flags & SCRIPT_ENABLE_SIGHASH_FORKID);
         std::vector<uint8_t> vchSig, r, s;
@@ -445,7 +455,7 @@ public:
                 const std::string& comment_,
                 int flags_,
                 bool P2SH = false,
-                Amount nValue_ = Amount(0)) // NOLINT(performance-unnecessary-value-param)
+                const Amount& nValue_ = Amount(0))
         : script(script_),
           comment(comment_),
           flags(flags_),
@@ -494,11 +504,14 @@ public:
         return *this;
     }
 
-    TestBuilder &PushSig(const CKey &key,
-                         SigHashType sigHashType = SigHashType(),
-                         unsigned int lenR = 32, unsigned int lenS = 32,
-                         Amount amount = Amount(0), // NOLINT(performance-unnecessary-value-param)
-                         uint32_t flags = SCRIPT_ENABLE_SIGHASH_FORKID) {
+    TestBuilder& PushSig(
+        const CKey& key,
+        SigHashType sigHashType = SigHashType(),
+        unsigned int lenR = 32,
+        unsigned int lenS = 32,
+        const Amount& amount = Amount(0),
+        uint32_t flags = SCRIPT_ENABLE_SIGHASH_FORKID)
+    {
 
         DoPush(MakeSig(script, key, sigHashType, lenR, lenS, amount, flags));
         return *this;
@@ -507,11 +520,14 @@ public:
     // Signing tranaction that spends this kind of the scriptPubKey:
     // <PubKey1> OP_CHECKSIGVERIFY OP_CODESEPARATOR <PubKey2> OP_CHECKSIGVERIFY OP_CODESEPARATOR .... <PubKeyN> OP_CHECKSIG
     // Using vector of keys:  keyN ... key2, key1
-    TestBuilder &PushSeparatorSigs(std::vector<const CKey*> keys,
-                                   SigHashType sigHashType = SigHashType(),
-                                   unsigned int lenR = 32, unsigned int lenS = 32,
-                                   Amount amount = Amount(0), // NOLINT(performance-unnecessary-value-param)
-                                   uint32_t flags = SCRIPT_ENABLE_SIGHASH_FORKID) {
+    TestBuilder& PushSeparatorSigs(
+        std::vector<const CKey*> keys,
+        SigHashType sigHashType = SigHashType(),
+        unsigned int lenR = 32,
+        unsigned int lenS = 32,
+        const Amount& amount = Amount(0),
+        uint32_t flags = SCRIPT_ENABLE_SIGHASH_FORKID)
+    {
 
         // splitting script of the form: 
         // <script1> OP_CODESEPARATOR <script2> OP_CODESEPARATOR ... <scriptN-1> OP_CODESEPARATOR <scriptN>
@@ -2070,8 +2086,10 @@ BOOST_AUTO_TEST_CASE(op_pushdata4_op_size)
     BOOST_CHECK_EQUAL(1U, stack.size());
 }
 
-CScript sign_multisig(CScript scriptPubKey, std::vector<CKey> keys, // NOLINT(performance-unnecessary-value-param)
-                      CTransaction transaction) { // NOLINT(performance-unnecessary-value-param)
+CScript sign_multisig(const CScript& scriptPubKey,
+                      const std::vector<CKey>& keys,
+                      const CTransaction& transaction)
+{
     uint256 hash =
         SignatureHash(scriptPubKey, transaction, 0, SigHashType(), Amount(0));
 
@@ -2093,11 +2111,13 @@ CScript sign_multisig(CScript scriptPubKey, std::vector<CKey> keys, // NOLINT(pe
     return result;
 }
 
-CScript sign_multisig(CScript scriptPubKey, const CKey &key,
-                      CTransaction transaction) {
+CScript sign_multisig(const CScript& scriptPubKey,
+                      const CKey& key,
+                      const CTransaction& transaction)
+{
     std::vector<CKey> keys;
     keys.push_back(key);
-    return sign_multisig(scriptPubKey, keys, transaction); // NOLINT(performance-unnecessary-value-param)
+    return sign_multisig(scriptPubKey, keys, transaction);
 }
 
 BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
@@ -2993,8 +3013,12 @@ BOOST_AUTO_TEST_CASE(script_IsUnspendable) {
     BOOST_CHECK((CScript() << OP_FALSE << OP_RETURN).IsUnspendable(ProtocolEra::PostGenesis));
 }
 
-void CheckSolver(const CScript scriptPubKey, ProtocolEra isGenesisEnabled, // NOLINT(performance-unnecessary-value-param)
-                       txnouttype expectedOutType, bool expectedResult) {
+void CheckSolver(
+    const CScript& scriptPubKey,
+    ProtocolEra isGenesisEnabled,
+    txnouttype expectedOutType,
+    bool expectedResult)
+{
     std::vector<std::vector<uint8_t>> solutions;
     txnouttype outType; // NOLINT(cppcoreguidelines-init-variables)
     BOOST_CHECK(Solver(scriptPubKey, isGenesisEnabled, outType,
@@ -3254,13 +3278,12 @@ namespace {
             }
         };
 
-        InstrumentedChecker(
-            Durations& duration,
-            const CTransaction& txToIn,
-            const Amount amount, // NOLINT(performance-unnecessary-value-param)
-            PrecomputedTransactionData& txdataIn)
-            : CachingTransactionSignatureChecker{&txToIn, 1, amount, true, txdataIn}
-            , mDuration{duration}
+        InstrumentedChecker(Durations& duration,
+                            const CTransaction& txToIn,
+                            const Amount& amount,
+                            PrecomputedTransactionData& txdataIn)
+            : CachingTransactionSignatureChecker{&txToIn, 1, amount, true, txdataIn},
+              mDuration{duration}
         {}
 
         bool VerifySignature(

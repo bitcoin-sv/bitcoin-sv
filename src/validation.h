@@ -1010,15 +1010,25 @@ private:
     std::shared_ptr<std::atomic<malleability::status>> malleability {nullptr};
 
 public:
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
-    CScriptCheck(const Config &configIn, bool consensusIn, const CScript &scriptPubKeyIn, const Amount amountIn,
-                 const CTransaction &txToIn, unsigned int nInIn,
-                 uint32_t nFlagsIn, bool cacheIn,
+    CScriptCheck(const Config& configIn,
+                 bool consensusIn,
+                 const CScript& scriptPubKeyIn,
+                 const Amount& amountIn,
+                 const CTransaction& txToIn,
+                 unsigned int nInIn,
+                 uint32_t nFlagsIn,
+                 bool cacheIn,
                  const PrecomputedTransactionData& txdataIn,
                  const std::shared_ptr<std::atomic<malleability::status>>& malleabilityIn)
-        : scriptPubKey(scriptPubKeyIn), amount(amountIn), ptxTo(&txToIn),
-          nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn),
-          txdata(txdataIn), config(configIn), consensus(consensusIn),
+        : scriptPubKey(scriptPubKeyIn),
+          amount(amountIn),
+          ptxTo(&txToIn),
+          nIn(nInIn),
+          nFlags(nFlagsIn),
+          cacheStore(cacheIn),
+          txdata(txdataIn),
+          config(configIn),
+          consensus(consensusIn),
           malleability{malleabilityIn}
     {}
 

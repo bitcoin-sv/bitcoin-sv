@@ -669,7 +669,7 @@ BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
 
 
 namespace {
-    CTransactionWrapperRef MakeTxWrapper(std::shared_ptr<CMempoolTxDBReader> txdb) // NOLINT(performance-unnecessary-value-param)
+    CTransactionWrapperRef MakeTxWrapper(const std::shared_ptr<CMempoolTxDBReader>& txdb)
     {
         const auto entries = GetABunchOfEntries(1);
         return std::make_shared<CTransactionWrapper>(entries[0].GetSharedTx(), txdb);

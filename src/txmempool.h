@@ -221,8 +221,7 @@ public:
 };
 
 struct update_fee_delta {
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
-    update_fee_delta(Amount _feeDelta) : feeDelta(_feeDelta) {}
+    update_fee_delta(const Amount& _feeDelta) : feeDelta(_feeDelta) {}
 
     void operator()(CTxMemPoolEntry &e) { e.UpdateFeeDelta(feeDelta); }
 
@@ -652,11 +651,9 @@ public:
     void SuspendSanityCheck() { suspendSanityCheck.store(true); }
     void ResumeSanityCheck() { suspendSanityCheck.store(false); }
 
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
-    void SetBlockMinTxFee(CFeeRate feerate) { blockMinTxfee = feerate; };
+    void SetBlockMinTxFee(const CFeeRate& feerate) { blockMinTxfee = feerate; };
     CFeeRate GetBlockMinTxFee() const { return blockMinTxfee; };
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
-    void SetMinDebugRejectionFee(CFeeRate feerate) { minDebugRejectionFee = feerate; };
+    void SetMinDebugRejectionFee(const CFeeRate& feerate) { minDebugRejectionFee = feerate; };
     CFeeRate GetMinDebugRejectionFee() const { return minDebugRejectionFee; };
 
     /** Rebuilds the mempool by reseting it and then resubmitting transactions that were inside before.
@@ -1367,8 +1364,7 @@ class CPFPGroup
 
 public:
     // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
-    explicit CPFPGroup(SecondaryMempoolEntryData evalParams, std::vector<CTxMemPool::txiter>&& txs)
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
+    explicit CPFPGroup(const SecondaryMempoolEntryData& evalParams, std::vector<CTxMemPool::txiter>&& txs)
         : evaluationParams{evalParams}
         , transactions{txs}
         , payingTxId{transactions.back()->GetTxId()}

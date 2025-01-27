@@ -46,9 +46,12 @@ static CCriticalSection walletCriticalSection; // NOLINT(cert-err58-cpp, cppcore
 
 static std::vector<COutput> vCoins; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
-static void add_coin(const CWallet &wallet, const Amount nValue, // NOLINT(performance-unnecessary-value-param)
-                     int nAge = 6 * 24, bool fIsFromMe = false,
-                     int nInput = 0) {
+static void add_coin(const CWallet& wallet,
+                     const Amount& nValue,
+                     int nAge = 6 * 24,
+                     bool fIsFromMe = false,
+                     int nInput = 0)
+{
     static int nextLockTime = 0;
     CMutableTransaction tx;
     tx.nLockTime = nextLockTime++; // so all transactions get different hashes
@@ -77,7 +80,8 @@ static void empty_wallet(void) {
     wtxn.clear();
 }
 
-static bool equal_sets(CoinSet a, CoinSet b) { // NOLINT(performance-unnecessary-value-param)
+static bool equal_sets(const CoinSet& a, const CoinSet& b) 
+{
     std::pair<CoinSet::iterator, CoinSet::iterator> ret =
         mismatch(a.begin(), a.end(), b.begin());
     return ret.first == a.end() && ret.second == b.end();

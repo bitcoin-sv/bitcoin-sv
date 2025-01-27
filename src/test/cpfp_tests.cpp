@@ -45,62 +45,64 @@ namespace std
 
 namespace{
 
-CTxMemPoolEntry MakeEntry(
-    // NOLINTBEGIN(performance-unnecessary-value-param)
-    CFeeRate feerate, 
-    std::vector<std::tuple<TxId, size_t, Amount>> inChainInputs, 
-    std::vector<std::tuple<CTransactionRef, int>> inMempoolInputs,
-    size_t nOutputs, size_t additionalSize=0, Amount feeAlreadyPaid=Amount{1},
-    // NOLINTEND(performance-unnecessary-value-param)
-    size_t opReturnSize=0)
-{
-    CMutableTransaction tx;
-    Amount totalInput; // NOLINT(cppcoreguidelines-init-variables)
-    for(const auto& input: inChainInputs)
+    CTxMemPoolEntry MakeEntry(
+        const CFeeRate& feerate,
+        const std::vector<std::tuple<TxId, size_t, Amount>>& inChainInputs,
+        const std::vector<std::tuple<CTransactionRef, int>>& inMempoolInputs,
+        size_t nOutputs,
+        size_t additionalSize = 0,
+        const Amount& feeAlreadyPaid = Amount{1},
+        size_t opReturnSize = 0)
     {
-        auto[id, ndx, amount] = input;
-        tx.vin.push_back(CTxIn(id, ndx, CScript()));
-        totalInput += amount;
-    }
-
-    for(const auto& input: inMempoolInputs)
-    {
-        auto[txInput, ndx] = input;
-        tx.vin.push_back(CTxIn(txInput->GetId(), ndx, CScript()));
-        totalInput += txInput->vout[ndx].nValue; // NOLINT(cppcoreguidelines-avoid-c-arrays)
-    }
-
-    for(size_t i = 0; i < nOutputs; i++)
-    {
-        CScript script;
-        script << OP_TRUE;
-        tx.vout.push_back(CTxOut(Amount{1}, script));
-    }
-    
-    if(opReturnSize != 0)
-    {
-        CScript script;
-        script << OP_FALSE << OP_RETURN;
-        script << std::vector<uint8_t>(opReturnSize);
-        tx.vout.push_back(CTxOut(Amount(), script));
-    }
-
-    auto txSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) + additionalSize;
-    auto totalFee = feerate.GetFee(txSize);
-    auto perOputput = (totalInput - totalFee) / int64_t(nOutputs) + Amount(1);
-
-    for(auto& output: tx.vout)
-    {
-        if(output.scriptPubKey.begin_instructions()->opcode() != OP_FALSE)
+        CMutableTransaction tx;
+        Amount totalInput; // NOLINT(cppcoreguidelines-init-variables)
+        for(const auto& input : inChainInputs)
         {
-            output.nValue = perOputput;
+            auto [id, ndx, amount] = input;
+            tx.vin.push_back(CTxIn(id, ndx, CScript()));
+            totalInput += amount;
         }
-    }
 
-    auto txRef = MakeTransactionRef(tx);
-    CTxMemPoolEntry entry(txRef, totalFee, int64_t(0), false, false, LockPoints());
-    return entry;
-}
+        for(const auto& input : inMempoolInputs)
+        {
+            auto [txInput, ndx] = input;
+            tx.vin.push_back(CTxIn(txInput->GetId(), ndx, CScript()));
+            totalInput += txInput->vout[ndx]
+                              .nValue; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+        }
+
+        for(size_t i = 0; i < nOutputs; i++)
+        {
+            CScript script;
+            script << OP_TRUE;
+            tx.vout.push_back(CTxOut(Amount{1}, script));
+        }
+
+        if(opReturnSize != 0)
+        {
+            CScript script;
+            script << OP_FALSE << OP_RETURN;
+            script << std::vector<uint8_t>(opReturnSize);
+            tx.vout.push_back(CTxOut(Amount(), script));
+        }
+
+        auto txSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) +
+                      additionalSize;
+        auto totalFee = feerate.GetFee(txSize);
+        auto perOputput = (totalInput - totalFee) / int64_t(nOutputs) + Amount(1);
+
+        for(auto& output : tx.vout)
+        {
+            if(output.scriptPubKey.begin_instructions()->opcode() != OP_FALSE)
+            {
+                output.nValue = perOputput;
+            }
+        }
+
+        auto txRef = MakeTransactionRef(tx);
+        CTxMemPoolEntry entry(txRef, totalFee, int64_t(0), false, false, LockPoints());
+        return entry;
+    }
 
 TxId MakeId(uint16_t n)
 {
@@ -110,7 +112,8 @@ TxId MakeId(uint16_t n)
     return id;
 }
 
-std::vector<std::tuple<TxId, size_t, Amount>> MakeConfirmedInputs(size_t count, Amount value) // NOLINT(performance-unnecessary-value-param)
+std::vector<std::tuple<TxId, size_t, Amount>> MakeConfirmedInputs(size_t count,
+                                                                  const Amount& value)
 {
     static uint16_t nextTxid = 1;
     std::vector<std::tuple<TxId, size_t, Amount>> inputs;

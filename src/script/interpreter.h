@@ -80,15 +80,27 @@ protected:
                                  const uint256 &sighash) const;
 
 public:
-    TransactionSignatureChecker(const CTransaction *txToIn, unsigned int nInIn,
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
-                                const Amount amountIn)
-        : txTo(txToIn), nIn(nInIn), amount(amountIn), txdata(nullptr) {}
-    TransactionSignatureChecker(const CTransaction *txToIn, unsigned int nInIn,
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
-                                const Amount amountIn,
-                                const PrecomputedTransactionData &txdataIn)
-        : txTo(txToIn), nIn(nInIn), amount(amountIn), txdata(&txdataIn) {}
+    TransactionSignatureChecker(const CTransaction* txToIn,
+                                unsigned int nInIn,
+                                const Amount& amountIn)
+        : txTo(txToIn),
+          nIn(nInIn),
+          amount(amountIn),
+          txdata(nullptr)
+    {
+    }
+
+    TransactionSignatureChecker(const CTransaction* txToIn,
+                                unsigned int nInIn,
+                                const Amount& amountIn,
+                                const PrecomputedTransactionData& txdataIn)
+        : txTo(txToIn),
+          nIn(nInIn),
+          amount(amountIn),
+          txdata(&txdataIn)
+    {
+    }
+
     bool CheckSig(const std::vector<uint8_t> &scriptSig,
                   const std::vector<uint8_t> &vchPubKey,
                   const CScript &scriptCode, bool enabledSighashForkid) const override;
@@ -103,10 +115,13 @@ private:
     const CTransaction txTo;
 
 public:
-    MutableTransactionSignatureChecker(const CMutableTransaction *txToIn,
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
-                                       unsigned int nInIn, const Amount amount)
-        : TransactionSignatureChecker(&txTo, nInIn, amount), txTo(*txToIn) {}
+    MutableTransactionSignatureChecker(const CMutableTransaction* txToIn,
+                                       unsigned int nInIn,
+                                       const Amount& amount)
+        : TransactionSignatureChecker(&txTo, nInIn, amount),
+          txTo(*txToIn)
+    {
+    }
 };
 
 /**

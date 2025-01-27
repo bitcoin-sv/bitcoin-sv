@@ -141,14 +141,22 @@ public:
 
     CTxIn() = default;
 
-    explicit CTxIn(COutPoint prevoutIn, CScript scriptSigIn = CScript(),
+    explicit CTxIn(COutPoint prevoutIn,
+                   CScript scriptSigIn = CScript(),
                    uint32_t nSequenceIn = SEQUENCE_FINAL)
-        // NOLINTNEXTLINE(performance-unnecessary-value-param)
-        : prevout(prevoutIn), scriptSig(scriptSigIn), nSequence(nSequenceIn) {}
-    CTxIn(TxId prevTxId, uint32_t nOut, CScript scriptSigIn = CScript(),
+        : prevout(prevoutIn),
+          scriptSig(std::move(scriptSigIn)),
+          nSequence(nSequenceIn)
+    {
+    }
+
+    CTxIn(TxId prevTxId,
+          uint32_t nOut,
+          CScript scriptSigIn = CScript(),
           uint32_t nSequenceIn = SEQUENCE_FINAL)
-        // NOLINTNEXTLINE(performance-unnecessary-value-param)
-        : CTxIn(COutPoint(prevTxId, nOut), scriptSigIn, nSequenceIn) {}
+        : CTxIn(COutPoint(prevTxId, nOut), std::move(scriptSigIn), nSequenceIn)
+    {
+    }
 
     ADD_SERIALIZE_METHODS
 
@@ -184,10 +192,11 @@ public:
 
     CTxOut() { SetNull(); }
 
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
-    CTxOut(Amount nValueIn, CScript scriptPubKeyIn)
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
-        : nValue(nValueIn), scriptPubKey(scriptPubKeyIn) {}
+    CTxOut(const Amount& nValueIn, CScript scriptPubKeyIn)
+        : nValue{nValueIn},
+          scriptPubKey{std::move(scriptPubKeyIn)}
+    {
+    }
 
     ADD_SERIALIZE_METHODS
 

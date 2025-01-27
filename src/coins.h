@@ -72,8 +72,7 @@ class CoinImpl // NOLINT(cppcoreguidelines-special-member-functions)
 public:
     CoinImpl() : storage{CTxOut{}}, out{&storage.value()} {}
 
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
-    CoinImpl(Amount amount, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase, bool IsConfiscation)
+    CoinImpl(const Amount& amount, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase, bool IsConfiscation)
         : storage{CTxOut{amount, {}}}
         , out{&storage.value()}
         , nHeightAndIsCoinBase{(static_cast<uint32_t>(nHeightIn) << 1) | (IsCoinbase ? 1u : 0u)}

@@ -118,7 +118,7 @@ namespace {
     // Create txn input data for a given txn and source
     TxInputDataSPtr TxInputData(TxSource source,
                                 CMutableTransaction& spend,
-                                std::shared_ptr<CNode> pNode = nullptr, // NOLINT(performance-unnecessary-value-param)
+                                const std::shared_ptr<CNode>& pNode = nullptr,
                                 TxValidationPriority priority = TxValidationPriority::normal) {
         // Return txn's input data
         return std::make_shared<CTxInputData>(
@@ -131,10 +131,11 @@ namespace {
                    Amount(0), // nAbsurdFee
                    pNode);   // pNode
     }
+
     // Create a vector with input data for a given txn and source
     std::vector<TxInputDataSPtr> TxInputDataVec(TxSource source,
                                                 const std::vector<CMutableTransaction>& spends,
-                                                std::shared_ptr<CNode> pNode = nullptr, // NOLINT(performance-unnecessary-value-param)
+                                                const std::shared_ptr<CNode>& pNode = nullptr,
                                                 TxValidationPriority priority = TxValidationPriority::normal) {
         std::vector<TxInputDataSPtr> vTxInputData {};
         vTxInputData.reserve(spends.size());
@@ -155,13 +156,14 @@ namespace {
         }
         return vTxInputData;
     }
+
     // Validate txn using asynchronous validation interface
-    void ProcessTxnsAsynchApi(
-        const Config& config,
-        CTxMemPool& pool,
-        std::vector<CMutableTransaction>& spends,
-        TxSource source,
-        std::shared_ptr<CNode> pNode = nullptr) {
+    void ProcessTxnsAsynchApi(const Config& config,
+                              CTxMemPool& pool,
+                              std::vector<CMutableTransaction>& spends,
+                              TxSource source,
+                              const std::shared_ptr<CNode>& pNode = nullptr)
+    {
 
         // Create txn validator
         std::shared_ptr<CTxnValidator> txnValidator {
@@ -174,17 +176,18 @@ namespace {
         // Clear mempool before validation
         pool.Clear();
         // Schedule txns for processing.
-        txnValidator->newTransaction(TxInputDataVec(source, spends, pNode)); // NOLINT(performance-unnecessary-value-param)
+        txnValidator->newTransaction(TxInputDataVec(source, spends, pNode));
         // Wait for the Validator to process all queued txns.
         txnValidator->waitForEmptyQueue();
     }
+
     // Validate a single txn using synchronous validation interface
-    CValidationState ProcessTxnSynchApi(
-        const Config& config,
-        CTxMemPool& pool,
-        CMutableTransaction& spend,
-        TxSource source,
-        std::shared_ptr<CNode> pNode = nullptr) {
+    CValidationState ProcessTxnSynchApi(const Config& config,
+                                        CTxMemPool& pool,
+                                        CMutableTransaction& spend,
+                                        TxSource source,
+                                        const std::shared_ptr<CNode>& pNode = nullptr)
+    {
 
         // Create txn validator
         std::shared_ptr<CTxnValidator> txnValidator {
@@ -198,16 +201,17 @@ namespace {
         pool.Clear();
         // Mempool Journal ChangeSet
         mining::CJournalChangeSetPtr changeSet {nullptr};
-        return txnValidator->processValidation(TxInputData(source, spend, pNode), changeSet); // NOLINT(performance-unnecessary-value-param)
+        return txnValidator->processValidation(TxInputData(source, spend, pNode), changeSet);
     }
+
     // Validate txn using synchronous validation interface
     void ProcessTxnsSynchApi(
         const Config& config,
         CTxMemPool& pool,
         std::vector<CMutableTransaction>& spends,
         TxSource source,
-        std::shared_ptr<CNode> pNode = nullptr) { // NOLINT(performance-unnecessary-value-param)
-
+        const std::shared_ptr<CNode>& pNode = nullptr)
+    {
         // Create txn validator
         std::shared_ptr<CTxnValidator> txnValidator {
             std::make_shared<CTxnValidator>(
@@ -230,13 +234,15 @@ namespace {
         result = txnValidator->processValidation(TxInputData(source, spends[1], pNode), changeSet);
         BOOST_CHECK(!result.IsValid());
     }
+
     // Validate txns using synchronous batch validation interface
     CTxnValidator::RejectedTxns ProcessTxnsSynchBatchApi(
         const Config& config,
         CTxMemPool& pool,
         std::vector<CMutableTransaction>& spends,
         TxSource source,
-        std::shared_ptr<CNode> pNode = nullptr) {
+        const std::shared_ptr<CNode>& pNode = nullptr)
+    {
 
         // Create txn validator
         std::shared_ptr<CTxnValidator> txnValidator {
@@ -251,7 +257,10 @@ namespace {
         // Mempool Journal ChangeSet
         mining::CJournalChangeSetPtr changeSet {nullptr};
         // Validate the first txn
-        return txnValidator->processValidation(TxInputDataVec(source, spends, pNode), changeSet); // NOLINT(performance-unnecessary-value-param)
+        return txnValidator->processValidation(TxInputDataVec(source,
+                                                              spends,
+                                                              pNode),
+                                               changeSet);
     }
 
     CNodePtr DummyNode(ConfigInit& testConfig)

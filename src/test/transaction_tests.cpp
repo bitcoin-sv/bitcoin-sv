@@ -1009,8 +1009,9 @@ BOOST_AUTO_TEST_CASE(test_IsStandard_MaxTxSizePolicy)
     BOOST_CHECK(IsStandardTx(config, tx_gt_def, genesisActivationHeight, reason));
 }
 
-
-void TestIsStandardWithScriptFactory(std::function<CScript()> scriptFactory, uint64_t initialScriptSize) { // NOLINT(performance-unnecessary-value-param)
+void TestIsStandardWithScriptFactory(const std::function<CScript()>& scriptFactory,
+                                     uint64_t initialScriptSize)
+{
 
     DummyConfig config(CBaseChainParams::MAIN);
     config.SetGenesisActivationHeight(config.GetChainParams().GetConsensus().genesisHeight);

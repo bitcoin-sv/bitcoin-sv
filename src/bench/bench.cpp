@@ -12,8 +12,8 @@ benchmark::BenchRunner::BenchmarkMap &benchmark::BenchRunner::benchmarks() {
     return benchmarks_map;
 }
 
-// NOLINTNEXTLINE(performance-unnecessary-value-param)
-benchmark::BenchRunner::BenchRunner(std::string name, benchmark::BenchFunction func)
+benchmark::BenchRunner::BenchRunner(const std::string& name,
+                                    const benchmark::BenchFunction& func)
 {
     benchmarks().insert(std::make_pair(name, func));
 }

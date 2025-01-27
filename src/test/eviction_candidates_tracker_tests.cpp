@@ -98,7 +98,7 @@ public:
         return iter;
     }
 
-    void AddGroup(std::vector<CTxMemPoolEntry> entries) // NOLINT(performance-unnecessary-value-param)
+    void AddGroup(const std::vector<CTxMemPoolEntry>& entries)
     {
         SecondaryMempoolEntryData groupData;
         std::vector<CTxMemPoolTestAccess::txiter> iters;

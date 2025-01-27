@@ -13,7 +13,6 @@
 #include <string>
 #include <type_traits>
 
-// NOLINTBEGIN(performance-unnecessary-value-param)
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct Amount {
 private:
@@ -37,11 +36,11 @@ public:
     /**
      * Implement standard operators
      */
-    Amount &operator+=(const Amount a) {
+    Amount &operator+=(const Amount& a) {
         amount += a.amount;
         return *this;
     }
-    Amount &operator-=(const Amount a) {
+    Amount &operator-=(const Amount& a) {
         amount -= a.amount;
         return *this;
     }
@@ -173,7 +172,7 @@ private:
 
 public:
     CFeeRate () = default;
-    explicit CFeeRate(const Amount _nSatoshisPerK)
+    explicit CFeeRate(const Amount& _nSatoshisPerK)
         : nSatoshisPerK(_nSatoshisPerK) {}
     /**
      * Constructor for a fee rate in satoshis per kB. The size in bytes must not
@@ -216,6 +215,5 @@ public:
         READWRITE(nSatoshisPerK);
     }
 };
-// NOLINTEND(performance-unnecessary-value-param)
 
 #endif //  BITCOIN_AMOUNT_H

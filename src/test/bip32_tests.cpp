@@ -25,14 +25,15 @@ struct TestVector {
     std::string strHexMaster;
     std::vector<TestDerivation> vDerive;
 
-    TestVector(std::string strHexMasterIn) : strHexMaster(strHexMasterIn) {} // NOLINT(performance-unnecessary-value-param)
+    TestVector(std::string strHexMasterIn) : strHexMaster{std::move(strHexMasterIn)}
+    {}
 
-    TestVector &operator()(std::string pub, std::string prv,
-                           unsigned int nChild) {
+    TestVector& operator()(std::string pub, std::string prv, unsigned int nChild)
+    {
         vDerive.push_back(TestDerivation());
-        TestDerivation &der = vDerive.back();
-        der.pub = pub; // NOLINT(performance-unnecessary-value-param)
-        der.prv = prv; // NOLINT(performance-unnecessary-value-param)
+        TestDerivation& der = vDerive.back();
+        der.pub = std::move(pub);
+        der.prv = std::move(prv);
         der.nChild = nChild;
         return *this;
     }

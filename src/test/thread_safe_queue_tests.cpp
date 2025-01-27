@@ -33,7 +33,7 @@ struct CThreadSafeQueue<T>::UnitTestAccess
 
 BOOST_AUTO_TEST_SUITE(thread_safe_queue_tests)
 
-bool WaitFor(std::function<bool()> f) // NOLINT(performance-unnecessary-value-param)
+bool WaitFor(const std::function<bool()>& f)
 {
     for(int i = 0; i < 100; i++)
     {

@@ -67,10 +67,11 @@ namespace {
     TxInputDataSPtr CreateOrphanTxn(TxSource source,
                                     std::vector<CTxIn> vTxnInputs = CreateTxnInputs(1),
                                     std::vector<CTxOut> vTxnOutputs = CreateTxnOutputs(1),
-                                    std::shared_ptr<CNode> pNode=nullptr) { // NOLINT(performance-unnecessary-value-param)
+                                    const std::shared_ptr<CNode>& pNode=nullptr)
+    {
         CMutableTransaction tx;
-        tx.vin = vTxnInputs; // NOLINT(performance-unnecessary-value-param)
-        tx.vout = vTxnOutputs; // NOLINT(performance-unnecessary-value-param)
+        tx.vin = std::move(vTxnInputs);
+        tx.vout = std::move(vTxnOutputs);
         // Return txn's input data
         return std::make_shared<CTxInputData>(
                    g_connman->GetTxIdTracker(),

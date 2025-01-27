@@ -57,14 +57,15 @@ class MutableTransactionSignatureCreator : public TransactionSignatureCreator {
     CTransaction tx;
 
 public:
-    MutableTransactionSignatureCreator(const CKeyStore *keystoreIn,
-                                       const CMutableTransaction *txToIn,
-                                       // NOLINTNEXTLINE(performance-unnecessary-value-param)
-                                       unsigned int nInIn, const Amount amount,
+    MutableTransactionSignatureCreator(const CKeyStore* keystoreIn,
+                                       const CMutableTransaction* txToIn,
+                                       unsigned int nInIn,
+                                       const Amount& amount,
                                        SigHashType sigHashTypeIn)
-        : TransactionSignatureCreator(keystoreIn, &tx, nInIn, amount,
-                                      sigHashTypeIn),
-          tx(*txToIn) {}
+        : TransactionSignatureCreator(keystoreIn, &tx, nInIn, amount, sigHashTypeIn),
+          tx(*txToIn)
+    {
+    }
 };
 
 /** A signature creator that just produces 72-byte empty signatures. */

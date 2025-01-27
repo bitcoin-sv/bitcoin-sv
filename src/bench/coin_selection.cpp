@@ -9,9 +9,10 @@
 
 #include <set>
 
-// NOLINTNEXTLINE(performance-unnecessary-value-param)
-static void addCoin(const Amount nValue, const CWallet &wallet,
-                    std::vector<COutput> &vCoins) {
+static void addCoin(const Amount& nValue,
+                    const CWallet &wallet,
+                    std::vector<COutput>& vCoins)
+{
     int nInput = 0;
 
     static int nextLockTime = 0;

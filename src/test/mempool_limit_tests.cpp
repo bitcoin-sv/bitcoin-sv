@@ -42,9 +42,10 @@ namespace {
         CTxMemPool &pool; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
         std::vector<Entry> entries;
         Entries(CTxMemPool& pool) : pool(pool) {}
+    
         // return entries that satisfy the predicate by consulting the actual mempool entries
-        Entries that(Predicate predicate) const {
-            return filter(with(predicate)); // NOLINT(performance-unnecessary-value-param)
+        Entries that(const Predicate& predicate) const {
+            return filter(with(predicate));
         }
         // return entries that were submitted to primary mempool
         Entries for_primary() const {
@@ -65,13 +66,20 @@ namespace {
             }
 	private:
         using Filter = std::function<bool(const Entry&)>;
-        Entries filter(Filter cond) const {
+        Entries filter(Filter cond) const
+        {
             Entries ret(pool);
-            std::copy_if(entries.cbegin(), entries.cend(), std::back_inserter(ret.entries), cond); // NOLINT(performance-unnecessary-value-param)
+            std::copy_if(entries.cbegin(),
+                         entries.cend(),
+                         std::back_inserter(ret.entries),
+                         std::move(cond));
             return ret;
         }
-        Filter with(Predicate predicate) const { // NOLINT(performance-unnecessary-value-param)
-            return [this, predicate](const Entry& entry) {
+
+        Filter with(const Predicate& predicate) const
+        {
+            return [this, predicate](const Entry& entry)
+            {
                 CTxMemPoolTestAccess testPoolAccess(pool);
                 return predicate(testPoolAccess, entry);
             };
@@ -108,19 +116,21 @@ namespace {
         return predicate;
     }
 
-	Predicate are_not(Predicate predicate) { // NOLINT(performance-unnecessary-value-param)
+	Predicate are_not(const Predicate& predicate)
+    {
         return [predicate](CTxMemPoolTestAccess& pool, const Entry& entry) {
             return !predicate(pool, entry);
         };
     }
 
-	struct Demand {
+    struct Demand
+    {
         int howMany;
         CFeeRate fee;
-        Demand(int howMany, CFeeRate fee) : howMany(howMany), fee(fee) {} // NOLINT(performance-unnecessary-value-param)
+        Demand(int howMany, CFeeRate fee) : howMany(howMany), fee(std::move(fee)) {}
     };
 
-    std::vector<CTxMemPoolEntry> GetABunchOfEntries(Demand demand) // NOLINT(performance-unnecessary-value-param)
+    std::vector<CTxMemPoolEntry> GetABunchOfEntries(const Demand& demand)
     {
         static int unique = 0;
         std::vector<uint8_t> fluff;
