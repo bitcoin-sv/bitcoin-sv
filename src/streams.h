@@ -141,7 +141,7 @@ class CDataStream {
 protected:
     typedef CSerializeData vector_type;
     vector_type vch;
-    vector_type::size_type nReadPos;
+    vector_type::difference_type nReadPos;
 
     int nType;
     int nVersion;
@@ -223,14 +223,12 @@ public:
     //
     // Vector subset
     //
-    // NOLINTBEGIN(*-narrowing-conversions)
     const_iterator begin() const { return vch.begin() + nReadPos; }
     iterator begin() { return vch.begin() + nReadPos; }
-    // NOLINTEND(*-narrowing-conversions)
     const_iterator end() const { return vch.end(); }
     iterator end() { return vch.end(); }
     size_type size() const { return vch.size() - nReadPos; }
-    bool empty() const { return vch.size() == nReadPos; }
+    bool empty() const { return std::ssize(vch) == nReadPos; }
     void resize(size_type n, value_type c = 0) { vch.resize(n + nReadPos, c); }
     void reserve(size_type n) { vch.reserve(n + nReadPos); }
     const_reference operator[](size_type pos) const {
@@ -252,16 +250,18 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     const value_type *data() const { return vch.data() + nReadPos; }
 
-    void insert(iterator it, std::vector<char>::const_iterator first,
-                std::vector<char>::const_iterator last) {
-        size_type span = last - first;
+    void insert(iterator it,
+                std::vector<char>::const_iterator first,
+                std::vector<char>::const_iterator last)
+    {
+        std::vector<char>::difference_type span = last - first;
         if (!span) {
             return;
         }
 
         assert(last - first > 0);
-        if (it == vch.begin() + nReadPos && // NOLINT(*-narrowing-conversions)
-            span <= nReadPos) {
+        if (it == vch.begin() + nReadPos && span <= nReadPos)
+        {
             // special case for inserting at the front when there's room
             nReadPos -= span;
             memcpy(&vch[nReadPos], &first[0], span);
@@ -270,14 +270,15 @@ public:
         }
     }
 
-    void insert(iterator it, const char *first, const char *last) {
-        size_type span = last - first;
+    void insert(iterator it, const char *first, const char *last)
+    {
+        std::vector<char>::difference_type span = last - first;
         if (!span) {
             return;
         }
 
         assert(last - first > 0);
-        if (it == vch.begin() + nReadPos && // NOLINT(*-narrowing-conversions)
+        if (it == vch.begin() + nReadPos &&
             span <= nReadPos) {
             // special case for inserting at the front when there's room
             nReadPos -= span;
@@ -288,23 +289,26 @@ public:
         }
     }
 
-    iterator erase(iterator it) {
-        if (it == vch.begin() + nReadPos) { // NOLINT(*-narrowing-conversions)
+    iterator erase(iterator it)
+    {
+        if (it == vch.begin() + nReadPos)
+        {
             // special case for erasing from the front
-            if (++nReadPos >= vch.size()) {
+            if (++nReadPos >= std::ssize(vch))
+            {
                 // whenever we reach the end, we take the opportunity to clear
                 // the buffer
                 nReadPos = 0;
                 return vch.erase(vch.begin(), vch.end());
             }
-            return vch.begin() + nReadPos; // NOLINT(*-narrowing-conversions)
+            return vch.begin() + nReadPos;
         } else {
             return vch.erase(it);
         }
     }
 
     iterator erase(iterator first, iterator last) {
-        if (first == vch.begin() + nReadPos) { // NOLINT(*-narrowing-conversions)
+        if (first == vch.begin() + nReadPos) {
             // special case for erasing from the front
             if (last == vch.end()) {
                 nReadPos = 0;
@@ -318,11 +322,12 @@ public:
     }
 
     inline void Compact() {
-        vch.erase(vch.begin(), vch.begin() + nReadPos); // NOLINT(*-narrowing-conversions)
+        vch.erase(vch.begin(), vch.begin() + nReadPos);
         nReadPos = 0;
     }
 
-    bool Rewind(size_type n) {
+    bool Rewind(std::vector<char>::difference_type n)
+    {
         // Rewind by n characters if the buffer hasn't been compacted yet
         if (n > nReadPos) return false;
         nReadPos -= n;
