@@ -90,8 +90,8 @@ namespace bsv
         static_assert(sizeof(unique_bn_ptr) == sizeof(bignum_st*));
         unique_bn_ptr value_;
     };
-    // NOLINTNEXTLINE(performance-noexcept-swap)
-    inline void swap(bint& a, bint& b) { a.swap(b);}
+
+    inline void swap(bint& a, bint& b) noexcept { a.swap(b);}
 
     bool operator<(const bint&, const bint&);
     bool operator==(const bint&, const bint&);

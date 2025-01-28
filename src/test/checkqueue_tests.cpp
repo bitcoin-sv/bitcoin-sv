@@ -37,8 +37,8 @@ namespace
 
             return true;
         }
-        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-swap)
-        void swap(CBlockingValidator& check) // NOLINT(performance-noexcept-swap)
+
+        void swap(CBlockingValidator& check) noexcept
         {
             std::atomic<bool>* tmp = mBlocking;
             mBlocking = check.mBlocking;
@@ -54,8 +54,8 @@ namespace
         {
             return true;
         }
-        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-swap)
-        void swap(CDummyValidator& check) {/**/} // NOLINT(performance-noexcept-swap)
+
+        void swap(CDummyValidator&) noexcept {}
     };
 
     struct CCancellingValidator
@@ -66,8 +66,8 @@ namespace
 
             return {};
         }
-        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-swap)
-        void swap(CCancellingValidator& check) {/**/} // NOLINT(performance-noexcept-swap)
+
+        void swap(CCancellingValidator&) noexcept {}
     };
 }
 

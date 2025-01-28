@@ -24,8 +24,7 @@ static void CCheckQueueSpeed(benchmark::State &state) {
         {
             return true;
         }
-        // NOLINTNEXTLINE(*-noexcept-swap)
-        void swap(FakeJobNoWork &x){};
+        void swap(FakeJobNoWork&) noexcept{};
     };
     boost::thread_group tg;
     checkqueue::CCheckQueuePool<FakeJobNoWork, int> pool{
@@ -73,8 +72,7 @@ static void CCheckQueueSpeedPrevectorJob(benchmark::State &state) {
         {
             return true;
         }
-        // NOLINTNEXTLINE(*-noexcept-swap)
-        void swap(PrevectorJob &x) { p.swap(x.p); };
+        void swap(PrevectorJob& x) noexcept { p.swap(x.p); };
     };
     boost::thread_group tg;
     checkqueue::CCheckQueuePool<PrevectorJob, int> pool{

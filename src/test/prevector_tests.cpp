@@ -157,7 +157,7 @@ public:
         test();
     }
 
-    void swap() { // NOLINT(bugprone-exception-escape, cppcoreguidelines-noexcept-swap,performance-noexcept-swap)
+    void swap() noexcept { // NOLINT(bugprone-exception-escape)
         real_vector.swap(real_vector_alt);
         pre_vector.swap(pre_vector_alt);
         test();
