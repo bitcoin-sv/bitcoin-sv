@@ -3,7 +3,6 @@ Checks: '-clang-analyzer-*,
          -bugprone-empty-catch,
          -bugprone-implicit-widening-of-multiplication-result,
          -bugprone-narrowing-conversions,
-         -bugprone-use-after-move,
          
          -cert-err58-cpp,
           

@@ -506,10 +506,9 @@ void CheckAddCoinBase(const Amount& base_value,
 template<typename... Args>
 void CheckAddCoin(Args&&... args)
 {
-    for(const Amount& base_value : {ABSENT, PRUNED, VALUE1})
-    {
-        CheckAddCoinBase(base_value, std::forward<Args>(args)...);
-    }
+    CheckAddCoinBase(ABSENT, args...);
+    CheckAddCoinBase(PRUNED, args...);
+    CheckAddCoinBase(VALUE1, std::forward<Args>(args)...);
 }
 
 BOOST_AUTO_TEST_CASE(coin_add) {

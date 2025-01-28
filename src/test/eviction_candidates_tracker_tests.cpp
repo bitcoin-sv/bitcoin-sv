@@ -255,7 +255,7 @@ BOOST_AUTO_TEST_CASE(broad_tree) {
             mempool.AddTx(newEntry);
             if(mempool.tracker)
             {
-                BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == (i + 1)); // NOLINT(bugprone-use-after-move)
+                BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == (i + 1));
             }
         }
 
