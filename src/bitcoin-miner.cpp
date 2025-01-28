@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 
+#include <type_traits>
 #if defined(HAVE_CONFIG_H)
 #include "config/bitcoin-config.h"
 #endif
@@ -180,23 +181,20 @@ void print_coinbase_transaction(ostream& str, vector<unsigned char>& coinbase_by
     str << ".\n";
 }
 
-void Add_space_for_extra_nonce(vector<unsigned char>& coinbase_bytes, size_t offset_extra_nonce)
+void Add_space_for_extra_nonce(vector<unsigned char>& coinbase_bytes,
+                               vector<unsigned char>::difference_type offset_extra_nonce)
 {
     // Copy the first part of the coinbase transaction into the tmp vector
-    // NOLINTNEXTLINE(*-narrowing-conversions)
     vector<unsigned char> tmp(coinbase_bytes.begin(), coinbase_bytes.begin() + offset_extra_nonce);
 
     // Add space for the extra-nonce into the tmp vector
-    // NOLINTNEXTLINE(*-narrowing-conversions)
-    for(size_t i=0; i<sizeof(extra_nonce_type); i++)
+    for(size_t i=0; i < sizeof(extra_nonce_type); i++)
         tmp.push_back((unsigned char)OP_NOP1);
 
     // Add on the second part of the coinbase transaction onto the tmp vector
-    // NOLINTNEXTLINE(*-narrowing-conversions)
     tmp.insert(tmp.begin() + offset_extra_nonce + sizeof(extra_nonce_type),
-               // NOLINTNEXTLINE(*-narrowing-conversions)
-                coinbase_bytes.begin() + offset_extra_nonce,
-                coinbase_bytes.end());
+               coinbase_bytes.begin() + offset_extra_nonce,
+               coinbase_bytes.end());
 
     // Copy the tmp vector into the original transaction 
     coinbase_bytes.assign(tmp.begin(), tmp.end());
@@ -232,10 +230,10 @@ static bool CpuMineBlockHasher(CBlockHeader *pblock, vector<unsigned char>& coin
     // 3/4 bytes - block height [start offset=42] RegTest: typically looks like {0x02, 0xA&, 0x00}
     // -- extra nonce -- [start offset=45/46]
 
-    size_t bytes_used_for_height = coinbaseBytes[42];
-    size_t offset_extra_nonce = 43 + bytes_used_for_height;
+    const vector<unsigned char>::difference_type bytes_used_for_height = coinbaseBytes[42];
+    const vector<unsigned char>::difference_type offset_extra_nonce = 43 + bytes_used_for_height;
     
-    if(coinbaseBytes.size() < offset_extra_nonce + 2) // crude.
+    if(ssize(coinbaseBytes) < offset_extra_nonce + 2) // crude.
     {
         cerr << "Invalid coinbase transaction supplied\n";
         return false;
