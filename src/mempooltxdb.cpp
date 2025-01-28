@@ -355,9 +355,9 @@ void CAsyncMempoolTxDB::Add(CTransactionWrapperRef&& transactionToAdd)
     assert(success && "Push to task queue failed");
 }
 
-void CAsyncMempoolTxDB::Remove(CMempoolTxDB::TxData&& transactionToRemove)
+void CAsyncMempoolTxDB::Remove(const CMempoolTxDB::TxData& transactionToRemove)
 {
-    const auto success = queue->PushWait(Task{RemoveTask{std::move(transactionToRemove)}});
+    const auto success = queue->PushWait(Task{RemoveTask{transactionToRemove}});
     assert(success && "Push to task queue failed");
 }
 

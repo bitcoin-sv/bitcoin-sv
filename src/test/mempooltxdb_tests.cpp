@@ -225,9 +225,9 @@ BOOST_AUTO_TEST_CASE(AsyncDeleteFromTxDB)
     }
 
     // Remove all transactions from the database.
-    for (auto& td : txdata)
+    for(const auto& td : txdata)
     {
-        txdb.Remove(std::move(td)); // NOLINT(performance-move-const-arg)
+        txdb.Remove(td);
     }
     txdb.Sync();
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);

@@ -247,7 +247,11 @@ BOOST_AUTO_TEST_CASE(broad_tree) {
         for(size_t i = 0; i < 100; i++)
         {
             auto feerate = 100 + ((i % 2 == 0) ? (i * 0.1) : (i * -0.1)); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
-            auto newEntry = MakeEntry(feerate, {}, { std::make_tuple<CTransactionRef, int>(entry.GetSharedTx(), std::move(i))}, 1, 0); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions, performance-move-const-arg)
+            auto newEntry = MakeEntry(feerate,
+                                      {},
+                                      {std::make_tuple<CTransactionRef, int>(entry.GetSharedTx(), i)},
+                                      1,
+                                      0); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions) 
             mempool.AddTx(newEntry);
             if(mempool.tracker)
             {
@@ -283,7 +287,11 @@ BOOST_AUTO_TEST_CASE(secondary_mempool_first) {
 
     for(int i = 0; i < 100; i++)
     {    
-        auto newEntry = MakeEntry(100 + (i * 0.1), {}, { std::make_tuple<CTransactionRef, int>(entry.GetSharedTx(), std::move(i))}, 1, 0); // NOLINT(performance-move-const-arg, bugprone-use-after-move)
+        auto newEntry = MakeEntry(100 + (i * 0.1),
+                                  {},
+                                  {std::make_tuple(entry.GetSharedTx(), i)},
+                                  1,
+                                  0);
         if(i % 2 == 0)
         {
             CTestTxMemPoolEntry(newEntry).groupingData() =

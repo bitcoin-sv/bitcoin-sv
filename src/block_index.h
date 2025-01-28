@@ -517,7 +517,7 @@ public:
     void SetDiskBlockData(
         size_t transactionsCount,
         const CDiskBlockPos& pos,
-        CDiskBlockMetaData metaData,
+        const CDiskBlockMetaData& metaData,
         const CBlockSource& source,
         DirtyBlockIndexStore& notifyDirty)
     {
@@ -533,8 +533,7 @@ public:
 
         if (!metaData.diskDataHash.IsNull() && metaData.diskDataSize)
         {
-            // NOLINTNEXTLINE(performance-move-const-arg)
-            mDiskBlockMetaData = std::move(metaData);
+            mDiskBlockMetaData = metaData;
             nStatus = nStatus.withDiskBlockMetaData();
         }
 

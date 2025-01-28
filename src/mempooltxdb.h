@@ -97,10 +97,6 @@ public:
     {
         TxId txid;
         uint64_t size;
-
-        // NOLINTNEXTLINE(performance-move-const-arg)
-        TxData(TxId&& txid_, uint64_t size_) : txid{std::move(txid_)}, size{size_} {}
-        TxData(const TxId& txid_, uint64_t size_) : txid{txid_}, size{size_} {}
     };
 
     /**
@@ -186,7 +182,7 @@ public:
     void Add(CTransactionWrapperRef&& transactionToAdd);
 
     // Asynchronously remove a transaction from the database.
-    void Remove(CMempoolTxDB::TxData&& transactionToRemove);
+    void Remove(const CMempoolTxDB::TxData& transactionToRemove);
 
     // Get the size of the data in the database.
     uint64_t GetDiskUsage()
