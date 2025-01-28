@@ -249,9 +249,9 @@ BOOST_AUTO_TEST_CASE(broad_tree) {
             auto feerate = 100 + ((i % 2 == 0) ? (i * 0.1) : (i * -0.1)); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
             auto newEntry = MakeEntry(feerate,
                                       {},
-                                      {std::make_tuple<CTransactionRef, int>(entry.GetSharedTx(), i)},
+                                      {std::make_tuple(entry.GetSharedTx(), i)},
                                       1,
-                                      0); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions) 
+                                      0);
             mempool.AddTx(newEntry);
             if(mempool.tracker)
             {

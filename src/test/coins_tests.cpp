@@ -14,6 +14,7 @@
 #include "chainparams.h"
 
 #include <chrono>
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <thread>
@@ -274,15 +275,15 @@ static const Amount FAIL(-3);
 static const Amount VALUE1(100);
 static const Amount VALUE2(200);
 static const Amount VALUE3(300);
-static const char DIRTY = CCoinsCacheEntry::DIRTY;
-static const char FRESH = CCoinsCacheEntry::FRESH;
-static const char NO_ENTRY = -1;
+static const uint8_t DIRTY = CCoinsCacheEntry::DIRTY;
+static const uint8_t FRESH = CCoinsCacheEntry::FRESH;
+static const uint8_t NO_ENTRY = -1;
 
-static const auto FLAGS = {char(0), FRESH, DIRTY, char(DIRTY | FRESH)};
-static const auto CLEAN_FLAGS = {char(0), FRESH};
+static const auto FLAGS = {uint8_t{0}, FRESH, DIRTY, uint8_t(DIRTY | FRESH)};
+static const auto CLEAN_FLAGS = {uint8_t(0), FRESH};
 static const auto ABSENT_FLAGS = {NO_ENTRY};
 
-static void SetCoinValue(const Amount& value, CCoinsCacheEntry &coin, char flags) {
+static void SetCoinValue(const Amount& value, CCoinsCacheEntry &coin, uint8_t flags) {
     assert(value != ABSENT);
     coin = {CoinImpl{}, static_cast<uint8_t>(flags)};
     assert(coin.GetCoin().IsSpent());
@@ -298,7 +299,7 @@ static void SetCoinValue(const Amount& value, CCoinsCacheEntry &coin, char flags
     }
 }
 
-size_t InsertCoinMapEntry(CCoinsMap &map, const Amount& value, char flags) {
+size_t InsertCoinMapEntry(CCoinsMap &map, const Amount& value, uint8_t flags) {
     if (value == ABSENT) {
         assert(flags == NO_ENTRY);
         return 0;
@@ -312,7 +313,8 @@ size_t InsertCoinMapEntry(CCoinsMap &map, const Amount& value, char flags) {
 }
 
 
-void GetCoinMapEntry(const CCoinsMap &map, Amount &value, char &flags) {
+void GetCoinMapEntry(const CCoinsMap& map, Amount& value, uint8_t& flags)
+{
     auto it = map.find(OUTPOINT);
     if (it == map.end()) {
         value = ABSENT;
@@ -329,7 +331,7 @@ void GetCoinMapEntry(const CCoinsMap &map, Amount &value, char &flags) {
     }
 }
 
-void WriteCoinViewEntry(TestCoinsSpanCache& span, const Amount& value, char flags) {
+void WriteCoinViewEntry(TestCoinsSpanCache& span, const Amount& value, uint8_t flags) {
     CCoinsMap map;
     InsertCoinMapEntry(map, value, flags);
     span.BatchWrite(map, uint256S("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"));
@@ -339,7 +341,7 @@ class SingleEntryCacheTest {
 public:
     SingleEntryCacheTest(const Amount& base_value,
                          const Amount& cache_value,
-                         char cache_flags)
+                         uint8_t cache_flags)
     {
         {
             TestCoinsSpanCache span{base};
@@ -362,15 +364,15 @@ public:
 void CheckAccessCoin(const Amount& base_value,
                      const Amount& cache_value,
                      const Amount& expected_value,
-                     char cache_flags,
-                     char expected_flags)
+                     uint8_t cache_flags,
+                     uint8_t expected_flags)
 {
     SingleEntryCacheTest test(base_value, cache_value, cache_flags);
     test.cache->GetCoin(OUTPOINT);
     test.cache->SelfTest();
 
     Amount result_value;
-    char result_flags{};
+    uint8_t result_flags{};
     GetCoinMapEntry(test.cache->GetRawCacheCoins(), result_value, result_flags);
     BOOST_CHECK_EQUAL(result_value, expected_value);
     BOOST_CHECK_EQUAL(result_flags, expected_flags);
@@ -416,15 +418,15 @@ BOOST_AUTO_TEST_CASE(coin_access) {
 void CheckSpendCoin(const Amount& base_value,
                     const Amount& cache_value,
                     const Amount& expected_value,
-                    char cache_flags,
-                    char expected_flags)
+                    uint8_t cache_flags,
+                    uint8_t expected_flags)
 {
     SingleEntryCacheTest test(base_value, cache_value, cache_flags);
     test.cache->SpendCoin(OUTPOINT);
     test.cache->SelfTest();
 
     Amount result_value;
-    char result_flags{};
+    uint8_t result_flags{};
     GetCoinMapEntry(test.cache->GetRawCacheCoins(), result_value, result_flags);
     BOOST_CHECK_EQUAL(result_value, expected_value);
     BOOST_CHECK_EQUAL(result_flags, expected_flags);
@@ -472,15 +474,15 @@ void CheckAddCoinBase(const Amount& base_value,
                       const Amount& cache_value,
                       const Amount& modify_value,
                       const Amount& expected_value,
-                      char cache_flags,
-                      char expected_flags,
+                      uint8_t cache_flags,
+                      uint8_t expected_flags,
                       bool coinbase,
                       bool confiscation = false)
 {
     SingleEntryCacheTest test(base_value, cache_value, cache_flags);
 
     Amount result_value;
-    char result_flags{};
+    uint8_t result_flags{};
     try {
         CTxOut output;
         output.nValue = modify_value;
@@ -564,14 +566,14 @@ BOOST_AUTO_TEST_CASE(coin_add) {
 void CheckWriteCoin(const Amount& parent_value,
                     const Amount& child_value,
                     const Amount& expected_value,
-                    char parent_flags,
-                    char child_flags,
-                    char expected_flags)
+                    uint8_t parent_flags,
+                    uint8_t child_flags,
+                    uint8_t expected_flags)
 {
     SingleEntryCacheTest test(ABSENT, parent_value, parent_flags);
 
     Amount result_value;
-    char result_flags{};
+    uint8_t result_flags{};
     try {
         WriteCoinViewEntry(*test.cache, child_value, child_flags);
         test.cache->SelfTest();
@@ -652,9 +654,9 @@ BOOST_AUTO_TEST_CASE(coin_write) {
     // is always left unchanged.
     for (const Amount& parent_value : {ABSENT, PRUNED, VALUE1}) {
         for (const Amount& child_value : {ABSENT, PRUNED, VALUE2}) {
-            for (char parent_flags :
+            for (uint8_t parent_flags :
                  parent_value == ABSENT ? ABSENT_FLAGS : FLAGS) {
-                for (char child_flags :
+                for (uint8_t child_flags :
                      child_value == ABSENT ? ABSENT_FLAGS : CLEAN_FLAGS) {
                     CheckWriteCoin(parent_value, child_value, parent_value,
                                    parent_flags, child_flags, parent_flags);
@@ -680,7 +682,7 @@ BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
 
     // Hash and height of a block that contains unspent transaction (txId)
     auto blockHash = uint256S("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
-    std::uint32_t blockHeight = 1;
+    std::int32_t blockHeight = 1;
 
     // Size (in bytes) of small locking script
     std::size_t script_small_size = 0;
@@ -1036,7 +1038,7 @@ BOOST_FIXTURE_TEST_CASE(no_coins_caching, TestingSetup)
     // Hash and height of a block that contains unspent transaction (txId)
     auto block_1_hash = uint256S("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     auto block_2_hash = uint256S("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
-    std::uint32_t blockHeight = 1;
+    std::int32_t blockHeight = 1;
 
     CScript script_template =
         []
@@ -1208,7 +1210,7 @@ BOOST_FIXTURE_TEST_CASE(coins_caching, TestingSetup)
     // Hash and height of a block that contains unspent transaction (txId)
     auto block_1_hash = uint256S("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     auto block_2_hash = uint256S("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
-    std::uint32_t blockHeight = 1;
+    std::int32_t blockHeight = 1;
 
     CScript script_template =
         []
@@ -1247,7 +1249,7 @@ BOOST_FIXTURE_TEST_CASE(coins_caching, TestingSetup)
         BOOST_TEST(primary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
         BOOST_TEST(secondary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
 
-        for(std::uint32_t i = 0; i < coins_count; ++i)
+        for(uint32_t i = 0; i < coins_count; ++i)
         {
             CTxOut txo;
             txo.nValue = Amount(123);
@@ -1450,7 +1452,7 @@ BOOST_FIXTURE_TEST_CASE(sharding, TestingSetup)
 
     // Hash and height of a block that contains unspent transactions
     uint256 blockHash { InsecureRand256() };
-    uint32_t blockHeight {1};
+    int32_t blockHeight {1};
 
     //
     // Add sample UTXOs to database
@@ -1583,7 +1585,7 @@ BOOST_FIXTURE_TEST_CASE(cache_all_inputs, TestingSetup)
 
     // Hash and height of a block that contains unspent transactions
     uint256 blockHash { InsecureRand256() };
-    uint32_t blockHeight {1};
+    int32_t blockHeight {1};
 
     //
     // Add sample UTXOs to database

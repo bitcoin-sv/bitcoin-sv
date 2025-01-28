@@ -265,7 +265,7 @@ BuildSpendingTransaction(const CScript &scriptSig,
 
 static void DoTest(const CScript& scriptPubKey,
                    const CScript& scriptSig,
-                   int flags,
+                   uint32_t flags,
                    const std::string& message,
                    int scriptError,
                    const std::optional<malleability::status>& expected_malleability,
@@ -402,7 +402,7 @@ private:
     bool havePush{};
     std::vector<uint8_t> push;
     std::string comment;
-    int flags;
+    uint32_t flags;
     int scriptError{SCRIPT_ERR_OK};
     std::optional<malleability::status> expected_malleability {std::nullopt};
     Amount nValue;
@@ -453,7 +453,7 @@ private:
 public:
     TestBuilder(const CScript& script_,
                 const std::string& comment_,
-                int flags_,
+                uint32_t flags_,
                 bool P2SH = false,
                 const Amount& nValue_ = Amount(0))
         : script(script_),
@@ -1494,8 +1494,15 @@ BOOST_AUTO_TEST_CASE(chronicle_pushdata_only)
     // Post-Chronicle, scriptSig only pushes, malleability disallowed
     tests.push_back(
         TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                "PostChronicle, scriptSig only pushes, malleability DISALLOWED", postChronicleFlags, false)
-            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, postChronicleFlags)
+                    "PostChronicle, scriptSig only pushes, malleability DISALLOWED",
+                    postChronicleFlags,
+                    false)
+            .PushSig(keys.key0,
+                     SigHashType().withForkId(),
+                     32,
+                     32,
+                     Amount{0},
+                     postChronicleFlags)
             .Malleability(malleability::non_malleable | malleability::disallowed)
             .ScriptError(SCRIPT_ERR_OK));
     // Post-Chronicle, scriptSig only pushes, malleability allowed

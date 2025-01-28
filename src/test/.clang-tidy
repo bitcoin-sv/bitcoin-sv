@@ -2,13 +2,11 @@ Checks: '-clang-analyzer-*,
 
          -bugprone-empty-catch,
          -bugprone-implicit-widening-of-multiplication-result,
-         -bugprone-narrowing-conversions,
          
          -cert-err58-cpp,
           
          -cppcoreguidelines-avoid-c-arrays,
          -cppcoreguidelines-avoid-non-const-global-variables,
-         -cppcoreguidelines-narrowing-conversions,
          -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
          -cppcoreguidelines-pro-bounds-constant-array-index,
          -cppcoreguidelines-pro-bounds-pointer-arithmetic,
@@ -17,7 +15,5 @@ Checks: '-clang-analyzer-*,
       '
 
 InheritParentConfig: true
-WarningsAsErrors: '*'
-HeaderFilterRegex: '.*'
 ...
 
