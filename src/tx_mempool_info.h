@@ -110,13 +110,11 @@ private:
             : mValue{std::move(ref)}
         {}
         
-        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
-        AtomicTxRef(AtomicTxRef&& other)
+        AtomicTxRef(AtomicTxRef&& other) noexcept
             : mValue{ std::atomic_load( &other.mValue ) }
         {}
         
-        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
-        AtomicTxRef& operator=(AtomicTxRef&& other)
+        AtomicTxRef& operator=(AtomicTxRef&& other) noexcept
         {
             mValue = std::atomic_load( &other.mValue );
             return *this;

@@ -196,13 +196,13 @@ CJournal::ReadLock::ReadLock(const std::shared_ptr<CJournal>& journal)
 }
 
 // Move constructor
-CJournal::ReadLock::ReadLock(ReadLock&& that)
+CJournal::ReadLock::ReadLock(ReadLock&& that) noexcept
 : mJournal{std::move(that.mJournal)}, mLock{std::move(that.mLock)}
 {
 }
 
 // Move assignment
-CJournal::ReadLock& CJournal::ReadLock::operator=(ReadLock&& that)
+CJournal::ReadLock& CJournal::ReadLock::operator=(ReadLock&& that) noexcept
 {
     if(this != &that)
     {
