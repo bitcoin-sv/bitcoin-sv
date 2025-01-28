@@ -120,7 +120,6 @@ public:
         std::lock_guard lockGuard{mMutexCurrentlyValidatingBlocks};
 
         int count =
-            // NOLINTNEXTLINE(*-narrowing-conversions)
             std::count_if(
                 mCurrentlyValidatingBlocks.begin(),
                 mCurrentlyValidatingBlocks.end(),
