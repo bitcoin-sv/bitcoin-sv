@@ -598,7 +598,7 @@ public:
             std::vector<uint8_t>(push.begin() + pos,
                                  push.begin() + pos + datain.size()) == datain,
             comment);
-        push.erase(push.begin() + pos, push.begin() + pos + datain.size()); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+        push.erase(push.begin() + pos, push.begin() + pos + ssize(datain));
         push.insert(push.begin() + pos, dataout.begin(), dataout.end());
         return *this;
     }
@@ -1464,7 +1464,7 @@ BOOST_AUTO_TEST_CASE(script_json_test) {
             unsigned int scriptflags = ParseScriptFlags(scriptFlagsString);
             int scriptError = ParseScriptError(scriptErrorString);
 
-            DoTest(scriptPubKey, scriptSig, scriptflags, strTest, scriptError, // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+            DoTest(scriptPubKey, scriptSig, scriptflags, strTest, scriptError,
                    std::nullopt, nValue);
         } catch (std::runtime_error &e) {
             BOOST_TEST_MESSAGE("Script test failed.  scriptSig:  "
@@ -3201,7 +3201,7 @@ BOOST_AUTO_TEST_CASE(txout_IsDustReturnScript) {
 
     // do not add data length, it is done automatically
     testScript = CScript();
-    testScript << OP_FALSE << OP_RETURN << protocol_id.size() << protocol_id; // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+    testScript << OP_FALSE << OP_RETURN << ssize(protocol_id) << protocol_id;
     BOOST_CHECK(!IsDustReturnScript(testScript));
 
     static const std::vector<uint8_t> nonsense_id = {'n','o','n','s'};
@@ -3356,7 +3356,7 @@ BOOST_AUTO_TEST_CASE(caching_invalid_signatures)
         for(auto& key : keys){
           scriptPubKey << ToByteVector(key.GetPubKey());
         }
-        scriptPubKey << CScriptNum(keys.size()) << OP_CHECKMULTISIG; // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+        scriptPubKey << CScriptNum(ssize(keys)) << OP_CHECKMULTISIG;
         scriptPubKey << OP_1;
         CMutableTransaction creditingTx =
             BuildCreditingTransaction(scriptPubKey, Amount(0));
