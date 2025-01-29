@@ -654,7 +654,7 @@ BOOST_AUTO_TEST_CASE(op_depth)
         BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
         BOOST_CHECK_EQUAL(i + 1, stack.size());
         vector<uint8_t> op;
-        bsv::serialize<int>(i, back_inserter(op)); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+        bsv::serialize(i, back_inserter(op));
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.at(i)), end(stack.at(i)),
                                       begin(op), end(op));
     }
