@@ -127,9 +127,9 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount) {
                << Serialize(s2);
     BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(scriptSig2, ProtocolEra::PreGenesis, sigOpCountError), 3U);
 
-    uint64_t maxPubKeysPerMultiSig = 100;   // larger than before genesis limit
+    int64_t maxPubKeysPerMultiSig = 100;   // larger than before genesis limit
     std::vector<CPubKey> keysAfterGenesis;
-    for (uint64_t i = 0; i < maxPubKeysPerMultiSig; i++) {
+    for (int64_t i = 0; i < maxPubKeysPerMultiSig; i++) {
         CKey k;
         k.MakeNewKey(true);
         keysAfterGenesis.push_back(k.GetPubKey());
@@ -141,10 +141,10 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount) {
     // Test policy after Genesis
     testConfig.Reset();
     CScript s4;
-    s4 << OP_1 << ToByteVector(dummy) << maxPubKeysPerMultiSig - 1 << OP_CHECKMULTISIG; // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+    s4 << OP_1 << ToByteVector(dummy) << maxPubKeysPerMultiSig - 1 << OP_CHECKMULTISIG;
     BOOST_CHECK_EQUAL(s4.GetSigOpCount(false, ProtocolEra::PostGenesis, sigOpCountError), maxPubKeysPerMultiSig - 1);
     CScript s5;
-    s5 << OP_1 << ToByteVector(dummy) << maxPubKeysPerMultiSig + 1 << OP_CHECKMULTISIG; // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+    s5 << OP_1 << ToByteVector(dummy) << maxPubKeysPerMultiSig + 1 << OP_CHECKMULTISIG;
     BOOST_CHECK_EQUAL(s5.GetSigOpCount(false, ProtocolEra::PostGenesis, sigOpCountError), maxPubKeysPerMultiSig + 1);
 
     // Test default policy before Genesis with fAccurate == true
@@ -278,8 +278,8 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
     // Default flags
     int flags = SCRIPT_VERIFY_P2SH;
     
-    uint64_t genesisHeight = 10;
-    testConfig.SetGenesisActivationHeight(genesisHeight); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+    int32_t genesisHeight = 10;
+    testConfig.SetGenesisActivationHeight(genesisHeight);
     
 
     // Multisig script (legacy counting)
@@ -289,7 +289,6 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
                                          << OP_CHECKMULTISIGVERIFY;
         // Do not use a valid signature to avoid using wallet operations.
         CScript scriptSig = CScript() << OP_0 << OP_0;
-        // NOLINTNEXTLINE(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
         for(int nHeight : {genesisHeight-1, genesisHeight}){ // test before and after genesis (should be the same)
             BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, nHeight);
 
@@ -332,7 +331,7 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
                             << OP_0 << OP_0 << ToByteVector(redeemScript);
         { // testing before genesis
             bool sigOpCountError; // NOLINT(cppcoreguidelines-init-variables)
-            BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight-1); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+            BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight-1);
             BOOST_REQUIRE(GetTransactionSigOpCount(testConfig, CTransaction(spendingTx), coins,
                                             true, ProtocolEra::PreGenesis, sigOpCountError) == 2);
             BOOST_REQUIRE(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) ==
@@ -340,7 +339,7 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
         }
         { // testing after genesis
             bool sigOpCountError; // NOLINT(cppcoreguidelines-init-variables)
-            BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+            BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight);
             BOOST_REQUIRE(GetTransactionSigOpCount(testConfig, CTransaction(spendingTx), coins,
                                             true, ProtocolEra::PostGenesis, sigOpCountError) == 0);
             BOOST_REQUIRE(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) ==
@@ -361,7 +360,7 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
         // Do not use a valid signature to avoid using wallet operations.
         CScript scriptSig = CScript() << OP_0 << signature;
 
-        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight);
 
         bool sigOpCountError; // NOLINT(cppcoreguidelines-init-variables)
 
@@ -388,7 +387,7 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
         CScript scriptSig = CScript() << OP_0 << OP_0;
 
         bool sigOpCountError {false};
-        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight);
         BOOST_CHECK(GetTransactionSigOpCount(testConfig, CTransaction(creationTx), coins, true, ProtocolEra::PostGenesis, sigOpCountError) == 0);
         BOOST_CHECK(sigOpCountError == true);
     }
@@ -401,7 +400,7 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
         CScript scriptSig = CScript() << OP_0 << OP_0;
 
         bool sigOpCountError {false};
-        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight);
         BOOST_CHECK(GetTransactionSigOpCount(testConfig, CTransaction(creationTx), coins, true, ProtocolEra::PostGenesis, sigOpCountError) == 0);
         BOOST_CHECK(sigOpCountError == true);
 
