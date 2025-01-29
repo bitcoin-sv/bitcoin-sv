@@ -39,12 +39,12 @@ CBlockIndex* AddBlockIndex(CBlockIndex& prev, BlockIndexStore& mapBlockIndex)
 
 BOOST_AUTO_TEST_CASE(BlockIndexMutexDistributionTest)
 {
-    uint32_t BLOCK_COUNT = 100000;
+    uint32_t BLOCK_COUNT = 100'000;
     uint32_t MUTEX_COUNT = 8;
-    // NOLINTNEXTLINE(bugprone-narrowing-conversions)
-    uint32_t LOWER_LIMIT = BLOCK_COUNT / MUTEX_COUNT - 0.1 * BLOCK_COUNT; // NOLINT(bugprone-integer-division, cppcoreguidelines-narrowing-conversions)
-    // NOLINTNEXTLINE(bugprone-narrowing-conversions)
-    uint32_t UPPER_LIMIT = BLOCK_COUNT / MUTEX_COUNT + 0.1 * BLOCK_COUNT; // NOLINT(bugprone-integer-division, cppcoreguidelines-narrowing-conversions)
+    // NOLINTNEXTLINE(*-narrowing-conversions, bugprone-integer-division)
+    uint32_t LOWER_LIMIT = BLOCK_COUNT / MUTEX_COUNT - 0.1 * BLOCK_COUNT;
+    // NOLINTNEXTLINE(*-narrowing-conversions, bugprone-integer-division)
+    uint32_t UPPER_LIMIT = BLOCK_COUNT / MUTEX_COUNT + 0.1 * BLOCK_COUNT;
 
     LOCK(cs_main);
     std::map<std::mutex*, uint32_t> blockIndexDistribution;

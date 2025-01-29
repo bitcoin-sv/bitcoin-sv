@@ -71,7 +71,8 @@ template <typename Cache> double test_cache(size_t megabytes, double load) {
     Cache set{};
     size_t bytes = megabytes * (1 << 20);
     set.setup_bytes(bytes);
-    uint32_t n_insert = static_cast<uint32_t>(load * (bytes / sizeof(uint256))); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions, bugprone-integer-division)
+    // NOLINTNEXTLINE(*-narrowing-conversions, bugprone-integer-division)
+    uint32_t n_insert = static_cast<uint32_t>(load * (bytes / sizeof(uint256)));
     hashes.resize(n_insert);
     for (uint32_t i = 0; i < n_insert; ++i) {
         insecure_GetRandHash(hashes[i]);
@@ -140,7 +141,8 @@ template <typename Cache> void test_cache_erase(size_t megabytes) {
     Cache set{};
     size_t bytes = megabytes * (1 << 20);
     set.setup_bytes(bytes);
-    uint32_t n_insert = static_cast<uint32_t>(load * (bytes / sizeof(uint256))); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions, bugprone-integer-division)
+    // NOLINTNEXTLINE(*-narrowing-conversions, bugprone-integer-division)
+    uint32_t n_insert = static_cast<uint32_t>(load * (bytes / sizeof(uint256)));
     hashes.resize(n_insert);
     for (uint32_t i = 0; i < n_insert; ++i) {
         insecure_GetRandHash(hashes[i]);
@@ -200,7 +202,8 @@ template <typename Cache> void test_cache_erase_parallel(size_t megabytes) {
     Cache set{};
     size_t bytes = megabytes * (1 << 20);
     set.setup_bytes(bytes);
-    uint32_t n_insert = static_cast<uint32_t>(load * (bytes / sizeof(uint256))); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions, bugprone-integer-division)
+    // NOLINTNEXTLINE(*-narrowing-conversions, bugprone-integer-division)
+    uint32_t n_insert = static_cast<uint32_t>(load * (bytes / sizeof(uint256)));
     hashes.resize(n_insert);
     for (uint32_t i = 0; i < n_insert; ++i) {
         insecure_GetRandHash(hashes[i]);
