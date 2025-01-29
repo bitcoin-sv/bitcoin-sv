@@ -122,8 +122,7 @@ class HTTPRequest
         std::string toEncode { toEncodeStr.str() };
 
         std::string encoded {};
-        // NOLINTNEXTLINE(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
-        char* encodedURI { evhttp_uriencode(toEncode.data(), toEncode.size(), false) };
+        char* encodedURI { evhttp_uriencode(toEncode.data(), std::ssize(toEncode), false) };
         if(encodedURI)
         {   
             encoded = encodedURI;
