@@ -24,8 +24,7 @@ static void LockedPool(benchmark::State &state) {
     uint32_t s = 0x12345678;
     while (state.KeepRunning()) {
         for (int x = 0; x < BITER; ++x) {
-            // NOLINTNEXTLINE(*-narrowing-conversions)
-            int idx = s & (addr.size() - 1);
+            const auto idx = s & (addr.size() - 1);
             if (s & 0x80000000) {
                 b.free(addr[idx]);
                 addr[idx] = 0;
