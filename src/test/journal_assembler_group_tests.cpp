@@ -44,7 +44,8 @@ namespace
         txn.vout.resize(1);
         std::vector<uint8_t> stuff;
         stuff.resize(txnSize - 32); // make serialized transaction 500 bytes
-        txn.vout[0].scriptPubKey = CScript() << stuff << OP_DROP << unique++ << OP_DROP; // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+        // NOLINTNEXTLINE(*-narrowing-conversions)
+        txn.vout[0].scriptPubKey = CScript() << stuff << OP_DROP << unique++ << OP_DROP;
         const auto tx = MakeTransactionRef(std::move(txn));
         return JournalEntryAccess::Make(
             std::make_shared<CTransactionWrapper>(tx, nullptr),
