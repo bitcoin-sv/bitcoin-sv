@@ -306,8 +306,9 @@ BOOST_AUTO_TEST_CASE(bitwiseOperators) {
 BOOST_AUTO_TEST_CASE(comparison) // <= >= < >
 {
     arith_uint256 TmpL;
-    for (unsigned int i = 0; i < 256; ++i) { // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
-        TmpL = OneL << i; // NOLINT(bugprone-narrowing-conversions)
+    for(int i = 0; i < 256; ++i)
+    {
+        TmpL = OneL << i;
         BOOST_CHECK(TmpL >= ZeroL && TmpL > ZeroL && ZeroL < TmpL &&
                     ZeroL <= TmpL);
         BOOST_CHECK(TmpL >= 0 && TmpL > 0 && 0 < TmpL && 0 <= TmpL);
@@ -332,16 +333,17 @@ BOOST_AUTO_TEST_CASE(plusMinus) {
     BOOST_CHECK(TmpL == R1L + R2L);
     BOOST_CHECK(OneL + MaxL == ZeroL);
     BOOST_CHECK(MaxL + OneL == ZeroL);
-    for (unsigned int i = 1; i < 256; ++i) {
+    for(int i = 1; i < 256; ++i)
+    {
         BOOST_CHECK((MaxL >> i) + OneL == (HalfL >> (i - 1)));
-        BOOST_CHECK(OneL + (MaxL >> i) == (HalfL >> (i - 1))); // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
-        TmpL = (MaxL >> i); // NOLINT(bugprone-narrowing-conversions)
+        BOOST_CHECK(OneL + (MaxL >> i) == (HalfL >> (i - 1)));
+        TmpL = (MaxL >> i);
         TmpL += OneL;
-        BOOST_CHECK(TmpL == (HalfL >> (i - 1))); // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
-        TmpL = (MaxL >> i); // NOLINT(bugprone-narrowing-conversions)
+        BOOST_CHECK(TmpL == (HalfL >> (i - 1)));
+        TmpL = (MaxL >> i);
         TmpL += 1;
-        BOOST_CHECK(TmpL == (HalfL >> (i - 1))); // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
-        TmpL = (MaxL >> i); // NOLINT(bugprone-narrowing-conversions)
+        BOOST_CHECK(TmpL == (HalfL >> (i - 1)));
+        TmpL = (MaxL >> i);
         BOOST_CHECK(TmpL++ == (MaxL >> i));
         BOOST_CHECK(TmpL == (HalfL >> (i - 1)));
     }
@@ -359,13 +361,14 @@ BOOST_AUTO_TEST_CASE(plusMinus) {
     BOOST_CHECK(R1L - (-R2L) == R1L + R2L);
     BOOST_CHECK(R1L - (-OneL) == R1L + OneL);
     BOOST_CHECK(R1L - OneL == R1L + (-OneL));
-    for (unsigned int i = 1; i < 256; ++i) {
+    for(int i = 1; i < 256; ++i)
+    {
         BOOST_CHECK((MaxL >> i) - (-OneL) == (HalfL >> (i - 1)));
-        BOOST_CHECK((HalfL >> (i - 1)) - OneL == (MaxL >> i)); // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
-        TmpL = (HalfL >> (i - 1)); // NOLINT(bugprone-narrowing-conversions)
+        BOOST_CHECK((HalfL >> (i - 1)) - OneL == (MaxL >> i));
+        TmpL = (HalfL >> (i - 1));
         BOOST_CHECK(TmpL-- == (HalfL >> (i - 1)));
-        BOOST_CHECK(TmpL == (MaxL >> i)); // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
-        TmpL = (HalfL >> (i - 1)); // NOLINT(bugprone-narrowing-conversions)
+        BOOST_CHECK(TmpL == (MaxL >> i));
+        TmpL = (HalfL >> (i - 1));
         BOOST_CHECK(--TmpL == (MaxL >> i));
     }
     TmpL = R1L;
