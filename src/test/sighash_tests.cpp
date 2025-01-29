@@ -17,6 +17,7 @@
 #include "validation.h" // For CheckRegularTransaction
 #include "version.h"
 
+#include <cstdint>
 #include <iostream>
 
 #include <boost/test/unit_test.hpp>
@@ -93,20 +94,21 @@ static void RandomScript(CScript &script) {
         OP_3,     OP_CHECKSIG, OP_IF,
         OP_VERIF, OP_RETURN,   OP_CODESEPARATOR};
     script = CScript();
-    int ops = (InsecureRandRange(10)); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
-    for (int i = 0; i < ops; i++) {
+    const auto ops = (InsecureRandRange(10));
+    for (uint64_t i = 0; i < ops; i++) {
         script << oplist[InsecureRandRange(sizeof(oplist) / sizeof(oplist[0]))]; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 }
 
 static void RandomTransaction(CMutableTransaction &tx, bool fSingle) {
-    tx.nVersion = insecure_rand(); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+    tx.nVersion = insecure_rand(); // NOLINT(*-narrowing-conversions)
     tx.vin.clear();
     tx.vout.clear();
     tx.nLockTime = (InsecureRandBool()) ? insecure_rand() : 0;
-    int ins = (InsecureRandBits(2)) + 1; // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
-    int outs = fSingle ? ins : (InsecureRandBits(2)) + 1; // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
-    for (int in = 0; in < ins; in++) {
+    const auto ins = InsecureRandBits(2) + 1;
+    const auto outs = fSingle ? ins : (InsecureRandBits(2)) + 1;
+    for(uint64_t in = 0; in < ins; in++)
+    {
         tx.vin.push_back(CTxIn());
         CTxIn &txin = tx.vin.back();
         txin.prevout = COutPoint(InsecureRand256(), InsecureRandBits(2));
@@ -114,7 +116,9 @@ static void RandomTransaction(CMutableTransaction &tx, bool fSingle) {
         txin.nSequence =
             (InsecureRandBool()) ? insecure_rand() : (unsigned int)-1;
     }
-    for (int out = 0; out < outs; out++) {
+
+    for(uint64_t out = 0; out < outs; out++)
+    {
         tx.vout.push_back(CTxOut());
         CTxOut &txout = tx.vout.back();
         txout.nValue = Amount(int64_t(insecure_rand()) % 100000000);
@@ -141,7 +145,7 @@ BOOST_AUTO_TEST_CASE(sighash_test) {
         RandomTransaction(txTo, (nHashType & 0x1f) == SIGHASH_SINGLE);
         CScript scriptCode;
         RandomScript(scriptCode);
-        int nIn = InsecureRandRange(txTo.vin.size()); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+        int nIn = InsecureRandRange(txTo.vin.size()); // NOLINT(*-narrowing-conversions)
 
         uint256 shref =
             SignatureHashOld(scriptCode, CTransaction(txTo), nIn, nHashType);
