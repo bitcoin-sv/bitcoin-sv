@@ -49,7 +49,8 @@ CTxMemPoolEntry MakeEntry(
     }
     
     auto txSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-    auto totalFee = Amount(int64_t( feerate * txSize) / nOutputs * nOutputs); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+    // NOLINTNEXTLINE(*-narrowing-conversions)
+    auto totalFee = Amount(int64_t( feerate * txSize) / nOutputs * nOutputs);
     auto perOutput = (totalInput - totalFee) / int64_t(nOutputs);
 
     for(auto& output: tx.vout)
@@ -172,7 +173,7 @@ public:
                 links, 
                 [](CTxMemPoolTestAccess::txiter entry)
                 {
-                    int64_t score = entry->GetFee().GetSatoshis() * 100000 / entry->GetTxSize(); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+                    auto score = entry->GetFee().GetSatoshis() * 100'000 / entry->GetTxSize();
                     if(!entry->IsInPrimaryMempool())
                     {
                         score += std::numeric_limits<int64_t>::min();
@@ -246,7 +247,8 @@ BOOST_AUTO_TEST_CASE(broad_tree) {
     {
         for(size_t i = 0; i < 100; i++)
         {
-            auto feerate = 100 + ((i % 2 == 0) ? (i * 0.1) : (i * -0.1)); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+            // NOLINTNEXTLINE(*-narrowing-conversions)
+            auto feerate = 100 + ((i % 2 == 0) ? (i * 0.1) : (i * -0.1));
             auto newEntry = MakeEntry(feerate,
                                       {},
                                       {std::make_tuple(entry.GetSharedTx(), i)},
@@ -269,7 +271,8 @@ BOOST_AUTO_TEST_CASE(broad_tree) {
         {
             BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == (100-i)); // NOLINT(bugprone-unchecked-optional-access)
             auto txToRemove = mempool.tracker->GetMostWorthless(); // NOLINT(bugprone-unchecked-optional-access)
-            double feeRate = double(txToRemove->GetFee().GetSatoshis()) / txToRemove->GetTxSize(); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+            // NOLINTNEXTLINE(*-narrowing-conversions)
+            double feeRate = double(txToRemove->GetFee().GetSatoshis()) / txToRemove->GetTxSize();
             mempool.RemoveTx(txToRemove);
             BOOST_ASSERT(feeRate >= lastRemovedFeeRate);
             lastRemovedFeeRate = feeRate;
@@ -307,7 +310,8 @@ BOOST_AUTO_TEST_CASE(secondary_mempool_first) {
     for(int i = 0; i < 100; i++)
     {
         auto txToRemove = mempool.tracker->GetMostWorthless(); // NOLINT(bugprone-unchecked-optional-access)
-        double feeRate = double(txToRemove->GetFee().GetSatoshis()) / txToRemove->GetTxSize(); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+        // NOLINTNEXTLINE(*-narrowing-conversions)
+        double feeRate = double(txToRemove->GetFee().GetSatoshis()) / txToRemove->GetTxSize();
         bool fromSecondary = !txToRemove->IsInPrimaryMempool();
         mempool.RemoveMostWorthless();
         if(fromSecondary)
