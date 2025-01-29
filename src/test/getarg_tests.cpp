@@ -29,7 +29,8 @@ static void ResetArgs(const std::string &strArg) {
         vecChar.push_back(s.c_str());
     }
 
-    gArgs.ParseParameters(vecChar.size(), &vecChar[0]); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+    // NOLINTNEXTLINE(*-narrowing-conversions)
+    gArgs.ParseParameters(vecChar.size(), &vecChar[0]);
 }
 
 BOOST_AUTO_TEST_CASE(boolarg) {
