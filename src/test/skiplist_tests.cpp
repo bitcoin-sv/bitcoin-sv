@@ -9,6 +9,7 @@
 #include "util.h"
 #include "block_index_store.h"
 
+#include <cstdint>
 #include <map>
 #include <vector>
 
@@ -55,9 +56,10 @@ BOOST_AUTO_TEST_CASE(skiplist_test) {
         }
     }
 
-    for (int i = 0; i < 1000; i++) {
-        int from = InsecureRandRange(SKIPLIST_LENGTH - 1); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
-        int to = InsecureRandRange(from + 1); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+    for(int i = 0; i < 1000; i++)
+    {
+        const auto from = InsecureRandRange(SKIPLIST_LENGTH - 1);
+        const auto to = InsecureRandRange(from + 1);
 
         BOOST_CHECK(vIndex[SKIPLIST_LENGTH - 1]->GetAncestor(from) ==
                     vIndex[from]);
@@ -138,7 +140,8 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
 
     // Test 100 random starting points for locators.
     for (int n = 0; n < 100; n++) {
-        int r = InsecureRandRange(150000); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+        // NOLINTNEXTLINE(*-narrowing-conversions)
+        int r = InsecureRandRange(150'000);
         CBlockIndex *tip =
             (r < 100000) ? chain[r] : chainSide[r - 50000];
         CBlockLocator locator = chain.GetLocator(tip);
@@ -182,16 +185,19 @@ BOOST_AUTO_TEST_CASE(findearliestatleast_test) {
             return blockIndexStore.Insert( header );
         }() );
 
-    for (unsigned int i = 1; i < 100000; ++i)
+    for(int32_t i = 1; i < 100'000; ++i)
     {
         CBlockHeader header;
         header.hashPrevBlock = chain.Tip()->GetBlockHash();
-        if (i < 10) {
+        if(i < 10)
+        {
             header.nTime = i;
-        } else {
+        }
+        else
+        {
             // randomly choose something in the range [MTP, MTP*2]
-            int64_t medianTimePast = chain[i-1]->GetMedianTimePast(); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
-            int r = InsecureRandRange(medianTimePast); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+            const int64_t medianTimePast = chain[i-1]->GetMedianTimePast();
+            const auto r = InsecureRandRange(medianTimePast);
             header.nTime = r + medianTimePast;
         }
         header.nBits =
@@ -205,9 +211,10 @@ BOOST_AUTO_TEST_CASE(findearliestatleast_test) {
 
     // Check that we set nTimeMax up correctly.
     int64_t curTimeMax = 0;
-    for (size_t i = 0; i < blockIndexStore.Count(); ++i)
+    for(size_t i = 0; i < blockIndexStore.Count(); ++i)
     {
-        curTimeMax = std::max(curTimeMax, chain[i]->GetBlockTime()); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+        // NOLINTNEXTLINE(*-narrowing-conversions)
+        curTimeMax = std::max(curTimeMax, chain[i]->GetBlockTime());
         BOOST_CHECK(curTimeMax == chain[i]->GetBlockTimeMax());
     }
 
@@ -215,7 +222,8 @@ BOOST_AUTO_TEST_CASE(findearliestatleast_test) {
     for (size_t i = 0; i < blockIndexStore.Count(); ++i)
     {
         // Pick a random element in vBlocksMain.
-        int r = InsecureRandRange(blockIndexStore.Count()); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+        // NOLINTNEXTLINE(*-narrowing-conversions)
+        const int r = InsecureRandRange(blockIndexStore.Count());
         int64_t test_time = chain[r]->GetBlockTime();
         CBlockIndex *ret = chain.FindEarliestAtLeast(test_time);
         BOOST_CHECK(ret->GetBlockTimeMax() >= test_time);
