@@ -16,16 +16,21 @@ BOOST_FIXTURE_TEST_SUITE(wallet_crypto, BasicTestingSetup)
 
 bool OldSetKeyFromPassphrase(const SecureString &strKeyData,
                              const std::vector<uint8_t> &chSalt,
-                             const unsigned int nRounds,
+                             const int nRounds,
                              const unsigned int nDerivationMethod,
                              uint8_t *chKey, uint8_t *chIV) {
     if (nRounds < 1 || chSalt.size() != WALLET_CRYPTO_SALT_SIZE) return false;
 
     int i = 0;
-    if (nDerivationMethod == 0)
-        i = EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha512(), &chSalt[0],
-                           (uint8_t *)&strKeyData[0], strKeyData.size(), // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions, cppcoreguidelines-pro-type-cstyle-cast)
-                           nRounds, chKey, chIV); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+    if(nDerivationMethod == 0)
+        i = EVP_BytesToKey(EVP_aes_256_cbc(),
+                           EVP_sha512(),
+                           &chSalt[0],
+                           (uint8_t*)&strKeyData[0], // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+                           strKeyData.size(), // NOLINT(*-narrowing-conversions)
+                           nRounds,
+                           chKey,
+                           chIV);
 
     if (i != (int)WALLET_CRYPTO_KEY_SIZE) {
         memory_cleanse(chKey, sizeof(chKey));
@@ -40,7 +45,7 @@ bool OldEncrypt(const CKeyingMaterial &vchPlaintext,
                 const uint8_t chIV[16]) { // NOLINT(cppcoreguidelines-avoid-c-arrays)
     // max ciphertext len for a n bytes of plaintext is
     // n + AES_BLOCK_SIZE - 1 bytes
-    int nLen = vchPlaintext.size(); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+    int nLen = vchPlaintext.size(); // NOLINT(*-narrowing-conversions)
     int nCLen = nLen + AES_BLOCK_SIZE, nFLen = 0;
     vchCiphertext = std::vector<uint8_t>(nCLen);
 
@@ -74,7 +79,7 @@ bool OldDecrypt(const std::vector<uint8_t> &vchCiphertext,
                 CKeyingMaterial &vchPlaintext, const uint8_t chKey[32], // NOLINT(cppcoreguidelines-avoid-c-arrays)
                 const uint8_t chIV[16]) { // NOLINT(cppcoreguidelines-avoid-c-arrays)
     // plaintext will always be equal to or lesser than length of ciphertext
-    int nLen = vchCiphertext.size(); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+    int nLen = vchCiphertext.size(); // NOLINT(*-narrowing-conversions)
     int nPLen = nLen, nFLen = 0;
 
     vchPlaintext = CKeyingMaterial(nPLen);
@@ -108,7 +113,7 @@ class TestCrypter {
 public:
     static void TestPassphraseSingle(
         const std::vector<uint8_t> &vchSalt, const SecureString &passphrase,
-        uint32_t rounds,
+        int rounds,
         const std::vector<uint8_t> &correctKey = std::vector<uint8_t>(),
         const std::vector<uint8_t> &correctIV = std::vector<uint8_t>()) {
         uint8_t chKey[WALLET_CRYPTO_KEY_SIZE]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
@@ -142,7 +147,7 @@ public:
 
     static void TestPassphrase(
         const std::vector<uint8_t> &vchSalt, const SecureString &passphrase,
-        uint32_t rounds,
+        int rounds,
         const std::vector<uint8_t> &correctKey = std::vector<uint8_t>(),
         const std::vector<uint8_t> &correctIV = std::vector<uint8_t>()) {
         TestPassphraseSingle(vchSalt, passphrase, rounds, correctKey,
@@ -240,9 +245,8 @@ BOOST_AUTO_TEST_CASE(passphrase) {
 
     std::string hash(GetRandHash().ToString());
     std::vector<uint8_t> vchSalt(8);
-    GetRandBytes(&vchSalt[0], vchSalt.size()); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
-    uint32_t rounds = insecure_rand();
-    if (rounds > 30000) rounds = 30000;
+    GetRandBytes(&vchSalt[0], vchSalt.size()); // NOLINT(*-narrowing-conversions)
+    const int rounds{static_cast<int>(std::clamp(insecure_rand(), 0u, 30'000u))};
     TestCrypter::TestPassphrase(vchSalt, SecureString(hash.begin(), hash.end()),
                                 rounds);
 }
