@@ -17,6 +17,7 @@
 #include "test/testutil.h"
 
 #include <boost/thread.hpp>
+#include <cstdint>
 
 // install boost test formatters for the popular durations
 namespace std { namespace chrono { // NOLINT(cert-dcl58-cpp)
@@ -121,7 +122,7 @@ struct TestMemPoolEntryHelper {
     // Default values
     Amount nFee {0};
     int64_t nTime {0};
-    unsigned int nHeight {1};
+    int32_t nHeight {1};
     bool spendsCoinbase {false};
     LockPoints lp;
 

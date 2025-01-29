@@ -237,10 +237,14 @@ CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CMutableTransaction &tx,
     return FromTx(txn, pool);
 }
 
-CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransaction &txn,
-                                               CTxMemPool *pool) {
-    return CTxMemPoolEntry(MakeTransactionRef(txn), nFee, nTime, 
-                           nHeight, spendsCoinbase, lp); // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransaction& txn, CTxMemPool* pool)
+{
+    return CTxMemPoolEntry(MakeTransactionRef(txn),
+                           nFee,
+                           nTime,
+                           nHeight,
+                           spendsCoinbase,
+                           lp);
 }
 
 namespace {
