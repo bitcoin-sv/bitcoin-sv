@@ -298,7 +298,7 @@ BOOST_AUTO_TEST_CASE(AsyncMultiWriteRemoveCoalesce)
     std::mt19937 generator(insecure_rand());
 
     auto entries = GetABunchOfEntries(541);
-    const auto middle = entries.begin() + entries.size() / 2; // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+    const auto middle = entries.begin() + ssize(entries) / 2;
 
     CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
