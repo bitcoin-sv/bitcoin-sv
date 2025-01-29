@@ -297,8 +297,8 @@ BOOST_AUTO_TEST_CASE(max_send_queues_size) {
 
     std::string reason;
 
-    uint64_t testBlockSize = LEGACY_MAX_BLOCK_SIZE + 1;
-    gArgs.ForceSetArg("-excessiveblocksize", to_string(testBlockSize)); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+    int64_t testBlockSize = LEGACY_MAX_BLOCK_SIZE + 1;
+    gArgs.ForceSetArg("-excessiveblocksize", to_string(testBlockSize));
     BOOST_CHECK(testConfig.SetMaxBlockSize(testBlockSize, &reason));
     BOOST_CHECK_EQUAL(testConfig.GetMaxSendQueuesBytes(), testBlockSize * DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES);
 
