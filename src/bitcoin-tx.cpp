@@ -198,7 +198,7 @@ static void RegisterLoad(const std::string &strInput) {
     while ((!feof(f)) && (!ferror(f))) {
         char buf[4096]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-        int bread = fread(buf, 1, sizeof(buf), f); // NOLINT(*-narrowing-conversions)
+        const auto bread = fread(buf,1, sizeof(buf), f);
         if (bread <= 0) {
             break;
         }
@@ -406,7 +406,7 @@ static void MutateTxAddOutMultiSig(CMutableTransaction &tx,
         throw std::runtime_error("Too many parameters");
     }
 
-    // NOLINTNEXTLINE(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     CScript scriptPubKey = GetScriptForMultisig(required, pubkeys);
 
     if (bScriptHash) {
