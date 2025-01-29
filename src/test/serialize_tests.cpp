@@ -427,7 +427,7 @@ BOOST_AUTO_TEST_CASE(insert_delete) {
     BOOST_CHECK_EQUAL(ss.size(), 6U);
     BOOST_CHECK_EQUAL(ss[0], 0);
 
-    ss.erase(ss.begin() + ss.size() - 1); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+    ss.erase(ss.begin() + std::ssize(ss) - 1);
     BOOST_CHECK_EQUAL(ss.size(), 5U);
     BOOST_CHECK_EQUAL(ss[4], (char)0xff);
 
