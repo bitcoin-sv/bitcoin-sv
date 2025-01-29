@@ -23,8 +23,7 @@ public:
 
     int RandomInt(int nMax) override {
         state = (CHashWriter(SER_GETHASH, 0) << state).GetHash().GetCheapHash();
-        // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
-        return (unsigned int)(state % nMax); // NOLINT(bugprone-narrowing-conversions)
+        return (unsigned int)(state % nMax); // NOLINT(*-narrowing-conversions)
     }
 
     CAddrInfo *Find(const CNetAddr &addr, int *pnId = nullptr) {
@@ -369,11 +368,11 @@ BOOST_AUTO_TEST_CASE(addrman_getaddr) {
 
     // Test 25: Ensure GetAddr still returns 23% when addrman has many addrs.
     for (unsigned int i = 1; i < (8 * 256); i++) {
-        // NOLINTBEGIN(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+        // NOLINTBEGIN(*-narrowing-conversions)
         int octet1 = i % 256;
         int octet2 = (i / 256) % 256;
         int octet3 = (i / (256 * 2)) % 256;
-        // NOLINTEND(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+        // NOLINTEND(*-narrowing-conversions)
         std::string strAddr = std::to_string(octet1) + "." +
                               std::to_string(octet2) + "." +
                               std::to_string(octet3) + ".23";
