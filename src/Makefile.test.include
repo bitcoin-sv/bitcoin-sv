@@ -53,6 +53,7 @@ BITCOIN_TESTS =\
   test/bn_helpers.h \
   test/bn_op_tests.cpp \
   test/bswap_tests.cpp \
+  test/chain_guard.h \
   test/checkpoints_tests.cpp \
   test/checkqueue_tests.cpp \
   test/check_selfish_mining_tests.cpp \

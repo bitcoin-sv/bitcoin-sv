@@ -79,6 +79,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	bloom_tests.cpp
     bn_op_tests.cpp
 	bswap_tests.cpp
+    chain_guard.h
 	checkpoints_tests.cpp
 	checkqueue_tests.cpp
 	check_selfish_mining_tests.cpp
