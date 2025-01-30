@@ -195,10 +195,9 @@ namespace
                 UniValue revocationMessage { UniValue::VOBJ };
                 revocationMessage.push_back(Pair("compromised_minerId", v3Params.revocationMessage->mCompromisedId));
                 document.push_back(Pair("revocationMessage", revocationMessage));
-                // NOLINTBEGIN(bugprone-unchecked-optional-access)
+                assert(v3Params.revocationCurrentMinerIdKey);
                 document.push_back(Pair("revocationMessageSig", CreateSignatureRevocationMessage(
                     v3Params.revocationMessage.value(), v3Params.revocationKey, v3Params.revocationCurrentMinerIdKey.value())));
-                // NOLINTEND(bugprone-unchecked-optional-access)
             }
         }
         else
