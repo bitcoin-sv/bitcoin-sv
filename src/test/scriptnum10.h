@@ -137,7 +137,7 @@ public:
             return std::numeric_limits<int>::max();
         else if (m_value < std::numeric_limits<int>::min())
             return std::numeric_limits<int>::min();
-        return m_value; // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+        return m_value; // NOLINT(*-narrowing-conversions)
     }
 
     std::vector<uint8_t> getvch() const { return serialize(m_value); }
