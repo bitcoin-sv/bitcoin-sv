@@ -964,8 +964,8 @@ BOOST_AUTO_TEST_CASE(test_IsStandard_MaxTxSizePolicy)
 
     std::string reason;
     GlobalConfig config;
-    uint64_t genesisActivationHeight = config.GetChainParams().GetConsensus().genesisHeight;
-    config.SetGenesisActivationHeight(genesisActivationHeight); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+    const auto genesisActivationHeight = config.GetChainParams().GetConsensus().genesisHeight;
+    config.SetGenesisActivationHeight(genesisActivationHeight);
 
     CMutableTransaction t;
     t.vin.resize(1);
