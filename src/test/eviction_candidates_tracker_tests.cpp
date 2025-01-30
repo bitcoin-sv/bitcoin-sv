@@ -185,7 +185,8 @@ public:
     
     void RemoveMostWorthless()
     {
-        auto iter = tracker->GetMostWorthless(); // NOLINT(bugprone-unchecked-optional-access)
+        assert(tracker);
+        auto iter = tracker->GetMostWorthless();
         RemoveTx(iter);
     }
 };
@@ -269,8 +270,9 @@ BOOST_AUTO_TEST_CASE(broad_tree) {
         double lastRemovedFeeRate = 0;
         for(size_t i = 0; i < 100; i++)
         {
-            BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == (100-i)); // NOLINT(bugprone-unchecked-optional-access)
-            auto txToRemove = mempool.tracker->GetMostWorthless(); // NOLINT(bugprone-unchecked-optional-access)
+            assert(mempool.tracker);
+            BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == (100-i));
+            auto txToRemove = mempool.tracker->GetMostWorthless();
             // NOLINTNEXTLINE(*-narrowing-conversions)
             double feeRate = double(txToRemove->GetFee().GetSatoshis()) / txToRemove->GetTxSize();
             mempool.RemoveTx(txToRemove);
@@ -309,7 +311,8 @@ BOOST_AUTO_TEST_CASE(secondary_mempool_first) {
     bool lastFromSecondary = true;
     for(int i = 0; i < 100; i++)
     {
-        auto txToRemove = mempool.tracker->GetMostWorthless(); // NOLINT(bugprone-unchecked-optional-access)
+        assert(mempool.tracker);
+        auto txToRemove = mempool.tracker->GetMostWorthless();
         // NOLINTNEXTLINE(*-narrowing-conversions)
         double feeRate = double(txToRemove->GetFee().GetSatoshis()) / txToRemove->GetTxSize();
         bool fromSecondary = !txToRemove->IsInPrimaryMempool();
@@ -359,12 +362,13 @@ BOOST_AUTO_TEST_CASE(group) {
     group.push_back(MakeEntry(10,{}, inMempoolInputs, 1, 1000));
     mempool.AddGroup(group);
     mempool.InitializeTracker();
-    BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == 1); // NOLINT(bugprone-unchecked-optional-access)
+    assert(mempool.tracker);
+    BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == 1);
     mempool.AddTx(MakeEntry(1000, {}, {std::make_tuple(group[0].GetSharedTx(), 1)}, 1, 1000));
-    BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == 1); // NOLINT(bugprone-unchecked-optional-access)
+    BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == 1);
     mempool.RemoveMostWorthless();
     mempool.RemoveMostWorthless();
-    BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == 4); // NOLINT(bugprone-unchecked-optional-access)
+    BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == 4);
 
 }
 
