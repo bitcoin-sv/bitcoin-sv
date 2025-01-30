@@ -288,7 +288,8 @@ BOOST_AUTO_TEST_CASE(net_messages)
         {
             uint64_t maxToRead { std::min<uint64_t>(bytesToRead, serialisedMsg.size()) };
             uint64_t numRead { netMsg.Read(config, serialisedMsg.data(), maxToRead) };
-            serialisedMsg.erase(serialisedMsg.begin(), serialisedMsg.begin() + numRead); // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+            // NOLINTNEXTLINE(*-narrowing-conversions)
+            serialisedMsg.erase(serialisedMsg.begin(), serialisedMsg.begin() + numRead);
             totRead += numRead;
         }
         BOOST_CHECK(netMsg.Complete());

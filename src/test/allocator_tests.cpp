@@ -110,8 +110,8 @@ BOOST_AUTO_TEST_CASE(arena_tests) {
         addr.push_back(0);
     uint32_t s = 0x12345678;
     for (int x = 0; x < 5000; ++x) {
-        // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions)
-        int idx = s & (addr.size() - 1); // NOLINT(bugprone-narrowing-conversions)
+        // NOLINTNEXTLINE(*-narrowing-conversions)
+        int idx = s & (addr.size() - 1);
         if (s & 0x80000000) {
             b.free(addr[idx]);
             addr[idx] = 0;

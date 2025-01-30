@@ -60,7 +60,7 @@ namespace
                 {
                     return false;
                 }
-                lastIndex = txn.mIndex; // NOLINT(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
+                lastIndex = txn.mIndex; // NOLINT(*-narrowing-conversions)
             }
         }
 

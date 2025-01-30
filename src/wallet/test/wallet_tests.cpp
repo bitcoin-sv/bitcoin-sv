@@ -367,8 +367,7 @@ BOOST_AUTO_TEST_CASE(coin_selection_tests) {
             if (amt - Amount(2000) < MIN_CHANGE) {
                 // needs more than one input:
                 uint16_t returnSize = std::ceil(
-                    // NOLINTNEXTLINE(*-narrowing-conversions)
-                    (2000.0 + MIN_CHANGE.GetSatoshis()) / amt.GetSatoshis()); 
+                    (2000.0 + MIN_CHANGE.GetSatoshis()) / amt.GetSatoshis()); // NOLINT(*-narrowing-conversions)
                 Amount returnValue = returnSize * amt;
                 BOOST_CHECK_EQUAL(nValueRet, returnValue);
                 BOOST_CHECK_EQUAL(setCoinsRet.size(), returnSize);
