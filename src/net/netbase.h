@@ -20,7 +20,7 @@
 // NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variable)
 extern int nConnectTimeout;
 extern bool fNameLookup;
-// NOLINTEND (cppcoreguidelines-avoid-non-const-global-variable)
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variable)
 
 //! -timeout default
 static const int DEFAULT_CONNECT_TIMEOUT = 5000;

@@ -38,7 +38,7 @@ bool fNameLookup = DEFAULT_NAME_LOOKUP;
 // (milliseconds)
 static const int SOCKS5_RECV_TIMEOUT = 20 * 1000;
 static std::atomic<bool> interruptSocks5Recv(false);
-// NOLINTEND (cppcoreguidelines-avoid-non-const-global-variable)
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variable)
 
 enum Network ParseNetwork(std::string net) {
     boost::to_lower(net);

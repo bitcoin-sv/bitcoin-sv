@@ -428,7 +428,7 @@ bool operator<(const CService &a, const CService &b) {
     return (CNetAddr)a < (CNetAddr)b ||
            ((CNetAddr)a == (CNetAddr)b && a.port < b.port);
 }
-// NOLINTEND (cppcoreguidelines-slicing)
+// NOLINTEND(cppcoreguidelines-slicing)
 
 bool CService::GetSockAddr(struct sockaddr *paddr, socklen_t *addrlen) const {
     if (IsIPv4()) {
@@ -476,7 +476,7 @@ std::string CService::ToStringIPPort() const {
         return ToStringIP() + ":" + ToStringPort();
     } else {
         return "[" + ToStringIP() + "]:" + ToStringPort();
-        // NOLINTEND (cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 }
 
