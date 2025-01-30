@@ -564,7 +564,7 @@ public:
             mapValue.clear();
             if (std::string::npos != nSepPos) {
                 CDataStream ss(
-                    // NOLINTNEXTLINE(bugprone-narrowing-conversions)
+                    // NOLINTNEXTLINE(*-narrowing-conversions)
                     std::vector<char>(strComment.begin() + nSepPos + 1,
                                       strComment.end()),
                     s.GetType(), s.GetVersion());
