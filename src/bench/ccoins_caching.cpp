@@ -91,14 +91,12 @@ static void CCoinsCaching(benchmark::State &state) {
     // Benchmark.
     while (state.KeepRunning()) {
         CTransaction t(t1);
-        bool success =
-            // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-            AreInputsStandard(
-                task::CCancellationSource::Make()->GetToken(),
-                GlobalConfig::GetConfig(),
-                t,
-                coins,
-                0).value();
+        const auto o = AreInputsStandard(task::CCancellationSource::Make()->GetToken(),
+                                         GlobalConfig::GetConfig(),
+                                         t,
+                                         coins,
+                                         0);
+        bool success = o ? o.value() : false;
         assert(success);
         Amount value = coins.GetValueIn(t);
         assert(value == (50 + 21 + 22) * CENT);
@@ -234,7 +232,10 @@ protected:
         mLatestRequestedScriptSize = (mOverrideSize.has_value() ? mOverrideSize.value() : maxScriptSize);
         mLatestGetCoin = CoinsDB::GetCoin(outpoint, mLatestRequestedScriptSize);
 
-        return mLatestGetCoin->MakeNonOwning(); // NOLINT(bugprone-unchecked-optional-access)
+        if(mLatestGetCoin)
+            return mLatestGetCoin->MakeNonOwning();
+        else
+            return {};
     }
 
     using CoinsDB::ReadLock;
