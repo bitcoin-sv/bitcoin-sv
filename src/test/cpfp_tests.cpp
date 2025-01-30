@@ -37,8 +37,10 @@ namespace std
                          MemPoolRemovalReason,
                          std::optional<CTransactionConflictData>>& x)
     {
-        os << std::get<0>(x).ToString() << ' ' << std::get<1>(x) << ' '
-           << std::get<2>(x).value(); // NOLINT(bugprone-unchecked-optional-access)
+        const auto& [txid, reason, conflict] = x;
+        assert(conflict);
+        os << txid.ToString() << ' ' << reason << ' '
+           << *conflict;
         return os;
     }
 }
