@@ -207,7 +207,7 @@ private:
 
                     nTodo -= nNow;
 
-                    if (mSessionToken->IsCanceled()) // NOLINT(bugprone-unchecked-optional-access)
+                    if(mSessionToken && mSessionToken->IsCanceled())
                     {
                         // drain remaining work from the queue (there can still
                         // be some work in other workers)
@@ -241,7 +241,7 @@ private:
                         // the result without the fear of some workers still
                         // being active from current session once the next
                         // session starts
-                        if (mSessionToken->IsCanceled()) // NOLINT(bugprone-unchecked-optional-access)
+                        if(mSessionToken && mSessionToken->IsCanceled())
                         {
                             fAllOk = {};
                         }
@@ -281,16 +281,21 @@ private:
                 subguard.DoNotReleaseNL();
             }
             // execute work
-            for (T &check : vChecks) {
-                if (!fOk.has_value() || !fOk.value() || mSessionToken->IsCanceled()) // NOLINT(bugprone-unchecked-optional-access)
+            for (T &check : vChecks)
+            {
+                if(!fOk.has_value() || !fOk.value()
+                   || (mSessionToken && mSessionToken->IsCanceled()))
                 {
                     break;
                 }
 
-                fOk = check(*mSessionToken); // NOLINT(bugprone-unchecked-optional-access)
-                if (fOk.has_value() && (fOk.value() == false))
+                if(mSessionToken)
                 {
-                    vTempFailedChecks.emplace_back(std::move(check));
+                    fOk = check(*mSessionToken);
+                    if (fOk.has_value() && (fOk.value() == false))
+                    {
+                        vTempFailedChecks.emplace_back(std::move(check));
+                    }
                 }
             }
             vChecks.clear();
