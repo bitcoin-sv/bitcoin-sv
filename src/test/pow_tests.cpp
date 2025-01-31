@@ -179,7 +179,7 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
         blocks.SetTip(
             GetBlockIndex(
                 blocks.Tip(),
-                2 * 3600, // NOLINT(bugprone-implicit-widening-of-multiplication-result)
+                2 * 3600,
                 initialBits,
                 blockIndexStore) );
         BOOST_CHECK_EQUAL(
@@ -191,7 +191,7 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
     blocks.SetTip(
         GetBlockIndex(
             blocks.Tip(),
-            2 * 3600, // NOLINT(bugprone-implicit-widening-of-multiplication-result)
+            2 * 3600,
             initialBits,
             blockIndexStore) );
     currentPow.SetCompact(currentPow.GetCompact());
@@ -204,7 +204,7 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
     blocks.SetTip(
         GetBlockIndex(
             blocks.Tip(),
-            2 * 3600, // NOLINT(bugprone-implicit-widening-of-multiplication-result)
+            2 * 3600,
             currentPow.GetCompact(),
             blockIndexStore) );
     currentPow.SetCompact(currentPow.GetCompact());
@@ -217,7 +217,7 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
     blocks.SetTip(
         GetBlockIndex(
             blocks.Tip(),
-            2 * 3600, // NOLINT(bugprone-implicit-widening-of-multiplication-result)
+            2 * 3600,
             currentPow.GetCompact(),
             blockIndexStore) );
     currentPow.SetCompact(currentPow.GetCompact());
@@ -230,7 +230,7 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
     blocks.SetTip(
         GetBlockIndex(
             blocks.Tip(),
-            2 * 3600, // NOLINT(bugprone-implicit-widening-of-multiplication-result)
+            2 * 3600,
             currentPow.GetCompact(),
             blockIndexStore) );
     currentPow.SetCompact(currentPow.GetCompact());
@@ -244,7 +244,7 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
     blocks.SetTip(
         GetBlockIndex(
             blocks.Tip(),
-            2 * 3600, // NOLINT(bugprone-implicit-widening-of-multiplication-result)
+            2 * 3600,
             currentPow.GetCompact(),
             blockIndexStore) );
     BOOST_CHECK(powLimit.GetCompact() != currentPow.GetCompact());

@@ -161,10 +161,10 @@ BOOST_AUTO_TEST_CASE(DoS_bantime) {
     SendMessages(config, dummyNode, *connman, interruptDummy);
     BOOST_CHECK(connman->IsBanned(addr));
 
-    SetMockTime(nStartTime + 60 * 60); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
+    SetMockTime(nStartTime + 60 * 60);
     BOOST_CHECK(connman->IsBanned(addr));
 
-    SetMockTime(nStartTime + 60 * 60 * 24 + 1); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
+    SetMockTime(nStartTime + 60 * 60 * 24 + 1);
     BOOST_CHECK(!connman->IsBanned(addr));
 }
 

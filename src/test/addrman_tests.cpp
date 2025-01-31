@@ -394,7 +394,7 @@ BOOST_AUTO_TEST_CASE(addrman_getaddr) {
     // Test 26: IsTerrible() is true for stale address > ADDRMAN_HORIZON_DAYS
     CAddress addr6 = CAddress(ResolveService("252.254.5.6", 8333), NODE_NONE);
     int64_t nNow = GetAdjustedTime();
-    addr6.nTime = nNow - (ADDRMAN_HORIZON_DAYS * 24 * 60 * 60) - 1; // NOLINT(bugprone-implicit-widening-of-multiplication-result)
+    addr6.nTime = nNow - (ADDRMAN_HORIZON_DAYS * 24 * 60 * 60) - 1;
     addrman.Add(addr6, source1);
     CAddrInfo *info6 = addrman.Find(addr6);
     BOOST_ASSERT(info6->IsTerrible(nNow));

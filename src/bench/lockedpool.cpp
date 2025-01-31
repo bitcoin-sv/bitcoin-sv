@@ -16,7 +16,6 @@
 static void LockedPool(benchmark::State &state) {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     void *synth_base = reinterpret_cast<void *>(0x08000000);
-    // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
     const size_t synth_size = 1024 * 1024;
     Arena b(synth_base, synth_size, 16);
 

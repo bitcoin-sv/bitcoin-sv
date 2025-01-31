@@ -106,7 +106,7 @@ BOOST_AUTO_TEST_CASE(protocol_msghdr_length)
     BOOST_CHECK_EQUAL(zero.IsOversized(config), false);
 
     // test with inv message with 10 tx
-    CMessageHeader inv10 { HdrUnitTestAccess::Make(config.GetChainParams().NetMagic(), NetMsgType::INV, (1UL+10*(4+32)), uint256{}) }; // NOLINT(bugprone-implicit-widening-of-multiplication-result)
+    CMessageHeader inv10 { HdrUnitTestAccess::Make(config.GetChainParams().NetMagic(), NetMsgType::INV, (1UL+10*(4+32)), uint256{}) };
     BOOST_CHECK_EQUAL(inv10.IsValid(config), true);
     BOOST_CHECK_EQUAL(inv10.IsOversized(config), false);
 

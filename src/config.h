@@ -1282,7 +1282,6 @@ public:
         return true;
     }
     uint64_t GetMaxMempoolSizeDisk() const override {
-        // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
         return DEFAULT_MAX_MEMPOOL_SIZE * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR * ONE_MEGABYTE;
     }
 
@@ -1300,7 +1299,6 @@ public:
 
         return true;
     }
-    // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
     uint64_t GetMemPoolExpiry() const override { return DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR; }
 
     bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) override

@@ -19,7 +19,6 @@
 namespace {
     constexpr auto NUMBER_OF_WRITERS = 5;
     constexpr auto NUMBER_OF_ENTRIES = 100000;
-    // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
     constexpr auto QUEUE_SIZE_LIMIT = NUMBER_OF_ENTRIES * NUMBER_OF_WRITERS * sizeof(std::uint64_t) / 2;
     constexpr auto DATA_END_MARKER = std::uint64_t(-1);
 

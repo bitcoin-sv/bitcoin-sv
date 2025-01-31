@@ -12,7 +12,6 @@
 #include "uint256.h"
 
 /* Number of bytes to hash per iteration */
-// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const uint64_t BUFFER_SIZE = 1000 * 1000;
 
 static void RIPEMD160(benchmark::State &state) {

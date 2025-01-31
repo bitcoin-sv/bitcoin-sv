@@ -114,7 +114,6 @@ static const unsigned int DEFAULT_MAXPENDINGRESPONSES_GETHEADERS = 0;
 /** The default for -maxpendingresponses_gethdrsen. 0 = Unlimited */
 static const unsigned int DEFAULT_MAXPENDINGRESPONSES_GETHDRSEN = 0;
 /** The default timeframe for -maxuploadtarget. 1 day. */
-// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const uint64_t MAX_UPLOAD_TIMEFRAME = 60 * 60 * 24;
 /** Default for blocks only*/
 static const bool DEFAULT_BLOCKSONLY = false;
@@ -141,9 +140,7 @@ static const unsigned int DEFAULT_BLOCK_TXN_MAX_PERCENT = 99;
 static const bool DEFAULT_FORCEDNSSEED = true;
 
 // Maximum sizes of queued messages for receiving and sending
-// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const size_t DEFAULT_MAXRECEIVEBUFFER = 500 * 1000;
-// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const size_t DEFAULT_MAXSENDBUFFER = 500 * 1000;
 
 static const ServiceFlags REQUIRED_SERVICES = ServiceFlags(NODE_NETWORK);

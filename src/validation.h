@@ -194,7 +194,6 @@ static const int64_t DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD = 600;  // percent
 *   (i.e. 5 min)*/
 static const int64_t DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 50; // percent
 
-// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
 
 /** Default for -permitbaremultisig */
@@ -310,7 +309,6 @@ enum FlushStateMode {
  * the prune to be one 128MB block file + added 15% undo data = 147MB greater
  * for a total of 545MB.
  */
-// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const uint64_t MIN_DISK_SPACE_FOR_BLOCK_FILES = 550 * 1024 * 1024;
 
 /** get number of blocks that are currently being processed */

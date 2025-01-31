@@ -391,7 +391,7 @@ BOOST_AUTO_TEST_CASE(multiple_outputs)
         values.insert(maybeInt.value());
     }
     // every number between 0 and (numThreads * entriesPerThread - 1) is in set
-    BOOST_CHECK(values.size() == numThreads * entriesPerThread); // NOLINT(bugprone-implicit-widening-of-multiplication-result)
+    BOOST_CHECK(values.size() == numThreads * entriesPerThread);
     BOOST_CHECK(*values.rbegin() == numThreads * entriesPerThread - 1);
     
     BOOST_CHECK(get_Count(collectingQueue) == 0);
