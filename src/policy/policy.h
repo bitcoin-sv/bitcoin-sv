@@ -63,7 +63,7 @@ static const uint64_t STN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER = 128 * ONE_MEG
 
 /** Default for -minminingtxfee, which sets the minimum feerate for a transaction
  * in blocks created by mining code **/
-static const Amount DEFAULT_BLOCK_MIN_TX_FEE(500); // NOLINT(cert-err58-cpp)
+static const Amount DEFAULT_BLOCK_MIN_TX_FEE{500};
 /** The maximum size for transactions we're willing to relay/mine - before genesis*/
 static const uint64_t MAX_TX_SIZE_POLICY_BEFORE_GENESIS = 100000 - 1; // -1 because pre genesis policy validation was >=
 /** The default size for transactions we're willing to relay/mine */
@@ -91,8 +91,7 @@ static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE = 1000;
 /** Default for -maxnonfinalmempool, maximum megabytes of non-final mempool memory usage */
 static const unsigned int DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE = 50;
 /** Minimum feerate increase for mempool limiting **/
-// NOLINTNEXTLINE(cert-err58-cpp)
-static const CFeeRate MEMPOOL_FULL_FEE_INCREMENT(Amount(1000));
+static const CFeeRate MEMPOOL_FULL_FEE_INCREMENT(Amount{1'000});
 /** Default for -maxscriptsizepolicy **/
 static const unsigned int DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS = 500 * ONE_KILOBYTE;
 /** Default -maxmempoolsizedisk factor, maximum megabytes of total mempool disk usage as scaled -maxmempool */

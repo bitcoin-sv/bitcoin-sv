@@ -8,27 +8,21 @@
 
 #include "serialize.h"
 
+#include <concepts>
 #include <cstdlib>
 #include <iostream>
 #include <string>
-#include <type_traits>
 
-// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct Amount {
 private:
-    int64_t amount;
+    int64_t amount{};
 
 public:
-    constexpr Amount() : amount(0) {}
+    explicit constexpr Amount(std::integral auto amount) noexcept:
+        amount(amount)
+    {}
 
-    template <typename T>
-    explicit constexpr Amount(T _camount) : amount(_camount) {
-        static_assert(std::is_integral<T>(),
-                      "Only integer types can be used as amounts");
-    }
-
-    constexpr Amount(const Amount &_camount) : amount(_camount.amount) {}
-    constexpr Amount& operator=(const Amount&) = default;
+    Amount() = default;
 
     // Allow access to underlying value for non-monetary operations
     int64_t GetSatoshis() const { return amount; }
@@ -142,8 +136,8 @@ public:
     }
 };
 
-static const Amount COIN(100000000); // NOLINT(cert-err58-cpp)
-static const Amount CENT(1000000);   // NOLINT(cert-err58-cpp)
+static const Amount COIN{100'000'000}; 
+static const Amount CENT{1'000'000};
 
 extern const std::string CURRENCY_UNIT;
 
@@ -157,7 +151,8 @@ extern const std::string CURRENCY_UNIT;
  * critical; in unusual circumstances like a(nother) overflow bug that allowed
  * for the creation of coins out of thin air modification could lead to a fork.
  */
-static const Amount MAX_MONEY = 21000000 * COIN; // NOLINT(cert-err58-cpp)
+static const Amount MAX_MONEY{21'000'000 * COIN};
+
 inline bool MoneyRange(const Amount nValue) {
     return (nValue >= Amount(0) && nValue <= MAX_MONEY);
 }

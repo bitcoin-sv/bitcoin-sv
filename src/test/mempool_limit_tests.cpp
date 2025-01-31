@@ -127,7 +127,7 @@ namespace {
     {
         int howMany;
         CFeeRate fee;
-        Demand(int howMany, CFeeRate fee) : howMany(howMany), fee(std::move(fee)) {}
+        Demand(int howMany, CFeeRate fee) : howMany(howMany), fee(fee) {}
     };
 
     std::vector<CTxMemPoolEntry> GetABunchOfEntries(const Demand& demand)

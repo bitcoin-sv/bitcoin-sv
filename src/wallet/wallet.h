@@ -44,18 +44,18 @@ extern bool bSpendZeroConfChange;
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 static const unsigned int DEFAULT_KEYPOOL_SIZE = 1000;
+
 //! -paytxfee default
-// NOLINTBEGIN(cert-err58-cpp)
-static const Amount DEFAULT_TRANSACTION_FEE(0);
+static const Amount DEFAULT_TRANSACTION_FEE{0};
 //! -fallbackfee default
-static const Amount DEFAULT_FALLBACK_FEE(20000);
+static const Amount DEFAULT_FALLBACK_FEE{20'000};
 //! -mintxfee default
-static const Amount DEFAULT_TRANSACTION_MINFEE(1000);
+static const Amount DEFAULT_TRANSACTION_MINFEE{1'000};
 //! target minimum change amount
-static const Amount MIN_CHANGE = CENT;
+static const Amount MIN_CHANGE{CENT};
 //! final minimum change amount after paying for fees
-static const Amount MIN_FINAL_CHANGE = MIN_CHANGE / 2;
-// NOLINTEND(cert-err58-cpp)
+static const Amount MIN_FINAL_CHANGE{MIN_CHANGE / 2};
+
 //! Default for -spendzeroconfchange
 static const bool DEFAULT_SPEND_ZEROCONF_CHANGE = true;
 //! Default for -walletrejectlongchains
