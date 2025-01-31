@@ -14,7 +14,7 @@
 #include <boost/test/unit_test.hpp>
 
 namespace {
-    std::vector<TxSource> vTxSources { // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
+    std::vector<TxSource> vTxSources { // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
         TxSource::wallet,
         TxSource::rpc,
         TxSource::file,

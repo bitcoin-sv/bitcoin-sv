@@ -28,7 +28,7 @@ namespace
     };
 
     const vector<pair<string, json_value_type>>
-        required_fields{make_pair("version", json_value_type::string), // NOLINT(cert-err58-cpp)
+        required_fields{make_pair("version", json_value_type::string),
                         make_pair("height", json_value_type::number),
                         make_pair("minerId", json_value_type::string),
                         make_pair("prevMinerId", json_value_type::string),
@@ -39,12 +39,11 @@ namespace
                         make_pair("prevRevocationKeySig",
                                    json_value_type::string)};
     
-    const string version{"0.3"}; // NOLINT(cert-err58-cpp)
-    const string height{"1234"}; // NOLINT(cert-err58-cpp)
+    const string version{"0.3"};
+    const string height{"1234"};
     constexpr int h{1234};
-    const string compressed_key_2{[]{ return string{"02"} + string(64, '0');}()}; // NOLINT(cert-err58-cpp)
-    const string compressed_key_3{[]{ return string{"03"} + string(64, '0');}()}; // NOLINT(cert-err58-cpp)
-    // NOLINTBEGIN(cert-err58-cpp)
+    const string compressed_key_2{[]{ return string{"02"} + string(64, '0');}()};
+    const string compressed_key_3{[]{ return string{"03"} + string(64, '0');}()};
     const string miner_id{
         "031ad1328476a7ff79016775b5cc66d028af6d647da5c8627e1266e6a209d3d1ee"};
     const string prev_miner_id{
@@ -103,23 +102,23 @@ namespace
                         []{
                             return refs;
                         }()};
-    // NOLINTEND(cert-err58-cpp)
-    const key_set mi_keys{miner_id, prev_miner_id, prev_miner_id_sig}; // NOLINT(cert-err58-cpp)
-    const key_set rev_keys{rev_key, prev_rev_key, prev_rev_key_sig}; // NOLINT(cert-err58-cpp)
+
+    const key_set mi_keys{miner_id, prev_miner_id, prev_miner_id_sig};
+    const key_set rev_keys{rev_key, prev_rev_key, prev_rev_key_sig};
     const vector<data_ref> data_refs;
-    const miner_info_doc mi_doc{miner_info_doc::v0_3, // NOLINT(cert-err58-cpp)
+    const miner_info_doc mi_doc{miner_info_doc::v0_3,
                                 h,
                                 mi_keys,
                                 rev_keys,
                                 data_refs};
 
-    const string sig_bad_0{[] { // NOLINT(cert-err58-cpp)
+    const string sig_bad_0{[] {
         string s{"304502"};
         s.insert(s.end(), 136, '0');
         return s;
     }()};
 
-    const string sig_bad_1{[] { // NOLINT(cert-err58-cpp)
+    const string sig_bad_1{[] {
         string s{"304502"};
         s.insert(s.end(), 136, '1');
         return s;

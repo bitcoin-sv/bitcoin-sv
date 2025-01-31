@@ -15,7 +15,7 @@
 using namespace std;
 using namespace bsv;
 
-static const std::vector<uint8_t> txs = [] // NOLINT(cert-err58-cpp)
+static const std::vector<uint8_t> txs = []
 {
     std::vector<uint8_t> txs;
 

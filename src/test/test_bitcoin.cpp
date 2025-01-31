@@ -47,7 +47,7 @@ using mining::CBlockTemplate;
 
 constexpr auto env_var_name = "TEST_BITCOIN_RANDOM_SEED";
 
-const uint256 insecure_rand_seed = []() { // NOLINT(cert-err58-cpp)
+const uint256 insecure_rand_seed = []() {
     auto env = std::getenv(env_var_name);
     auto hash = env ? uint256S(env) : GetRandHash();
     if (env) {
@@ -57,7 +57,7 @@ const uint256 insecure_rand_seed = []() { // NOLINT(cert-err58-cpp)
     }
     return hash;
 }();
-FastRandomContext insecure_rand_ctx(insecure_rand_seed); // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
+FastRandomContext insecure_rand_ctx(insecure_rand_seed); // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 extern void noui_connect();
 
@@ -257,7 +257,7 @@ struct Init { // NOLINT(cppcoreguidelines-special-member-functions)
     std::list<std::function<void(void)>> cleanup;
 };
 
-Init init; // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
+Init init; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 Init::Init() {
     if (getenv("TRAVIS_NOHANG_WORKAROUND")) {

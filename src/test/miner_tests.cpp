@@ -108,7 +108,7 @@ struct CBlockIndex::UnitTestAccess<miner_tests_uid>
 };
 using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<miner_tests_uid>;
 
-static CFeeRate blockMinFeeRate = CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE); // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
+static CFeeRate blockMinFeeRate = CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE); // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 static struct { // NOLINT(cppcoreguidelines-avoid-c-arrays)
     uint8_t extranonce;

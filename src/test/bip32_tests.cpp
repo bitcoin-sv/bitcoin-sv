@@ -38,7 +38,6 @@ struct TestVector {
         return *this;
     }
 };
-// NOLINTNEXTLINE(cert-err58-cpp)
 TestVector test1 = TestVector("000102030405060708090a0b0c0d0e0f")( // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
     "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1R"
     "upje8YtGqsefD265TMg7usUDFdp6W1EGMcet8",
@@ -66,7 +65,7 @@ TestVector test1 = TestVector("000102030405060708090a0b0c0d0e0f")( // NOLINT(cpp
                    "xprvA41z7zogVVwxVSgdKUHDy1SKmdb533PjDz7J6N6mV6uS3ze1ai8FHa8"
                    "kmHScGpWmj4WggLyQjgPie1rFSruoUihUZREPSL39UNdE3BBDu76",
                    0);
-// NOLINTNEXTLINE(cert-err58-cpp)
+
 TestVector test2 = TestVector("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdba" // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
                               "b7b4b1aeaba8a5a29f9c999693908d8a8784817e7b787572"
                               "6f6c696663605d5a5754514e4b484542")(

@@ -41,7 +41,7 @@ static auto make_msg_header{[](const string& cmd) // NOLINT(cppcoreguidelines-av
     return v;
 }};
 
-static std::vector<uint8_t> block_msg_payload{[] // NOLINT(cppcoreguidelines-avoid-non-const-global-variables, cert-err58-cpp)
+static std::vector<uint8_t> block_msg_payload{[] // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 {
     std::vector<uint8_t> v;
 

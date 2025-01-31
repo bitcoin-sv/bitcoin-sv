@@ -30,7 +30,7 @@ BOOST_AUTO_TEST_CASE(default_move)
     single_seg_parser b{std::move(a)};
     // NOLINTNEXTLINE(bugprone-use-after-move, clang-analyzer-cplusplus.Move)
     BOOST_CHECK_EQUAL(0U, a.size());
-    BOOST_CHECK_EQUAL(0U, b.size()); // NOLINT(cert-err58-cpp)
+    BOOST_CHECK_EQUAL(0U, b.size());
 }
 
 BOOST_AUTO_TEST_CASE(single_seg_parser_lvalue)
@@ -80,7 +80,7 @@ BOOST_AUTO_TEST_CASE(single_seg_parser_ptr)
     BOOST_CHECK_EQUAL(42U, parser->size());
 }
 
-static const std::vector<uint8_t> large_txs = [] // NOLINT(cert-err58-cpp)
+static const std::vector<uint8_t> large_txs = []
 {
     std::vector<uint8_t> txs;
 

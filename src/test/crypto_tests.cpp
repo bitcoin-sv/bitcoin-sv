@@ -253,7 +253,7 @@ std::string LongTestString(void) {
     return ret;
 }
 
-const std::string test1 = LongTestString(); // NOLINT(cert-err58-cpp)
+const std::string test1 = LongTestString();
 
 BOOST_AUTO_TEST_CASE(ripemd160_testvectors) {
     TestRIPEMD160("", "9c1185a5c5e9fc54612808977ee8f548b2258d31");

@@ -327,7 +327,7 @@ BOOST_AUTO_TEST_CASE(parse_part_msg)
     BOOST_CHECK_EQUAL(1 + sid_len * sids_per_seg, parser.readable_size());
 }
 
-const std::vector<uint8_t> mcci_msg{[] // NOLINT(cert-err58-cpp)
+const std::vector<uint8_t> mcci_msg{[]
 {
     vector<uint8_t> v;
     constexpr int n{200};

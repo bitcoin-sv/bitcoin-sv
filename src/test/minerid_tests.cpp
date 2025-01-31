@@ -28,7 +28,7 @@ using namespace std;
 
 BOOST_FIXTURE_TEST_SUITE(minerid_tests, BasicTestingSetup)
 
-vector<uint8_t> protocolPrefix{0xac, 0x1e, 0xed, 0x88}; // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
+vector<uint8_t> protocolPrefix{0xac, 0x1e, 0xed, 0x88}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 template <typename O>
 void hash_sha256(const string_view msg, O o)

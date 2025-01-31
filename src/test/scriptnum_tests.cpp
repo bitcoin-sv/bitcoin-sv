@@ -21,7 +21,7 @@ namespace
     constexpr auto min64 = numeric_limits<int64_t>::min();
     constexpr auto max64 = numeric_limits<int64_t>::max();
 
-    vector<int64_t> test_data{min64, -1, 0, 1, max64}; // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
+    vector<int64_t> test_data{min64, -1, 0, 1, max64}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 }
 
 static_assert(!require_min_encoding(min_encoding_check::no));

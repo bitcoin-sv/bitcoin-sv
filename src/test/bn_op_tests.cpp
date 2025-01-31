@@ -1016,7 +1016,7 @@ BOOST_AUTO_TEST_CASE(op_lshift_far)
 namespace
 {
     const vector<uint8_t> failure = {};
-    const vector<uint8_t> success = {1}; // NOLINT(cert-err58-cpp)
+    const vector<uint8_t> success = {1};
 
     struct equality_checker : BaseSignatureChecker
     {

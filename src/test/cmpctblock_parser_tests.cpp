@@ -21,7 +21,7 @@ constexpr size_t sids_per_seg{1'000};
 constexpr size_t pftx_count_len{0x3};
 constexpr size_t pftx_count{0xfd};
 
-const std::vector<uint8_t> cmpctblock_msg{[] // NOLINT(cert-err58-cpp)
+const std::vector<uint8_t> cmpctblock_msg{[]
 {
     vector<uint8_t> v;
     v.insert(v.end(), version_len, 1); // version

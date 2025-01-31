@@ -25,7 +25,7 @@
  *  expected behavior. For example improving the hit rate may cause some tests
  *  using BOOST_CHECK_CLOSE to fail.
  */
-FastRandomContext local_rand_ctx(true); // NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
+FastRandomContext local_rand_ctx(true); // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 BOOST_AUTO_TEST_SUITE(cuckoocache_tests)
 

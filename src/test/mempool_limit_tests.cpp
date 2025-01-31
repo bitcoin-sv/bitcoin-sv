@@ -22,9 +22,9 @@ namespace {
     // fixed size transactions so we can correlate sizes and counts
     // large enough transactions so we are not dominated by index ram usage
     constexpr int TX_SIZE = 1000;
-    const CFeeRate A_PRIMARY = CFeeRate(Amount(6000)); // NOLINT(cert-err58-cpp)
-    const CFeeRate A_BLOCK_MIN_FEE = CFeeRate(Amount(1000)); // NOLINT(cert-err58-cpp)
-    const CFeeRate A_SECONDARY = CFeeRate(Amount(100)); // NOLINT(cert-err58-cpp)
+    const CFeeRate A_PRIMARY = CFeeRate(Amount(6000));
+    const CFeeRate A_BLOCK_MIN_FEE = CFeeRate(Amount(1000));
+    const CFeeRate A_SECONDARY = CFeeRate(Amount(100));
 
     // test representation of mempool entry
     struct Entry {

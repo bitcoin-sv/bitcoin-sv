@@ -22,32 +22,32 @@ const uint8_t R1Array[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "\x22\x81\xaa\xb5\x33\xf0\x08\x32\xd5\x56\xb1\xf9\xea\xe5\x1d\x7d";
 const char R1ArrayHex[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "7D1DE5EAF9B156D53208F033B5AA8122D2d2355d5e12292b121156cfdb4a529c";
-const uint256 R1L = uint256(std::vector<uint8_t>(R1Array, R1Array + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic, cert-err58-cpp)
-const uint160 R1S = uint160(std::vector<uint8_t>(R1Array, R1Array + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic, cert-err58-cpp)
+const uint256 R1L = uint256(std::vector<uint8_t>(R1Array, R1Array + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+const uint160 R1S = uint160(std::vector<uint8_t>(R1Array, R1Array + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
 const uint8_t R2Array[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "\x70\x32\x1d\x7c\x47\xa5\x6b\x40\x26\x7e\x0a\xc3\xa6\x9c\xb6\xbf"
     "\x13\x30\x47\xa3\x19\x2d\xda\x71\x49\x13\x72\xf0\xb4\xca\x81\xd7";
-const uint256 R2L = uint256(std::vector<uint8_t>(R2Array, R2Array + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic, cert-err58-cpp)
-const uint160 R2S = uint160(std::vector<uint8_t>(R2Array, R2Array + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic, cert-err58-cpp)
+const uint256 R2L = uint256(std::vector<uint8_t>(R2Array, R2Array + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+const uint160 R2S = uint160(std::vector<uint8_t>(R2Array, R2Array + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
 const uint8_t ZeroArray[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
     "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-const uint256 ZeroL = uint256(std::vector<uint8_t>(ZeroArray, ZeroArray + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic, cert-err58-cpp)
-const uint160 ZeroS = uint160(std::vector<uint8_t>(ZeroArray, ZeroArray + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic, cert-err58-cpp)
+const uint256 ZeroL = uint256(std::vector<uint8_t>(ZeroArray, ZeroArray + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+const uint160 ZeroS = uint160(std::vector<uint8_t>(ZeroArray, ZeroArray + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
 const uint8_t OneArray[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
     "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-const uint256 OneL = uint256(std::vector<uint8_t>(OneArray, OneArray + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cert-err58-cpp, cppcoreguidelines-pro-bounds-pointer-arithmetic)
-const uint160 OneS = uint160(std::vector<uint8_t>(OneArray, OneArray + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cert-err58-cpp, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+const uint256 OneL = uint256(std::vector<uint8_t>(OneArray, OneArray + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+const uint160 OneS = uint160(std::vector<uint8_t>(OneArray, OneArray + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
 const uint8_t MaxArray[] = // NOLINT(cppcoreguidelines-avoid-c-arrays)
     "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff"
     "\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff";
-const uint256 MaxL = uint256(std::vector<uint8_t>(MaxArray, MaxArray + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cert-err58-cpp, cppcoreguidelines-pro-bounds-pointer-arithmetic)
-const uint160 MaxS = uint160(std::vector<uint8_t>(MaxArray, MaxArray + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cert-err58-cpp, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+const uint256 MaxL = uint256(std::vector<uint8_t>(MaxArray, MaxArray + 32)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+const uint160 MaxS = uint160(std::vector<uint8_t>(MaxArray, MaxArray + 20)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
 std::string ArrayToString(const uint8_t A[], unsigned int width) { // NOLINT(cppcoreguidelines-avoid-c-arrays)
     std::stringstream Stream;

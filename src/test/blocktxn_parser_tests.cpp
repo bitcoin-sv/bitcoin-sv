@@ -13,7 +13,7 @@
 using namespace std;
 using namespace bsv;
 
-const std::vector<uint8_t> blocktxn_msg{[] // NOLINT(cert-err58-cpp)
+const std::vector<uint8_t> blocktxn_msg{[]
 {
     vector<uint8_t> v(32, 1);
 
