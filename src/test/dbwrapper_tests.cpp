@@ -301,7 +301,8 @@ BOOST_AUTO_TEST_CASE(iterator_string_ordering) {
     CDBWrapper dbw(ph, (1 << 20), true, false, false);
     for (int x = 0x00; x < 10; ++x) {
         for (int y = 0; y < 10; y++) {
-            sprintf(buf, "%d", x); // NOLINT(cppcoreguidelines-pro-type-vararg, cert-err33-c, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+            const auto n = sprintf(buf, "%d", x); // NOLINT(cppcoreguidelines-pro-type-vararg, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+            assert(n >= 0);
             StringContentsSerializer key(buf); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
             for (int z = 0; z < y; z++)
                 key += key;
@@ -318,12 +319,16 @@ BOOST_AUTO_TEST_CASE(iterator_string_ordering) {
             seek_start = 0;
         else
             seek_start = 5;
-        sprintf(buf, "%d", seek_start); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-type-vararg, cert-err33-c)
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-type-vararg)
+        const auto n = sprintf(buf, "%d", seek_start);
+        assert(n >= 0);
         StringContentsSerializer seek_key(buf); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         it->Seek(seek_key);
         for (unsigned x = seek_start; x < 10; ++x) {
             for (unsigned y = 0; y < 10; y++) {
-                sprintf(buf, "%d", x); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-type-vararg, cert-err33-c)
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-type-vararg)
+                const auto n = sprintf(buf, "%d", x);
+                assert(n >= 0);
                 std::string exp_key(buf); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
                 for (unsigned z = 0; z < y; z++)
                     exp_key += exp_key;
