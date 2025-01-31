@@ -362,7 +362,6 @@ public:
             return std::nullopt;
         }
 
-        // NOLINTNEXTLINE(clang-analyzer-cplusplus.Move)
         auto objectSize = sizeCalculator(theQueue.front());
         
         T out = std::move(theQueue.front());
