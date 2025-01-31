@@ -84,7 +84,7 @@ BOOST_AUTO_TEST_CASE(construction)
             CScriptNum actual{v, min_encoding_check::no, ms, max_size, big_int};
             BOOST_FAIL("should throw");
         }
-        catch(...) // NOLINT(bugprone-empty-catch)
+        catch(...)
         {
         }
     }
