@@ -62,8 +62,8 @@ typedef int SOCKET;
 #define WSAEINPROGRESS EINPROGRESS
 #define WSAEADDRINUSE EADDRINUSE
 #define WSAENOTSOCK EBADF
-#define INVALID_SOCKET -1 // NOLINT(bugprone-macro-parentheses)
-#define SOCKET_ERROR -1   // NOLINT(bugprone-macro-parentheses)
+#define INVALID_SOCKET (-1)
+#define SOCKET_ERROR (-1)
 #endif
 
 #ifdef WIN32
