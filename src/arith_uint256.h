@@ -41,9 +41,12 @@ public:
             pn[i] = b.pn[i];
     }
 
-    // NOLINTNEXTLINE(bugprone-unhandled-self-assignment)
-    base_uint &operator=(const base_uint &b) {
-        for (int i = 0; i < WIDTH; i++)
+    base_uint &operator=(const base_uint& b)
+    {
+        if(this == &b)
+            return *this;
+
+        for(int i = 0; i < WIDTH; i++)
             // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             pn[i] = b.pn[i];
         return *this;

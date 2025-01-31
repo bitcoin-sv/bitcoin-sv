@@ -123,9 +123,11 @@ private:
             : mValue{ std::atomic_load( &other.mValue ) }
         {}
     
-        // NOLINTNEXTLINE(bugprone-unhandled-self-assignment)
         AtomicTxRef& operator=(const AtomicTxRef& other)
         {
+            if(this == &other)
+                return *this;
+
             mValue = std::atomic_load( &other.mValue );
             return *this;
         }
