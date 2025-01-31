@@ -40,4 +40,4 @@ static void LockedPool(benchmark::State &state) {
     addr.clear();
 }
 
-BENCHMARK(LockedPool) // NOLINT(cert-err58-cpp)
+BENCHMARK(LockedPool)

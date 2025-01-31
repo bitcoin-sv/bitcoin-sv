@@ -39,8 +39,6 @@ static void Base58Decode(benchmark::State &state) {
     }
 }
 
-// NOLINTBEGIN(cert-err58-cpp)
 BENCHMARK(Base58Encode)
 BENCHMARK(Base58CheckEncode)
 BENCHMARK(Base58Decode)
-// NOLINTEND(cert-err58-cpp)

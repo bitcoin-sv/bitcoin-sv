@@ -313,8 +313,6 @@ static void CCoinsInsertionV2(benchmark::State &state) {
     CCoinsInsertion(state, /* V1 */ false);
 }
 
-// NOLINTBEGIN(cert-err58-cpp)
 BENCHMARK(CCoinsCaching)
 BENCHMARK(CCoinsInsertionV1)
 BENCHMARK(CCoinsInsertionV2)
-// NOLINTEND(cert-err58-cpp)

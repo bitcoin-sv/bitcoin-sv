@@ -229,9 +229,7 @@ namespace {
     }
 } // anonymous namespace
 
-// NOLINTBEGIN(cert-err58-cpp)
 BENCHMARK(ThreadSafeQueue_SingleSingle);
 BENCHMARK(ThreadSafeQueue_MultiMulti);
 BENCHMARK(ThreadSafeQueue_SingleMulti);
 BENCHMARK(ThreadSafeQueue_MultiSingle);
-// NOLINTEND(cert-err58-cpp)

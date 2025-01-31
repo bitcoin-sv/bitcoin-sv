@@ -72,4 +72,4 @@ static void CoinSelection(benchmark::State &state) {
     ClearCoins();
 }
 
-BENCHMARK(CoinSelection) // NOLINT(cert-err58-cpp)
+BENCHMARK(CoinSelection)

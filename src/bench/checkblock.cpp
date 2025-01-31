@@ -64,5 +64,5 @@ static void DeserializeAndCheckBlockTest(benchmark::State &state) {
     }
 }
 
-BENCHMARK(DeserializeBlockTest) // NOLINT(cert-err58-cpp)
-BENCHMARK(DeserializeAndCheckBlockTest) // NOLINT(cert-err58-cpp)
+BENCHMARK(DeserializeBlockTest)
+BENCHMARK(DeserializeAndCheckBlockTest)

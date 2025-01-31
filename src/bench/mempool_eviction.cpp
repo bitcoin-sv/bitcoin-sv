@@ -123,4 +123,4 @@ static void MempoolEviction(benchmark::State &state) {
     }
 }
 
-BENCHMARK(MempoolEviction) // NOLINT(cert-err58-cpp)
+BENCHMARK(MempoolEviction)

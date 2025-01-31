@@ -91,7 +91,5 @@ static void WriteToSeparateFilesDatatx(benchmark::State &state) {
     }
 }
 
-// NOLINTBEGIN(cert-err58-cpp)
 BENCHMARK(WriteToFileDataTx);
 BENCHMARK(WriteToSeparateFilesDatatx);
-// NOLINTEND(cert-err58-cpp)

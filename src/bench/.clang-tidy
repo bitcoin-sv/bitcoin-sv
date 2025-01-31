@@ -1,0 +1,8 @@
+Checks: '-clang-analyzer-*,
+
+         -cert-err58-cpp,
+      '
+
+InheritParentConfig: true
+...
+

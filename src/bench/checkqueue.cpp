@@ -99,5 +99,5 @@ static void CCheckQueueSpeedPrevectorJob(benchmark::State &state) {
     tg.join_all();
 }
 
-BENCHMARK(CCheckQueueSpeed) // NOLINT(cert-err58-cpp)
-BENCHMARK(CCheckQueueSpeedPrevectorJob) // NOLINT(cert-err58-cpp)
+BENCHMARK(CCheckQueueSpeed)
+BENCHMARK(CCheckQueueSpeedPrevectorJob)

@@ -63,5 +63,5 @@ static void check_safe_mode_parameters(benchmark::State& state)
     }
 }
 
-BENCHMARK(check_safe_mode_parameters); // NOLINT(cert-err58-cpp)
+BENCHMARK(check_safe_mode_parameters);
 

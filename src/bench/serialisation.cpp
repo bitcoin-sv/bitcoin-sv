@@ -51,7 +51,7 @@ void encode_hex_tx(benchmark::State& state)
         EncodeHexTx(tx, jw.getWriter());
     }
 }
-BENCHMARK(encode_hex_tx); // NOLINT(cert-err58-cpp)
+BENCHMARK(encode_hex_tx);
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static auto make_btxs = []
@@ -88,7 +88,7 @@ static auto make_btxs = []
 };
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-static BlockTransactions btxs = make_btxs(); // NOLINT(cert-err58-cpp)
+static BlockTransactions btxs = make_btxs();
 
 static void ser_btxs_noreserve(benchmark::State& state)
 {
@@ -101,7 +101,7 @@ static void ser_btxs_noreserve(benchmark::State& state)
         CVectorWriter(SER_NETWORK, INIT_PROTO_VERSION, data, pos, btxs);
     }
 }
-BENCHMARK(ser_btxs_noreserve); // NOLINT(cert-err58-cpp)
+BENCHMARK(ser_btxs_noreserve);
 
 static void ser_btxs_reserve(benchmark::State& state)
 {
@@ -115,7 +115,7 @@ static void ser_btxs_reserve(benchmark::State& state)
         CVectorWriter(SER_NETWORK, INIT_PROTO_VERSION, data, pos, btxs);
     }
 }
-BENCHMARK(ser_btxs_reserve); // NOLINT(cert-err58-cpp)
+BENCHMARK(ser_btxs_reserve);
 
 static void ser_msgmaker(benchmark::State& state)
 {
@@ -128,7 +128,7 @@ static void ser_msgmaker(benchmark::State& state)
         mm.Make(NetMsgType::BLOCKTXN, btxs);
     }
 }
-BENCHMARK(ser_msgmaker); // NOLINT(cert-err58-cpp)
+BENCHMARK(ser_msgmaker);
 
 static void ser_btxs_getsersize_test(benchmark::State& state)
 {
@@ -140,7 +140,7 @@ static void ser_btxs_getsersize_test(benchmark::State& state)
         asm volatile(""::"g"(&x):"memory");
     }
 }
-BENCHMARK(ser_btxs_getsersize_test); // NOLINT(cert-err58-cpp)
+BENCHMARK(ser_btxs_getsersize_test);
 
 static void ser_btxs_size_test(benchmark::State& state)
 {
@@ -152,4 +152,4 @@ static void ser_btxs_size_test(benchmark::State& state)
         asm volatile(""::"g"(&x):"memory");
     }
 }
-BENCHMARK(ser_btxs_size_test); // NOLINT(cert-err58-cpp)
+BENCHMARK(ser_btxs_size_test);

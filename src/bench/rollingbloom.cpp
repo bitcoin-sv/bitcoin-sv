@@ -39,4 +39,4 @@ static void RollingBloom(benchmark::State &state) {
     (void) match;
 }
 
-BENCHMARK(RollingBloom) // NOLINT(cert-err58-cpp)
+BENCHMARK(RollingBloom)

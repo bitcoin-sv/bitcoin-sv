@@ -87,7 +87,6 @@ static void FastRandom_1bit(benchmark::State &state) {
     (void) x;
 }
 
-// NOLINTBEGIN(cert-err58-cpp)
 BENCHMARK(RIPEMD160)
 BENCHMARK(SHA1)
 BENCHMARK(SHA256)
@@ -97,4 +96,3 @@ BENCHMARK(SHA256_32b)
 BENCHMARK(SipHash_32b)
 BENCHMARK(FastRandom_32bit)
 BENCHMARK(FastRandom_1bit)
-// NOLINTEND(cert-err58-cpp)
