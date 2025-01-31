@@ -152,7 +152,6 @@ static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24;
 // Multiple streams enabled by default
 static const bool DEFAULT_STREAMS_ENABLED = true;
 // Default prioritised list of stream policies to use
-// NOLINTNEXTLINE(cert-err58-cpp)
 static const std::string DEFAULT_STREAM_POLICY_LIST =
     std::string{BlockPriorityStreamPolicy::POLICY_NAME} + "," +
     std::string{DefaultStreamPolicy::POLICY_NAME};
@@ -160,7 +159,6 @@ static const std::string DEFAULT_STREAM_POLICY_LIST =
 // Parallel block fetch timeout for slow peers (in seconds)
 static const unsigned int DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT = 30;
 // Parallel block fetch maximum number of requests for a single block to different peers
-// NOLINTNEXTLINE(cert-err58-cpp)
 static const size_t DEFAULT_MAX_BLOCK_PARALLEL_FETCH = 3;
 /**
  * Default maximum amount of concurrent async tasks per node before node message

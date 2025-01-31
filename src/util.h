@@ -132,7 +132,6 @@ protected:
     std::map<std::string, std::vector<std::string>> mapMultiArgs;
 
 public:
-    // NOLINTNEXTLINE(cert-err58-cpp)
     static inline const std::array<std::string, 3> sensitiveArgs{"-rpcuser", "-rpcpassword", "-rpcauth"};
 
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)

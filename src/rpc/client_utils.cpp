@@ -184,7 +184,7 @@ CRPCConvertTable::CRPCConvertTable() {
 }
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-static CRPCConvertTable rpcCvtTable; // NOLINTNEXTLINE(cert-err58-cpp)
+static CRPCConvertTable rpcCvtTable; // NOLINT(cert-err58-cpp)
 
 /**
  * Non-RFC4627 JSON parser, accepts internal values (such as numbers, true,

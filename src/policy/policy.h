@@ -163,13 +163,12 @@ static const uint64_t DEFAULT_SCRIPT_NUM_LENGTH_POLICY = 0;
 static const uint64_t MIN_COINS_PROVIDER_CACHE_SIZE = ONE_MEGABYTE;
 static const uint64_t DEFAULT_COINS_PROVIDER_CACHE_SIZE = ONE_GIGABYTE;
 
-// NOLINTNEXTLINE(cert-err58-cpp)
 static const std::set<std::string> DEFAULT_CLIENTUA_BAN_PATTERNS {"abc","cash","bch"};
 
 /* Default min time difference in sec between the last block and last mempool
 * transaction for the block to be classified as selfishly mined */
-// NOLINTNEXTLINE(cert-err58-cpp)
 static constexpr int64_t DEFAULT_MIN_BLOCK_MEMPOOL_TIME_DIFFERENCE_SELFISH = 60;
+
 /** 
 * Percentage threshold of number of txs in mempool 
 * that are not included in received block for 
