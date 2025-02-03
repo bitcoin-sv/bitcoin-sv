@@ -185,18 +185,20 @@ int CommandLineRPC(int argc, char *argv[]) {
         throw;
     }
 
-    if (strPrint != "") {
-        // NOLINTNEXTLINE(cert-err33-c)
-        fprintf((nRet == 0 ? stdout : stderr), "%s\n", strPrint.c_str()); // NOLINT(cppcoreguidelines-pro-type-vararg)
+    if(strPrint != "")
+    {
+        std::ostream& os = (nRet == 0 ? std::cout : std::cerr);
+        os << strPrint << '\n';
     }
     return nRet;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     SetupEnvironment();
-    if (!SetupNetworking()) {
-        // NOLINTNEXTLINE(cert-err33-c)
-        fprintf(stderr, "Error: Initializing networking failed\n"); // NOLINT(cppcoreguidelines-pro-type-vararg)
+    if(!SetupNetworking())
+    {
+        std::cerr << "Error: Initializing networking failed\n";
         return EXIT_FAILURE;
     }
 
