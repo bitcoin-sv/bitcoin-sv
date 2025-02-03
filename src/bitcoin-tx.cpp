@@ -58,8 +58,7 @@ static int AppInitRawTx(int argc, char *argv[]) {
     try {
         SelectParams(ChainNameFromCommandLine());
     } catch (const std::exception &e) {
-        // NOLINTNEXTLINE(cert-err33-c, cppcoreguidelines-pro-type-vararg)
-        fprintf(stderr, "Error: %s\n", e.what());
+        std::cerr << "Error: " << e.what() << '\n';
         return EXIT_FAILURE;
     }
 
@@ -79,9 +78,7 @@ static int AppInitRawTx(int argc, char *argv[]) {
             _("Update hex-encoded bitcoin transaction") + "\n" +
             "  bitcoin-tx [options] -create [commands]   " +
             _("Create hex-encoded bitcoin transaction") + "\n" + "\n";
-
-        // NOLINTNEXTLINE(cert-err33-c, cppcoreguidelines-pro-type-vararg)
-        fprintf(stdout, "%s", strUsage.c_str());
+        std::cout << strUsage << '\n';
 
         strUsage = HelpMessageGroup(_("Options:"));
         strUsage += HelpMessageOpt("-?", _("This help message"));
@@ -94,9 +91,7 @@ static int AppInitRawTx(int argc, char *argv[]) {
                                                  "instead of the default which is "
                                                  "Chronicle."));
         AppendParamsHelpMessages(strUsage);
-
-        // NOLINTNEXTLINE(cert-err33-c, cppcoreguidelines-pro-type-vararg)
-        fprintf(stdout, "%s", strUsage.c_str());
+        std::cout << strUsage << '\n';
 
         strUsage = HelpMessageGroup(_("Commands:"));
         strUsage += HelpMessageOpt("delin=N", _("Delete input N from TX"));
@@ -126,8 +121,7 @@ static int AppInitRawTx(int argc, char *argv[]) {
                 _("prevtxs=JSON object") + ", " + _("privatekeys=JSON object") +
                 ". " + _("See signrawtransaction docs for format of sighash "
                          "flags, JSON objects."));
-        // NOLINTNEXTLINE(cert-err33-c, cppcoreguidelines-pro-type-vararg)
-        fprintf(stdout, "%s", strUsage.c_str());
+        std::cout << strUsage << '\n';
 
         strUsage = HelpMessageGroup(_("Register Commands:"));
         strUsage +=
@@ -135,12 +129,10 @@ static int AppInitRawTx(int argc, char *argv[]) {
                            _("Load JSON file FILENAME into register NAME"));
         strUsage += HelpMessageOpt("set=NAME:JSON-STRING",
                                    _("Set register NAME to given JSON-STRING"));
-        // NOLINTNEXTLINE(cert-err33-c, cppcoreguidelines-pro-type-vararg)
-        fprintf(stdout, "%s", strUsage.c_str());
+        std::cout << strUsage << '\n'; 
 
         if (argc < 2) {
-            // NOLINTNEXTLINE(cert-err33-c, cppcoreguidelines-pro-type-vararg)
-            fprintf(stderr, "Error: too few parameters\n");
+            std::cerr << "Error: too few parameters\n";
             return EXIT_FAILURE;
         }
 
@@ -914,9 +906,10 @@ static int CommandLineRawTx(int argc, char *argv[],
         throw;
     }
 
-    if (strPrint != "") {
-        // NOLINTNEXTLINE(cert-err33-c, cppcoreguidelines-pro-type-vararg)
-        fprintf((nRet == 0 ? stdout : stderr), "%s\n", strPrint.c_str());
+    if(strPrint != "")
+    {
+        std::ostream& os{(nRet == 0) ? std::cout : std::cerr};
+        os << strPrint << '\n';
     }
 
     return nRet;
