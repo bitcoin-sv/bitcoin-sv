@@ -401,9 +401,9 @@ static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
 
     if (!error.isNull())
     {
-        // NOLINTNEXTLINE(cert-err33-c, cppcoreguidelines-pro-type-vararg)
-        fprintf(stderr, "Block Candidate submission error: %d %s\n", error["code"].get_int(),
-            error["message"].get_str().c_str());
+        std::cerr << "Block Candidate submission error: "
+                  << error["code"].get_int() << ' '
+                  << error["message"].get_str() << '\n';
         return reply;
     }
 
@@ -411,15 +411,20 @@ static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
 
     if (result.isStr())
     {
-        // NOLINTNEXTLINE(cert-err33-c, cppcoreguidelines-pro-type-vararg)
-        fprintf(stderr, "Block Candidate rejected. Error: %s\n", result.get_str().c_str());
+        std::cerr << "Block Candidate rejected. Error: "
+                  << result.get_str() << '\n';
+
         // Print some debug info if the block is rejected
         UniValue dbg = solution[0].get_obj();
-        // NOLINTNEXTLINE(cert-err33-c, cppcoreguidelines-pro-type-vararg)
-        fprintf(stderr, "id: %s  time: %d  nonce: %d  version: 0x%x\n", dbg["id"].get_str().c_str(),
-            (uint32_t)dbg["time"].get_int64(), (uint32_t)dbg["nonce"].get_int64(), (uint32_t)dbg["version"].get_int());
-        // NOLINTNEXTLINE(cert-err33-c, cppcoreguidelines-pro-type-vararg)
-        fprintf(stderr, "coinbase: %s\n", dbg["coinbase"].get_str().c_str());
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+        std::ignore = fprintf(stderr,
+                              "id: %s  time: %d  nonce: %d  version: 0x%x\n",
+                              dbg["id"].get_str().c_str(),
+                              (uint32_t)dbg["time"].get_int64(),
+                              (uint32_t)dbg["nonce"].get_int64(),
+                              (uint32_t)dbg["version"].get_int());
+
+        std::cerr << "coinbase: " << dbg["coinbase"].get_str() << '\n';
     }
     else
     {
@@ -432,8 +437,7 @@ static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
         }
         else
         {
-            // NOLINTNEXTLINE(cert-err33-c, cppcoreguidelines-pro-type-vararg)
-            fprintf(stderr, "Unknown \"submitminingsolution\" Response.\n");
+            std::cerr << "Unknown \"submitminingsolution\" Response.\n";
         }
     }
 
@@ -559,8 +563,8 @@ int CpuMiner(RandomIntGenerator & random_int_func)
         if (strPrint != "")
         {
             if (nRet != 0)
-                // NOLINTNEXTLINE(cert-err33-c, cppcoreguidelines-pro-type-vararg)
-                fprintf(stderr, "%s\n", strPrint.c_str());
+                std::cerr << strPrint << '\n';
+
             // Actually do some mining
             if (result.isNull())
             {
@@ -590,8 +594,7 @@ int main(int argc, char *argv[])
     SetupEnvironment();
     if (!SetupNetworking())
     {
-        // NOLINTNEXTLINE(cert-err33-c, cppcoreguidelines-pro-type-vararg)
-        fprintf(stderr, "Error: Initializing networking failed\n");
+        std::cerr << "Error: Initializing networking failed\n";
         exit(1);
     }
 
