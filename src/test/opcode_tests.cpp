@@ -692,7 +692,7 @@ BOOST_AUTO_TEST_CASE(rshift_test)
 BOOST_AUTO_TEST_CASE(rshift_big_int)
 {
     constexpr std::vector<uint8_t>::size_type size{INT32_MAX};
-    std::vector<uint8_t> data(size + 1l, 0x00);
+    std::vector<uint8_t> data(size + 1L, 0x00);
     data[0] = 0x80;
 
     Config& config = GlobalConfig::GetConfig();
@@ -715,7 +715,7 @@ BOOST_AUTO_TEST_CASE(rshift_big_int)
 BOOST_AUTO_TEST_CASE(lshift_big_int)
 {
     constexpr std::vector<uint8_t>::size_type size{INT32_MAX};
-    std::vector<uint8_t> data(size + 2l, 0x00);
+    std::vector<uint8_t> data(size + 2L, 0x00);
     data[0] = 0x40;
 
     Config& config = GlobalConfig::GetConfig();

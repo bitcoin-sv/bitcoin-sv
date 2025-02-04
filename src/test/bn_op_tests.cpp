@@ -964,7 +964,7 @@ BOOST_AUTO_TEST_CASE(op_rshift)
 BOOST_AUTO_TEST_CASE(op_rshift_far)
 {
     constexpr vector<uint8_t>::size_type size{INT32_MAX / 8};
-    std::vector<uint8_t> data(size + 1l, 0x0);
+    std::vector<uint8_t> data(size + 1L, 0x0);
     data[0] = 0x80;
 
     auto source = task::CCancellationSource::Make();
@@ -990,7 +990,7 @@ BOOST_AUTO_TEST_CASE(op_rshift_far)
 BOOST_AUTO_TEST_CASE(op_lshift_far)
 {
     constexpr vector<uint8_t>::size_type size{INT32_MAX / 8};
-    std::vector<uint8_t> data(size + 1l, 0x0);
+    std::vector<uint8_t> data(size + 1L, 0x0);
     data[size] = 0x1;
 
     auto source = task::CCancellationSource::Make();
