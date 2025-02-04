@@ -60,55 +60,54 @@ struct ScriptErrorDesc {
     const char *name;
 };
 
-static ScriptErrorDesc script_errors[] = { // NOLINT(cppcoreguidelines-avoid-non-const-global-variables, cppcoreguidelines-avoid-c-arrays)
-    {SCRIPT_ERR_OK, "OK"},
-    {SCRIPT_ERR_UNKNOWN_ERROR, "UNKNOWN_ERROR"},
-    {SCRIPT_ERR_EVAL_FALSE, "EVAL_FALSE"},
-    {SCRIPT_ERR_OP_RETURN, "OP_RETURN"},
-    {SCRIPT_ERR_SCRIPT_SIZE, "SCRIPT_SIZE"},
-    {SCRIPT_ERR_PUSH_SIZE, "PUSH_SIZE"},
-    {SCRIPT_ERR_OP_COUNT, "OP_COUNT"},
-    {SCRIPT_ERR_STACK_SIZE, "STACK_SIZE"},
-    {SCRIPT_ERR_SIG_COUNT, "SIG_COUNT"},
-    {SCRIPT_ERR_PUBKEY_COUNT, "PUBKEY_COUNT"},
-    {SCRIPT_ERR_INVALID_OPERAND_SIZE, "OPERAND_SIZE"},
-    {SCRIPT_ERR_INVALID_NUMBER_RANGE, "INVALID_NUMBER_RANGE"},
-    {SCRIPT_ERR_INVALID_SPLIT_RANGE, "SPLIT_RANGE"},
-    {SCRIPT_ERR_SCRIPTNUM_OVERFLOW, "SCRIPTNUM_OVERFLOW"},
-    {SCRIPT_ERR_SCRIPTNUM_MINENCODE, "SCRIPTNUM_MINENCODE"},
-    {SCRIPT_ERR_VERIFY, "VERIFY"},
-    {SCRIPT_ERR_EQUALVERIFY, "EQUALVERIFY"},
-    {SCRIPT_ERR_CHECKMULTISIGVERIFY, "CHECKMULTISIGVERIFY"},
-    {SCRIPT_ERR_CHECKSIGVERIFY, "CHECKSIGVERIFY"},
-    {SCRIPT_ERR_NUMEQUALVERIFY, "NUMEQUALVERIFY"},
-    {SCRIPT_ERR_BAD_OPCODE, "BAD_OPCODE"},
-    {SCRIPT_ERR_DISABLED_OPCODE, "DISABLED_OPCODE"},
-    {SCRIPT_ERR_INVALID_STACK_OPERATION, "INVALID_STACK_OPERATION"},
-    {SCRIPT_ERR_INVALID_ALTSTACK_OPERATION, "INVALID_ALTSTACK_OPERATION"},
-    {SCRIPT_ERR_UNBALANCED_CONDITIONAL, "UNBALANCED_CONDITIONAL"},
-    {SCRIPT_ERR_NEGATIVE_LOCKTIME, "NEGATIVE_LOCKTIME"},
-    {SCRIPT_ERR_UNSATISFIED_LOCKTIME, "UNSATISFIED_LOCKTIME"},
-    {SCRIPT_ERR_SIG_HASHTYPE, "SIG_HASHTYPE"},
-    {SCRIPT_ERR_SIG_DER, "SIG_DER"},
-    {SCRIPT_ERR_MINIMALDATA, "MINIMALDATA"},
-    {SCRIPT_ERR_SIG_PUSHONLY, "SIG_PUSHONLY"},
-    {SCRIPT_ERR_SIG_HIGH_S, "SIG_HIGH_S"},
-    {SCRIPT_ERR_SIG_NULLDUMMY, "SIG_NULLDUMMY"},
-    {SCRIPT_ERR_PUBKEYTYPE, "PUBKEYTYPE"},
-    {SCRIPT_ERR_CLEANSTACK, "CLEANSTACK"},
-    {SCRIPT_ERR_MINIMALIF, "MINIMALIF"},
-    {SCRIPT_ERR_SIG_NULLFAIL, "NULLFAIL"},
-    {SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS, "DISCOURAGE_UPGRADABLE_NOPS"},
-    {SCRIPT_ERR_NONCOMPRESSED_PUBKEY, "NONCOMPRESSED_PUBKEY"},
-    {SCRIPT_ERR_ILLEGAL_FORKID, "ILLEGAL_FORKID"},
-    {SCRIPT_ERR_MUST_USE_FORKID, "MISSING_FORKID"},
-    {SCRIPT_ERR_ILLEGAL_RELAX, "ILLEGAL_RELAX"},
-    {SCRIPT_ERR_DIV_BY_ZERO, "DIV_BY_ZERO"},
-    {SCRIPT_ERR_MOD_BY_ZERO, "MOD_BY_ZERO"},
-};
+static constexpr std::array<ScriptErrorDesc, 44> script_errors = {
+    {{SCRIPT_ERR_OK, "OK"},
+     {SCRIPT_ERR_UNKNOWN_ERROR, "UNKNOWN_ERROR"},
+     {SCRIPT_ERR_EVAL_FALSE, "EVAL_FALSE"},
+     {SCRIPT_ERR_OP_RETURN, "OP_RETURN"},
+     {SCRIPT_ERR_SCRIPT_SIZE, "SCRIPT_SIZE"},
+     {SCRIPT_ERR_PUSH_SIZE, "PUSH_SIZE"},
+     {SCRIPT_ERR_OP_COUNT, "OP_COUNT"},
+     {SCRIPT_ERR_STACK_SIZE, "STACK_SIZE"},
+     {SCRIPT_ERR_SIG_COUNT, "SIG_COUNT"},
+     {SCRIPT_ERR_PUBKEY_COUNT, "PUBKEY_COUNT"},
+     {SCRIPT_ERR_INVALID_OPERAND_SIZE, "OPERAND_SIZE"},
+     {SCRIPT_ERR_INVALID_NUMBER_RANGE, "INVALID_NUMBER_RANGE"},
+     {SCRIPT_ERR_INVALID_SPLIT_RANGE, "SPLIT_RANGE"},
+     {SCRIPT_ERR_SCRIPTNUM_OVERFLOW, "SCRIPTNUM_OVERFLOW"},
+     {SCRIPT_ERR_SCRIPTNUM_MINENCODE, "SCRIPTNUM_MINENCODE"},
+     {SCRIPT_ERR_VERIFY, "VERIFY"},
+     {SCRIPT_ERR_EQUALVERIFY, "EQUALVERIFY"},
+     {SCRIPT_ERR_CHECKMULTISIGVERIFY, "CHECKMULTISIGVERIFY"},
+     {SCRIPT_ERR_CHECKSIGVERIFY, "CHECKSIGVERIFY"},
+     {SCRIPT_ERR_NUMEQUALVERIFY, "NUMEQUALVERIFY"},
+     {SCRIPT_ERR_BAD_OPCODE, "BAD_OPCODE"},
+     {SCRIPT_ERR_DISABLED_OPCODE, "DISABLED_OPCODE"},
+     {SCRIPT_ERR_INVALID_STACK_OPERATION, "INVALID_STACK_OPERATION"},
+     {SCRIPT_ERR_INVALID_ALTSTACK_OPERATION, "INVALID_ALTSTACK_OPERATION"},
+     {SCRIPT_ERR_UNBALANCED_CONDITIONAL, "UNBALANCED_CONDITIONAL"},
+     {SCRIPT_ERR_NEGATIVE_LOCKTIME, "NEGATIVE_LOCKTIME"},
+     {SCRIPT_ERR_UNSATISFIED_LOCKTIME, "UNSATISFIED_LOCKTIME"},
+     {SCRIPT_ERR_SIG_HASHTYPE, "SIG_HASHTYPE"},
+     {SCRIPT_ERR_SIG_DER, "SIG_DER"},
+     {SCRIPT_ERR_MINIMALDATA, "MINIMALDATA"},
+     {SCRIPT_ERR_SIG_PUSHONLY, "SIG_PUSHONLY"},
+     {SCRIPT_ERR_SIG_HIGH_S, "SIG_HIGH_S"},
+     {SCRIPT_ERR_SIG_NULLDUMMY, "SIG_NULLDUMMY"},
+     {SCRIPT_ERR_PUBKEYTYPE, "PUBKEYTYPE"},
+     {SCRIPT_ERR_CLEANSTACK, "CLEANSTACK"},
+     {SCRIPT_ERR_MINIMALIF, "MINIMALIF"},
+     {SCRIPT_ERR_SIG_NULLFAIL, "NULLFAIL"},
+     {SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS, "DISCOURAGE_UPGRADABLE_NOPS"},
+     {SCRIPT_ERR_NONCOMPRESSED_PUBKEY, "NONCOMPRESSED_PUBKEY"},
+     {SCRIPT_ERR_ILLEGAL_FORKID, "ILLEGAL_FORKID"},
+     {SCRIPT_ERR_MUST_USE_FORKID, "MISSING_FORKID"},
+     {SCRIPT_ERR_ILLEGAL_RELAX, "ILLEGAL_RELAX"},
+     {SCRIPT_ERR_DIV_BY_ZERO, "DIV_BY_ZERO"},
+     {SCRIPT_ERR_MOD_BY_ZERO, "MOD_BY_ZERO"}}};
 
 const char *FormatScriptError(ScriptError_t err) {
-    for (size_t i = 0; i < ARRAYLEN(script_errors); ++i) {
+    for (size_t i = 0; i < script_errors.size(); ++i) {
         if (script_errors[i].err == err) { // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
             return script_errors[i].name; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         }
@@ -120,7 +119,7 @@ const char *FormatScriptError(ScriptError_t err) {
 }
 
 ScriptError_t ParseScriptError(const std::string &name) {
-    for (size_t i = 0; i < ARRAYLEN(script_errors); ++i) {
+    for (size_t i = 0; i < script_errors.size(); ++i) {
         if (script_errors[i].name == name) { // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
             return script_errors[i].err; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         }
@@ -356,14 +355,15 @@ static void DoTest(const CScript& scriptPubKey,
 }
 
 namespace {
-// NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays)
-const uint8_t vchKey0[32] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
-const uint8_t vchKey1[32] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0};
-const uint8_t vchKey2[32] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
-// NOLINTEND(cppcoreguidelines-avoid-c-arrays)
+const std::array<uint8_t, 32> vchKey0 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                         0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
+const std::array<uint8_t, 32> vchKey1 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                         0, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+const std::array<uint8_t, 32> vchKey2 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                         0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
 struct KeyData {
     CKey key0, key0C, key1, key1C, key2, key2C;
     CPubKey pubkey0, pubkey0C, pubkey0H;
@@ -372,20 +372,21 @@ struct KeyData {
 
     KeyData() {
 
-        key0.Set(vchKey0, vchKey0 + 32, false); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
-        key0C.Set(vchKey0, vchKey0 + 32, true); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        key0.Set(vchKey0.begin(), vchKey0.end(), false);
+        key0C.Set(vchKey0.begin(), vchKey0.end(), true);
         pubkey0 = key0.GetPubKey();
         pubkey0H = key0.GetPubKey();
         pubkey0C = key0C.GetPubKey();
-        *const_cast<uint8_t *>(&pubkey0H[0]) = 0x06 | (pubkey0H[64] & 1); // NOLINT(cppcoreguidelines-pro-type-const-cast)
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+        *const_cast<uint8_t *>(&pubkey0H[0]) = 0x06 | (pubkey0H[64] & 1);
 
-        key1.Set(vchKey1, vchKey1 + 32, false); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
-        key1C.Set(vchKey1, vchKey1 + 32, true); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        key1.Set(vchKey1.begin(), vchKey1.end(), false);
+        key1C.Set(vchKey1.begin(), vchKey1.end(), true);
         pubkey1 = key1.GetPubKey();
         pubkey1C = key1C.GetPubKey();
 
-        key2.Set(vchKey2, vchKey2 + 32, false); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
-        key2C.Set(vchKey2, vchKey2 + 32, true); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        key2.Set(vchKey2.begin(), vchKey2.end(), false);
+        key2C.Set(vchKey2.begin(), vchKey2.end(), true);
         pubkey2 = key2.GetPubKey();
         pubkey2C = key2C.GetPubKey();
     }
@@ -1940,12 +1941,10 @@ BOOST_AUTO_TEST_CASE(chronicle_clean_stack)
 BOOST_AUTO_TEST_CASE(script_PushData) {
     // Check that PUSHDATA1, PUSHDATA2, and PUSHDATA4 create the same value on
     // the stack as the 1-75 opcodes do.
-    // NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays)
-    static const uint8_t direct[] = {1, 0x5a};
-    static const uint8_t pushdata1[] = {OP_PUSHDATA1, 1, 0x5a};
-    static const uint8_t pushdata2[] = {OP_PUSHDATA2, 1, 0, 0x5a};
-    static const uint8_t pushdata4[] = {OP_PUSHDATA4, 1, 0, 0, 0, 0x5a};
-    // NOLINTEND(cppcoreguidelines-avoid-c-arrays)
+    static const std::array<uint8_t, 2> direct = {1, 0x5a};
+    static const std::array<uint8_t, 3> pushdata1 = {OP_PUSHDATA1, 1, 0x5a};
+    static const std::array<uint8_t, 4> pushdata2 = {OP_PUSHDATA2, 1, 0, 0x5a};
+    static const std::array<uint8_t, 6> pushdata4 = {OP_PUSHDATA4, 1, 0, 0, 0, 0x5a};
 
     LimitedStack directStack(UINT32_MAX);
     auto source = task::CCancellationSource::Make();
@@ -1953,7 +1952,7 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                           true,
                           source->GetToken(),
                           directStack,
-                          CScript(&direct[0], &direct[sizeof(direct)]),
+                          CScript(direct.begin(), direct.end()),
                           SCRIPT_VERIFY_P2SH,
                           BaseSignatureChecker());
     assert(res);
@@ -1964,7 +1963,7 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                      true,
                      source->GetToken(),
                      pushdata1Stack,
-                     CScript(&pushdata1[0], &pushdata1[sizeof(pushdata1)]),
+                     CScript(pushdata1.begin(), pushdata1.end()),
                      SCRIPT_VERIFY_P2SH,
                      BaseSignatureChecker());
     assert(res);
@@ -1976,7 +1975,7 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                      true,
                      source->GetToken(),
                      pushdata2Stack,
-                     CScript(&pushdata2[0], &pushdata2[sizeof(pushdata2)]),
+                     CScript(pushdata2.begin(), pushdata2.end()),
                      SCRIPT_VERIFY_P2SH,
                      BaseSignatureChecker());
     assert(res);
@@ -1988,7 +1987,7 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
                      true,
                      source->GetToken(),
                      pushdata4Stack,
-                     CScript(&pushdata4[0], &pushdata4[sizeof(pushdata4)]),
+                     CScript(pushdata4.begin(), pushdata4.end()),
                      SCRIPT_VERIFY_P2SH,
                      BaseSignatureChecker());
     assert(res);
@@ -2761,8 +2760,8 @@ BOOST_AUTO_TEST_CASE(script_IsPushOnly_on_invalid_scripts) {
     // P2SH evaluation uses it, although this specific behavior should not be
     // consensus critical as the P2SH evaluation would fail first due to the
     // invalid push. Still, it doesn't hurt to test it explicitly.
-    static const uint8_t direct[] = {1}; // NOLINT(cppcoreguidelines-avoid-c-arrays)
-    BOOST_CHECK(!CScript(direct, direct + sizeof(direct)).IsPushOnly()); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    static const std::array<uint8_t, 1> direct = {1};
+    BOOST_CHECK(!CScript(direct.begin(), direct.end()).IsPushOnly());
 }
 
 BOOST_AUTO_TEST_CASE(script_GetScriptAsm) {
