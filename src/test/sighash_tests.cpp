@@ -89,7 +89,7 @@ static uint256 SignatureHashOld(CScript scriptCode, const CTransaction &txTo,
 }
 
 static void RandomScript(CScript &script) {
-    static const opcodetype oplist[] = { // NOLINT(cppcoreguidelines-avoid-c-arrays)
+    static const std::array oplist{
         OP_FALSE, OP_1,        OP_2,
         OP_3,     OP_CHECKSIG, OP_IF,
         OP_VERIF, OP_RETURN,   OP_CODESEPARATOR};
