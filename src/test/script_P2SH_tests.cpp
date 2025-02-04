@@ -74,7 +74,7 @@ BOOST_AUTO_TEST_CASE(sign) {
     // Test SignSignature() (and therefore the version of Solver() that signs
     // transactions)
     CBasicKeyStore keystore;
-    CKey key[4];
+    std::array<CKey, 4> key;
     for (int i = 0; i < 4; i++) {
         key[i].MakeNewKey(true);
         keystore.AddKey(key[i]);
@@ -82,12 +82,12 @@ BOOST_AUTO_TEST_CASE(sign) {
 
     // 8 Scripts: checking all combinations of
     // different keys, straight/P2SH, pubkey/pubkeyhash
-    CScript standardScripts[4];
+    std::array<CScript, 4> standardScripts;
     standardScripts[0] << ToByteVector(key[0].GetPubKey()) << OP_CHECKSIG;
     standardScripts[1] = GetScriptForDestination(key[1].GetPubKey().GetID());
     standardScripts[2] << ToByteVector(key[1].GetPubKey()) << OP_CHECKSIG;
     standardScripts[3] = GetScriptForDestination(key[2].GetPubKey().GetID());
-    CScript evalScripts[4];
+    std::array<CScript, 4> evalScripts;
     for (int i = 0; i < 4; i++) {
         keystore.AddCScript(standardScripts[i]);
         evalScripts[i] = GetScriptForDestination(CScriptID(standardScripts[i]));
@@ -110,7 +110,7 @@ BOOST_AUTO_TEST_CASE(sign) {
         testConfig, CTransaction(txFrom),
         testConfig.GetGenesisActivationHeight(), reason));
 
-    CMutableTransaction txTo[8]; // Spending transactions
+    std::array<CMutableTransaction, 8> txTo; // Spending transactions
     for (int i = 0; i < 8; i++) {
         txTo[i].vin.resize(1);
         txTo[i].vout.resize(1);
@@ -209,7 +209,7 @@ BOOST_AUTO_TEST_CASE(set) {
     LOCK(cs_main);
     // Test the CScript::Set* methods
     CBasicKeyStore keystore;
-    CKey key[4];
+    std::array<CKey, 4> key;
     std::vector<CPubKey> keys;
     for (int i = 0; i < 4; i++) {
         key[i].MakeNewKey(true);
@@ -217,7 +217,7 @@ BOOST_AUTO_TEST_CASE(set) {
         keys.push_back(key[i].GetPubKey());
     }
 
-    CScript inner[4];
+    std::array<CScript, 4> inner;
     inner[0] = GetScriptForDestination(key[0].GetPubKey().GetID());
     inner[1] = GetScriptForMultisig(
         2, std::vector<CPubKey>(keys.begin(), keys.begin() + 2));
@@ -226,7 +226,7 @@ BOOST_AUTO_TEST_CASE(set) {
     inner[3] = GetScriptForMultisig(
         2, std::vector<CPubKey>(keys.begin(), keys.begin() + 3));
 
-    CScript outer[4];
+    std::array<CScript, 4> outer;
     for (int i = 0; i < 4; i++) {
         outer[i] = GetScriptForDestination(CScriptID(inner[i]));
         keystore.AddCScript(inner[i]);
@@ -245,7 +245,7 @@ BOOST_AUTO_TEST_CASE(set) {
     BOOST_CHECK(reason == "scriptpubkey");
 
     // Spending transactions
-    CMutableTransaction txTo[4];
+    std::array<CMutableTransaction, 4> txTo;
     for (int i = 0; i < 4; i++) {
         txTo[i].vin.resize(1);
         txTo[i].vout.resize(1);
@@ -293,51 +293,51 @@ BOOST_AUTO_TEST_CASE(is) {
 
     // Not considered pay-to-script-hash if using one of the OP_PUSHDATA
     // opcodes:
-    static const uint8_t direct[] = {OP_HASH160, 20, 0, 0, 0, 0, 0,       0,
-                                     0,          0,  0, 0, 0, 0, 0,       0,
-                                     0,          0,  0, 0, 0, 0, OP_EQUAL};
+    static const std::vector<uint8_t> direct{OP_HASH160, 20, 0, 0, 0, 0, 0,       0,
+                                             0,          0,  0, 0, 0, 0, 0,       0,
+                                             0,          0,  0, 0, 0, 0, OP_EQUAL};
     BOOST_CHECK(IsP2SH(direct));
-    static const uint8_t pushdata1[] = {OP_HASH160, OP_PUSHDATA1,
-                                        20,         0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          OP_EQUAL};
+    static const std::vector<uint8_t> pushdata1{OP_HASH160, OP_PUSHDATA1,
+                                                20,         0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          OP_EQUAL};
     BOOST_CHECK(!IsP2SH(pushdata1));
-    static const uint8_t pushdata2[] = {OP_HASH160, OP_PUSHDATA2,
-                                        20,         0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        OP_EQUAL};
+    static const std::vector<uint8_t> pushdata2{OP_HASH160, OP_PUSHDATA2,
+                                                20,         0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                OP_EQUAL};
     BOOST_CHECK(!IsP2SH(pushdata2));
-    static const uint8_t pushdata4[] = {OP_HASH160, OP_PUSHDATA4,
-                                        20,         0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        0,          0,
-                                        OP_EQUAL};
+    static const std::vector<uint8_t> pushdata4{OP_HASH160, OP_PUSHDATA4,
+                                                20,         0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                0,          0,
+                                                OP_EQUAL};
     BOOST_CHECK(!IsP2SH(pushdata4));
 
     CScript not_p2sh;
@@ -380,7 +380,7 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
     CCoinsViewEmpty coinsDummy;
     CCoinsViewCache coins(coinsDummy);
     CBasicKeyStore keystore;
-    CKey key[6];
+    std::array<CKey, 6> key;
     for (int i = 0; i < 6; i++) {
         key[i].MakeNewKey(true);
         keystore.AddKey(key[i]);

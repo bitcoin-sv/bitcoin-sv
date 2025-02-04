@@ -16,8 +16,10 @@
 
 #include "test/test_bitcoin.h"
 
+#include <array>
 #include <boost/test/unit_test.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <crypto/sha256.h>
 
 namespace
 {
@@ -60,8 +62,10 @@ namespace
         transform_hex(minerIdPubKey, back_inserter(dataToSign));
         transform_hex(vctxid, back_inserter(dataToSign));
 
-        uint8_t hashPrevSignature[CSHA256::OUTPUT_SIZE] {};
-        CSHA256().Write(reinterpret_cast<const uint8_t*>(&dataToSign[0]), dataToSign.size()).Finalize(hashPrevSignature);
+        std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashPrevSignature{};
+        CSHA256()
+            .Write(reinterpret_cast<const uint8_t*>(dataToSign.data()), dataToSign.size())
+            .Finalize(hashPrevSignature.data());
         std::vector<uint8_t> prevMinerIdSignature {};
         BOOST_CHECK(prevMinerIdKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashPrevSignature), std::end(hashPrevSignature)}), prevMinerIdSignature));
         return HexStr(prevMinerIdSignature);
@@ -72,8 +76,10 @@ namespace
     {
         std::string document { coinbaseDocument.write() };
         std::vector<uint8_t> documentBytes { document.begin(), document.end() };
-        uint8_t hashSignature[CSHA256::OUTPUT_SIZE] {};
-        CSHA256().Write(documentBytes.data(), documentBytes.size()).Finalize(hashSignature);
+        std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashSignature{};
+        CSHA256()
+            .Write(documentBytes.data(), documentBytes.size())
+            .Finalize(hashSignature.data());
         std::vector<uint8_t> signature {};
         BOOST_CHECK(minerIdKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashSignature), std::end(hashSignature)}), signature));
         return signature;

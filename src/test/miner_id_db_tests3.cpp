@@ -17,8 +17,11 @@
 
 #include "test/test_bitcoin.h"
 
+#include <array>
 #include <boost/test/unit_test.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <crypto/sha256.h>
+#include <iterator>
 
 namespace
 {
@@ -103,8 +106,10 @@ namespace
         {
             transform_hex(vctxid, back_inserter(dataToSign));
         }
-        uint8_t hashPrevSignature[CSHA256::OUTPUT_SIZE] {};
-        CSHA256().Write(reinterpret_cast<const uint8_t*>(&dataToSign[0]), dataToSign.size()).Finalize(hashPrevSignature);
+        std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashPrevSignature{};
+        CSHA256()
+            .Write(reinterpret_cast<const uint8_t*>(&dataToSign[0]), dataToSign.size())
+            .Finalize(hashPrevSignature.data());
         std::vector<uint8_t> prevMinerIdSignature {};
         BOOST_CHECK(prevMinerIdKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashPrevSignature), std::end(hashPrevSignature)}), prevMinerIdSignature));
         return HexStr(prevMinerIdSignature);
@@ -123,8 +128,10 @@ namespace
         transform_hex(hexEncodedPrevRevocationPubKey, back_inserter(dataToSign));
         transform_hex(hexEncodedRevocationPubKey, back_inserter(dataToSign));
 
-        uint8_t hashPrevSignature[CSHA256::OUTPUT_SIZE] {};
-        CSHA256().Write(reinterpret_cast<const uint8_t*>(&dataToSign[0]), dataToSign.size()).Finalize(hashPrevSignature);
+        std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashPrevSignature{};
+        CSHA256()
+            .Write(reinterpret_cast<const uint8_t*>(&dataToSign[0]), dataToSign.size())
+            .Finalize(hashPrevSignature.data());
         std::vector<uint8_t> prevRevocationKeySignature {};
         BOOST_CHECK(prevRevocationKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashPrevSignature), std::end(hashPrevSignature)}), prevRevocationKeySignature));
         return HexStr(prevRevocationKeySignature);
@@ -135,8 +142,10 @@ namespace
     std::vector<uint8_t> CreateSignatureOverDocument(const CKey& minerIdKey, const Document& document)
     {
         std::vector<uint8_t> documentBytes { document.begin(), document.end() };
-        uint8_t hashSignature[CSHA256::OUTPUT_SIZE] {};
-        CSHA256().Write(documentBytes.data(), documentBytes.size()).Finalize(hashSignature);
+        std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashSignature{};
+        CSHA256()
+            .Write(documentBytes.data(), documentBytes.size())
+            .Finalize(hashSignature.data());
         std::vector<uint8_t> signature {};
         BOOST_CHECK(minerIdKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashSignature), std::end(hashSignature)}), signature));
         return signature;
@@ -150,8 +159,10 @@ namespace
     {
         const std::vector<uint8_t> dataToSign { ParseHex(message.mCompromisedId) };
 
-        uint8_t hashForSigning[CSHA256::OUTPUT_SIZE] {};
-        CSHA256().Write(dataToSign.data(), dataToSign.size()).Finalize(hashForSigning);
+        std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashForSigning{};
+        CSHA256()
+            .Write(dataToSign.data(), dataToSign.size())
+            .Finalize(hashForSigning.data());
         std::vector<uint8_t> sig1 {};
         BOOST_CHECK(revocationKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashForSigning), std::end(hashForSigning)}), sig1));
         std::vector<uint8_t> sig2 {};
@@ -319,12 +330,16 @@ namespace
         concatMerklePrevBlock.insert(concatMerklePrevBlock.end(), modifiedMerkleRoot.begin(), modifiedMerkleRoot.end());
         concatMerklePrevBlock.insert(concatMerklePrevBlock.end(), block.hashPrevBlock.begin(), block.hashPrevBlock.end());
 
-        uint8_t hashConcatMerklePrevBlock[CSHA256::OUTPUT_SIZE] {};
-        CSHA256().Write(reinterpret_cast<const uint8_t*>(concatMerklePrevBlock.data()), concatMerklePrevBlock.size()).Finalize(hashConcatMerklePrevBlock);
-        const std::vector<uint8_t> hashConcatMerklePrevBlockBytes { hashConcatMerklePrevBlock, hashConcatMerklePrevBlock + sizeof(hashConcatMerklePrevBlock) };
+        std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashConcatMerklePrevBlock{};
+        CSHA256()
+            .Write(reinterpret_cast<const uint8_t*>(concatMerklePrevBlock.data()),
+                   concatMerklePrevBlock.size())
+            .Finalize(hashConcatMerklePrevBlock.data());
+        const std::vector hashConcatMerklePrevBlockBytes(hashConcatMerklePrevBlock.begin(),
+                                                         hashConcatMerklePrevBlock.end());
 
-        std::vector<uint8_t> signature {};
-        BOOST_CHECK(minerKey.Sign(uint256 { hashConcatMerklePrevBlockBytes }, signature));
+        std::vector<uint8_t> signature{};
+        BOOST_CHECK(minerKey.Sign(uint256{ hashConcatMerklePrevBlockBytes }, signature));
 
         // Update coinbase
         coinbase.vout[1].scriptPubKey << hashConcatMerklePrevBlockBytes << signature;

@@ -50,7 +50,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
     uint32_t flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC;
 
     ScriptError err{};
-    CKey key[4];
+    std::array<CKey, 4> key;
     Amount amount(0);
     for (int i = 0; i < 4; i++) {
         key[i].MakeNewKey(true);
@@ -77,7 +77,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
     txFrom.vout[2].scriptPubKey = escrow;
 
     // Spending transaction
-    CMutableTransaction txTo[3];
+    std::array<CMutableTransaction, 3> txTo;
     for (int i = 0; i < 3; i++) {
         txTo[i].vin.resize(1);
         txTo[i].vout.resize(1);
@@ -231,7 +231,7 @@ BOOST_AUTO_TEST_CASE(multisig_IsStandard) {
 
     DummyConfig config(CBaseChainParams::MAIN);
 
-    CKey key[4];
+    std::array<CKey, 4> key;
     for (int i = 0; i < 4; i++)
         key[i].MakeNewKey(true);
 
@@ -260,7 +260,7 @@ BOOST_AUTO_TEST_CASE(multisig_IsStandard) {
                 << ToByteVector(key[3].GetPubKey()) << OP_4 << OP_CHECKMULTISIG;
     BOOST_CHECK(!::IsStandard(config, one_of_four, 1, whichType));
 
-    CScript malformed[6];
+    std::array<CScript, 6> malformed;
     malformed[0] << OP_3 << ToByteVector(key[0].GetPubKey())
                  << ToByteVector(key[1].GetPubKey()) << OP_2
                  << OP_CHECKMULTISIG;
@@ -293,8 +293,8 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
     // satisfy an (a|b) or 2-of-3 keys needed to spend an escrow transaction.
     //
     CBasicKeyStore keystore, emptykeystore, partialkeystore;
-    CKey key[3];
-    CTxDestination keyaddr[3];
+    std::array<CKey, 3> key;
+    std::array<CTxDestination, 3> keyaddr;
     for (int i = 0; i < 3; i++) {
         key[i].MakeNewKey(true);
         keystore.AddKey(key[i]);
@@ -408,7 +408,7 @@ BOOST_AUTO_TEST_CASE(multisig_Sign) {
     // Test SignSignature() (and therefore the version of Solver() that signs
     // transactions)
     CBasicKeyStore keystore;
-    CKey key[4];
+    std::array<CKey, 4> key;
     for (int i = 0; i < 4; i++) {
         key[i].MakeNewKey(true);
         keystore.AddKey(key[i]);
@@ -435,7 +435,7 @@ BOOST_AUTO_TEST_CASE(multisig_Sign) {
     txFrom.vout[2].scriptPubKey = escrow;
 
     // Spending transaction
-    CMutableTransaction txTo[3];
+    std::array<CMutableTransaction, 3> txTo;
     for (int i = 0; i < 3; i++) {
         txTo[i].vin.resize(1);
         txTo[i].vout.resize(1);

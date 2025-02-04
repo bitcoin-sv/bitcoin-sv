@@ -5,7 +5,6 @@ Checks: '-clang-analyzer-*,
          
          -cert-err58-cpp,
           
-         -cppcoreguidelines-avoid-c-arrays,
          -cppcoreguidelines-avoid-non-const-global-variables,
          -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
          -cppcoreguidelines-pro-bounds-constant-array-index,
