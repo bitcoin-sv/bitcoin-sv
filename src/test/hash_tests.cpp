@@ -6,6 +6,7 @@
 #include "test/test_bitcoin.h"
 #include "utilstrencodings.h"
 
+#include <array>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
@@ -58,7 +59,7 @@ BOOST_AUTO_TEST_CASE(murmurhash3) {
  *
  * from: https://131002.net/siphash/siphash24.c
  */
-uint64_t siphash_4_2_testvec[] = { // NOLINT(cppcoreguidelines-avoid-c-arrays, cppcoreguidelines-avoid-non-const-global-variables)
+const std::array<uint64_t, 64> siphash_4_2_testvec = {
     0x726fdb47dd0e0e31, 0x74f839c593dc67fd, 0x0d6c8009d9a94f5a,
     0x85676696d7fb7e2d, 0xcf2794e0277187b7, 0x18765564cd99a68d,
     0xcbc9466e58fee3ce, 0xab0200f58b01d137, 0x93f5f5799a932462,
@@ -85,22 +86,22 @@ uint64_t siphash_4_2_testvec[] = { // NOLINT(cppcoreguidelines-avoid-c-arrays, c
 BOOST_AUTO_TEST_CASE(siphash) {
     CSipHasher hasher(0x0706050403020100ULL, 0x0F0E0D0C0B0A0908ULL);
     BOOST_CHECK_EQUAL(hasher.Finalize(), 0x726fdb47dd0e0e31ull);
-    static const uint8_t t0[1] = {0}; // NOLINT(cppcoreguidelines-avoid-c-arrays)
-    hasher.Write(t0, 1); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    static const std::array<uint8_t, 1> t0 = {0};
+    hasher.Write(t0.data(), t0.size());
     BOOST_CHECK_EQUAL(hasher.Finalize(), 0x74f839c593dc67fdull);
-    static const uint8_t t1[7] = {1, 2, 3, 4, 5, 6, 7}; // NOLINT(cppcoreguidelines-avoid-c-arrays)
-    hasher.Write(t1, 7); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    static const std::array<uint8_t, 7> t1 = {1, 2, 3, 4, 5, 6, 7};
+    hasher.Write(t1.data(), t1.size());
     BOOST_CHECK_EQUAL(hasher.Finalize(), 0x93f5f5799a932462ull);
     hasher.Write(0x0F0E0D0C0B0A0908ULL);
     BOOST_CHECK_EQUAL(hasher.Finalize(), 0x3f2acc7f57c29bdbull);
-    static const uint8_t t2[2] = {16, 17}; // NOLINT(cppcoreguidelines-avoid-c-arrays)
-    hasher.Write(t2, 2); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    static const std::array<uint8_t, 2> t2 = {16, 17};
+    hasher.Write(t2.data(), t2.size());
     BOOST_CHECK_EQUAL(hasher.Finalize(), 0x4bc1b3f0968dd39cull);
-    static const uint8_t t3[9] = {18, 19, 20, 21, 22, 23, 24, 25, 26}; // NOLINT(cppcoreguidelines-avoid-c-arrays)
-    hasher.Write(t3, 9); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    static const std::array<uint8_t, 9> t3 = {18, 19, 20, 21, 22, 23, 24, 25, 26};
+    hasher.Write(t3.data(), t3.size());
     BOOST_CHECK_EQUAL(hasher.Finalize(), 0x2f2e6163076bcfadull);
-    static const uint8_t t4[5] = {27, 28, 29, 30, 31}; // NOLINT(cppcoreguidelines-avoid-c-arrays)
-    hasher.Write(t4, 5); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    static const std::array<uint8_t, 5> t4 = {27, 28, 29, 30, 31};
+    hasher.Write(t4.data(), t4.size());
     BOOST_CHECK_EQUAL(hasher.Finalize(), 0x7127512f72f27cceull);
     hasher.Write(0x2726252423222120ULL);
     BOOST_CHECK_EQUAL(hasher.Finalize(), 0x0e3ea96b5304a7d0ull);
@@ -115,14 +116,14 @@ BOOST_AUTO_TEST_CASE(siphash) {
 
     // Check test vectors from spec, one byte at a time
     CSipHasher hasher2(0x0706050403020100ULL, 0x0F0E0D0C0B0A0908ULL);
-    for (uint8_t x = 0; x < ARRAYLEN(siphash_4_2_testvec); ++x) { // NOLINT(bugprone-too-small-loop-variable)
-        BOOST_CHECK_EQUAL(hasher2.Finalize(), siphash_4_2_testvec[x]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+    for (uint8_t x = 0; x < siphash_4_2_testvec.size(); ++x) { // NOLINT(bugprone-too-small-loop-variable)
+        BOOST_CHECK_EQUAL(hasher2.Finalize(), siphash_4_2_testvec[x]);
         hasher2.Write(&x, 1);
     }
     // Check test vectors from spec, eight bytes at a time
     CSipHasher hasher3(0x0706050403020100ULL, 0x0F0E0D0C0B0A0908ULL);
-    for (uint8_t x = 0; x < ARRAYLEN(siphash_4_2_testvec); x += 8) { // NOLINT(bugprone-too-small-loop-variable)
-        BOOST_CHECK_EQUAL(hasher3.Finalize(), siphash_4_2_testvec[x]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+    for (uint8_t x = 0; x < siphash_4_2_testvec.size(); x += 8) { // NOLINT(bugprone-too-small-loop-variable)
+        BOOST_CHECK_EQUAL(hasher3.Finalize(), siphash_4_2_testvec[x]);
         hasher3.Write(uint64_t(x) | (uint64_t(x + 1) << 8) |
                       (uint64_t(x + 2) << 16) | (uint64_t(x + 3) << 24) |
                       (uint64_t(x + 4) << 32) | (uint64_t(x + 5) << 40) |
@@ -144,12 +145,12 @@ BOOST_AUTO_TEST_CASE(siphash) {
         uint64_t k2 = InsecureRand64();
         uint256 x = InsecureRand256();
         uint32_t n = insecure_rand();
-        uint8_t nb[4]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
-        WriteLE32(nb, n); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+        std::array<uint8_t, 4> nb{};
+        WriteLE32(nb.data(), n);
         CSipHasher sip256(k1, k2);
         sip256.Write(x.begin(), 32);
         CSipHasher sip288 = sip256;
-        sip288.Write(nb, 4); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+        sip288.Write(nb.data(), nb.size());
         BOOST_CHECK_EQUAL(SipHashUint256(k1, k2, x), sip256.Finalize());
         BOOST_CHECK_EQUAL(SipHashUint256Extra(k1, k2, x, n), sip288.Finalize());
     }
