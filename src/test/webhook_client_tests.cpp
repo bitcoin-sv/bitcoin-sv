@@ -30,7 +30,7 @@ namespace
         void do_read()
         {
             auto self { shared_from_this() };
-            mSocket.async_read_some(boost::asio::buffer(mData, max_length),
+            mSocket.async_read_some(boost::asio::buffer(mData, mData.size()),
                 [this, self](boost::system::error_code ec, size_t length)
                 {
                     if(!ec)
@@ -60,8 +60,7 @@ namespace
         }
 
         tcp::socket mSocket;
-        enum { max_length = 1024 };
-        char mData[max_length]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+        std::array<char, 1024> mData{};
     };
 
     // Simple asynchronous socket server

@@ -209,13 +209,14 @@ BOOST_AUTO_TEST_CASE(PrevectorTestInt) {
                 test.pop_back();
             }
             if (InsecureRandBits(5) == 7) {
-                int values[4]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+                std::array<int, 4> values{};
                 int num = 1 + (InsecureRandBits(2)); // NOLINT(*-narrowing-conversions)
                 for (int k = 0; k < num; k++) {
-                    values[k] = insecure_rand(); // NOLINT(*-narrowing-conversions, cppcoreguidelines-pro-bounds-constant-array-index)
+                    values[k] = insecure_rand(); // NOLINT(*-narrowing-conversions)
                 }
-                test.insert_range(InsecureRandRange(test.size() + 1), values, // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-                                  values + num); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                test.insert_range(InsecureRandRange(test.size() + 1),
+                                  values.data(),
+                                  values.data() + num);
             }
             if (InsecureRandBits(5) == 8) {
                 int del = std::min<int>(test.size(), 1 + (InsecureRandBits(2))); // NOLINT(*-narrowing-conversions)

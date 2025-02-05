@@ -294,16 +294,17 @@ struct StringContentsSerializer {
     }
 };
 
-BOOST_AUTO_TEST_CASE(iterator_string_ordering) {
-    char buf[16]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+BOOST_AUTO_TEST_CASE(iterator_string_ordering)
+{
+    std::array<char, 16> buf{};
 
     fs::path ph = fs::temp_directory_path() / fs::unique_path();
     CDBWrapper dbw(ph, (1 << 20), true, false, false);
     for (int x = 0x00; x < 10; ++x) {
         for (int y = 0; y < 10; y++) {
-            const auto n = sprintf(buf, "%d", x); // NOLINT(cppcoreguidelines-pro-type-vararg, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+            const auto n = sprintf(buf.data(), "%d", x); // NOLINT(cppcoreguidelines-pro-type-vararg)
             assert(n >= 0);
-            StringContentsSerializer key(buf); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+            StringContentsSerializer key(buf.data());
             for (int z = 0; z < y; z++)
                 key += key;
             uint32_t value = x * x;
@@ -319,17 +320,17 @@ BOOST_AUTO_TEST_CASE(iterator_string_ordering) {
             seek_start = 0;
         else
             seek_start = 5;
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-type-vararg)
-        const auto n = sprintf(buf, "%d", seek_start);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+        const auto n = sprintf(buf.data(), "%d", seek_start);
         assert(n >= 0);
-        StringContentsSerializer seek_key(buf); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+        StringContentsSerializer seek_key(buf.data());
         it->Seek(seek_key);
         for (unsigned x = seek_start; x < 10; ++x) {
             for (unsigned y = 0; y < 10; y++) {
-                // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-type-vararg)
-                const auto n = sprintf(buf, "%d", x);
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+                const auto n = sprintf(buf.data(), "%d", x);
                 assert(n >= 0);
-                std::string exp_key(buf); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+                std::string exp_key(buf.data());
                 for (unsigned z = 0; z < y; z++)
                     exp_key += exp_key;
                 StringContentsSerializer key;

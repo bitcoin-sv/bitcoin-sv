@@ -4,6 +4,7 @@
 
 #include "test/sigutil.h"
 
+#include <array>
 #include <cassert>
 
 void NegateSignatureS(std::vector<uint8_t> &vchSig) {
@@ -17,7 +18,7 @@ void NegateSignatureS(std::vector<uint8_t> &vchSig) {
 
     // Really ugly to implement mod-n negation here, but it would be feature
     // creep to expose such functionality from libsecp256k1.
-    static const uint8_t order[33] = { // NOLINT(cppcoreguidelines-avoid-c-arrays)
+    static const std::array<uint8_t, 33> order = {
         0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0xBA, 0xAE, 0xDC, 0xE6, 0xAF,
         0x48, 0xA0, 0x3B, 0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36, 0x41, 0x41};
@@ -27,7 +28,7 @@ void NegateSignatureS(std::vector<uint8_t> &vchSig) {
 
     int carry = 0;
     for (int p = 32; p >= 1; p--) {
-        int n = (int)order[p] - s[p] - carry; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        int n = (int)order[p] - s[p] - carry;
         s[p] = (n + 256) & 0xFF;
         carry = (n < 0);
     }

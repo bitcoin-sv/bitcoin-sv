@@ -103,9 +103,9 @@ void RunTest(const TestVector &test) {
     key.SetMaster(&seed[0], seed.size());
     pubkey = key.Neuter();
     for (const TestDerivation &derive : test.vDerive) {
-        uint8_t data[74]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
-        key.Encode(data); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-        pubkey.Encode(data); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+        std::array<uint8_t, 74> data{};
+        key.Encode(data.data());
+        pubkey.Encode(data.data());
 
         // Test private key
         CBitcoinExtKey b58key;

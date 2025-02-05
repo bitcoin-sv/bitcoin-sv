@@ -91,11 +91,12 @@ BOOST_AUTO_TEST_CASE(caddrdb_read) {
     CAddrMan addrman1;
 
     BOOST_CHECK(addrman1.size() == 0);
-    try {
-        uint8_t pchMsgTmp[4]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+    try
+    {
+        std::array<uint8_t, 4> pchMsgTmp{};
         ssPeers1 >> FLATDATA(pchMsgTmp);
         ssPeers1 >> addrman1;
-    } catch (const std::exception &e) {
+    }catch (const std::exception &e) {
         exceptionThrown = true;
     }
 
@@ -122,8 +123,9 @@ BOOST_AUTO_TEST_CASE(caddrdb_read_corrupted) {
     bool exceptionThrown = false;
     CAddrMan addrman1;
     BOOST_CHECK(addrman1.size() == 0);
-    try {
-        uint8_t pchMsgTmp[4]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+    try
+    {
+        std::array<uint8_t, 4> pchMsgTmp{};
         ssPeers1 >> FLATDATA(pchMsgTmp);
         ssPeers1 >> addrman1;
     } catch (const std::exception &e) {

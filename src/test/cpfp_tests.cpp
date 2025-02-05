@@ -69,8 +69,7 @@ namespace{
         {
             auto [txInput, ndx] = input;
             tx.vin.push_back(CTxIn(txInput->GetId(), ndx, CScript()));
-            totalInput += txInput->vout[ndx]
-                              .nValue; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+            totalInput += txInput->vout[ndx].nValue;
         }
 
         for(size_t i = 0; i < nOutputs; i++)

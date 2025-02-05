@@ -485,7 +485,7 @@ BOOST_AUTO_TEST_CASE(to_size_t_limited)
 // clang-format off
 /** A selection of numbers that do not trigger int64_t overflow
  *  when added/subtracted. */
-static const int64_t values[] = {0, // NOLINT(cppcoreguidelines-avoid-c-arrays)
+static const std::array<int64_t, 13> values = {0,
                                  1,
                                  -2,
                                  127,
@@ -499,8 +499,8 @@ static const int64_t values[] = {0, // NOLINT(cppcoreguidelines-avoid-c-arrays)
                                  1 - (1LL << 32),
                                  1LL << 40};
 
-static const int64_t offsets[] = {1,      0x79,   0x80,   0x81,   0xFF, // NOLINT(cppcoreguidelines-avoid-c-arrays)
-                                  0x7FFF, 0x8000, 0xFFFF, 0x10000};
+static const std::array<int64_t, 9> offsets = {1, 0x79, 0x80, 0x81, 0xFF,   
+                                               0x7FFF, 0x8000, 0xFFFF, 0x1'0000};
 
 static bool verify(const CScriptNum10 &bignum, const CScriptNum &scriptnum) {
     return bignum.getvch() == scriptnum.getvch() &&
@@ -641,22 +641,25 @@ static void RunOperators(const int64_t &num1, const int64_t &num2) {
     CheckCompare(num1, num2);
 }
 
-BOOST_AUTO_TEST_CASE(creation) {
-    for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i) {
-        for (size_t j = 0; j < sizeof(offsets) / sizeof(offsets[0]); ++j) {
-            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
+BOOST_AUTO_TEST_CASE(creation)
+{
+    for (size_t i = 0; i < values.size(); ++i)
+    {
+        for (size_t j = 0; j < offsets.size(); ++j)
+        {
             RunCreate(values[i]);
             RunCreate(values[i] + offsets[j]);
             RunCreate(values[i] - offsets[j]);
-            // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
         }
     }
 }
 
-BOOST_AUTO_TEST_CASE(operators) {
-    for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i) {
-        for (size_t j = 0; j < sizeof(offsets) / sizeof(offsets[0]); ++j) {
-            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
+BOOST_AUTO_TEST_CASE(operators)
+{
+    for(size_t i = 0; i < values.size(); ++i)
+    {
+        for(size_t j = 0; j < offsets.size(); ++j)
+        {
             RunOperators(values[i], values[i]);
             RunOperators(values[i], -values[i]);
             RunOperators(values[i], values[j]);
@@ -669,7 +672,6 @@ BOOST_AUTO_TEST_CASE(operators) {
             RunOperators(values[i] + values[j], values[i] - values[j]);
             RunOperators(values[i] - values[j], values[i] + values[j]);
             RunOperators(values[i] - values[j], values[i] - values[j]);
-            // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
         }
     }
 }

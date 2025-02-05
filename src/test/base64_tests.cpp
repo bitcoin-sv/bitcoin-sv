@@ -5,20 +5,26 @@
 #include "test/test_bitcoin.h"
 #include "utilstrencodings.h"
 
+#include <array>
+
 #include <boost/test/unit_test.hpp>
 
 BOOST_FIXTURE_TEST_SUITE(base64_tests, BasicTestingSetup)
 
-BOOST_AUTO_TEST_CASE(base64_testvectors) {
-    static const std::string vstrIn[] = {"",     "f",     "fo",    "foo", // NOLINT(cppcoreguidelines-avoid-c-arrays)
-                                         "foob", "fooba", "foobar"};
-    static const std::string vstrOut[] = { // NOLINT(cppcoreguidelines-avoid-c-arrays)
+BOOST_AUTO_TEST_CASE(base64_testvectors)
+{
+    static const std::array<std::string, 7> vstrIn = {
+        "", "f", "fo", "foo", "foob", "fooba", "foobar"};
+
+    static const std::array<std::string, 7> vstrOut = {
         "", "Zg==", "Zm8=", "Zm9v", "Zm9vYg==", "Zm9vYmE=", "Zm9vYmFy"};
-    for (unsigned int i = 0; i < sizeof(vstrIn) / sizeof(vstrIn[0]); i++) {
-        std::string strEnc = EncodeBase64(vstrIn[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
-        BOOST_CHECK(strEnc == vstrOut[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
-        std::string strDec = DecodeBase64(strEnc);
-        BOOST_CHECK(strDec == vstrIn[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+
+    for(unsigned int i = 0; i < vstrIn.size(); i++)
+    {
+        const std::string strEnc = EncodeBase64(vstrIn[i]);
+        BOOST_CHECK(strEnc == vstrOut[i]);
+        const std::string strDec = DecodeBase64(strEnc);
+        BOOST_CHECK(strDec == vstrIn[i]);
     }
 }
 

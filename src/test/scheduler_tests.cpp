@@ -49,8 +49,8 @@ BOOST_AUTO_TEST_CASE(manythreads) {
     // counters should sum to the number of initial tasks performed.
     CScheduler microTasks;
 
-    boost::mutex counterMutex[10]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
-    int counter[10] = {0}; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+    std::array<boost::mutex, 10> counterMutex;
+    std::array<int, 10> counter{};
     ResetGlobalRandomContext();
     boost::random::mt19937 rng(insecure_rand());
     boost::random::uniform_int_distribution<> zeroToNine(0, 9);
@@ -72,8 +72,8 @@ BOOST_AUTO_TEST_CASE(manythreads) {
         int whichCounter = zeroToNine(rng);
         CScheduler::Function f = boost::bind(
             &microTask, std::ref(microTasks),
-            std::ref(counterMutex[whichCounter]), // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
-            std::ref(counter[whichCounter]), randomDelta(rng), tReschedule); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+            std::ref(counterMutex[whichCounter]),
+            std::ref(counter[whichCounter]), randomDelta(rng), tReschedule);
         microTasks.schedule(f, t);
     }
     nTasks = microTasks.getQueueInfo(first, last);
@@ -106,7 +106,7 @@ BOOST_AUTO_TEST_CASE(manythreads) {
         int whichCounter = zeroToNine(rng);
         CScheduler::Function f = boost::bind(
             &microTask, std::ref(microTasks),
-            std::ref(counterMutex[whichCounter]), // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+            std::ref(counterMutex[whichCounter]),
             std::ref(counter[whichCounter]), randomDelta(rng), tReschedule); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         microTasks.schedule(f, t);
     }
@@ -116,9 +116,10 @@ BOOST_AUTO_TEST_CASE(manythreads) {
     microThreads.join_all(); // ... wait until all the threads are done
 
     int counterSum = 0;
-    for (int i = 0; i < 10; i++) {
-        BOOST_CHECK(counter[i] != 0); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
-        counterSum += counter[i]; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+    for(size_t i = 0; i < counter.size(); i++)
+    {
+        BOOST_CHECK(counter[i] != 0);
+        counterSum += counter[i];
     }
     BOOST_CHECK_EQUAL(counterSum, 200);
 }

@@ -110,10 +110,13 @@ using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<miner_tests_uid>;
 
 static CFeeRate blockMinFeeRate = CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE); // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
-static struct { // NOLINT(cppcoreguidelines-avoid-c-arrays)
+struct Nonce
+{
     uint8_t extranonce;
     uint32_t nonce;
-} blockinfo[] = { // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+};
+static const std::array<Nonce, 110> blockinfo =
+{{
     {4, 0xa4a3e223}, {2, 0x15c32f9e}, {1, 0x0375b547}, {1, 0x7004a8a5},
     {2, 0xce440296}, {2, 0x52cfe198}, {1, 0x77a72cd0}, {2, 0xbb5d6f84},
     {2, 0x83f30c2c}, {1, 0x48a73d5b}, {1, 0xef7dcd01}, {2, 0x6809c6c4},
@@ -142,7 +145,7 @@ static struct { // NOLINT(cppcoreguidelines-avoid-c-arrays)
     {1, 0x3141c7c1}, {1, 0xb3b595f4}, {1, 0x735abf08}, {5, 0x623bfbce},
     {2, 0xd351e722}, {1, 0xf4ca48c9}, {1, 0x5b19c670}, {1, 0xa164bf0e},
     {2, 0xbbbeb305}, {2, 0xfe1c810a},
-};
+}};
 
 bool TestSequenceLocks(const CTransaction &tx, const Config& config, int flags) {
     CoinsDBView view{ *pcoinsTip };
@@ -181,7 +184,8 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     // blocks :)
     int32_t baseheight = 0;
     std::vector<CTransactionRef> txFirst;
-    for (size_t i = 0; i < sizeof(blockinfo) / sizeof(*blockinfo); ++i) { // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    for (size_t i = 0; i < blockinfo.size(); ++i)
+    {
         // pointer for convenience.
         CBlockRef blockRef = pblocktemplate->GetBlockRef();
         CBlock *pblock = blockRef.get();
@@ -190,7 +194,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         CMutableTransaction txCoinbase(*pblock->vtx[0]);
         txCoinbase.nVersion = 1;
         txCoinbase.vin[0].scriptSig = CScript();
-        txCoinbase.vin[0].scriptSig.push_back(blockinfo[i].extranonce); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        txCoinbase.vin[0].scriptSig.push_back(blockinfo[i].extranonce);
         txCoinbase.vin[0].scriptSig.push_back(chainActive.Height());
         // Ignore the (optional) segwit commitment added by CreateNewBlock (as
         // the hardcoded nonces don't account for this)
@@ -200,7 +204,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         if (txFirst.size() == 0) baseheight = chainActive.Height();
         if (txFirst.size() < 4) txFirst.push_back(pblock->vtx[0]);
         pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
-        pblock->nNonce = blockinfo[i].nonce; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        pblock->nNonce = blockinfo[i].nonce;
         std::shared_ptr<const CBlock> shared_pblock =
             std::make_shared<const CBlock>(*pblock);
         BOOST_CHECK(ProcessNewBlock(testingSetup.testConfig, shared_pblock, true, nullptr, CBlockSource::MakeLocal("test")));
@@ -828,7 +832,8 @@ void Test_CreateNewBlock_JBA_Config(TestingSetup& testingSetup)
 
     // We can't make transactions until we have inputs. Therefore, load 100 blocks
     std::vector<CTransactionRef> txFirst;
-    for (size_t i = 0; i < sizeof(blockinfo) / sizeof(*blockinfo); ++i) { // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    for (size_t i = 0; i < blockinfo.size(); ++i)
+    {
         // pointer for convenience.
         CBlockRef blockRef = pblocktemplate->GetBlockRef();
         CBlock *pblock = blockRef.get();
@@ -837,7 +842,7 @@ void Test_CreateNewBlock_JBA_Config(TestingSetup& testingSetup)
         CMutableTransaction txCoinbase(*pblock->vtx[0]);
         txCoinbase.nVersion = 1;
         txCoinbase.vin[0].scriptSig = CScript();
-        txCoinbase.vin[0].scriptSig.push_back(blockinfo[i].extranonce); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        txCoinbase.vin[0].scriptSig.push_back(blockinfo[i].extranonce);
         txCoinbase.vin[0].scriptSig.push_back(chainActive.Height());
         txCoinbase.vout.resize(1);
         txCoinbase.vout[0].scriptPubKey = CScript();
@@ -845,7 +850,7 @@ void Test_CreateNewBlock_JBA_Config(TestingSetup& testingSetup)
         if (txFirst.size() < 4)
             txFirst.push_back(pblock->vtx[0]);
         pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
-        pblock->nNonce = blockinfo[i].nonce; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        pblock->nNonce = blockinfo[i].nonce;
         std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(*pblock);
         BOOST_CHECK(ProcessNewBlock(testingSetup.testConfig, shared_pblock, true, nullptr, CBlockSource::MakeLocal("test")));
         pblock->hashPrevBlock = pblock->GetHash();

@@ -804,7 +804,7 @@ BOOST_AUTO_TEST_CASE(ValidateConfiscationTxContents_test)
 namespace {
 // Helper to run function in two threads.
 template<typename Cnt, typename F>
-void run_in_two_threads(Cnt (&cnt)[2], F f) //NOLINT(cppcoreguidelines-avoid-c-arrays)
+void run_in_two_threads(std::array<Cnt, 2>& cnt, F f)
 {
     cnt[0] = {};
     std::thread thd(f, &cnt[0]);
@@ -899,11 +899,12 @@ BOOST_AUTO_TEST_CASE(db_thread_safety_tests)
     };
 
     // Provides counters that are used to check if function completed successfully
-    struct Cnt //NOLINT(cppcoreguidelines-avoid-c-arrays)
+    struct Cnt
     {
         std::size_t ok = 0;
         std::size_t alt = 0;
-    } cnt[2];
+    };
+    std::array<Cnt, 2> cnt;
 
     // Freeze all TXOs on policy-only blacklist while checking if they are frozen
     start_frozen_txo_checker(0);

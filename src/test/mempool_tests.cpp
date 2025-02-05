@@ -55,27 +55,23 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest) {
         txParent.vout[i].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
         txParent.vout[i].nValue = Amount(33000LL);
     }
-    CMutableTransaction txChild[3]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+    std::array<CMutableTransaction, 3> txChild;
     for (int i = 0; i < 3; i++) {
-        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
         txChild[i].vin.resize(1);
         txChild[i].vin[0].scriptSig = CScript() << OP_11;
         txChild[i].vin[0].prevout = COutPoint(txParent.GetId(), i);
         txChild[i].vout.resize(1);
         txChild[i].vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
         txChild[i].vout[0].nValue = Amount(11000LL);
-        // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
     }
-    CMutableTransaction txGrandChild[3]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+    std::array<CMutableTransaction, 3> txGrandChild;
     for (int i = 0; i < 3; i++) {
-        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
         txGrandChild[i].vin.resize(1);
         txGrandChild[i].vin[0].scriptSig = CScript() << OP_11;
         txGrandChild[i].vin[0].prevout = COutPoint(txChild[i].GetId(), 0);
         txGrandChild[i].vout.resize(1);
         txGrandChild[i].vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
         txGrandChild[i].vout[0].nValue = Amount(11000LL);
-        // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 
     CTxMemPool testPool;

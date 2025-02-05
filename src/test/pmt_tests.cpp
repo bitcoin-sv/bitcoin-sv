@@ -30,12 +30,12 @@ public:
 BOOST_FIXTURE_TEST_SUITE(pmt_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(pmt_test1) {
-    static const unsigned int nTxCounts[] = {1,   4,   7,   17,  56,   100, // NOLINT(cppcoreguidelines-avoid-c-arrays)
-                                             127, 256, 312, 513, 1000, 4095};
+    static const std::array<unsigned int, 12> nTxCounts =
+        {1, 4, 7, 17, 56, 100, 127, 256, 312, 513, 1000, 4095};
 
-    for(int i = 0; i < 12; i++)
+    for(size_t i = 0; i < nTxCounts.size(); i++)
     {
-        auto nTx = nTxCounts[i]; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        auto nTx = nTxCounts[i];
 
         // build a block with some dummy transactions
         CBlock block;

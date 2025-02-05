@@ -7,6 +7,7 @@
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
+#include <crypto/sha256.h>
 
 namespace
 {
@@ -30,9 +31,14 @@ namespace
             assert(encodedRevocationMessage.size() == 33);
 
             // Hash revocation message
-            uint8_t hashRevocationMessageBytes[CSHA256::OUTPUT_SIZE] {}; // NOLINT(cppcoreguidelines-avoid-c-arrays)
-            CSHA256().Write(reinterpret_cast<const uint8_t*>(encodedRevocationMessage.data()), encodedRevocationMessage.size()).Finalize(hashRevocationMessageBytes); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-type-reinterpret-cast)
-            const uint256 hashRevocationMessage { std::vector<uint8_t> {std::begin(hashRevocationMessageBytes), std::end(hashRevocationMessageBytes)} };
+            std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashRevocationMessageBytes{};
+            CSHA256()
+                .Write(reinterpret_cast<const uint8_t*>(encodedRevocationMessage.data()),
+                       encodedRevocationMessage.size())
+                .Finalize(hashRevocationMessageBytes.data());
+            const uint256 hashRevocationMessage{
+                std::vector<uint8_t>{std::begin(hashRevocationMessageBytes),
+                                     std::end(hashRevocationMessageBytes)}};
 
             // Create signatures over hash of revocation message
             std::vector<uint8_t> sig1 {};
