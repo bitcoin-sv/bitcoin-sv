@@ -8,11 +8,9 @@
 #include <boost/test/unit_test.hpp>
 #include <sstream>
 #include <variant>
-#include "boost/algorithm/hex.hpp"
 
 #include "miner_id/miner_info.h"
 #include "miner_id/miner_info_error.h"
-#include "script/instruction_iterator.h"
 #include "script/opcodes.h"
 #include "uint256.h"
 
@@ -178,16 +176,16 @@ namespace
         else if(src.size() <= 0xffff)
         {
             dst.insert(dst.end(), OP_PUSHDATA2);
-            uint8_t data[2]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
-            WriteLE16(data, src.size()); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-            dst.insert(dst.end(), data, data + sizeof(data)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            std::array<uint8_t, 2> data{};
+            WriteLE16(data.data(), src.size());
+            dst.insert(dst.end(), data.begin(), data.end());
         }
         else
         {
             dst.insert(dst.end(), OP_PUSHDATA4);
-            uint8_t data[4]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
-            WriteLE32(data, src.size()); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-            dst.insert(dst.end(), data, data + sizeof(data)); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            std::array<uint8_t, 4> data{};
+            WriteLE32(data.data(), src.size());
+            dst.insert(dst.end(), data.begin(), data.end());
         }
         dst.insert(dst.end(), src.begin(), src.end());
     }
