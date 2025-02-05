@@ -213,7 +213,7 @@ BOOST_AUTO_TEST_CASE(tx_invalid) {
 BOOST_AUTO_TEST_CASE(basic_transaction_tests) {
     // Random real transaction
     // (e2769b09e784f32f62ef849763d4f45b98e07ba658647343b915ff832b110436)
-    uint8_t ch[] = { // NOLINT(cppcoreguidelines-avoid-c-arrays)
+    std::array<uint8_t, 260> ch = {
         0x01, 0x00, 0x00, 0x00, 0x01, 0x6b, 0xff, 0x7f, 0xcd, 0x4f, 0x85, 0x65,
         0xef, 0x40, 0x6d, 0xd5, 0xd6, 0x3d, 0x4f, 0xf9, 0x4f, 0x31, 0x8f, 0xe8,
         0x20, 0x27, 0xfd, 0x4d, 0xc4, 0x51, 0xb0, 0x44, 0x74, 0x01, 0x9f, 0x74,
@@ -236,7 +236,7 @@ BOOST_AUTO_TEST_CASE(basic_transaction_tests) {
         0x00, 0x19, 0x76, 0xa9, 0x14, 0xc1, 0x09, 0x32, 0x48, 0x3f, 0xec, 0x93,
         0xed, 0x51, 0xf5, 0xfe, 0x95, 0xe7, 0x25, 0x59, 0xf2, 0xcc, 0x70, 0x43,
         0xf9, 0x88, 0xac, 0x00, 0x00, 0x00, 0x00, 0x00};
-    std::vector<uint8_t> vch(ch, ch + sizeof(ch) - 1); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    std::vector<uint8_t> vch(ch.begin(), ch.end());
     CDataStream stream(vch, SER_DISK, CLIENT_VERSION);
     CMutableTransaction tx;
     stream >> tx;
@@ -264,10 +264,10 @@ SetupDummyInputs(CBasicKeyStore &keystoreRet, CCoinsViewCache &coinsRet) {
     dummyTransactions.resize(2);
 
     // Add some keys to the keystore:
-    CKey key[4]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+    std::array<CKey, 4> key;
     for (int i = 0; i < 4; i++) {
-        key[i].MakeNewKey(i % 2); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
-        keystoreRet.AddKey(key[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        key[i].MakeNewKey(i % 2);
+        keystoreRet.AddKey(key[i]);
     }
 
     // Create some dummy input transactions
@@ -1184,10 +1184,10 @@ SetupDummyInputsForConsolidationTxns(CBasicKeyStore &keystoreRet, CCoinsViewCach
     dummyTransactions.resize(2);
 
     // Add some keys to the keystore:
-    CKey key[4]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+    std::array<CKey, 4> key;
     for (int i = 0; i < 4; i++) {
-        key[i].MakeNewKey(i % 2); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
-        keystoreRet.AddKey(key[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        key[i].MakeNewKey(i % 2);
+        keystoreRet.AddKey(key[i]);
     }
 
     // Create some dummy input transactions
