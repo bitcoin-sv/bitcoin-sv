@@ -14,5 +14,8 @@ Checks: '-clang-analyzer-*,
       '
 
 InheritParentConfig: true
+CheckOptions:    
+  - key:             cppcoreguidelines-avoid-c-arrays.AllowStringArrays
+    value:           'true'
 ...
 
