@@ -445,6 +445,7 @@ public:
     bool IsEquivalentTo(const CWalletTx &tx) const;
 
     bool InMempool() const;
+    bool InNonFinalMempool() const;
     bool IsTrusted() const;
 
     int64_t GetTxTime() const;

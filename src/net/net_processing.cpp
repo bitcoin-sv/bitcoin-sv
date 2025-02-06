@@ -1361,23 +1361,33 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                         }
                     }
                 }
-            } else if (inv.type == MSG_TX) {
+            }
+            else if (inv.type == MSG_TX)
+            {
                 // Send stream from relay memory
                 bool push = false;
                 auto mi = mapRelay.find(inv.hash);
-                if (mi != mapRelay.end()) {
-                    connman.PushMessage(
-                        pfrom,
-                        msgMaker.Make(NetMsgType::TX, *mi->second));
-                    push = true;
-                } else if (pfrom->timeLastMempoolReq) {
+                if (mi != mapRelay.end())
+                {
+                    // Check we do actually have the transaction
+                    if(mi->second)
+                    {
+                        connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::TX, *mi->second));
+                        push = true;
+                    }
+                    else
+                    {
+                        LogPrintf("ERROR: NULL txn in mapRelay for %s\n", inv.hash.ToString());
+                    }
+                }
+                else if (pfrom->timeLastMempoolReq)
+                {
                     auto txinfo = mempool.Info(inv.hash);
                     // To protect privacy, do not answer getdata using the
                     // mempool when that TX couldn't have been INVed in reply to
                     // a MEMPOOL request.
-                    if (!txinfo.IsNull() &&
-                        txinfo.nTime <= pfrom->timeLastMempoolReq) {
-
+                    if (!txinfo.IsNull() && txinfo.nTime <= pfrom->timeLastMempoolReq)
+                    {
                         if(const auto& pTx{txinfo.GetTx()}; pTx)
                         {
                             connman.PushMessage(pfrom,

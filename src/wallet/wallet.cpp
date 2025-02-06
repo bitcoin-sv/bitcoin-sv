@@ -1818,12 +1818,20 @@ bool CWalletTx::RelayWalletTransaction(CConnman *connman) {
     CValidationState state;
     // GetDepthInMainChain already catches known conflicts.
     if (InMempool() || SubmitTxToMempool(maxTxFee, state)) {
-        LogPrintf("Relaying wtx %s\n", GetId().ToString());
         if (connman) {
-            CInv inv { MSG_TX, GetId() };
-            TxMempoolInfo txinfo { mempool.Info(GetId()) };
-            connman->EnqueueTransaction( {inv, txinfo} );
-            return true;
+            TxMempoolInfo txinfo {};
+            if(InMempool()) {
+                txinfo = mempool.Info(GetId());
+            }
+            else if(InNonFinalMempool()) {
+                txinfo = mempool.getNonFinalPool().getInfo(GetId());
+            }
+
+            if(!txinfo.IsNull()) {
+                LogPrintf("Relaying wtx %s\n", GetId().ToString());
+                connman->EnqueueTransaction( { CInv { MSG_TX, GetId() }, txinfo} );
+                return true;
+            }
         }
     }
 
@@ -2006,6 +2014,10 @@ Amount CWalletTx::GetChange() const {
 
 bool CWalletTx::InMempool() const {
     return mempool.Exists(GetId());
+}
+
+bool CWalletTx::InNonFinalMempool() const {
+    return mempool.getNonFinalPool().exists(GetId());
 }
 
 bool CWalletTx::IsTrusted() const {
