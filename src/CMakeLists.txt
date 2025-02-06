@@ -766,6 +766,7 @@ endif()
 
 if(ENABLE_CLANG_TIDY)
     include(ClangTidy)
+    AddClangTidy(server)
     AddClangTidy(bitcoind)
     if(BUILD_BITCOIN_CLI)
         AddClangTidy(bitcoin-cli)
