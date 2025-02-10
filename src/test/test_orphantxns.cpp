@@ -87,17 +87,18 @@ namespace {
     void OrphanTxnsObjectCreateNOrphanTxns(
         std::shared_ptr<COrphanTxns>& orphanTxns,
         TxSource source,
-        size_t nOrphanTxnsCount,
+        const size_t nOrphanTxnsCount,
         CConnman::CAsyncTaskPool& asyncTaskPool,
         std::vector<CNodePtr>& nodes)
     {
+        assert(nOrphanTxnsCount <= std::numeric_limits<int64_t>::max());
         nodes.clear();
         for(size_t i = 0; i < nOrphanTxnsCount; i++)
         {
             CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
             CNodePtr pNode =
                 CNode::Make(
-                    i,
+                    static_cast<NodeId>(i),
                     NODE_NETWORK,
                     0,
                     INVALID_SOCKET,
@@ -261,7 +262,6 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxnfrompeer) {
                 maxInputsOutputs)
     };
     size_t nTxnsNumber=10;
-    size_t nNodesNumber=10;
     // Create orphan transactions:
     std::vector<CNodePtr> nodes {};
     OrphanTxnsObjectCreateNOrphanTxns(orphanTxns,
@@ -272,14 +272,15 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxnfrompeer) {
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Erase txns from a node which is not connected (there are no orphan txns from this node)
-    orphanTxns->eraseTxnsFromPeer((NodeId)(nNodesNumber+1));
+    const NodeId nNodesNumber=10;
+    orphanTxns->eraseTxnsFromPeer(nNodesNumber+1);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Erase all txns from Node0
-    orphanTxns->eraseTxnsFromPeer((NodeId)(0));
+    orphanTxns->eraseTxnsFromPeer(0);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber-1);
     // Delete txns from all other nodes
-    for (NodeId nodeId=1; nodeId < (NodeId)nNodesNumber; nodeId++) {
-        orphanTxns->eraseTxnsFromPeer((NodeId)nodeId);
+    for(NodeId nodeId=1; nodeId < nNodesNumber; nodeId++) {
+        orphanTxns->eraseTxnsFromPeer(nodeId);
     }
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 0);
 }
