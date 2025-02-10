@@ -326,7 +326,7 @@ static void DoTest(const CScript& scriptPubKey,
 
     CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
     stream << tx2;
-    int libconsensus_flags = flags & bitcoinconsensus_SCRIPT_FLAGS_VERIFY_ALL;
+    const auto libconsensus_flags = flags & bitcoinconsensus_SCRIPT_FLAGS_VERIFY_ALL;
     if (libconsensus_flags == flags) {
         if (flags & bitcoinconsensus_SCRIPT_ENABLE_SIGHASH_FORKID) {
             BOOST_CHECK_MESSAGE(bitcoinconsensus_verify_script_with_amount(
@@ -4519,5 +4519,6 @@ BOOST_AUTO_TEST_CASE(VerifyScript_minimal_encoding)
         BOOST_CHECK_EQUAL(exp_mall, malleability::status{ms});
     }
 }
+
 
 BOOST_AUTO_TEST_SUITE_END()
