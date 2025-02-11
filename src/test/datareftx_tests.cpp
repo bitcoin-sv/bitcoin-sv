@@ -34,7 +34,7 @@ namespace
         for(size_t i = 0; i < NumDatarefTx; ++i)
         {
             size_t index {0};
-            do // NOLINT(cppcoreguidelines-avoid-do-while)
+            do
             {
                 index = static_cast<size_t>(dist(mt));
                 // Have to check random index is in range due to common library bug

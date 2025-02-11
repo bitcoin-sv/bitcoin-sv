@@ -6,6 +6,7 @@ Checks: '-*,
          -bugprone-easily-swappable-parameters,
          
          cppcoreguidelines*,
+         -cppcoreguidelines-avoid-do-while,
          -cppcoreguidelines-avoid-magic-numbers,
          -cppcoreguidelines-macro-usage,
          -cppcoreguidelines-macro-to-enum,
@@ -20,8 +21,6 @@ WarningsAsErrors: '*'
 HeaderFilterRegex: '.*'
 CheckOptions:    
   - key:             bugprone-implicit-widening-of-multiplication-result.IgnoreConstantIntExpr
-    value:           'true'
-  - key:             cppcoreguidelines-avoid-do-while.IgnoreMacros
     value:           'true'
   - key:             cppcoreguidelines-pro-type-member-init.IgnoreArrays
     value:           'true'

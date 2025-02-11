@@ -472,7 +472,7 @@ int CpuMiner(RandomIntGenerator & random_int_func)
         {
             // Execute and handle connection failures with -rpcwait
             const bool fWait = true;
-            do // NOLINT(cppcoreguidelines-avoid-do-while)
+            do
             {
                 try
                 {

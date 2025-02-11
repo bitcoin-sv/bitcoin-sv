@@ -434,7 +434,7 @@ private:
                                      sigHashType, amount, nullptr, flags & SCRIPT_ENABLE_SIGHASH_FORKID);
         std::vector<uint8_t> vchSig, r, s;
         uint32_t iter = 0;
-        do { // NOLINT(cppcoreguidelines-avoid-do-while)
+        do {
             key.Sign(hash, vchSig, iter++);
             if ((lenS == 33) != (vchSig[5 + vchSig[3]] == 33)) {
                 NegateSignatureS(vchSig);

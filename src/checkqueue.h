@@ -188,7 +188,7 @@ private:
         std::optional<bool> fOk = true;
         CTotalScopeGuard guard{mutex, nTotal};
 
-        do { // NOLINT(cppcoreguidelines-avoid-do-while)
+        do {
             {
                 boost::unique_lock<boost::mutex> lock(mutex);
                 auto subguard = guard.GetSubGuardNL();

@@ -36,7 +36,7 @@ std::vector<uint8_t> StreamSerialize(
     std::vector<uint8_t> serializedData;
     auto runStart = std::chrono::steady_clock::now();
 
-    do // NOLINT(cppcoreguidelines-avoid-do-while)
+    do
     {
         using namespace std::chrono_literals;
 
@@ -63,7 +63,7 @@ inline std::vector<uint8_t> SerializeAsyncStream(
     std::vector<uint8_t> serializedData;
     auto runStart = std::chrono::steady_clock::now();
 
-    do // NOLINT(cppcoreguidelines-avoid-do-while)
+    do
     {
         using namespace std::chrono_literals;
 

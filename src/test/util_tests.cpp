@@ -23,14 +23,14 @@ BOOST_FIXTURE_TEST_SUITE(util_tests, BasicTestingSetup)
 BOOST_AUTO_TEST_CASE(util_criticalsection) {
     CCriticalSection cs;
 
-    do { // NOLINT(cppcoreguidelines-avoid-do-while)
+    do {
         LOCK(cs);
         break;
 
         BOOST_ERROR("break was swallowed!");
     } while (0);
 
-    do { // NOLINT(cppcoreguidelines-avoid-do-while)
+    do {
         TRY_LOCK(cs, lockTest);
         if (lockTest) break;
 
@@ -300,7 +300,7 @@ BOOST_AUTO_TEST_CASE(util_seed_insecure_rand) {
         // How often does it get a zero from the uniform range [0,mod)?
         for (int i = 0; i < 10000; i++) {
             uint32_t rval; // NOLINT(cppcoreguidelines-init-variables)
-            do { // NOLINT(cppcoreguidelines-avoid-do-while)
+            do {
                 rval = local_rand_ctx.rand32() & mask;
             } while (rval >= (uint32_t)mod);
             count += rval == 0;

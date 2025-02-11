@@ -120,7 +120,6 @@ int CommandLineRPC(int argc, char *argv[]) {
 
         // Execute and handle connection failures with -rpcwait
         const bool fWait = gArgs.GetBoolArg("-rpcwait", false);
-        // NOLINTNEXTLINE(cppcoreguidelines-avoid-do-while)
         do {
             try {
                 const UniValue reply = CallRPC(strMethod, params);

@@ -181,7 +181,7 @@ namespace{
             std::vector<CMutableTransaction> permutedTxsToValidate{txsToValidate};
             std::sort(permutedTxsToValidate.begin(), permutedTxsToValidate.end(), CompareTxById);
             BOOST_TEST(!expectedVariants.empty());
-            do { // NOLINT(cppcoreguidelines-avoid-do-while)
+            do {
                 executedTasks.clear();
 
                 // Run the scheduler for any permutation of input txs.

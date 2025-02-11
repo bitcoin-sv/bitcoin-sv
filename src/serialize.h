@@ -387,7 +387,7 @@ void WriteVarInt(Stream &os, I n) {
         n = (n >> 7) - 1;
         len++;
     }
-    do { // NOLINT(cppcoreguidelines-avoid-do-while) 
+    do {
         ser_writedata8(os, tmp[len]);
     } while (len--);
 }

@@ -78,7 +78,7 @@ BOOST_AUTO_TEST_CASE(exception)
 
             // try reading from stream for max 5 seconds and in the meantime
             // exception from the other thread should be thrown
-            do // NOLINT(cppcoreguidelines-avoid-do-while)
+            do
             {
                 auto chunk = stream.Read(5);
 

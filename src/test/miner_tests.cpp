@@ -725,7 +725,7 @@ void CheckBlockMaxSizeForTime(TestingSetup& testingSetup, uint64_t medianPastTim
         // the same value to get desired median past time.
         int32_t height = 0;
         uint256 prevHash;
-        do // NOLINT(cppcoreguidelines-avoid-do-while)
+        do
         {   
             CBlockHeader header;
             header.nTime = medianPastTime;

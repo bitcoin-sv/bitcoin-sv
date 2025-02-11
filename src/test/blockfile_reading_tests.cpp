@@ -206,7 +206,7 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
         auto runStart = std::chrono::steady_clock::now();
         bool deleted = false;
 
-        do // NOLINT(cppcoreguidelines-avoid-do-while)
+        do
         {
             using namespace std::chrono_literals;
 
