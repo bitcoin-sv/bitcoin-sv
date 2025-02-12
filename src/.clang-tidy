@@ -23,7 +23,6 @@ Checks: '-*,
          cert-*,
 
          -cert-dcl03-c,
-         -cert-dcl50-cpp,
          -cert-err33-c,
          -cert-err34-c,
          -cert-err58-cpp,

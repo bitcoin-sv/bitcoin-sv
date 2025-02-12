@@ -120,6 +120,7 @@ VMTouch::VMTouch() : pagesize(sysconf(_SC_PAGESIZE))
 VMTouch::~VMTouch()
 {   }
 
+// NOLINTNEXTLINE(cert-dcl50-cpp)
 static void fatal(const char *fmt, ...) {
     va_list ap;
     char buf[4096];
@@ -130,6 +131,8 @@ static void fatal(const char *fmt, ...) {
 
     throw std::runtime_error(buf);
 }
+
+// NOLINTNEXTLINE(cert-dcl50-cpp)
 void VMTouch::warning(const char *fmt, ...) {
     va_list ap;
     char buf[4096];
