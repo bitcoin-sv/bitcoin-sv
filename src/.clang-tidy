@@ -5,7 +5,6 @@ Checks: '-*,
          -performance-move-const-arg,
          -performance-unnecessary-copy-initialization,
          -performance-unnecessary-value-param,
-         -performance-faster-string-find,
 
          bugprone*,
          -bugprone-assert-side-effect,
