@@ -35,6 +35,7 @@ void CTimeLockedMempool::addOrUpdateTransaction(
     const TxInputDataSPtr& pTxInputData,
     CValidationState& state)
 {
+    // NOLINTNEXTLINE(performance-unnecessary-copy-initialization)
     CTransactionRef txn { info.GetTx() };
 
     std::unique_lock lock { mMtx };

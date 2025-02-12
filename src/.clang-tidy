@@ -2,7 +2,6 @@ Checks: '-*,
          performance*,
          -performance-enum-size,
          -performance-move-const-arg,
-         -performance-unnecessary-copy-initialization,
          -performance-unnecessary-value-param,
 
          bugprone*,

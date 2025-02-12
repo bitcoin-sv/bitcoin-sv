@@ -124,8 +124,8 @@ int64_t GetBlockProofEquivalentTime(const CBlockIndex &to,
                                     const Consensus::Params &params) {
     arith_uint256 r;
     int sign = 1;
-    const auto fromChainWork = from.GetChainWork();
-    const auto toChainWork = to.GetChainWork();
+    const auto& fromChainWork = from.GetChainWork();
+    const auto& toChainWork = to.GetChainWork();
     if (toChainWork > fromChainWork)
     {
         r = toChainWork - fromChainWork;

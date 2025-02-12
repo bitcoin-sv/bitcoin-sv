@@ -2447,7 +2447,7 @@ void CheckSafeModeParametersForAllForksOnStartup(const Config& config)
 
 static void InvalidChainFound(const Config& config, const CBlockIndex *pindexNew)
 {
-    auto chainWork = pindexNew->GetChainWork();
+    const auto& chainWork = pindexNew->GetChainWork();
     if (!pindexBestInvalid ||
         chainWork > pindexBestInvalid->GetChainWork())
     {
