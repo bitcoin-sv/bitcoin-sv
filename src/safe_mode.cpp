@@ -515,6 +515,7 @@ void SafeMode::SafeModeResult::ToJson(CJSONWriter& writer) const
         writer.writeEndObject();
 
         std::vector<std::reference_wrapper<const SafeModeFork>> sortedForks;
+        sortedForks.reserve(forks.size());
         for(const auto& f: forks)
         {
             sortedForks.emplace_back(f.second);

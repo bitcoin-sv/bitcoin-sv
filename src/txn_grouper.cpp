@@ -63,6 +63,7 @@ auto TxnGrouper::GetNumGroups(const std::vector<CTransactionRef>& vtx, size_t nu
     // Create list of groups of the right size. This will be maintained as a min-heap
     // with the smallest group always at the top.
     std::vector<UPtrTxnGroup> groups {};
+    groups.reserve(numGroups);
     for(size_t i = 0; i < numGroups; ++i)
     {
         groups.emplace_back(std::make_unique<TxnGroup>());
