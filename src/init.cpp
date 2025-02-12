@@ -2591,7 +2591,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     if (gArgs.IsArgSet("-invalidtxfileevictionpolicy"))
     {
-        assert(CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY == InvalidTxEvictionPolicy::IGNORE_NEW);
+        static_assert(CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY == InvalidTxEvictionPolicy::IGNORE_NEW);
         auto evictionPolicy = gArgs.GetArg("-invalidtxfileevictionpolicy", "IGNORE_NEW");
         if (std::string err; !config.SetInvalidTxFileSinkEvictionPolicy(evictionPolicy, &err))
         {
