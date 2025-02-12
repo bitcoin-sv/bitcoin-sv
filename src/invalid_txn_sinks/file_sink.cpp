@@ -84,7 +84,7 @@ void CInvalidTxnFileSink::FillFilesState()
     }
 }
 
-bool CInvalidTxnFileSink::RemoveFile(const std::string fname, int64_t fsize)
+bool CInvalidTxnFileSink::RemoveFile(const std::string& fname, int64_t fsize)
 {
     std::string txid; int count = 0;
     if (!ParseFilename(fname, txid, count))

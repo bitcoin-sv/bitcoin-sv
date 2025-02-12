@@ -1,7 +1,6 @@
 Checks: '-*,
          performance*,
          -performance-enum-size,
-         -performance-unnecessary-value-param,
 
          bugprone*,
          -bugprone-easily-swappable-parameters,

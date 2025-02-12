@@ -58,7 +58,7 @@ extern UniValue mempoolInfoToJSON(const Config& config);
 extern void writeMempoolToJson(CJSONWriter& jWriter, bool fVerbose = false);
 
 static bool RESTERR(HTTPRequest *req, enum HTTPStatusCode status,
-                    std::string message) {
+                    const std::string& message) {
     req->WriteHeader("Content-Type", "text/plain");
     req->WriteReply(status, message + "\r\n");
     return false;

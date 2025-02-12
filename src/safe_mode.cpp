@@ -478,7 +478,9 @@ void SafeMode::SafeModeResult::ToJson(CJSONWriter& writer) const
         return status;
     };
 
-    auto WriteBlock = [&](CJSONWriter& writer, std::string jsonObjectName, const CBlockIndex* block )
+    auto WriteBlock = [&](CJSONWriter& writer,
+                          const std::string& jsonObjectName,
+                          const CBlockIndex* block)
     {
         writer.writeBeginObject(jsonObjectName);
         if(block)
@@ -492,8 +494,6 @@ void SafeMode::SafeModeResult::ToJson(CJSONWriter& writer) const
         writer.writeEndObject();
     };
 
-
-    
     writer.writeBeginObject();
         writer.pushKV("safemodeenabled", maxLevel != SafeModeLevel::NONE);
         WriteBlock(writer, "activetip", chainActive.Tip());

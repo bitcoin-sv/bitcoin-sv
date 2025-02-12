@@ -71,10 +71,10 @@ class CAutoCloseDir : public boost::noncopyable {
   DIR * dir;
   std::function<void(const std::string& message)> warning;
 public:
-
-  CAutoCloseDir(DIR* dir, std::function<void(const std::string& message)> warning) : dir(dir), warning(warning)
-  {
-  }
+    CAutoCloseDir(DIR* dir, std::function<void(const std::string& message)> warning)
+        : dir{dir},
+          warning{std::move(warning)}
+    {}
 
   ~CAutoCloseDir()
   {
@@ -92,9 +92,13 @@ class CAutoMunmap : public boost::noncopyable {
   uint64_t len_of_range = 0;
   std::function<void(const std::string& message)> warning;
 public:
-  CAutoMunmap(void *mem,uint64_t len_of_range, std::function<void(const std::string& message)> warning)
-   :  mem(mem), len_of_range(len_of_range), warning(warning)
-  {  }
+    CAutoMunmap(void* mem,
+                uint64_t len_of_range,
+                std::function<void(const std::string& message)> warning)
+        : mem{mem},
+          len_of_range{len_of_range},
+          warning{std::move(warning)}
+    {}
 
   void Release()
   {

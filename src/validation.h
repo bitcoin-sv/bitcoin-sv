@@ -419,11 +419,10 @@ extern CBlockValidationStatus blockValidationStatus;
  * its BlockChecked method called whenever *any* block completes validation.
  *
  * @param[in]   config  The global config.
- * @param[in]   pblock  The block we want to verify.
+ * @param[in]   block  The block we want to verify.
  * @return True if the block is valid.
  */
-bool VerifyNewBlock(const Config &config,
-                     const std::shared_ptr<const CBlock> pblock);
+bool VerifyNewBlock(const Config& config, const CBlock& block);
 
 /**
  * Process an incoming block. This only returns after the best known valid

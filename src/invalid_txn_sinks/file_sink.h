@@ -38,7 +38,7 @@ namespace InvalidTxnPublisher
         void FillFilesState();
 
         // Deletes a file and updates file relevant data
-        bool RemoveFile(const std::string fname, int64_t fsize);
+        bool RemoveFile(const std::string& fname, int64_t fsize);
 
         // Deletes files, until cumulative files size drops below maximalSize
         bool ShrinkToSize(int64_t maximalSize);

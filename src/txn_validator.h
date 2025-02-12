@@ -152,7 +152,8 @@ class CTxnValidator final
      * An interface to facilitate Unit Tests.
      */
     /** Wait for the Validator until the predicate returns true (through asynch interface) */
-    void waitUntil(std::function<bool(const QueueCounts&)> predicate, bool fCheckOrphanQueueEmpty=true);
+    void waitUntil(const std::function<bool(const QueueCounts&)>& predicate,
+                   bool fCheckOrphanQueueEmpty = true);
     /** Wait for the Validator to process all queued txns (through asynch interface) */
     void waitForEmptyQueue(bool fCheckOrphanQueueEmpty=true);
 

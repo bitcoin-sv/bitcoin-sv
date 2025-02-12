@@ -61,7 +61,7 @@ public:
         Amount nAbsurdFee=Amount(0),
         std::weak_ptr<CNode> pNode={},
         bool fOrphan=false,
-        const std::shared_ptr<const TransactionSpecificConfig> tsc=nullptr);
+        std::shared_ptr<const TransactionSpecificConfig> tsc=nullptr);
     // Defaults
     CTxInputData(CTxInputData&&) = default;
     CTxInputData(const CTxInputData&) = delete;

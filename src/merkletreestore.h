@@ -214,7 +214,7 @@ private:
      * -maxmerkletreememcachesize. If cache size limitation is reached,
      * Merkle Trees that were added first are removed (FIFO).
      */
-    void Insert(const uint256& blockHash, CMerkleTreeRef merkleTree, const Config& config);
+    void Insert(const uint256& blockHash, const CMerkleTreeRef& merkleTree, const Config& config);
 };
 
 /** Access to global Merkle Tree factory */

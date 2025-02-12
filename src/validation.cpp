@@ -1028,6 +1028,7 @@ CTxnValResult TxnValidation(
     const TxInputDataSPtr& pTxInputData,
     const Config& config,
     CTxMemPool& pool,
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     TxnDoubleSpendDetectorSPtr dsDetector,
     bool fUseLimits,
     task::CTimedCancellationBudget& cancellationBudget)
@@ -4857,6 +4858,7 @@ bool ActivateBestChain(
     const Config &config,
     CValidationState &state,
     const CJournalChangeSetPtr& changeSet,
+    // NOLINTNEXTLINE(performance-unnecessary-value-param)
     std::shared_ptr<const CBlock> pblock)
 {
     // Note that while we're often called here from ProcessNewBlock, this is
@@ -6334,20 +6336,20 @@ static bool AcceptBlock(const Config& config,
     return true;
 }
 
-bool VerifyNewBlock(const Config &config,
-                    const std::shared_ptr<const CBlock> pblock) {
-
+bool VerifyNewBlock(const Config& config,
+                    const CBlock& block)
+{
     CValidationState state;
     BlockValidationOptions validationOptions = BlockValidationOptions().withCheckPoW(false);
-    const CBlockIndex* pindexPrev = FindPreviousBlockIndex(*pblock, state);
+    const CBlockIndex* pindexPrev = FindPreviousBlockIndex(block, state);
     if (!pindexPrev)
     {
         return false;
     }
 
-    bool ret = CheckBlock(config, *pblock, state, pindexPrev->GetHeight() + 1, validationOptions);
+    bool ret = CheckBlock(config, block, state, pindexPrev->GetHeight() + 1, validationOptions);
 
-    GetMainSignals().BlockChecked(*pblock, state);
+    GetMainSignals().BlockChecked(block, state);
 
     if (!ret) {
         return error("%s: VerifyNewBlock FAILED", __func__);

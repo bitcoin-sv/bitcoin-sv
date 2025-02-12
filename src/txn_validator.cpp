@@ -3,20 +3,24 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "txn_validator.h"
+
 #include "protocol_era.h"
 #include "txn_validation_config.h"
 #include "config.h"
 #include "net/net_processing.h"
 
+#include <utility>
+
 /** Constructor */
-CTxnValidator::CTxnValidator(
-    const Config& config,
-    CTxMemPool& mpool,
-    TxnDoubleSpendDetectorSPtr dsDetector,
-    TxIdTrackerWPtr pTxIdTracker)
-    : mConfig(config),
-      mMempool(mpool),
-      mpTxnDoubleSpendDetector(dsDetector) {
+CTxnValidator::CTxnValidator(const Config& config,
+                             CTxMemPool& mpool,
+                             TxnDoubleSpendDetectorSPtr dsDetector,
+                             // NOLINTNEXTLINE(performance-unnecessary-value-param)
+                             TxIdTrackerWPtr /*pTxIdTracker*/)
+    : mConfig{config},
+      mMempool{mpool},
+      mpTxnDoubleSpendDetector{std::move(dsDetector)}
+{
     // Configure our running frequency
     auto runFreq { gArgs.GetArg("-txnvalidationasynchrunfreq", DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS) };
     mAsynchRunFrequency = std::chrono::milliseconds {runFreq};
@@ -105,6 +109,7 @@ size_t CTxnValidator::GetTransactionsInQueueCount() const {
 }
 
 /** Handle a new transaction */
+// NOLINTNEXTLINE(performance-unnecessary-value-param)
 void CTxnValidator::newTransaction(TxInputDataSPtr pTxInputData) {
     const TxValidationPriority& txpriority = pTxInputData->GetTxValidationPriority();
     // Add transaction to the right queue based on priority.
@@ -767,7 +772,9 @@ bool CTxnValidator::isTxnKnown(const uint256& txid) const {
 
 /** Wait for the Validator until the predicate returns true.
  * An interface to facilitate Unit Tests.*/
-void CTxnValidator::waitUntil(std::function<bool(const QueueCounts&)> predicate, bool fCheckOrphanQueueEmpty) {
+void CTxnValidator::waitUntil(const std::function<bool(const QueueCounts&)>& predicate,
+                              bool fCheckOrphanQueueEmpty)
+{
     do {
        std::shared_lock lock { mProcessingQueueMtx };
        // Block the calling thread until notification is received and the predicate is not satisfied

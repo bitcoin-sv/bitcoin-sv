@@ -565,7 +565,7 @@ CMerkleTreeRef CMerkleTreeFactory::GetMerkleTree(const Config& config, const CBl
     return merkleTreeRef;
 }
 
-void CMerkleTreeFactory::Insert(const uint256& blockHash, CMerkleTreeRef merkleTree, const Config& config)
+void CMerkleTreeFactory::Insert(const uint256& blockHash, const CMerkleTreeRef& merkleTree, const Config& config)
 {
     LOCK(cs_merkleTreeFactory);
     if (merkleTreeMap.count(blockHash))

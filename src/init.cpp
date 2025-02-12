@@ -1758,7 +1758,12 @@ void CleanupBlockRevFiles() {
 /* shutdownToken must be passed by value to prevent access violation because
  * "import_files" thread can have longer life span than shutdownToken presented with a reference.
  */
-void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, const task::CCancellationToken shutdownToken) {
+void ThreadImport(const Config& config,
+                  // NOLINTBEGIN(performance-unnecessary-value-param)
+                  std::vector<fs::path> vImportFiles,
+                  const task::CCancellationToken shutdownToken)
+                  // NOLINTEND(performance-unnecessary-value-param)
+{
     RenameThread("loadblk");
 
     {

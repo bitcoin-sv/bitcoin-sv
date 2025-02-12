@@ -31,6 +31,7 @@
 #include "validationinterface.h"
 #include "invalid_txn_publisher.h"
 #include "rpc/http_protocol.h"
+#include <primitives/block.h>
 #include <univalue.h>
 #include <cstdint>
 #include <memory>
@@ -896,9 +897,9 @@ static UniValue verifyblockcandidate(const Config &config,
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
     }
 
-    auto verifyBlock = [](const Config& config , const std::shared_ptr<CBlock>& blockptr)
+    auto verifyBlock = [](const Config& config, const std::shared_ptr<CBlock>& blockptr)
     {
-        return VerifyNewBlock(config, blockptr);
+        return VerifyNewBlock(config, *blockptr);
     };
     return processBlock(config, blockptr, verifyBlock);
 }

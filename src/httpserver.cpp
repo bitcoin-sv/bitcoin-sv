@@ -40,11 +40,14 @@ static const size_t MAX_HEADERS_SIZE = 8192;
  */
 static const size_t MIN_SUPPORTED_BODY_SIZE = 0x02000000;
 
-struct HTTPPathHandler {
-    HTTPPathHandler() {}
-    HTTPPathHandler(std::string _prefix, bool _exactMatch,
-                    HTTPRequestHandler _handler)
-        : prefix(_prefix), exactMatch(_exactMatch), handler(_handler) {}
+struct HTTPPathHandler
+{
+    HTTPPathHandler(std::string _prefix, bool _exactMatch, HTTPRequestHandler _handler)
+        : prefix{std::move(_prefix)},
+          exactMatch{_exactMatch},
+          handler{std::move(_handler)}
+    {
+    }
     std::string prefix;
     bool exactMatch{};
     HTTPRequestHandler handler;
