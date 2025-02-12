@@ -38,7 +38,7 @@ public:
 
             // Print the message
             if (p < limit) {
-                va_list backup_ap;
+                va_list backup_ap; // NOLINT(cppcoreguidelines-pro-type-vararg)
                 va_copy(backup_ap, ap);
                 // Do not use vsnprintf elsewhere in bitcoin source code, see
                 // above.

@@ -32,8 +32,10 @@ static bool noui_ThreadSafeMessageBox(const std::string &message,
             strCaption += caption;
     }
 
-    if (!fSecure) LogPrintf("%s: %s\n", strCaption, message);
-    fprintf(stderr, "%s: %s\n", strCaption.c_str(), message.c_str());
+    if(!fSecure)
+        LogPrintf("%s: %s\n", strCaption, message);
+
+    std::cerr << strCaption << ": " << message << '\n';
     return false;
 }
 

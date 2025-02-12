@@ -120,6 +120,8 @@ VMTouch::VMTouch() : pagesize(sysconf(_SC_PAGESIZE))
 VMTouch::~VMTouch()
 {   }
 
+// NOLINTBEGIN(cppcoreguidelines-pro-type-vararg)
+
 // NOLINTNEXTLINE(cert-dcl50-cpp)
 static void fatal(const char *fmt, ...) {
     va_list ap;
@@ -180,6 +182,7 @@ void VMTouch::increment_nofile_rlimit()
 
     }
 }
+
 void VMTouch::vmtouch_file(const std::string& strPath)
 {
     int fd = -1;
@@ -532,6 +535,8 @@ void VMTouch::vmtouch_crawl(std::string strPath)
       }
     }
 }
+
+// NOLINTEND(cppcoreguidelines-pro-type-vararg)
 
 void VMTouch::vmtouch_touch(const std::string& strPath)
 {
