@@ -36,6 +36,7 @@ using namespace mining;
      * Special mempool coins provider for internal CTxMemPool use where smtx
      * mutex is expected to be locked.
      */
+    // NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
     class CoinsViewLockedMemPoolNL : public ICoinsView
     {
     public:
