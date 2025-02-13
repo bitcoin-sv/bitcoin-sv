@@ -5,7 +5,6 @@ Checks: '-*,
          -performance-unnecessary-value-param,
 
          bugprone*,
-         -bugprone-assert-side-effect,
          -bugprone-branch-clone,
          -bugprone-casting-through-void,
          -bugprone-easily-swappable-parameters,

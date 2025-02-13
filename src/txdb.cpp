@@ -115,6 +115,7 @@ public:
 
     static void Unserialize(CScriptCompressor* self, Stream& s, unsigned int nSize)
     {
+        // NOLINTNEXTLINE(bugprone-assert-side-effect)
         assert([](auto& s){
             bool result = !s.wasUnserializeScriptCalled;
             s.wasUnserializeScriptCalled = true;
