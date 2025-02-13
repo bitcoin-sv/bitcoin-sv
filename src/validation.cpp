@@ -3539,7 +3539,8 @@ private:
         if( config.GetEnableAssumeWhitelistedBlockDepth() )
         {
             if( (mostWorkBlockHeight - pindex->GetHeight()) >= config.GetAssumeWhitelistedBlockDepth() )
-            {
+            {   // NOLINT(bugprone-branch-clone)
+
                 // This block is deep enough under the block with most work to assume that a confiscation transaction is whitelisted
                 // even if its TxId is not present in our frozen TXO database.
                 // Note that block with most work is only available after its contents have already been downloaded.
