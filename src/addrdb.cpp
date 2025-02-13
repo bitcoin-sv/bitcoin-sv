@@ -94,7 +94,7 @@ bool CBanDB::Read(banmap_t &banSet) {
 
         // ... verify the network matches ours
         if (memcmp(pchMsgTmp, chainParams.DiskMagic().data(),
-                   sizeof(pchMsgTmp))) {
+                   sizeof(pchMsgTmp)) != 0) {
             return error("%s: Invalid network magic number", __func__);
         }
 
@@ -190,7 +190,7 @@ bool CAddrDB::Read(CAddrMan &addr, CDataStream &ssPeers) {
 
         // ... verify the network matches ours
         if (memcmp(pchMsgTmp, chainParams.DiskMagic().data(),
-                   sizeof(pchMsgTmp))) {
+                   sizeof(pchMsgTmp)) != 0) {
             return error("%s: Invalid network magic number", __func__);
         }
 

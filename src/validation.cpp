@@ -7200,7 +7200,7 @@ bool LoadExternalBlockFile(const Config &config, UniqueCFile fileIn,
                 nRewind = blkdat.GetPos() + 1;
                 blkdat >> FLATDATA(buf);
                 if (memcmp(buf, chainparams.DiskMagic().data(),
-                           CMessageFields::MESSAGE_START_SIZE)) {
+                           CMessageFields::MESSAGE_START_SIZE) != 0) {
                     continue;
                 }
                 // Read 32 bit size. If it is equal to 32 max than read also 64 bit size.
