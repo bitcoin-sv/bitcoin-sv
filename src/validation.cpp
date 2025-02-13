@@ -4575,15 +4575,15 @@ static bool ActivateBestChainStep(
                 }
             }
 
-            ~RAIIUpdateMempool()
+            ~RAIIUpdateMempool() // NOLINT(bugprone-exception-escape)
             {
-                if (std::uncaught_exceptions())
+                if(std::uncaught_exceptions())
                 {
                     RemoveSoftConsensusFreezeBlocksFromActiveChainTipNL(
                         config,
                         changeSet,
                         state,
-                        disconnectpool );
+                        disconnectpool);
                 }
 
                 UpdateIfNeeded();
