@@ -309,7 +309,7 @@ CTxnValidator::RejectedTxns CTxnValidator::processValidation(
     for (auto&& txid: vOrphanTxIds) {
         CValidationState state;
         state.SetMissingInputs();
-        mInvalidTxns.try_emplace(std::move(txid), std::move(state));
+        mInvalidTxns.try_emplace(txid, std::move(state));
     }
     return {mInvalidTxns, vRemovedTxIds};
 }
@@ -718,7 +718,7 @@ bool CTxnValidator::enqueueStdTxnNL(const TxInputDataSPtr& txn) {
     }
     if(isSpaceForTxnNL(txn, mStdTxnsMemSize)) {
         // Add the given txn to the list of new standard transactions.
-        mStdTxns.emplace_back(std::move(txn));
+        mStdTxns.emplace_back(txn);
         // Increase memory tracking
         incMemUsedNL(mStdTxnsMemSize, txn);
         return true;
@@ -736,7 +736,7 @@ bool CTxnValidator::enqueueNonStdTxnNL(const TxInputDataSPtr& txn) {
     }
     if(isSpaceForTxnNL(txn, mNonStdTxnsMemSize)) {
         // Add the given txn to the list of new non-standard transactions.
-        mNonStdTxns.emplace_back(std::move(txn));
+        mNonStdTxns.emplace_back(txn);
         // Increase memory tracking
         incMemUsedNL(mNonStdTxnsMemSize, txn);
         return true;

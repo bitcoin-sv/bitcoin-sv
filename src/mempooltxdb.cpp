@@ -303,7 +303,7 @@ public:
         }
         else
         {
-            std::vector<Task> temp{std::move(tasks)};
+            std::vector<Task> temp{tasks};
             temp.emplace_back(SyncTask{&sync});
             success = (clearList ? ReplaceContent(std::move(temp))
                                  : PushManyWait(std::move(temp)));

@@ -262,7 +262,7 @@ void CBlockIndex::SetBlockIndexFileMetaDataIfNotSetNL(
             return;
         }
         LogPrintf("Setting block index file metadata for block %s\n", GetBlockHash().ToString());
-        SetDiskBlockMetaData(std::move(metadata.diskDataHash), metadata.diskDataSize, notifyDirty);
+        SetDiskBlockMetaData(metadata.diskDataHash, metadata.diskDataSize, notifyDirty);
     }
 }
 
