@@ -78,6 +78,7 @@
 #include <boost/math/distributions/poisson.hpp>
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/thread.hpp>
+#include <cstddef>
 #include <variant>
 
 #if defined(NDEBUG)
@@ -3922,7 +3923,7 @@ bool FlushStateToDisk(
                 //        size would require too much space as most scripts are
                 //        compressed. In future we will store compressed size
                 //        so this code should be changed then.
-                if (!CheckDiskSpace(48 * 2 * 2 * pcoinsTip->GetCacheSize())) {
+                if (!CheckDiskSpace(static_cast<uint64_t>(48 * 2 * 2) * pcoinsTip->GetCacheSize())) {
                     return state.Error("out of disk space");
                 }
                 // Flush the chainstate (which may refer to block index

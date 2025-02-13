@@ -12,6 +12,8 @@
 #include <time_locked_mempool.h>
 #include <txn_validator.h>
 
+#include <cstddef>
+
 using namespace mining;
 
 CTimeLockedMempool::CTimeLockedMempool()
@@ -19,7 +21,7 @@ CTimeLockedMempool::CTimeLockedMempool()
     // Set some sane default values for config
     mMaxMemory = DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE * ONE_MEBIBYTE;
     mPeriodRunFreq = DEFAULT_NONFINAL_CHECKS_FREQ;
-    mPurgeAge = DEFAULT_NONFINAL_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
+    mPurgeAge = static_cast<unsigned long>(DEFAULT_NONFINAL_MEMPOOL_EXPIRY) * SECONDS_IN_ONE_HOUR;
     mMaxUpdateRate = DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE;
     mUpdatePeriodMins = DEFAULT_NONFINAL_MAX_REPLACEMENT_RATE_PERIOD;
 }
