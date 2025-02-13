@@ -3344,8 +3344,11 @@ private:
                 // opposed to nLockTime checks) must be in ConnectBlock because they
                 // require the UTXO set.
                 std::vector<int32_t> prevheights(tx.vin.size());
-                for (size_t j = 0; j < tx.vin.size(); j++) {
-                    prevheights[j] = shard.GetCoin(tx.vin[j].prevout)->GetHeight();
+                for (size_t j = 0; j < tx.vin.size(); j++)
+                {
+                    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+                    prevheights[j] = shard.GetCoin(tx.vin[j].prevout)->GetHeight(); 
+
                 }
 
                 if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex)) {

@@ -215,7 +215,9 @@ bool CTxMemPool::CheckAncestorLimitsNL(
 
             if(!(*it)->IsInPrimaryMempool())
             {
-                secondaryMempoolAncestorsCount += (*it)->groupingData.value().ancestorsCount + 1;
+                const auto& opt{(*it)->groupingData};
+                assert(opt);
+                secondaryMempoolAncestorsCount += opt->ancestorsCount + 1;
             }
             
             if(ancestorsCount >= limitAncestorCount)
@@ -412,12 +414,16 @@ SecondaryMempoolEntryData CTxMemPool::CalculateSecondaryMempoolData(txiter entry
     SecondaryMempoolEntryData groupingData({
             entryIt->GetFee(), entryIt->GetFeeDelta(), entryIt->GetTxSize()});
 
-    for (txiter parent : GetMemPoolParentsNL(entryIt)) {
-        if (!parent->IsInPrimaryMempool()) {
-            groupingData.fee += parent->groupingData->fee;
-            groupingData.feeDelta += parent->groupingData->feeDelta;
-            groupingData.size += parent->groupingData->size;
-            groupingData.ancestorsCount += parent->groupingData->ancestorsCount + 1;
+    for(txiter parent : GetMemPoolParentsNL(entryIt))
+    {
+        if(!parent->IsInPrimaryMempool())
+        {
+            const auto& parentGroupingData{parent->groupingData};
+            assert(parentGroupingData);
+            groupingData.fee += parentGroupingData->fee;
+            groupingData.feeDelta += parentGroupingData->feeDelta;
+            groupingData.size += parentGroupingData->size;
+            groupingData.ancestorsCount += parentGroupingData->ancestorsCount + 1;
         }
     }
 
@@ -445,7 +451,9 @@ CTxMemPool::ResultOfUpdateEntryGroupingDataNL CTxMemPool::UpdateEntryGroupingDat
 
     if(!IsPayingEnough(groupingData))
     {
-        if(entryIt->groupingData.value() == groupingData)
+        const auto& entryGroup{entryIt->groupingData};
+        assert(entryGroup);
+        if(*entryGroup == groupingData)
         {
             return ResultOfUpdateEntryGroupingDataNL::NOTHING;
         }
@@ -1473,7 +1481,10 @@ void CTxMemPool::CheckMempoolImplNL(
                     if(!it2->IsInPrimaryMempool())
                     {
                         secondaryMempoolAncestorsCount += 1;
-                        secondaryMempoolAncestorsCount += it2->groupingData.value().ancestorsCount;
+
+                        const auto groupingData{it2->groupingData};
+                        assert(groupingData);
+                        secondaryMempoolAncestorsCount += groupingData->ancestorsCount;
                     }
                 }
             } else {
@@ -1490,7 +1501,9 @@ void CTxMemPool::CheckMempoolImplNL(
         if(secondaryMempoolAncestorsCount)
         {
             assert(!it->IsInPrimaryMempool());
-            assert(secondaryMempoolAncestorsCount == it->groupingData.value().ancestorsCount);
+            const auto& groupingData{it->groupingData};
+            assert(groupingData);
+            assert(secondaryMempoolAncestorsCount == groupingData->ancestorsCount);
         }
         else
         {
@@ -2468,10 +2481,14 @@ void CTxMemPool::AddToDisconnectPoolUpToLimit(
         if(minerID->GetCoinbaseDocument().GetDataRefs())
         {
             // Build set of dataref txids for speedy lookup
-            for(const auto& dataref : minerID->GetCoinbaseDocument().GetDataRefs().value())
+            const auto& dataRefs{minerID->GetCoinbaseDocument().GetDataRefs()};
+            if(dataRefs)
             {
-                dataRefIds.insert(dataref.txid);
-                index.DeleteDatarefTxn(dataref.txid);
+                for(const auto& dataref : *dataRefs)
+                {
+                    dataRefIds.insert(dataref.txid);
+                    index.DeleteDatarefTxn(dataref.txid);
+                }
             }
         }
     }
@@ -2760,8 +2777,10 @@ bool CTxMemPool::TransactionWithinChainLimit(const uint256 &txid, int64_t maxAnc
         return static_cast<int64_t>(it->ancestorsCount) < maxAncestorCount; 
     }
 
+    const auto& groupingData{it->groupingData};
+    assert(groupingData);
     return (static_cast<int64_t>(it->ancestorsCount) < maxAncestorCount) &&
-           (static_cast<int64_t>(it->groupingData->ancestorsCount) < maxSecondaryMempoolAncestorCount);
+           (static_cast<int64_t>(groupingData->ancestorsCount) < maxSecondaryMempoolAncestorCount);
 }
 
 unsigned long CTxMemPool::Size() {
