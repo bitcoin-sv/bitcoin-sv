@@ -161,6 +161,7 @@ void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, c
                 {   
                     return;
                 }
+                // NOLINTNEXTLINE(clang-analyzer-unix.BlockInCriticalSection)
                 nBytes = recv(mSocket, pchBuf, sizeof(pchBuf), MSG_DONTWAIT);
             }
             if (nBytes > 0)

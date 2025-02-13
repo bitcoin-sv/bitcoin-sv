@@ -1,6 +1,5 @@
 Checks: '-*,
          clang-analyzer-*,
-         -clang-analyzer-unix.BlockInCriticalSection,
       '
 
 InheritParentConfig: true
