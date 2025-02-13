@@ -897,7 +897,8 @@ void CNode::SetSupportedStreamPolicies(const std::string& policies)
 
     LOCK(cs_supportedStreamPolicies);
     mSupportedStreamPolicies.clear();
-    boost::split(mSupportedStreamPolicies, policies, boost::is_any_of(","));
+    boost::split(mSupportedStreamPolicies, policies,
+                 [](const char c) { return c == ','; });
 
     // Filter common stream policies
     mCommonStreamPolicies.clear();

@@ -1,6 +1,5 @@
 Checks: '-*,
          clang-analyzer-*,
-         -clang-analyzer-cplusplus.NewDeleteLeaks,
          -clang-analyzer-unix.BlockInCriticalSection,
       '
 

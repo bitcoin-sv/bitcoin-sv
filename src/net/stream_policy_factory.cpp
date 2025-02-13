@@ -65,7 +65,8 @@ std::set<std::string> StreamPolicyFactory::GetSupportedPolicyNames() const
     // Get configured policy list
     std::string configuredPolicyStr { gArgs.GetArg("-multistreampolicies", DEFAULT_STREAM_POLICY_LIST) };
     std::set<std::string> configuredPolicySet {};
-    boost::split(configuredPolicySet, configuredPolicyStr, boost::is_any_of(","));
+    boost::split(configuredPolicySet, configuredPolicyStr,
+                 [](const char c) { return c == ','; });
 
     // Check items in configured list for validity
     std::set<std::string> allPolicies { GetAllPolicyNames() };
@@ -99,7 +100,8 @@ std::vector<std::string> StreamPolicyFactory::GetPrioritisedPolicyNames() const
     // Get configured prioritised policy list
     std::string configuredPolicyStr { gArgs.GetArg("-multistreampolicies", DEFAULT_STREAM_POLICY_LIST) };
     std::vector<std::string> prioritisedPolicies {};
-    boost::split(prioritisedPolicies, configuredPolicyStr, boost::is_any_of(","));
+    boost::split(prioritisedPolicies, configuredPolicyStr,
+                 [](const char c) { return c == ','; });
 
     // Filter configured prioritised list to only include supported policies
     prioritisedPolicies.erase(
