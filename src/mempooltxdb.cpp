@@ -417,6 +417,7 @@ namespace {
 
 void CAsyncMempoolTxDB::Work()
 {
+    // NOLINTNEXTLINE(bugprone-casting-through-void)
     const auto name = strprintf("mempooldb-%x", uintptr_t(static_cast<void*>(this)));
     RenameThread(name.c_str());
     LogPrint(BCLog::MEMPOOL, "Entering mempool TxDB worker thread.\n");
