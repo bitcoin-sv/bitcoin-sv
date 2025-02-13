@@ -66,7 +66,6 @@ void CInvalidTxnFileSink::FillFilesState()
             continue;
         }
 
-        std::string current_file = itr->path().string();
         auto filename = itr->path().filename().string();
 
         std::string txid;

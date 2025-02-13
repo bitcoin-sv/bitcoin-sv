@@ -313,7 +313,6 @@ static bool HTTPReq_JSONRPC(Config &config, HTTPRequest *req,
         // Set the URI
         jreq.URI = req->GetURI();
 
-        std::string strReply;
         // singleton request
         if (valRequest.isObject()) {
             jreq.parse(valRequest);
