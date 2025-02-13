@@ -6417,6 +6417,7 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
                     changeSet,
                     pblock))
             {
+                // NOLINTNEXTLINE(bugprone-lambda-function-name)
                 return error("%s: ActivateBestChain failed", __func__);
             }
 
