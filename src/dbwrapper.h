@@ -353,7 +353,7 @@ private:
     leveldb::WriteOptions syncoptions;
 
     //! the database itself
-    leveldb::DB *pdb;
+    leveldb::DB* pdb{nullptr};
 
     //! a key used for optional XOR-obfuscation of the database
     std::vector<uint8_t> obfuscate_key;

@@ -2033,7 +2033,7 @@ bool AppInitBasicSetup() {
     }
 
     // Clean shutdown on SIGTERM
-    struct sigaction sa;
+    struct sigaction sa{};
     sa.sa_handler = HandleSIGTERM;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
@@ -2041,7 +2041,7 @@ bool AppInitBasicSetup() {
     sigaction(SIGINT, &sa, nullptr);
 
     // Reopen bitcoind.log on SIGHUP
-    struct sigaction sa_hup;
+    struct sigaction sa_hup{};
     sa_hup.sa_handler = HandleSIGHUP;
     sigemptyset(&sa_hup.sa_mask);
     sa_hup.sa_flags = 0;
@@ -3474,7 +3474,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
             }
         }
         if (!gArgs.IsArgSet("-bind") && !gArgs.IsArgSet("-whitebind")) {
-            struct in_addr inaddr_any;
+            struct in_addr inaddr_any{};
             inaddr_any.s_addr = INADDR_ANY;
             fBound |=
                 Bind(connman, CService(in6addr_any, GetListenPort()), BF_NONE);

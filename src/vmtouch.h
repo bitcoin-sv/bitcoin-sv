@@ -110,7 +110,7 @@ private:
     void warning(const char *fmt, ...);
     std::vector<std::string> warnings;
 
-    dev_t orig_device;
+    dev_t orig_device{};
     bool orig_device_inited = false;
 
     // just to prevent any compiler optimizations when touching memory

@@ -172,9 +172,9 @@ private:
     //!< keep track of transactions that spend a coinbase or confiscation
     bool spendsCoinbaseOrConfiscation;
     // index of insertion to mempool, entry with smaller index is inserted before the one with larger
-    uint64_t insertionIndex;
+    uint64_t insertionIndex{};
     // ancestors count
-    size_t ancestorsCount;
+    size_t ancestorsCount{};
     
 public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
@@ -445,16 +445,16 @@ private:
     CFeeRate minDebugRejectionFee {Amount{0}};
 
     //!< sum of all mempool tx's virtual sizes.
-    uint64_t totalTxSize;
+    uint64_t totalTxSize{};
 
     //!< sum of dynamic memory usage of all the map elements (NOT the maps
     //! themselves)
-    uint64_t cachedInnerUsage;
+    uint64_t cachedInnerUsage{};
 
-    mutable int64_t lastRollingFeeUpdate;
-    mutable bool blockSinceLastRollingFeeBump;
+    mutable int64_t lastRollingFeeUpdate{};
+    mutable bool blockSinceLastRollingFeeBump{};
     //!< minimum fee to get into the pool, decreases exponentially
-    mutable double rollingMinimumFeeRate;
+    mutable double rollingMinimumFeeRate{};
 
     // Our journal builder
     mutable mining::CJournalBuilder mJournalBuilder;

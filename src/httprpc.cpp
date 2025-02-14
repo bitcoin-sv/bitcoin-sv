@@ -27,7 +27,7 @@ public:
     HTTPRPCTimer(struct event_base *eventBase, std::function<void(void)> &func,
                  int64_t millis)
         : ev(eventBase, false, func) {
-        struct timeval tv;
+        struct timeval tv{};
         tv.tv_sec = millis / 1000;
         tv.tv_usec = (millis % 1000) * 1000;
         ev.trigger(&tv);

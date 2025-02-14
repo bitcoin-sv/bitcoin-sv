@@ -135,12 +135,12 @@ public:
     void reset();
 
 private:
-    int nEntriesPerGeneration;
-    int nEntriesThisGeneration;
-    int nGeneration;
+    int nEntriesPerGeneration{};
+    int nEntriesThisGeneration{};
+    int nGeneration{};
     std::vector<uint64_t> data;
-    unsigned int nTweak;
-    int nHashFuncs;
+    unsigned int nTweak{};
+    int nHashFuncs{};
 };
 
 #endif // BITCOIN_BLOOM_H

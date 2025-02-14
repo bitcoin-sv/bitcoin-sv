@@ -479,9 +479,9 @@ public:
 
     struct UnfreezeAllResult
     {
-        unsigned int numUnfrozenPolicyOnly;
-        unsigned int numUnfrozenConsensus;
-        unsigned int numUnwhitelistedTxs;
+        unsigned int numUnfrozenPolicyOnly{};
+        unsigned int numUnfrozenConsensus{};
+        unsigned int numUnwhitelistedTxs{};
     };
 
     /**
@@ -498,8 +498,8 @@ public:
 
     struct CleanExpiredRecordsResult
     {
-        unsigned int numConsensusRemoved;
-        unsigned int numConsensusUpdatedToPolicyOnly;
+        unsigned int numConsensusRemoved{};
+        unsigned int numConsensusUpdatedToPolicyOnly{};
     };
 
     /**
@@ -695,8 +695,8 @@ public:
 
     struct ClearWhitelistResult
     {
-        unsigned int numFrozenBackToConsensus;
-        unsigned int numUnwhitelistedTxs;
+        unsigned int numFrozenBackToConsensus{};
+        unsigned int numUnwhitelistedTxs{};
     };
 
     /**

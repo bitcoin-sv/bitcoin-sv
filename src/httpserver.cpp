@@ -46,7 +46,7 @@ struct HTTPPathHandler {
                     HTTPRequestHandler _handler)
         : prefix(_prefix), exactMatch(_exactMatch), handler(_handler) {}
     std::string prefix;
-    bool exactMatch;
+    bool exactMatch{};
     HTTPRequestHandler handler;
 };
 

@@ -147,8 +147,9 @@ class InKeyTXO : public InKey<RecordType::TXO>
     using Base = InKey<RecordType::TXO>;
 
 public:
-    explicit InKeyTXO(COutPoint& txo)
-    : txo(txo)
+    explicit InKeyTXO(COutPoint& txo):
+       InKey<RecordType::TXO>(),
+       txo(txo)
     {}
 
     template<typename Stream>
@@ -170,8 +171,9 @@ class InKeyTxId : public InKey<RecordType::TXID>
     using Base = InKey<RecordType::TXID>;
 
 public:
-    explicit InKeyTxId(TxId& txid)
-    : txid(txid)
+    explicit InKeyTxId(TxId& txid):
+        InKey<RecordType::TXID>(),
+        txid(txid)
     {}
 
     template<typename Stream>
@@ -400,9 +402,6 @@ void CFrozenTXODB::Sync()
 auto CFrozenTXODB::UnfreezeAll(bool keepPolicyEntries) -> UnfreezeAllResult
 {
     UnfreezeAllResult res;
-    res.numUnfrozenPolicyOnly = 0;
-    res.numUnfrozenConsensus = 0;
-    res.numUnwhitelistedTxs = 0;
 
     // Lock db mutex for exclusive access
     auto lck = std::unique_lock<std::shared_mutex>(this->mtx_db);
@@ -450,8 +449,6 @@ auto CFrozenTXODB::UnfreezeAll(bool keepPolicyEntries) -> UnfreezeAllResult
 auto CFrozenTXODB::CleanExpiredRecords(std::int32_t nHeight) -> CleanExpiredRecordsResult
 {
     CleanExpiredRecordsResult res;
-    res.numConsensusRemoved = 0;
-    res.numConsensusUpdatedToPolicyOnly = 0;
 
     // Lock db mutex for exclusive access
     auto lck = std::unique_lock<std::shared_mutex>(this->mtx_db);
@@ -840,8 +837,6 @@ auto CFrozenTXODB::QueryAllWhitelistedTxs() -> WhitelistedTxIterator
 auto CFrozenTXODB::ClearWhitelist() -> ClearWhitelistResult
 {
     ClearWhitelistResult res;
-    res.numFrozenBackToConsensus = 0;
-    res.numUnwhitelistedTxs = 0;
 
     // Lock db mutex for exclusive access
     auto lck = std::unique_lock<std::shared_mutex>(this->mtx_db);

@@ -163,7 +163,7 @@ int VMTouch::is_mincore_page_resident(char p)
 
 void VMTouch::increment_nofile_rlimit()
 {
-    struct rlimit r;
+    struct rlimit r{};
 
     if (getrlimit(RLIMIT_NOFILE, &r))
       fatal("increment_nofile_rlimit: getrlimit (%s)", strerror(errno));
@@ -187,7 +187,7 @@ void VMTouch::vmtouch_file(const std::string& strPath)
 {
     int fd = -1;
     void* mem = nullptr;
-    struct stat sb;
+    struct stat sb{};
     int64_t len_of_file=0;
     uint64_t len_of_range=0;
     int64_t pages_in_range;
@@ -416,7 +416,7 @@ bool VMTouch::find_object(const struct stat& st)
 
 void VMTouch::vmtouch_crawl(std::string strPath)
 {
-    struct stat sb;
+    struct stat sb{};
     DIR *dirp;
     struct dirent *de;
     std::string npath;
