@@ -380,6 +380,8 @@ void SafeMode::CheckSafeModeParameters(const Config& config, const CBlockIndex* 
 
     currentResult = std::move(newResults);
     oldTip = chainActive.Tip();
+    
+    // NOLINTBEGIN(bugprone-use-after-move)
 
     // If we have any forks trigger safe mode
     if (GetSafeModeLevel() != newResults.maxLevel)
@@ -402,6 +404,7 @@ void SafeMode::CheckSafeModeParameters(const Config& config, const CBlockIndex* 
             AlertNotify(warning);
         }
     }
+    // NOLINTEND(bugprone-use-after-move)
 }
 
 void SafeMode::Clear() 
