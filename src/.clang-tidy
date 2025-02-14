@@ -38,7 +38,6 @@ Checks: '-*,
          -cppcoreguidelines-pro-type-reinterpret-cast,
          -cppcoreguidelines-rvalue-reference-param-not-moved,
          -cppcoreguidelines-special-member-functions,
-         -cppcoreguidelines-use-default-member-init,
       '
 
 WarningsAsErrors: '*'

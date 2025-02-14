@@ -86,7 +86,6 @@ struct CDataStreamInput_NoScr : TBase
     : Base(buf, key)
     , maxScriptSize(maxScriptSize)
     , actualScriptSize(actualScriptSize)
-    , wasUnserializeScriptCalled(false)
     {}
 
     template<typename T>
@@ -98,7 +97,7 @@ struct CDataStreamInput_NoScr : TBase
 
     const std::size_t maxScriptSize;
     std::optional<std::size_t>& actualScriptSize;
-    bool wasUnserializeScriptCalled;
+    bool wasUnserializeScriptCalled{};
 };
 
 } // anonymous namespace
