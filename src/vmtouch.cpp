@@ -114,7 +114,6 @@ public:
 
 VMTouch::VMTouch() : pagesize(sysconf(_SC_PAGESIZE))
 {
-    curr_crawl_depth = 0;
 }
 
 VMTouch::~VMTouch()

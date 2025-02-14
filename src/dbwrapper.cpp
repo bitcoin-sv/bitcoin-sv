@@ -95,7 +95,6 @@ CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize,
                        bool fMemory, bool fWipe, bool obfuscate,
                        MaxFiles maxFiles, size_t nMaxFileSize)
 {
-    penv = nullptr;
     readoptions.verify_checksums = true;
     iteroptions.verify_checksums = true;
     iteroptions.fill_cache = false;

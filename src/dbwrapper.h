@@ -335,7 +335,7 @@ class CDBWrapper {
 private:
     //! custom environment this database is using (may be nullptr in case of
     //! default environment)
-    leveldb::Env *penv;
+    leveldb::Env* penv{nullptr};
 
     //! database options used
     leveldb::Options options;

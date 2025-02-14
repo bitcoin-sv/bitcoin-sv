@@ -94,7 +94,7 @@ private:
     
     std::set<dev_and_inode> seen_inodes; 
     std::vector<std::string> ignoreList;
-    int curr_crawl_depth;
+    int curr_crawl_depth{};
     ino_t crawl_inodes[MAX_CRAWL_DEPTH];
     std::vector<std::string> filenameFilterList;
 
