@@ -1070,12 +1070,12 @@ void CTxMemPool::RemoveForBlock(
                     // let's see if it need to be updated later on
                     // it needs to be updated in two cases: 
                     //     1. parent and child are part of the same group (group needs to be disbanded)
-                    //     2. child is in secondary mempool, as well as it's parent (grouping data needs to be updated)
+                    //     2. child is in secondary mempool (grouping data needs to be updated)
                     if(found->IsCPFPGroupMember() && child->IsCPFPGroupMember() && (found->GetCPFPGroup() == child->GetCPFPGroup()))
                     {
                         childrenOfToRemoveGroupMembers.insert(child);
                     }
-                    else if(!found->IsInPrimaryMempool() && !child->IsInPrimaryMempool())
+                    else if(!child->IsInPrimaryMempool())
                     {
                         childrenOfToRemoveSecondaryMempool.insert(child);
                     }
