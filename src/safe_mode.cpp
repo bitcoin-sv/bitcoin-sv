@@ -381,30 +381,27 @@ void SafeMode::CheckSafeModeParameters(const Config& config, const CBlockIndex* 
     currentResult = std::move(newResults);
     oldTip = chainActive.Tip();
     
-    // NOLINTBEGIN(bugprone-use-after-move)
-
     // If we have any forks trigger safe mode
-    if (GetSafeModeLevel() != newResults.maxLevel)
+    if(GetSafeModeLevel() != currentResult.maxLevel)
     {
-        SetSafeModeLevel(newResults.maxLevel);
+        SetSafeModeLevel(currentResult.maxLevel);
         static std::map<SafeModeLevel, std::string> levelLookup = {
             {SafeModeLevel::NONE, "NONE"}, 
             {SafeModeLevel::VALID, "VALID"}, 
             {SafeModeLevel::INVALID, "INVALID"}, 
             {SafeModeLevel::UNKNOWN, "UNKNOWN"} 
         };
-        LogPrintf("WARNING: Safe mode level changed to " + levelLookup[newResults.maxLevel] + "\n");
-        if( newResults.maxLevel == SafeModeLevel::VALID)
+        LogPrintf("WARNING: Safe mode level changed to " + levelLookup[currentResult.maxLevel] + "\n");
+        if(currentResult.maxLevel == SafeModeLevel::VALID)
         {
             std::string warning = "'Warning: Large-work fork detected, forking after block:";
-            for (const auto& f: newResults.forks)
+            for (const auto& f: currentResult.forks)
             {
                 warning += " " + f.second.base->GetPrev()->GetBlockHash().ToString();
             }
             AlertNotify(warning);
         }
     }
-    // NOLINTEND(bugprone-use-after-move)
 }
 
 void SafeMode::Clear() 
