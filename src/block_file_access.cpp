@@ -436,7 +436,8 @@ bool BlockFileAccess::LoadBlockHashAndTx(
         _fseeki64(file.Get(), postx.TxOffset(), SEEK_CUR);
 #else
         // NOLINTNEXTLINE(*-narrowing-conversions)
-        fseek(file.Get(), postx.TxOffset(), SEEK_CUR);
+        if(fseek(file.Get(), postx.TxOffset(), SEEK_CUR) != 0)
+            return error("%s: fseek failed", __func__);
 #endif
         file >> txOut;
     } catch (const std::exception &e) {

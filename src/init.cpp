@@ -2054,7 +2054,7 @@ bool AppInitBasicSetup() {
 
     // Ignore SIGPIPE, otherwise it will bring the daemon down if the client
     // closes unexpectedly
-    signal(SIGPIPE, SIG_IGN);
+    std::ignore = signal(SIGPIPE, SIG_IGN);
 #endif
 
     std::set_new_handler(new_handler_terminate);
@@ -3154,32 +3154,41 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     return true;
 }
 
-static bool LockDataDirectory(bool probeOnly) {
+static bool LockDataDirectory(bool probeOnly)
+{
     std::string strDataDir = GetDataDir().string();
 
     // Make sure only a single Bitcoin process is using the data directory.
     fs::path pathLockFile = GetDataDir() / ".lock";
     // empty lock file; created if it doesn't exist.
-    FILE *file = fsbridge::fopen(pathLockFile, "a");
-    if (file) fclose(file);
+    FILE* file = fsbridge::fopen(pathLockFile, "a");
+    if(file)
+        std::ignore = fclose(file);
 
-    try {
-        static boost::interprocess::file_lock lock(
-            pathLockFile.string().c_str());
-        if (!lock.try_lock()) {
+    try
+    {
+        static boost::interprocess::file_lock lock(pathLockFile.string().c_str());
+        if(!lock.try_lock())
+        {
             return InitError(
                 strprintf(_("Cannot obtain a lock on data directory %s. %s is "
                             "probably already running."),
-                          strDataDir, _(PACKAGE_NAME)));
+                          strDataDir,
+                          _(PACKAGE_NAME)));
         }
-        if (probeOnly) {
+        if(probeOnly)
+        {
             lock.unlock();
         }
-    } catch (const boost::interprocess::interprocess_exception &e) {
+    }
+    catch(const boost::interprocess::interprocess_exception& e)
+    {
         return InitError(strprintf(_("Cannot obtain a lock on data directory "
                                      "%s. %s is probably already running.") +
                                        " %s.",
-                                   strDataDir, _(PACKAGE_NAME), e.what()));
+                                   strDataDir,
+                                   _(PACKAGE_NAME),
+                                   e.what()));
     }
     return true;
 }
