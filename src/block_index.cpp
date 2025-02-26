@@ -137,7 +137,7 @@ int64_t GetBlockProofEquivalentTime(const CBlockIndex &to,
     if (r.bits() > 63) {
         return sign * std::numeric_limits<int64_t>::max();
     }
-    return sign * r.GetLow64();
+    return sign * r.GetLow64(); // NOLINT(*-narrowing-conversions)
 }
 
 /**

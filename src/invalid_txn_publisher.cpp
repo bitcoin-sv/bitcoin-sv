@@ -58,6 +58,7 @@ size_t InvalidTxnInfo::DynamicMemoryUsage() const
             {
                 if(auto tx = std::get_if<CTransactionRef>(&item.mTransaction); tx)
                 {
+                    // NOLINTNEXTLINE(*-narrowing-conversions)
                     sum += memusage::DynamicUsage(*tx);
                 }
 

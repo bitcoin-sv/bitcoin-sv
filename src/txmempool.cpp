@@ -525,6 +525,7 @@ void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted to
                         }
                     }
                 }
+                // NOLINTNEXTLINE(*-narrowing-conversions)
                 countOfVisitedTxs += groupMembers.size();
                 TrackEntryModified(entry);
                 break;
@@ -948,6 +949,7 @@ void CTxMemPool::RemoveForReorgNL(
     int flags) {
 
     const int32_t nMemPoolHeight = tip.GetHeight() + 1;
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     const int nMedianTimePast = tip.GetMedianTimePast();
     // Remove transactions spending a coinbase which are now immature and
     // no-longer-final transactions.
@@ -1360,16 +1362,19 @@ void CTxMemPool::clearNL(bool skipTransactionDatabase/* = false*/) {
 
 void CTxMemPool::trackPackageRemovedNL(const CFeeRate &rate, bool haveSecondaryMempoolTxs) 
 {
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     if (rate.GetFeePerK().GetSatoshis() > rollingMinimumFeeRate) 
     {
         // if we still have secondary mempool transactions we should not bump the rolling fee
         // above blockMinTxfee
         if (haveSecondaryMempoolTxs && rate > blockMinTxfee)
         {
+            // NOLINTNEXTLINE(*-narrowing-conversions)
             rollingMinimumFeeRate = blockMinTxfee.GetFeePerK().GetSatoshis();
         }
         else
         {
+            // NOLINTNEXTLINE(*-narrowing-conversions)
             rollingMinimumFeeRate = rate.GetFeePerK().GetSatoshis();
         }
         blockSinceLastRollingFeeBump = false;
@@ -1757,6 +1762,7 @@ mining::CJournalChangeSetPtr CTxMemPool::RebuildMempool()
 }
 
 void CTxMemPool::SetSanityCheck(double dFrequency) {
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     nCheckFrequency = dFrequency * 4294967295.0;
 }
 
@@ -2112,9 +2118,11 @@ size_t CTxMemPool::SecondaryMempoolUsageNL() const {
     // worst case is secondary mempool entries consume more index which will slightly
     // increase memory pressure for primary mempool writeout instead of triggering
     // eviction from the secondary mempool
+    // NOLINTBEGIN(*-narrowing-conversions)
     double secondaryMempoolRatio = static_cast<double>(secondaryMempoolStats.Size()) / (mapTx.size() + 1);
     size_t indexSize = DynamicMemoryIndexUsageNL();
     return indexSize * secondaryMempoolRatio + secondaryMempoolStats.InnerUsage();
+    // NOLINTEND(*-narrowing-conversions)
 }
 
 void CTxMemPool::removeStagedNL(
@@ -2192,7 +2200,7 @@ int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeS
 
     CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
     removeStagedNL(stage, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::EXPIRY);
-    return stage.size();
+    return stage.size(); // NOLINT(*-narrowing-conversions)
 }
 
 int CTxMemPool::RemoveTxAndDescendants(const TxId & txid, const mining::CJournalChangeSetPtr& changeSet)
@@ -2205,7 +2213,7 @@ int CTxMemPool::RemoveTxAndDescendants(const TxId & txid, const mining::CJournal
         GetDescendantsNL(it, stage);
         CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
         removeStagedNL(stage, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::EXPIRY);
-        return stage.size();
+        return stage.size(); // NOLINT(*-narrowing-conversions)
     }
     return 0;
 }
@@ -2384,6 +2392,7 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
                 *pcoinsTip,
                 changeSet,
                 tip,
+                // NOLINTNEXTLINE(*-narrowing-conversions)
                 StandardNonFinalVerifyFlags(GetProtocolEra(config, tip.GetHeight())));
 
         if(tip.GetHeight() + 1 < CFrozenTXOCheck::Get_max_FrozenTXOData_enforceAtHeight_stop())
@@ -2450,6 +2459,7 @@ void CTxMemPool::RemoveFromMempoolForReorg(const Config &config,
             *pcoinsTip,
             changeSet,
             tip,
+            // NOLINTNEXTLINE(*-narrowing-conversions)
             StandardNonFinalVerifyFlags(GetProtocolEra(config, tip.GetHeight())));
     }
 
@@ -2595,7 +2605,7 @@ CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const
     if (blockSinceLastRollingFeeBump && rollingMinimumFeeRate != 0) {
         int64_t time = GetTime();
         if (time > lastRollingFeeUpdate + 10) {
-            double halflife = halflife_;
+            double halflife = halflife_; // NOLINT(*-narrowing-conversions)
             if (DynamicMemoryUsageNL() < sizelimit / 4) {
                 halflife /= 4;
             } else if (DynamicMemoryUsageNL() < sizelimit / 2) {
@@ -2604,6 +2614,7 @@ CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const
 
             rollingMinimumFeeRate =
                 rollingMinimumFeeRate /
+                // NOLINTNEXTLINE(*-narrowing-conversions)
                 pow(2.0, (time - lastRollingFeeUpdate) / halflife);
             lastRollingFeeUpdate = time;
         }
@@ -2619,9 +2630,11 @@ int64_t CTxMemPool::evaluateEvictionCandidateNL(txiter entry)
     if(entry->IsCPFPGroupMember())
     {
         const auto& evalParams = entry->GetCPFPGroup()->EvaluationParams();
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         return (evalParams.fee + evalParams.feeDelta).GetSatoshis() * 1000 / evalParams.size;
     }
-    
+   
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     int64_t score = entry->GetModifiedFee().GetSatoshis() * 1000 / entry->GetTxSize();
     if(!entry->IsInPrimaryMempool())
     {
@@ -3124,6 +3137,7 @@ bool CTxMemPool::LoadMempool(const Config &config,
                                  bool limitMempoolSize)>& processValidation)
 {
     try {
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int64_t nExpiryTimeout = config.GetMemPoolExpiry();
 
         uint64_t version;

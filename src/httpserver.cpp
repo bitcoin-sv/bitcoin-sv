@@ -210,6 +210,7 @@ static bool ThreadHTTP(struct event_base *base, struct evhttp *http) {
 
 /** Bind HTTP server to specified addresses */
 static bool HTTPBindAddresses(struct evhttp *http) {
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     int defaultPort = gArgs.GetArg("-rpcport", BaseParams().RPCPort());
     std::vector<std::pair<std::string, uint16_t>> endpoints;
 
@@ -279,6 +280,7 @@ ev_ssize_t GetMaxBodySizeSafe(uint64_t maxBlockSize)
     }
     else
     {
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         maxBodySize = MIN_SUPPORTED_BODY_SIZE + 2 * maxBlockSize;
     }
     return maxBodySize;
@@ -331,6 +333,7 @@ bool InitHTTPServer(Config &config) {
     }
 
     evhttp_set_timeout(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         http, gArgs.GetArg("-rpcservertimeout", DEFAULT_HTTP_SERVER_TIMEOUT));
     evhttp_set_max_headers_size(http, MAX_HEADERS_SIZE);
     evhttp_set_max_body_size(http, GetMaxBodySizeSafe(config.GetMaxBlockSize()));
@@ -354,7 +357,7 @@ bool InitHTTPServer(Config &config) {
     eventHTTP = http;
     LogPrint(BCLog::HTTP, "Initialized HTTP server\n");
 
-    int rpcThreads = std::max(static_cast<long>(gArgs.GetArg("-rpcthreads", DEFAULT_HTTP_THREADS)), 1L);
+    const auto rpcThreads = std::max(static_cast<long>(gArgs.GetArg("-rpcthreads", DEFAULT_HTTP_THREADS)), 1L);
     LogPrintf("HTTP: creating work queue with %d threads\n", rpcThreads);
     pWorkQueue = std::make_unique<CThreadPool<CQueueAdaptor>>(true, "HTTPServer", rpcThreads);
 
@@ -486,6 +489,7 @@ std::string HTTPRequest::ReadBody() {
      * better to not copy into an intermediate string but use a stream
      * abstraction to consume the evbuffer on the fly in the parsing algorithm.
      */
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     const char *data = (const char *)evbuffer_pullup(buf, size);
     // returns nullptr in case of empty buffer.
     if (!data) {

@@ -41,6 +41,7 @@ FILE* CMerkleTreeStore::OpenMerkleTreeFile(const MerkleTreeDiskPosition& merkleT
     }
     if (merkleTreeDiskPosition.fileOffset)
     {
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         if (fseek(file, merkleTreeDiskPosition.fileOffset, SEEK_SET))
         {
             LogPrintf("Unable to seek to position %u of %s\n", merkleTreeDiskPosition.fileOffset, path.string());

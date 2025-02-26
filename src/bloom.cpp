@@ -42,8 +42,9 @@ CBloomFilter::CBloomFilter(unsigned int nElements, double nFPRate, unsigned int 
         throw std::runtime_error ( "Error: Invalid Parameter nFPRate passed to constructor" );
     }
     vData.resize(std::min((unsigned int)(-1 / LN2SQUARED * nElements * log(nFPRate)), MAX_BLOOM_FILTER_SIZE * 8) / 8);
-    // NOLINTNEXTLINE(bugprone-integer-division)
-    nHashFuncs = std::min((unsigned int)(vData.size() * 8 / nElements * LN2),MAX_HASH_FUNCS);
+    // NOLINTNEXTLINE(bugprone-integer-division, *-narrowing-conversions)
+    nHashFuncs = std::min((unsigned int)(vData.size() * 8 / nElements * LN2),
+                          MAX_HASH_FUNCS);
     return;
 }
 
@@ -220,7 +221,7 @@ CRollingBloomFilter::CRollingBloomFilter(unsigned int nElements, double fpRate)
      nHashFuncs = std::max(1, std::min((int)round(logFpRate / log(0.5)), 50));
     /* In this rolling bloom filter, we'll store between 2 and 3 generations of
      * nElements / 2 entries. */
-    nEntriesPerGeneration = (nElements + 1) / 2;
+    nEntriesPerGeneration = (nElements + 1) / 2; // NOLINT(*-narrowing-conversions)
     uint32_t nMaxElements = nEntriesPerGeneration * 3;
     /* The maximum fpRate = pow(1.0 - exp(-nHashFuncs * nMaxElements /
      * nFilterBits), nHashFuncs)
@@ -282,7 +283,7 @@ void CRollingBloomFilter::insert(const std::vector<uint8_t> &vKey) {
 
     for (int n = 0; n < nHashFuncs; n++) {
         uint32_t h = RollingBloomHash(n, nTweak, vKey);
-        int bit = h & 0x3F;
+        int bit = h & 0x3F; // NOLINT(*-narrowing-conversions)
         /* FastMod works with the upper bits of h, so it is safe to ignore that the lower bits of h are already used for bit. */
         uint32_t pos = FastMod(h, data.size());
         /* The lowest bit of pos is ignored, and set to zero for the first bit,
@@ -302,7 +303,7 @@ void CRollingBloomFilter::insert(const uint256 &hash) {
 bool CRollingBloomFilter::contains(const std::vector<uint8_t> &vKey) const {
     for (int n = 0; n < nHashFuncs; n++) {
         uint32_t h = RollingBloomHash(n, nTweak, vKey);
-        int bit = h & 0x3F;
+        int bit = h & 0x3F; // NOLINT(*-narrowing-conversions)
         uint32_t pos = FastMod(h, data.size());
         /* If the relevant bit is not set in either data[pos & ~1] or data[pos |
          * 1], the filter does not contain vKey */

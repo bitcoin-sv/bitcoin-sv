@@ -2075,6 +2075,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 
     // Make sure enough file descriptors are available
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     const int nBind = std::max(
         (gArgs.IsArgSet("-bind") ? gArgs.GetArgs("-bind").size() : 0) +
             (gArgs.IsArgSet("-whitebind") ? gArgs.GetArgs("-whitebind").size()
@@ -2085,10 +2086,12 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         static_cast<int>(gArgs.GetArg("-maxconnections", DEFAULT_MAX_PEER_CONNECTIONS));
     nMaxConnections = std::max(nUserMaxConnections, 0);
 
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     const int nUserMaxOutboundConnections = gArgs.GetArg(
         "-maxoutboundconnections", DEFAULT_MAX_OUTBOUND_CONNECTIONS);
 
     // Trim requested connection counts, to fit into system limitations
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     if(std::string err; !config.SetMaxAddNodeConnections(gArgs.GetArg("-maxaddnodeconnections", DEFAULT_MAX_ADDNODE_CONNECTIONS), &err)) {
         return InitError(err);
     }
@@ -2174,6 +2177,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     // Checkmempool and checkblockindex default to true in regtest mode
     int ratio = std::min<int>(
         std::max<int>(
+            // NOLINTNEXTLINE(*-narrowing-conversions)
             gArgs.GetArg("-checkmempool",
                          chainparams.DefaultConsistencyChecks() ? 1 : 0),
             0),
@@ -2222,6 +2226,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     const auto defaultMaxMempoolSizeDisk = int64_t(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         std::ceil(1.0 * config.GetMaxMempool() * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR
                   / ONE_MEGABYTE));
     if (std::string err; !config.SetMaxMempoolSizeDisk(
@@ -2237,16 +2242,19 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     // script validation settings
     if(std::string error; !config.SetBlockScriptValidatorsParams(
+        // NOLINTBEGIN(*-narrowing-conversions)
         gArgs.GetArg("-maxparallelblocks", DEFAULT_SCRIPT_CHECK_POOL_SIZE),
         gArgs.GetArg("-threadsperblock", DEFAULT_SCRIPTCHECK_THREADS),
         gArgs.GetArg("-txnthreadsperblock", DEFAULT_TXNCHECK_THREADS),
         gArgs.GetArg("-scriptvalidatormaxbatchsize", DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE),
+        // NOLINTEND(*-narrowing-conversions)
         &error))
     {
         return InitError(error);
     }
 
     if(std::string error; !config.SetMaxConcurrentAsyncTasksPerNode(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg("-maxparallelblocksperpeer", DEFAULT_NODE_ASYNC_TASKS_LIMIT),
         &error))
     {
@@ -2283,6 +2291,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     // Configure height to stop running
     if (std::string err; !config.SetStopAtHeight(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg("-stopatheight", DEFAULT_STOPATHEIGHT), &err))
     {
         return InitError(err);
@@ -2651,11 +2660,13 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         fPruneMode = true;
     }
 
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     if(std::string err; !config.SetMinBlocksToKeep(gArgs.GetArg("-pruneminblockstokeep", DEFAULT_MIN_BLOCKS_TO_KEEP), &err)) {
         return InitError(err);
     }
 
     if(std::string err; !config.SetMaxStdTxnValidationDuration(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg(
             "-maxstdtxvalidationduration",
             DEFAULT_MAX_STD_TXN_VALIDATION_DURATION.count()),
@@ -2665,6 +2676,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 
     if(std::string err; !config.SetMaxNonStdTxnValidationDuration(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg(
             "-maxnonstdtxvalidationduration",
             DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION.count()),
@@ -2674,6 +2686,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 
     if(std::string err; !config.SetMaxTxnValidatorAsyncTasksRunDuration(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg(
             "-maxtxnvalidatorasynctasksrunduration",
             CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION.count()),
@@ -2683,6 +2696,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 
     if(std::string err; !config.SetMaxTxnChainValidationBudget(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg(
             "-maxtxchainvalidationbudget",
             DEFAULT_MAX_TXN_CHAIN_VALIDATION_BUDGET.count()),
@@ -2726,6 +2740,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     if(std::string err; !config.SetMaxCoinsDbOpenFiles(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg("-maxcoinsdbfiles", CoinsDB::MaxFiles::Default().maxFiles), &err))
     {
         return InitError(err);
@@ -2738,16 +2753,19 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     // Double-Spend processing parameters
     if(std::string err; !config.SetDoubleSpendNotificationLevel(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg("-dsnotifylevel", static_cast<int>(DSAttemptHandler::DEFAULT_NOTIFY_LEVEL)), &err))
     {
         return InitError(err);
     }
     if(std::string err; !config.SetDoubleSpendEndpointFastTimeout(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg("-dsendpointfasttimeout", rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT), &err))
     {
         return InitError(err);
     }
     if(std::string err; !config.SetDoubleSpendEndpointSlowTimeout(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg("-dsendpointslowtimeout", rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT), &err))
     {
         return InitError(err);
@@ -2758,6 +2776,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     if(std::string err; !config.SetDoubleSpendEndpointPort(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg("-dsendpointport", rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT), &err))
     {
         return InitError(err);
@@ -2868,6 +2887,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     RegisterDumpRPCCommands(tableRPC);
 #endif
 
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     nConnectTimeout = gArgs.GetArg("-timeout", DEFAULT_CONNECT_TIMEOUT);
     if (nConnectTimeout <= 0) nConnectTimeout = DEFAULT_CONNECT_TIMEOUT;
 
@@ -3078,20 +3098,24 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 
     {
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int64_t maxBlockEstimate = std::min(config.GetMaxBlockSize(), config.GetMaxMempool());
         std::string err;
 
         // Configure preferred size of a single Merkle Tree data file.
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int64_t merkleTreeFileSizeArg = gArgs.GetArgAsBytes("-preferredmerkletreefilesize", CalculatePreferredMerkleTreeSize(maxBlockEstimate));
         if (!config.SetPreferredMerkleTreeFileSize(merkleTreeFileSizeArg, &err))
             return InitError(err);
 
         // Configure size of Merkle Trees memory cache.
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int64_t maxMerkleTreeMemCacheSizeArg = gArgs.GetArgAsBytes("-maxmerkletreememcachesize", CalculatePreferredMerkleTreeSize(maxBlockEstimate));
         if (!config.SetMaxMerkleTreeMemoryCacheSize(maxMerkleTreeMemCacheSizeArg, &err))
             return InitError(err);
 
         // Configure maximum disk space that can be taken by Merkle Tree data files.
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int64_t maxMerkleTreeDiskspaceArg = gArgs.GetArgAsBytes("-maxmerkletreediskspace", CalculateMinDiskSpaceForMerkleFiles(maxBlockEstimate));
         if (maxMerkleTreeDiskspaceArg < merkleTreeFileSizeArg || maxMerkleTreeDiskspaceArg < maxMerkleTreeMemCacheSizeArg)
         {
@@ -3723,8 +3747,10 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
                 if (!CVerifyDB().VerifyDB(
                         config, *pcoinsTip,
+                        // NOLINTBEGIN(*-narrowing-conversions)
                         gArgs.GetArg("-checklevel", DEFAULT_CHECKLEVEL),
                         gArgs.GetArg("-checkblocks", DEFAULT_CHECKBLOCKS),
+                        // NOLINTEND(*-narrowing-conversions)
                         shutdownToken)) {
                     strLoadError = _("Corrupted block database detected");
                     break;

@@ -32,6 +32,7 @@ void CEvictionCandidateTracker::ExpireEntry(const TxId& txId)
 void CEvictionCandidateTracker::PopExpired()
 {
     if((entries.size() == 0) || 
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         ((double(heap.size() - entries.size()) / entries.size()) >  MAX_INVALID_TO_VALID_RATIO))
     {
         heap.erase(

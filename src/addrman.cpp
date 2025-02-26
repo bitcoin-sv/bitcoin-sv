@@ -16,6 +16,7 @@ int CAddrInfo::GetTriedBucket(const uint256 &nKey) const {
          << nKey << GetGroup() << (hash1 % ADDRMAN_TRIED_BUCKETS_PER_GROUP))
             .GetHash()
             .GetCheapHash();
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     return hash2 % ADDRMAN_TRIED_BUCKET_COUNT;
 }
 
@@ -30,6 +31,7 @@ int CAddrInfo::GetNewBucket(const uint256 &nKey, const CNetAddr &src) const {
                       << (hash1 % ADDRMAN_NEW_BUCKETS_PER_SOURCE_GROUP))
                          .GetHash()
                          .GetCheapHash();
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     return hash2 % ADDRMAN_NEW_BUCKET_COUNT;
 }
 
@@ -39,6 +41,7 @@ int CAddrInfo::GetBucketPosition(const uint256 &nKey, bool fNew,
                       << nKey << (fNew ? 'N' : 'K') << nBucket << GetKey())
                          .GetHash()
                          .GetCheapHash();
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     return hash1 % ADDRMAN_BUCKET_SIZE;
 }
 
@@ -92,7 +95,7 @@ CAddrInfo *CAddrMan::Create(const CAddress &addr, const CNetAddr &addrSource,
     int nId = nIdCount++;
     mapInfo[nId] = CAddrInfo(addr, addrSource);
     mapAddr[addr] = nId;
-    mapInfo[nId].nRandomPos = vRandom.size();
+    mapInfo[nId].nRandomPos = vRandom.size(); // NOLINT(*-narrowing-conversions)
     vRandom.push_back(nId);
     if (pnId) *pnId = nId;
     return &mapInfo[nId];
@@ -109,8 +112,8 @@ void CAddrMan::SwapRandom(unsigned int nRndPos1, unsigned int nRndPos2) {
     assert(mapInfo.count(nId1) == 1);
     assert(mapInfo.count(nId2) == 1);
 
-    mapInfo[nId1].nRandomPos = nRndPos2;
-    mapInfo[nId2].nRandomPos = nRndPos1;
+    mapInfo[nId1].nRandomPos = nRndPos2; // NOLINT(*-narrowing-conversions)
+    mapInfo[nId2].nRandomPos = nRndPos1; // NOLINT(*-narrowing-conversions)
 
     vRandom[nRndPos1] = nId2;
     vRandom[nRndPos2] = nId1;
@@ -221,6 +224,7 @@ void CAddrMan::Good_(const CService &addr, int64_t nTime) {
     int nRnd = RandomInt(ADDRMAN_NEW_BUCKET_COUNT);
     int nUBucket = -1;
     for (unsigned int n = 0; n < ADDRMAN_NEW_BUCKET_COUNT; n++) {
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int nB = (n + nRnd) % ADDRMAN_NEW_BUCKET_COUNT;
         int nBpos = info.GetBucketPosition(nKey, true, nB);
         if (vvNew[nB][nBpos] == nId) {
@@ -348,11 +352,11 @@ CAddrInfo CAddrMan::Select_(bool newOnly) {
             int nKBucketPos = RandomInt(ADDRMAN_BUCKET_SIZE);
             while (vvTried[nKBucket][nKBucketPos] == -1) {
                 nKBucket =
-                    (nKBucket +
+                    (nKBucket + // NOLINT(*-narrowing-conversions)
                      insecure_rand.randbits(ADDRMAN_TRIED_BUCKET_COUNT_LOG2)) %
                     ADDRMAN_TRIED_BUCKET_COUNT;
                 nKBucketPos =
-                    (nKBucketPos +
+                    (nKBucketPos + // NOLINT(*-narrowing-conversions)
                      insecure_rand.randbits(ADDRMAN_BUCKET_SIZE_LOG2)) %
                     ADDRMAN_BUCKET_SIZE;
             }
@@ -373,11 +377,11 @@ CAddrInfo CAddrMan::Select_(bool newOnly) {
             int nUBucketPos = RandomInt(ADDRMAN_BUCKET_SIZE);
             while (vvNew[nUBucket][nUBucketPos] == -1) {
                 nUBucket =
-                    (nUBucket +
+                    (nUBucket + // NOLINT(*-narrowing-conversions)
                      insecure_rand.randbits(ADDRMAN_NEW_BUCKET_COUNT_LOG2)) %
                     ADDRMAN_NEW_BUCKET_COUNT;
                 nUBucketPos =
-                    (nUBucketPos +
+                    (nUBucketPos + // NOLINT(*-narrowing-conversions)
                      insecure_rand.randbits(ADDRMAN_BUCKET_SIZE_LOG2)) %
                     ADDRMAN_BUCKET_SIZE;
             }
@@ -466,6 +470,7 @@ void CAddrMan::GetAddr_(std::vector<CAddress> &vAddr) {
     for (unsigned int n = 0; n < vRandom.size(); n++) {
         if (vAddr.size() >= nNodes) break;
 
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int nRndPos = RandomInt(vRandom.size() - n) + n;
         SwapRandom(n, nRndPos);
         assert(mapInfo.count(vRandom[n]) == 1);

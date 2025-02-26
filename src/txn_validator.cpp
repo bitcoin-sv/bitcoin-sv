@@ -327,10 +327,12 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
         // Get a number of High and Low priority threads.
         size_t nNumStdTxValidationThreads {
             static_cast<size_t>(
+                    // NOLINTNEXTLINE(*-narrowing-conversions)
                     gArgs.GetArg("-numstdtxvalidationthreads", GetNumHighPriorityValidationThrs()))
         };
         size_t nNumNonStdTxValidationThreads {
             static_cast<size_t>(
+                    // NOLINTNEXTLINE(*-narrowing-conversions)
                     gArgs.GetArg("-numnonstdtxvalidationthreads", GetNumLowPriorityValidationThrs()))
         };
         // Get a ratio for std and nonstd txns to be scheduled for validation in a single iteration.

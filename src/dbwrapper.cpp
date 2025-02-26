@@ -79,7 +79,7 @@ static leveldb::Options GetOptions(size_t nCacheSize, size_t nMaxFileSize, size_
     options.write_buffer_size = nCacheSize / 4;
     options.filter_policy = leveldb::NewBloomFilterPolicy(10);
     options.compression = leveldb::kNoCompression;
-    options.max_open_files = nMaxFiles;
+    options.max_open_files = nMaxFiles; // NOLINT(*-narrowing-conversions)
     options.max_file_size = nMaxFileSize;
     options.info_log = new CBitcoinLevelDBLogger();
     if (leveldb::kMajorVersion > 1 ||

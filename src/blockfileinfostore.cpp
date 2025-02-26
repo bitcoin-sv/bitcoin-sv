@@ -89,7 +89,7 @@ bool CBlockFileInfoStore::FindBlockPos(const Config &config, CValidationState &s
                 vinfoBlockFile[nLastBlockFile].ToString());
         }
         pBlockFileInfoStore->FlushBlockFile(!fKnown);
-        nLastBlockFile = nFile;
+        nLastBlockFile = nFile; // NOLINT(*-narrowing-conversions)
     }
 
     if (fKnown) {
@@ -117,7 +117,7 @@ bool CBlockFileInfoStore::FindBlockPos(const Config &config, CValidationState &s
         }
     }
 
-    setDirtyFileInfo.insert(nFile);
+    setDirtyFileInfo.insert(nFile); // NOLINT(*-narrowing-conversions)
     return true;
 }
 

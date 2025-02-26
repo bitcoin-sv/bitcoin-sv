@@ -123,6 +123,7 @@ VMTouch::VMTouch() : pagesize(sysconf(_SC_PAGESIZE))
 VMTouch::~VMTouch()
 {   }
 
+// NOLINTBEGIN(*-narrowing-conversions)
 // NOLINTBEGIN(cppcoreguidelines-avoid-goto)
 // NOLINTBEGIN(cppcoreguidelines-pro-type-vararg)
 
@@ -540,9 +541,6 @@ void VMTouch::vmtouch_crawl(std::string strPath)
     }
 }
 
-// NOLINTEND(cppcoreguidelines-pro-type-vararg)
-// NOLINTEND(cppcoreguidelines-avoid-goto)
-
 void VMTouch::vmtouch_touch(const std::string& strPath)
 {
     o_touch = true;
@@ -568,6 +566,10 @@ double VMTouch::getPagesInCorePercent()
 
   return 100.0*total_pages_in_core/total_pages;
 }
+
+// NOLINTEND(cppcoreguidelines-pro-type-vararg)
+// NOLINTEND(cppcoreguidelines-avoid-goto)
+// NOLINTEND(*-narrowing-conversions)
 
 #endif
 

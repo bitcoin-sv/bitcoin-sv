@@ -198,6 +198,7 @@ bool CoinsDB::DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
     size_t changed = 0;
     size_t batch_size =
         (size_t)gArgs.GetArgAsBytes("-dbbatchsize", nDefaultDbBatchSize);
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     int crash_simulate = gArgs.GetArg("-dbcrashratio", 0);
     assert(!hashBlock.IsNull());
 

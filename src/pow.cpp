@@ -27,6 +27,7 @@ static uint32_t GetNextEDAWorkRequired(const CBlockIndex *pindexPrev,
     if (nHeight % params.DifficultyAdjustmentInterval() == 0) {
         // Go back by what we want to be 14 days worth of blocks
         assert(nHeight >= params.DifficultyAdjustmentInterval());
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int32_t nHeightFirst = nHeight - params.DifficultyAdjustmentInterval();
         const CBlockIndex *pindexFirst = pindexPrev->GetAncestor(nHeightFirst);
         assert(pindexFirst);

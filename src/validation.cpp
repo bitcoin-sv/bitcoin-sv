@@ -833,6 +833,7 @@ size_t GetNumLowPriorityValidationThrs(size_t nTestingHCValue) {
     if (numHardwareThrs < 4) {
         return 1;
     }
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     return static_cast<size_t>(numHardwareThrs * 0.25);
 }
 
@@ -854,12 +855,13 @@ size_t GetNumHighPriorityValidationThrs(size_t nTestingHCValue) {
 MempoolSizeLimits MempoolSizeLimits::FromConfig() {
     const auto limitMemory = GlobalConfig::GetConfig().GetMaxMempool();
     const auto limitDisk = GlobalConfig::GetConfig().GetMaxMempoolSizeDisk();
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     const auto limitSecondaryRatio = GlobalConfig::GetConfig().GetMempoolMaxPercentCPFP() / 100.0;
     const auto limitExpiry = GlobalConfig::GetConfig().GetMemPoolExpiry();
     return MempoolSizeLimits(
         limitMemory,
         limitDisk,
-        limitSecondaryRatio * limitMemory,
+        limitSecondaryRatio * limitMemory, // NOLINT(*-narrowing-conversions)
         limitExpiry);
 }
 
@@ -868,6 +870,7 @@ std::vector<TxId> LimitMempoolSize(
     const CJournalChangeSetPtr& changeSet,
     const MempoolSizeLimits& limits) {
 
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     int expired = pool.Expire(GetTime() - limits.Age(), changeSet);
     if (expired != 0) {
         LogPrint(BCLog::MEMPOOL,
@@ -1116,8 +1119,12 @@ CTxnValResult TxnValidation(
         const CBlockIndex* tip = chainActive.Tip();
         int32_t height { tip->GetHeight() };
         lockTimeFlags = StandardNonFinalVerifyFlags(GetProtocolEra(config, height));
-        ContextualCheckTransactionForCurrentBlock(config, tx, height, tip->GetMedianTimePast(),
-            ctxState, lockTimeFlags);
+        ContextualCheckTransactionForCurrentBlock(config, tx, height,
+                                                  // NOLINTBEGIN(*-narrowing-conversions)
+                                                  tip->GetMedianTimePast(),
+                                                  ctxState,
+                                                  lockTimeFlags);
+                                                  // NOLINTEND(*-narrowing-conversions)
         if(ctxState.IsNonFinal() || ctxState.IsInvalid()) {
             if(ctxState.IsInvalid()) {
                 // We copy the state from a dummy to ensure we don't increase the
@@ -1210,6 +1217,7 @@ CTxnValResult TxnValidation(
     // transactions that can't be mined yet. Must keep pool.cs for this
     // unless we change CheckSequenceLocks to take a CoinsViewCache
     // instead of create its own.
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     if (!CheckSequenceLocks(*chainActive.Tip(), tx, config, lockTimeFlags, &lp, &view)) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "non-BIP68-final");
@@ -3474,6 +3482,7 @@ private:
         // Start enforcing BIP68 (sequence locks).
         int nLockTimeFlags = 0;
         if (pindex->GetHeight() >= consensusParams.CSVHeight) {
+            // NOLINTNEXTLINE(*-narrowing-conversions)
             nLockTimeFlags |= StandardNonFinalVerifyFlags(era);
         }
 
@@ -3817,6 +3826,7 @@ bool FlushStateToDisk(
     FlushStateMode mode,
     int32_t nManualPruneHeight) {
 
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     int64_t nMempoolUsage = mempool.DynamicMemoryUsage();
     LOCK(cs_main);
     static int64_t nLastWrite = 0;
@@ -3857,11 +3867,14 @@ bool FlushStateToDisk(
             if (nLastSetChain == 0) {
                 nLastSetChain = nNow;
             }
+            // NOLINTBEGIN(*-narrowing-conversions)
             int64_t nMempoolSizeMax = GlobalConfig::GetConfig().GetMaxMempool();
             int64_t cacheSize = pcoinsTip->DynamicMemoryUsage();
             int64_t nTotalSpace =
                 nCoinCacheUsage +
                 std::max<int64_t>(nMempoolSizeMax - nMempoolUsage, 0);
+            // NOLINTEND(*-narrowing-conversions)
+
             // The cache is large and we're within 10% and 10 MiB of the limit,
             // but we have time now (not in the middle of a block processing).
             bool fCacheLarge =
@@ -7203,6 +7216,7 @@ bool LoadExternalBlockFile(const Config &config, UniqueCFile fileIn,
             try {
                 // Locate a header.
                 uint8_t buf[CMessageFields::MESSAGE_START_SIZE];
+                // NOLINTNEXTLINE(*-narrowing-conversions)
                 blkdat.FindByte(chainparams.DiskMagic()[0]);
                 nRewind = blkdat.GetPos() + 1;
                 blkdat >> FLATDATA(buf);
@@ -7639,9 +7653,11 @@ double GuessVerificationProgress(const ChainTxData &data, const CBlockIndex *pin
 
     double fTxTotal;
     if (pindex->GetChainTx() <= data.nTxCount) {
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         fTxTotal = data.nTxCount + (nNow - data.nTime) * data.dTxRate;
     } else {
         fTxTotal =
+            // NOLINTNEXTLINE(*-narrowing-conversions)
             pindex->GetChainTx() + (nNow - pindex->GetBlockTime()) * data.dTxRate;
     }
 

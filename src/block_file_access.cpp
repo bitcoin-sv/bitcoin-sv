@@ -435,6 +435,7 @@ bool BlockFileAccess::LoadBlockHashAndTx(
 #if defined(WIN32)
         _fseeki64(file.Get(), postx.TxOffset(), SEEK_CUR);
 #else
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         fseek(file.Get(), postx.TxOffset(), SEEK_CUR);
 #endif
         file >> txOut;
