@@ -1747,7 +1747,7 @@ void CleanupBlockRevFiles() {
     // removing block files.
     int nContigCounter = 0;
     for (const auto& item : mapBlockFiles) {
-        if (atoi(item.first) == nContigCounter) {
+        if (atoi(item.first) == nContigCounter) { // NOLINT(cert-err34-c)
             nContigCounter++;
             continue;
         }
