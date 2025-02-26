@@ -42,6 +42,7 @@ CBloomFilter::CBloomFilter(unsigned int nElements, double nFPRate, unsigned int 
         throw std::runtime_error ( "Error: Invalid Parameter nFPRate passed to constructor" );
     }
     vData.resize(std::min((unsigned int)(-1 / LN2SQUARED * nElements * log(nFPRate)), MAX_BLOOM_FILTER_SIZE * 8) / 8);
+    // NOLINTNEXTLINE(bugprone-integer-division)
     nHashFuncs = std::min((unsigned int)(vData.size() * 8 / nElements * LN2),MAX_HASH_FUNCS);
     return;
 }
