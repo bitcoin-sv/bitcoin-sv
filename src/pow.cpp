@@ -13,6 +13,8 @@
 #include "uint256.h"
 #include "validation.h"
 
+#include <array>
+
 /**
  * Compute the next required proof of work using the legacy Bitcoin difficulty
  * adjustment + Emergency Difficulty Adjustment (EDA).
@@ -213,7 +215,7 @@ static const CBlockIndex *GetSuitableBlock(const CBlockIndex *pindex) {
      * influence, we select the median of the 3 top most blocks as a starting
      * point.
      */
-    const CBlockIndex *blocks[3];
+    std::array<const CBlockIndex*, 3> blocks{};
     blocks[2] = pindex;
     blocks[1] = pindex->GetPrev();
     blocks[0] = blocks[1]->GetPrev();

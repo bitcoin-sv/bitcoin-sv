@@ -125,6 +125,7 @@ VMTouch::~VMTouch()
 
 // NOLINTBEGIN(*-narrowing-conversions)
 // NOLINTBEGIN(cert-err33-c)
+// NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays)
 // NOLINTBEGIN(cppcoreguidelines-avoid-goto)
 // NOLINTBEGIN(cppcoreguidelines-pro-type-vararg)
 
@@ -570,6 +571,7 @@ double VMTouch::getPagesInCorePercent()
 
 // NOLINTEND(cppcoreguidelines-pro-type-vararg)
 // NOLINTEND(cppcoreguidelines-avoid-goto)
+// NOLINTEND(cppcoreguidelines-avoid-c-arrays)
 // NOLINTEND(cert-err33-c)
 // NOLINTEND(*-narrowing-conversions)
 

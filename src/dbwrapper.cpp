@@ -5,9 +5,13 @@
 #include "dbwrapper.h"
 #include "random.h"
 #include "util.h"
-#include <boost/filesystem.hpp>
+
 #include <algorithm>
+#include <array>
 #include <cstdint>
+
+#include <boost/filesystem.hpp>
+
 #include <leveldb/cache.h>
 #include <leveldb/env.h>
 #include <leveldb/filter_policy.h>
@@ -22,13 +26,13 @@ public:
         if (!LogAcceptCategory(BCLog::LEVELDB)) {
             return;
         }
-        char buffer[500];
+        std::array<char, 500> buffer{};
         for (int iter = 0; iter < 2; iter++) {
             char *base;
             int bufsize;
             if (iter == 0) {
                 bufsize = sizeof(buffer);
-                base = buffer;
+                base = buffer.data();
             } else {
                 bufsize = 30000;
                 base = new char[bufsize];
@@ -63,7 +67,7 @@ public:
             assert(p <= limit);
             base[std::min(bufsize - 1, (int)(p - base))] = '\0';
             LogPrintf("leveldb: %s", base);
-            if (base != buffer) {
+            if (base != buffer.data()) {
                 delete[] base;
             }
             break;
@@ -101,6 +105,17 @@ static const std::string OBFUSCATE_KEY_KEY("\000obfuscate_key", 14);
 
 // The length of the obfuscate key in number of bytes
 static constexpr unsigned int OBFUSCATE_KEY_NUM_BYTES{8};
+
+/**
+ * Returns a string (consisting of 8 random bytes) suitable for use as an
+ * obfuscating XOR key.
+ */
+static std::vector<uint8_t> CreateObfuscateKey()
+{
+    std::vector<uint8_t> buff(OBFUSCATE_KEY_NUM_BYTES);
+    GetRandBytes(buff.data(), OBFUSCATE_KEY_NUM_BYTES);
+    return buff;
+}
 
 CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize,
                        bool fMemory, bool fWipe, bool obfuscate,
@@ -182,16 +197,6 @@ bool CDBWrapper::WriteBatch(CDBBatch &batch, bool fSync) {
         pdb->Write(fSync ? syncoptions : writeoptions, &batch.batch);
     dbwrapper_private::HandleError(status);
     return true;
-}
-
-/**
- * Returns a string (consisting of 8 random bytes) suitable for use as an
- * obfuscating XOR key.
- */
-std::vector<uint8_t> CDBWrapper::CreateObfuscateKey() const {
-    uint8_t buff[OBFUSCATE_KEY_NUM_BYTES];
-    GetRandBytes(buff, OBFUSCATE_KEY_NUM_BYTES);
-    return std::vector<uint8_t>(&buff[0], &buff[OBFUSCATE_KEY_NUM_BYTES]);
 }
 
 bool CDBWrapper::IsEmpty() {

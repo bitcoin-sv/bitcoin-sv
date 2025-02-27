@@ -358,8 +358,6 @@ private:
     //! a key used for optional XOR-obfuscation of the database
     std::vector<uint8_t> obfuscate_key;
 
-    std::vector<uint8_t> CreateObfuscateKey() const;
-
 public:
     struct MaxFiles {
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)

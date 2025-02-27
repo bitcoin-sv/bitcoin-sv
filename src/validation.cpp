@@ -70,6 +70,7 @@
 #include "metrics.h"
 #include "safe_mode.h"
 
+#include <array>
 #include <atomic>
 
 #include <boost/algorithm/string/join.hpp>
@@ -7216,13 +7217,13 @@ bool LoadExternalBlockFile(const Config &config, UniqueCFile fileIn,
             uint32_t nSizeLegacy = 0;
             try {
                 // Locate a header.
-                uint8_t buf[CMessageFields::MESSAGE_START_SIZE];
+                std::array<uint8_t, CMessageFields::MESSAGE_START_SIZE> buf{};
                 // NOLINTNEXTLINE(*-narrowing-conversions)
                 blkdat.FindByte(chainparams.DiskMagic()[0]);
                 nRewind = blkdat.GetPos() + 1;
                 blkdat >> FLATDATA(buf);
-                if (memcmp(buf, chainparams.DiskMagic().data(),
-                           CMessageFields::MESSAGE_START_SIZE) != 0) {
+                if (memcmp(buf.data(), chainparams.DiskMagic().data(),
+                           buf.size()) != 0) {
                     continue;
                 }
                 // Read 32 bit size. If it is equal to 32 max than read also 64 bit size.

@@ -14,6 +14,8 @@
 #include "tinyformat.h"
 #include "util.h"
 
+#include <array>
+
 CBanDB::CBanDB(const CChainParams &chainParams) : chainParams(chainParams) {
     pathBanlist = GetDataDir() / "banlist.dat";
 }
@@ -87,14 +89,14 @@ bool CBanDB::Read(banmap_t &banSet) {
     if (hashIn != hashTmp)
         return error("%s: Checksum mismatch, data corrupted", __func__);
 
-    uint8_t pchMsgTmp[4];
+    std::array<uint8_t, 4> pchMsgTmp{};
     try {
         // de-serialize file header (network specific magic number) and ..
         ssBanlist >> FLATDATA(pchMsgTmp);
 
         // ... verify the network matches ours
-        if (memcmp(pchMsgTmp, chainParams.DiskMagic().data(),
-                   sizeof(pchMsgTmp)) != 0) {
+        if (memcmp(pchMsgTmp.data(), chainParams.DiskMagic().data(),
+                   pchMsgTmp.size()) != 0) {
             return error("%s: Invalid network magic number", __func__);
         }
 
@@ -183,14 +185,14 @@ bool CAddrDB::Read(CAddrMan &addr) {
 }
 
 bool CAddrDB::Read(CAddrMan &addr, CDataStream &ssPeers) {
-    uint8_t pchMsgTmp[4];
+    std::array<uint8_t, 4> pchMsgTmp{};
     try {
         // de-serialize file header (network specific magic number) and ..
         ssPeers >> FLATDATA(pchMsgTmp);
 
         // ... verify the network matches ours
-        if (memcmp(pchMsgTmp, chainParams.DiskMagic().data(),
-                   sizeof(pchMsgTmp)) != 0) {
+        if (memcmp(pchMsgTmp.data(), chainParams.DiskMagic().data(),
+                   pchMsgTmp.size()) != 0) {
             return error("%s: Invalid network magic number", __func__);
         }
 
