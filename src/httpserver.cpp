@@ -433,7 +433,7 @@ struct event_base *EventBase() {
 // this callback is called after successful or failed transmission
 static void httpevent_callback_fn(evutil_socket_t, short, void *data) {
     // Static handler: simply call inner handler
-    HTTPEvent *self = ((HTTPEvent *)data);
+    HTTPEvent* self = static_cast<HTTPEvent*>(data);
     self->handler();
     if (self->deleteWhenTriggered) delete self;
 }
@@ -490,7 +490,7 @@ std::string HTTPRequest::ReadBody() {
      * abstraction to consume the evbuffer on the fly in the parsing algorithm.
      */
     // NOLINTNEXTLINE(*-narrowing-conversions)
-    const char *data = (const char *)evbuffer_pullup(buf, size);
+    const char* data = reinterpret_cast<const char*>(evbuffer_pullup(buf, size));
     // returns nullptr in case of empty buffer.
     if (!data) {
         return "";
