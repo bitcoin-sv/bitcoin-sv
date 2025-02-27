@@ -52,7 +52,20 @@ public:
     }
 };
 
+struct rf_name
+{
+    enum RetFormat rf;
+    const char* name;
+};
+
 } // namespace
+
+static constexpr std::array<rf_name, 4> rf_names = {{
+    {RF_UNDEF, ""},
+    {RF_BINARY, "bin"},
+    {RF_HEX, "hex"},
+    {RF_JSON, "json"},
+}};
 
 extern UniValue mempoolInfoToJSON(const Config& config);
 extern void writeMempoolToJson(CJSONWriter& jWriter, bool fVerbose = false);
@@ -75,10 +88,10 @@ static enum RetFormat ParseDataFormat(std::string &param,
     param = strReq.substr(0, pos);
     const std::string suff(strReq, pos + 1);
 
-    for (size_t i = 0; i < ARRAYLEN(rf_names); i++) {
-        if (suff == rf_names[i].name) {
-            return rf_names[i].rf;
-        }
+    for(const auto& rf_name : rf_names)
+    {
+        if(suff == rf_name.name)
+            return rf_name.rf;
     }
 
     /* If no suffix is found, return original string.  */
@@ -86,12 +99,15 @@ static enum RetFormat ParseDataFormat(std::string &param,
     return rf_names[0].rf;
 }
 
-static std::string AvailableDataFormatsString() {
+static std::string AvailableDataFormatsString()
+{
     std::string formats = "";
-    for (size_t i = 0; i < ARRAYLEN(rf_names); i++) {
-        if (strlen(rf_names[i].name) > 0) {
+    for(const auto& rf_name : rf_names)
+    {
+        if(strlen(rf_name.name) > 0)
+        {
             formats.append(".");
-            formats.append(rf_names[i].name);
+            formats.append(rf_name.name);
             formats.append(", ");
         }
     }
