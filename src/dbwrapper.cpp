@@ -43,11 +43,13 @@ public:
             // Print the message
             if (p < limit) {
                 va_list backup_ap; // NOLINT(cppcoreguidelines-pro-type-vararg)
-                va_copy(backup_ap, ap);
+                // NOLINTBEGIN(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+                va_copy(backup_ap, ap); 
                 // Do not use vsnprintf elsewhere in bitcoin source code, see
                 // above.
                 p += vsnprintf(p, limit - p, format, backup_ap);
                 va_end(backup_ap);
+                // NOLINTEND(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
             }
 
             // Truncate to available space if necessary
