@@ -129,6 +129,7 @@ VMTouch::~VMTouch()
 // NOLINTBEGIN(cppcoreguidelines-avoid-goto)
 // NOLINTBEGIN(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 // NOLINTBEGIN(cppcoreguidelines-pro-type-vararg)
 
 // NOLINTNEXTLINE(cert-dcl50-cpp)
@@ -572,6 +573,7 @@ double VMTouch::getPagesInCorePercent()
 }
 
 // NOLINTEND(cppcoreguidelines-pro-type-vararg)
+// NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
 // NOLINTEND(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 // NOLINTEND(cppcoreguidelines-avoid-goto)

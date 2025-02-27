@@ -38,6 +38,7 @@ public:
                 base = new char[bufsize];
             }
             char *p = base;
+            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             char *limit = base + bufsize;
 
             // Print the message
@@ -68,6 +69,7 @@ public:
 
             assert(p <= limit);
             base[std::min(bufsize - 1, (int)(p - base))] = '\0';
+            // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             LogPrintf("leveldb: %s", base);
             if (base != buffer.data()) {
                 delete[] base;
