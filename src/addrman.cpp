@@ -132,8 +132,10 @@ void CAddrMan::Delete(int nId) {
     nNew--;
 }
 
-void CAddrMan::ClearNew(int nUBucket, int nUBucketPos) {
+void CAddrMan::ClearNew(int nUBucket, int nUBucketPos)
+{
     // if there is an entry in the specified bucket, delete it.
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
     if (vvNew[nUBucket][nUBucketPos] != -1) {
         int nIdDelete = vvNew[nUBucket][nUBucketPos];
         CAddrInfo &infoDelete = mapInfo[nIdDelete];
@@ -144,9 +146,12 @@ void CAddrMan::ClearNew(int nUBucket, int nUBucketPos) {
             Delete(nIdDelete);
         }
     }
+    // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
 }
 
-void CAddrMan::MakeTried(CAddrInfo &info, int nId) {
+void CAddrMan::MakeTried(CAddrInfo &info, int nId)
+{
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
     // remove the entry from all new buckets
     for (int bucket = 0; bucket < ADDRMAN_NEW_BUCKET_COUNT; bucket++) {
         int pos = info.GetBucketPosition(nKey, true, bucket);
@@ -192,6 +197,7 @@ void CAddrMan::MakeTried(CAddrInfo &info, int nId) {
     vvTried[nKBucket][nKBucketPos] = nId;
     nTried++;
     info.fInTried = true;
+    // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
 }
 
 void CAddrMan::Good_(const CService &addr, int64_t nTime) {
@@ -227,6 +233,7 @@ void CAddrMan::Good_(const CService &addr, int64_t nTime) {
         // NOLINTNEXTLINE(*-narrowing-conversions)
         int nB = (n + nRnd) % ADDRMAN_NEW_BUCKET_COUNT;
         int nBpos = info.GetBucketPosition(nKey, true, nB);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         if (vvNew[nB][nBpos] == nId) {
             nUBucket = nB;
             break;
@@ -294,6 +301,7 @@ bool CAddrMan::Add_(const CAddress &addr, const CNetAddr &source,
 
     int nUBucket = pinfo->GetNewBucket(nKey, source);
     int nUBucketPos = pinfo->GetBucketPosition(nKey, true, nUBucket);
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
     if (vvNew[nUBucket][nUBucketPos] != nId) {
         bool fInsert = vvNew[nUBucket][nUBucketPos] == -1;
         if (!fInsert) {
@@ -314,6 +322,7 @@ bool CAddrMan::Add_(const CAddress &addr, const CNetAddr &source,
             }
         }
     }
+    // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
     return fNew;
 }
 
@@ -343,6 +352,7 @@ CAddrInfo CAddrMan::Select_(bool newOnly) {
 
     if (newOnly && nNew == 0) return CAddrInfo();
 
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
     // Use a 50% chance for choosing between tried and new table entries.
     if (!newOnly && (nTried > 0 && (nNew == 0 || RandomInt(2) == 0))) {
         // use a tried node
@@ -394,6 +404,7 @@ CAddrInfo CAddrMan::Select_(bool newOnly) {
             fChanceFactor *= 1.2;
         }
     }
+    // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
 }
 
 #ifdef DEBUG_ADDRMAN

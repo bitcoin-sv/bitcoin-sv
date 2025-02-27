@@ -62,7 +62,13 @@ namespace
         }
     }
 }
-std::mutex& CBlockIndex::GetMutex() const { return blockIndexMutexes[ hash_byte(reinterpret_cast<std::size_t>(this)) % blockIndexMutexes.size() ]; }
+
+std::mutex& CBlockIndex::GetMutex() const
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
+    return blockIndexMutexes[hash_byte(reinterpret_cast<std::size_t>(this)) %
+                             blockIndexMutexes.size()];
+}
 
 CBlockIndex *CBlockIndex::GetAncestor(int32_t height) {
 
