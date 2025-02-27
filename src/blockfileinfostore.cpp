@@ -13,6 +13,7 @@
 #include "consensus/validation.h" // CValidationState
 
 /** Access to info about block files */
+// NOLINTNEXTLINE(cert-err58-cpp)
 std::unique_ptr<CBlockFileInfoStore> pBlockFileInfoStore = std::make_unique<CBlockFileInfoStore>();
 
 void CBlockFileInfoStore::FindNextFileWithEnoughEmptySpace(const Config &config,

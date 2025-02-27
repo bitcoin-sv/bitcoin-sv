@@ -5,7 +5,7 @@
 
 #include "validationinterface.h"
 
-static CMainSignals g_signals;
+static CMainSignals g_signals; // NOLINT(cert-err58-cpp)
 
 CMainSignals &GetMainSignals() {
     return g_signals;

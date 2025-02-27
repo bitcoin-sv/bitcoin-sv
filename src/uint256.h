@@ -29,7 +29,7 @@ protected:
 
 public:
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-    base_blob() { memset(data, 0, sizeof(data)); }
+    base_blob() noexcept { memset(data, 0, sizeof(data)); }
     
     template<typename T>
     base_blob(T first, T last)
@@ -165,7 +165,8 @@ public:
  */
 class uint256 : public base_blob<256> {
 public:
-    uint256() {}
+    uint256() = default;
+
     uint256(const base_blob& b) : base_blob(b) {}
     explicit uint256(const std::vector<uint8_t>& vch)
         : uint256(vch.begin(), vch.end()) 

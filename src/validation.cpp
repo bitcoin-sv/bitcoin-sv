@@ -90,12 +90,12 @@ using namespace mining;
 /**
  * Global state
  */
-CCriticalSection cs_main;
+CCriticalSection cs_main; // NOLINT(cert-err58-cpp)
 
 BlockIndexStore mapBlockIndex;
 CChain chainActive;
-CWaitableCriticalSection csBestBlock;
-CConditionVariable cvBlockChange;
+CWaitableCriticalSection csBestBlock; // NOLINT(cert-err58-cpp)
+CConditionVariable cvBlockChange;     // NOLINT(cert-err58-cpp)
 std::atomic_bool fImporting(false);
 std::atomic_bool fReindex{ false };
 bool fTxIndex = false;
@@ -115,13 +115,14 @@ CBlockValidationStatus blockValidationStatus;
 
 Amount maxTxFee = DEFAULT_TRANSACTION_MAXFEE;
 
-CTxMemPool mempool;
+CTxMemPool mempool; // NOLINT(cert-err58-cpp)
 
 static void CheckBlockIndex(const Consensus::Params &consensusParams);
 
 /** Constant stuff for coinbase transactions we create: */
-CScript COINBASE_FLAGS;
+CScript COINBASE_FLAGS; // NOLINT(cert-err58-cpp)
 
+// NOLINTNEXTLINE(cert-err58-cpp)
 const std::string strMessageMagic = "Bitcoin Signed Message:\n";
 
 // Internal stuff
@@ -195,7 +196,7 @@ bool fCheckForPruning = false;
  * Every received block is assigned a unique and increasing identifier, so we
  * know which one to give priority in case of a fork.
  */
-CCriticalSection cs_nBlockSequenceId;
+CCriticalSection cs_nBlockSequenceId; // NOLINT(cert-err58-cpp)
 /** Blocks loaded from disk are assigned id 0, so start the counter at 1. */
 int32_t nBlockSequenceId = 1;
 /** Decreasing counter (used by subsequent preciousblock calls). */

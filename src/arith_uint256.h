@@ -11,7 +11,6 @@
 #include <cstring>
 #include <stdexcept>
 #include <string>
-#include <vector>
 
 class uint256;
 
@@ -29,7 +28,7 @@ protected:
     uint32_t pn[WIDTH];
 
 public:
-    base_uint() {
+    base_uint() noexcept {
         for (int i = 0; i < WIDTH; i++)
             // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             pn[i] = 0;
@@ -52,7 +51,7 @@ public:
         return *this;
     }
 
-    base_uint(uint64_t b) {
+    base_uint(uint64_t b) noexcept {
         pn[0] = (unsigned int)b;
         pn[1] = (unsigned int)(b >> 32);
         for (int i = 2; i < WIDTH; i++)
@@ -278,9 +277,9 @@ public:
 /** 256-bit unsigned big integer. */
 class arith_uint256 : public base_uint<256> {
 public:
-    arith_uint256() {}
+    arith_uint256() = default;
     arith_uint256(const base_uint<256> &b) : base_uint<256>(b) {}
-    arith_uint256(uint64_t b) : base_uint<256>(b) {}
+    arith_uint256(uint64_t b) noexcept : base_uint<256>(b) {}
     explicit arith_uint256(const std::string &str) : base_uint<256>(str) {}
 
     /**

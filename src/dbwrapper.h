@@ -358,12 +358,6 @@ private:
     //! a key used for optional XOR-obfuscation of the database
     std::vector<uint8_t> obfuscate_key;
 
-    //! the key under which the obfuscation key is stored
-    static const std::string OBFUSCATE_KEY_KEY;
-
-    //! the length of the obfuscate key in number of bytes
-    static const unsigned int OBFUSCATE_KEY_NUM_BYTES;
-
     std::vector<uint8_t> CreateObfuscateKey() const;
 
 public:

@@ -93,7 +93,7 @@ std::unique_ptr<CConnman> g_connman;
 std::unique_ptr<PeerLogicValidation> peerLogic;
 
 #if ENABLE_ZMQ
-CCriticalSection cs_zmqNotificationInterface;
+CCriticalSection cs_zmqNotificationInterface; // NOLINT(cert-err58-cpp)
 CZMQNotificationInterface *pzmqNotificationInterface = nullptr;
 #endif
 
@@ -137,6 +137,7 @@ enum BindFlags {
 // the parent exits from main().
 //
 
+// NOLINTNEXTLINE(cert-err58-cpp)
 std::shared_ptr<task::CCancellationSource> shutdownSource(task::CCancellationSource::Make());
 std::atomic<bool> fDumpMempoolLater(false);
 
@@ -1683,8 +1684,8 @@ static void BlockNotifyCallback(bool initialSync,
 }
 
 static bool fHaveGenesis = false;
-static boost::mutex cs_GenesisWait;
-static CConditionVariable condvar_GenesisWait;
+static boost::mutex cs_GenesisWait; // NOLINT(cert-err58-cpp)
+static CConditionVariable condvar_GenesisWait; // NOLINT(cert-err58-cpp)
 
 static void BlockNotifyGenesisWait(bool, const CBlockIndex *pBlockIndex) {
     if (pBlockIndex != nullptr) {

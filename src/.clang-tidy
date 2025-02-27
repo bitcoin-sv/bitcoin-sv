@@ -6,7 +6,6 @@ Checks: '-*,
          -bugprone-easily-swappable-parameters,
 
          cert-*,
-         -cert-err58-cpp,
 
          -clang-analyzer-*
          

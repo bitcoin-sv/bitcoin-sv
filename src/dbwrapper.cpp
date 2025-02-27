@@ -91,6 +91,17 @@ static leveldb::Options GetOptions(size_t nCacheSize, size_t nMaxFileSize, size_
     return options;
 }
 
+//! the key under which the obfuscation key is stored
+// Prefixed with null character to avoid collisions with other keys
+//
+// We must use a string constructor which specifies length so that we copy past
+// the null-terminator.
+// NOLINTNEXTLINE(cert-err58-cpp)
+static const std::string OBFUSCATE_KEY_KEY("\000obfuscate_key", 14);
+
+// The length of the obfuscate key in number of bytes
+static constexpr unsigned int OBFUSCATE_KEY_NUM_BYTES{8};
+
 CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize,
                        bool fMemory, bool fWipe, bool obfuscate,
                        MaxFiles maxFiles, size_t nMaxFileSize)
@@ -172,14 +183,6 @@ bool CDBWrapper::WriteBatch(CDBBatch &batch, bool fSync) {
     dbwrapper_private::HandleError(status);
     return true;
 }
-
-// Prefixed with null character to avoid collisions with other keys
-//
-// We must use a string constructor which specifies length so that we copy past
-// the null-terminator.
-const std::string CDBWrapper::OBFUSCATE_KEY_KEY("\000obfuscate_key", 14);
-
-const unsigned int CDBWrapper::OBFUSCATE_KEY_NUM_BYTES = 8;
 
 /**
  * Returns a string (consisting of 8 random bytes) suitable for use as an
