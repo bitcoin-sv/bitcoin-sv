@@ -223,8 +223,7 @@ void Shutdown() {
             FlushStateToDisk();
         }
         pcoinsTip.reset();
-        delete pblocktree;
-        pblocktree = nullptr;
+        pblocktree.reset();
     }
 
     // Flush/destroy miner ID database
@@ -1772,7 +1771,7 @@ void ThreadImport(const Config& config,
 
         // -reindex
         if (fReindex) {
-            ReindexAllBlockFiles(config, pblocktree, fReindex);
+            ReindexAllBlockFiles(config, pblocktree.get(), fReindex);
         }
 
         // hardcoded $DATADIR/bootstrap.dat
@@ -3638,10 +3637,8 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
             try {
                 UnloadBlockIndex();
                 pcoinsTip.reset();
-                delete pblocktree;
+                pblocktree = std::make_unique<CBlockTreeDB>(nBlockTreeDBCache, false, fReindex);
 
-                pblocktree =
-                    new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
                 pMerkleTreeFactory = std::make_unique<CMerkleTreeFactory>(GetDataDir() / "merkle", static_cast<size_t>(nMerkleTreeIndexDBCache), GetMaxNumberOfMerkleTreeThreads());
                 pcoinsTip =
                     std::make_unique<CoinsDB>(

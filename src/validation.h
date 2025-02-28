@@ -1160,7 +1160,7 @@ extern std::unique_ptr<CoinsDB> pcoinsTip;
 
 /** Global variable that points to the active block tree (protected by cs_main)
  */
-extern CBlockTreeDB *pblocktree;
+extern std::unique_ptr<CBlockTreeDB> pblocktree;
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 /**

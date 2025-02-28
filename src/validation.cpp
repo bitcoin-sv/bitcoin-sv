@@ -225,7 +225,7 @@ const CBlockIndex *FindForkInGlobalIndex(const CChain &chain,
 }
 
 std::unique_ptr<CoinsDB> pcoinsTip;
-CBlockTreeDB *pblocktree = nullptr;
+std::unique_ptr<CBlockTreeDB> pblocktree;
 
 /**
  * Test whether the given transaction is final for the given height and time.
