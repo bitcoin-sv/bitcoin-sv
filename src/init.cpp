@@ -94,7 +94,7 @@ std::unique_ptr<PeerLogicValidation> peerLogic;
 
 #if ENABLE_ZMQ
 CCriticalSection cs_zmqNotificationInterface; // NOLINT(cert-err58-cpp)
-CZMQNotificationInterface *pzmqNotificationInterface = nullptr;
+std::unique_ptr<CZMQNotificationInterface> pzmqNotificationInterface;
 #endif
 
 #ifdef WIN32
@@ -247,8 +247,7 @@ void Shutdown() {
         LOCK(cs_zmqNotificationInterface);
         if (pzmqNotificationInterface) {
             pzmqNotificationInterface->UnregisterValidationInterface();
-            delete pzmqNotificationInterface;
-            pzmqNotificationInterface = nullptr;
+            pzmqNotificationInterface.reset();
         }
     }
 #endif

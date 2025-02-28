@@ -7,6 +7,7 @@
 #define BITCOIN_INIT_H
 
 #include <atomic>
+#include <memory>
 #include <string>
 
 #include "sync.h"
@@ -28,7 +29,7 @@ class CWallet;
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern CCriticalSection cs_zmqNotificationInterface;
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-extern CZMQNotificationInterface *pzmqNotificationInterface;
+extern std::unique_ptr<CZMQNotificationInterface> pzmqNotificationInterface;
 #endif
 
 namespace boost {
