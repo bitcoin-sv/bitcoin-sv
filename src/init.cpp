@@ -3408,7 +3408,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     }
     CConnman &connman = *g_connman;
 
-    peerLogic.reset(new PeerLogicValidation(&connman));
+    peerLogic = std::make_unique<PeerLogicValidation>(&connman);
     if (gArgs.IsArgSet("-broadcastdelay")) {
         const int64_t nDelayMillisecs = gArgs.GetArg("-broadcastdelay", DEFAULT_INV_BROADCAST_DELAY);
         if(!SetInvBroadcastDelay(nDelayMillisecs)){
