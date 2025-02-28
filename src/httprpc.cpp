@@ -6,7 +6,6 @@
 #include "config.h"
 #include "crypto/hmac_sha256.h"
 #include "httpserver.h"
-#include "random.h"
 #include "rpc/http_protocol.h"
 #include "rpc/protocol.h"
 #include "rpc/server.h"
@@ -14,7 +13,9 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "rpc/blockchain.h"
-#include <algorithm>
+
+#include <memory>
+
 #include <boost/algorithm/string.hpp> // boost::trim
 
 /** WWW-Authenticate to present with 401 Unauthorized response */
@@ -58,7 +59,7 @@ private:
 /* Pre-base64-encoded authentication token */
 static std::string strRPCUserColonPass;
 /* Stored RPC timer interface (for unregistration) */
-static HTTPRPCTimerInterface *httpRPCTimerInterface = 0;
+static std::unique_ptr<HTTPRPCTimerInterface> httpRPCTimerInterface;
 /* RPC CORS Domain, allowed Origin */
 static std::string strRPCCORSDomain;
 
@@ -375,8 +376,8 @@ bool StartHTTPRPC() {
     RegisterHTTPHandler("/wallet/", false, HTTPReq_JSONRPC);
 #endif
     assert(EventBase());
-    httpRPCTimerInterface = new HTTPRPCTimerInterface(EventBase());
-    RPCSetTimerInterface(httpRPCTimerInterface);
+    httpRPCTimerInterface = std::make_unique<HTTPRPCTimerInterface>(EventBase());
+    RPCSetTimerInterface(httpRPCTimerInterface.get());
     return true;
 }
 
@@ -387,9 +388,9 @@ void InterruptHTTPRPC() {
 void StopHTTPRPC() {
     LogPrint(BCLog::RPC, "Stopping HTTP RPC server\n");
     UnregisterHTTPHandler("/", true);
-    if (httpRPCTimerInterface) {
-        RPCUnsetTimerInterface(httpRPCTimerInterface);
-        delete httpRPCTimerInterface;
-        httpRPCTimerInterface = 0;
+    if(httpRPCTimerInterface)
+    {
+        RPCUnsetTimerInterface(httpRPCTimerInterface.get());
+        httpRPCTimerInterface.reset();
     }
 }
