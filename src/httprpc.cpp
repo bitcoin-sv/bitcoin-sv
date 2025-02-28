@@ -14,6 +14,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "rpc/blockchain.h"
+#include <algorithm>
 #include <boost/algorithm/string.hpp> // boost::trim
 
 /** WWW-Authenticate to present with 401 Unauthorized response */
@@ -37,17 +38,21 @@ private:
     HTTPEvent ev;
 };
 
-class HTTPRPCTimerInterface : public RPCTimerInterface {
+class HTTPRPCTimerInterface : public RPCTimerInterface
+{
 public:
-    HTTPRPCTimerInterface(struct event_base *_base) : base(_base) {}
-    const char *Name() override { return "HTTP"; }
-    RPCTimerBase *NewTimer(std::function<void(void)> &func,
-                           int64_t millis) override {
-        return new HTTPRPCTimer(base, func, millis);
+    HTTPRPCTimerInterface(struct event_base* _base) : base(_base) {}
+
+    const char* Name() override { return "HTTP"; }
+
+    std::unique_ptr<RPCTimerBase> NewTimer(std::function<void(void)>& func,
+                                           int64_t millis) override
+    {
+        return make_unique<HTTPRPCTimer>(base, func, millis);
     }
 
 private:
-    struct event_base *base;
+    struct event_base* base;
 };
 
 /* Pre-base64-encoded authentication token */

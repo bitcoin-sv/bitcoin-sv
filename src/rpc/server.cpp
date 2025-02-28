@@ -583,9 +583,7 @@ void RPCRunLater(const std::string &name, std::function<void(void)> func,
     deadlineTimers.erase(name);
     LogPrint(BCLog::RPC, "queue run of timer %s in %i seconds (using %s)\n",
              name, nSeconds, timerInterface->Name());
-    deadlineTimers.emplace(
-        name, std::unique_ptr<RPCTimerBase>(
-                  timerInterface->NewTimer(func, nSeconds * 1000)));
+    deadlineTimers.emplace(name, timerInterface->NewTimer(func, nSeconds * 1'000));
 }
 
 int RPCSerializationFlags() {

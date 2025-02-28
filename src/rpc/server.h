@@ -15,6 +15,7 @@
 #include <functional>
 #include <list>
 #include <map>
+#include <memory>
 #include <string>
 
 #include <univalue.h>
@@ -115,8 +116,8 @@ public:
      * but only GUI RPC console, and to break the dependency of pcserver on
      * httprpc.
      */
-    virtual RPCTimerBase *NewTimer(std::function<void(void)> &func,
-                                   int64_t millis) = 0;
+    virtual std::unique_ptr<RPCTimerBase> NewTimer(std::function<void(void)>& func,
+                                                   int64_t millis) = 0;
 };
 
 /** Set the factory function for timers */
