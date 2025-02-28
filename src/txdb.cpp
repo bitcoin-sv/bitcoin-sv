@@ -37,9 +37,12 @@ namespace {
 
 struct CoinEntry {
     COutPoint *outpoint;
-    char key;
-    CoinEntry(const COutPoint *ptr)
-        : outpoint(const_cast<COutPoint *>(ptr)), key(DB_COIN) {}
+    char key{DB_COIN};
+
+    CoinEntry(const COutPoint* ptr):
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+        outpoint(const_cast<COutPoint*>(ptr))
+    {}
 
     template <typename Stream> void Serialize(Stream &s) const {
         s << key;
@@ -295,9 +298,10 @@ bool CBlockTreeDB::ReadLastBlockFile(int &nFile) {
     return Read(DB_LAST_BLOCK, nFile);
 }
 
-CCoinsViewDBCursor *CoinsDB::Cursor() const {
-    CCoinsViewDBCursor *i = new CCoinsViewDBCursor(
-        const_cast<CDBWrapper &>(db).NewIterator(), GetBestBlock());
+CCoinsViewDBCursor* CoinsDB::Cursor() const
+{
+    CCoinsViewDBCursor* i = new CCoinsViewDBCursor(db.NewIterator(),
+                                                   GetBestBlock());
     /**
      * It seems that there are no "const iterators" for LevelDB. Since we only
      * need read operations on it, use a const-cast to get around that
@@ -317,10 +321,11 @@ CCoinsViewDBCursor *CoinsDB::Cursor() const {
 }
 
 // Same as CCoinsViewCursor::Cursor() with added Seek() to key txId
-CCoinsViewDBCursor* CoinsDB::Cursor(const TxId &txId) const {
-    CCoinsViewDBCursor* i = new CCoinsViewDBCursor(
-        const_cast<CDBWrapper&>(db).NewIterator(), GetBestBlock());
-    
+CCoinsViewDBCursor* CoinsDB::Cursor(const TxId& txId) const
+{
+    CCoinsViewDBCursor* i = new CCoinsViewDBCursor(db.NewIterator(),
+                                                   GetBestBlock());
+
     COutPoint op = COutPoint(txId, 0);
     CoinEntry key = CoinEntry(&op);
 
@@ -426,6 +431,7 @@ bool CBlockTreeDB::WriteBatchSync(
              blockinfo.begin();
          it != blockinfo.end(); it++) {
         batch.Write(std::make_pair(DB_BLOCK_INDEX, (*it)->GetBlockHash()),
+                    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
                     CDiskBlockIndex(const_cast<CBlockIndex&>(**it)));
     }
     return WriteBatch(batch, true);

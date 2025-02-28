@@ -70,8 +70,9 @@ std::mutex& CBlockIndex::GetMutex() const
                              blockIndexMutexes.size()];
 }
 
-CBlockIndex *CBlockIndex::GetAncestor(int32_t height) {
-
+CBlockIndex *CBlockIndex::GetAncestor(int32_t height)
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
     return const_cast<CBlockIndex*>(static_cast<const CBlockIndex*>(this)->GetAncestor(height));
 }
 

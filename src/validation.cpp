@@ -385,6 +385,7 @@ bool CheckSequenceLocks(
     // know if a transaction can be part of the *next* block, we need to use one
     // more than chainActive.Height()
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
     CBlockIndex::TemporaryBlockIndex index{ const_cast<CBlockIndex&>(tip), {} };
     std::pair<int32_t, int64_t> lockPair;
     if (bool useExistingLockPoints = (viewMemPool == nullptr); useExistingLockPoints) {
@@ -5087,6 +5088,7 @@ bool IsBlockABestChainTipCandidate(const CBlockIndex& index)
 {
     AssertLockHeld(cs_main);
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
     return (setBlockIndexCandidates.find(const_cast<CBlockIndex*>(&index)) != setBlockIndexCandidates.end());
 }
 
@@ -6979,7 +6981,12 @@ bool ReplayBlocks(const Config &config, CoinsDB& view) {
             LogPrintf("Rolling back %s (%i)\n",
                       pindexOld->GetBlockHash().ToString(), pindexOld->GetHeight());
             // Use new private CancellationSource that can not be cancelled
-            DisconnectResult res = ProcessingBlockIndex(const_cast<CBlockIndex&>(*pindexOld)).DisconnectBlock(block, cache, task::CCancellationSource::Make()->GetToken());
+            DisconnectResult
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+                res = ProcessingBlockIndex(const_cast<CBlockIndex&>(*pindexOld))
+                          .DisconnectBlock(block,
+                                           cache,
+                                           task::CCancellationSource::Make()->GetToken());
             if (res == DISCONNECT_FAILED) {
                 return error(
                     "RollbackBlock(): DisconnectBlock failed at %d, hash=%s",
@@ -7125,6 +7132,7 @@ bool InitBlockIndex(const Config &config) {
     if (!fReindex) {
         try {
             const CChainParams &chainparams = config.GetChainParams();
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
             CBlock &block = const_cast<CBlock &>(chainparams.GenesisBlock());
 
             // Start new block file

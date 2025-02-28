@@ -472,7 +472,8 @@ public:
         return WriteBatch(batch, true);
     }
 
-    CDBIterator *NewIterator() {
+    CDBIterator* NewIterator() const
+    {
         // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
         return new CDBIterator(*this, pdb->NewIterator(iteroptions));
     }
