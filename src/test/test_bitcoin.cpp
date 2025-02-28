@@ -122,7 +122,7 @@ TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory:
     RegisterAllRPCCommands(tableRPC);
     mempool.SetSanityCheck(1.0);
     InitFrozenTXO(DEFAULT_FROZEN_TXO_DB_CACHE);
-    pblocktree = new CBlockTreeDB(1 << 20, true); // NOLINT(cppcoreguidelines-owning-memory)
+    pblocktree = std::make_unique<CBlockTreeDB>(1 << 20, true);
     pcoinsTip =
         std::make_unique<CoinsDB>(
             std::numeric_limits<size_t>::max(),
@@ -175,8 +175,7 @@ TestingSetup::~TestingSetup() { // NOLINT(bugprone-exception-escape)
 
     ShutdownScriptCheckQueues();
     UnregisterNodeSignals(GetNodeSignals());
-    delete pblocktree; // NOLINT(cppcoreguidelines-owning-memory)
-    pblocktree = nullptr;
+    pblocktree.reset();
     ShutdownFrozenTXO();
     g_blockReadCache.reset();
 }

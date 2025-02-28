@@ -24,16 +24,15 @@
 #include <atomic>
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <set>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 #include <random>
 
-typedef CWallet *CWalletRef;
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-extern std::vector<CWalletRef> vpwallets;
+extern std::vector<std::unique_ptr<CWallet>> vpwallets;
 
 /**
  * Settings
@@ -1103,8 +1102,8 @@ public:
      * Initializes the wallet, returns a new CWallet instance or a null pointer
      * in case of an error.
      */
-    static CWallet *CreateWalletFromFile(const CChainParams &chainParams,
-                                         const std::string walletFile);
+    static std::unique_ptr<CWallet> CreateWalletFromFile(const CChainParams& chainParams,
+                                                         const std::string walletFile);
     static bool InitLoadWallet(const CChainParams &chainParams);
 
     /**

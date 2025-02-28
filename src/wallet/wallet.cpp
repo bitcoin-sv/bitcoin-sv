@@ -29,7 +29,6 @@
 #include "script/sign.h"
 #include "timedata.h"
 #include "txmempool.h"
-#include "txn_validator.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -41,10 +40,11 @@
 
 #include <cassert>
 #include <cstdint>
+#include <memory>
 
 using namespace mining;
 
-std::vector<CWalletRef> vpwallets;
+std::vector<std::unique_ptr<CWallet>> vpwallets;
 
 /** Transaction fee set by the user */
 CFeeRate payTxFee(DEFAULT_TRANSACTION_FEE);
@@ -4111,7 +4111,7 @@ std::string CWallet::GetWalletHelpString(bool showDebug) {
     return strUsage;
 }
 
-CWallet *CWallet::CreateWalletFromFile(const CChainParams &chainParams,
+std::unique_ptr<CWallet> CWallet::CreateWalletFromFile(const CChainParams &chainParams,
                                        const std::string walletFile) {
     // Needed to restore wallet transaction meta data after -zapwallettxes
     std::vector<CWalletTx> vWtx;
@@ -4139,7 +4139,7 @@ CWallet *CWallet::CreateWalletFromFile(const CChainParams &chainParams,
     bool fFirstRun = true;
     std::unique_ptr<CWalletDBWrapper> dbw(
         new CWalletDBWrapper(&bitdb, walletFile));
-    CWallet *walletInstance = new CWallet(chainParams, std::move(dbw));
+    auto walletInstance = std::make_unique<CWallet>(chainParams, std::move(dbw));
     DBErrors nLoadWalletRet = walletInstance->LoadWallet(fFirstRun);
     if (nLoadWalletRet != DB_LOAD_OK) {
         if (nLoadWalletRet == DB_CORRUPT) {
@@ -4308,18 +4308,21 @@ CWallet *CWallet::CreateWalletFromFile(const CChainParams &chainParams,
     return walletInstance;
 }
 
-bool CWallet::InitLoadWallet(const CChainParams &chainParams) {
-    if (gArgs.GetBoolArg("-disablewallet", DEFAULT_DISABLE_WALLET)) {
+bool CWallet::InitLoadWallet(const CChainParams& chainParams)
+{
+    if(gArgs.GetBoolArg("-disablewallet", DEFAULT_DISABLE_WALLET))
+    {
         LogPrintf("Wallet disabled!\n");
         return true;
     }
 
-    for (const std::string &walletFile : gArgs.GetArgs("-wallet")) {
-        CWallet *const pwallet = CreateWalletFromFile(chainParams, walletFile);
-        if (!pwallet) {
+    for(const std::string& walletFile : gArgs.GetArgs("-wallet"))
+    {
+        std::unique_ptr<CWallet> pwallet = CreateWalletFromFile(chainParams, walletFile);
+        if(!pwallet)
             return false;
-        }
-        vpwallets.push_back(pwallet);
+
+        vpwallets.push_back(std::move(pwallet));
     }
 
     return true;

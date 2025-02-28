@@ -15,14 +15,15 @@
 #include "wallet/test/wallet_test_fixture.h"
 #include "blockfileinfostore.h"
 
-#include <boost/test/unit_test.hpp>
-
 #include <univalue.h>
 
 #include <cstdint>
+#include <memory>
 #include <set>
 #include <utility>
 #include <vector>
+
+#include <boost/test/unit_test.hpp>
 
 extern CWallet *pwalletMain; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
@@ -493,8 +494,8 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChain100Setup) {
     // before the missing block, and success for a key whose creation time is
     // after.
     {
-        CWallet wallet(Params());
-        vpwallets.insert(vpwallets.begin(), &wallet);
+        vpwallets.emplace(vpwallets.begin(),
+                          std::make_unique<CWallet>(Params()));
         UniValue keys;
         keys.setArray();
         UniValue key;
@@ -570,34 +571,35 @@ BOOST_FIXTURE_TEST_CASE(importwallet_rescan, TestChain100Setup) {
 
     // Import key into wallet and call dumpwallet to create backup file.
     {
-        CWallet wallet(Params());
-        LOCK(wallet.cs_wallet);
-        wallet.mapKeyMetadata[coinbaseKey.GetPubKey().GetID()].nCreateTime =
+        auto wallet = std::make_unique<CWallet>(Params());
+        LOCK(wallet->cs_wallet);
+        wallet->mapKeyMetadata[coinbaseKey.GetPubKey().GetID()].nCreateTime =
             KEY_TIME;
-        wallet.AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey());
+        wallet->AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey());
 
         JSONRPCRequest request;
         request.params.setArray();
         request.params.push_back((pathTemp / "wallet.backup").string());
-        vpwallets.insert(vpwallets.begin(), &wallet);
+        vpwallets.insert(vpwallets.begin(), std::move(wallet));
         ::dumpwallet(GlobalConfig::GetConfig(), request);
     }
 
     // Call importwallet RPC and verify all blocks with timestamps >= BLOCK_TIME
     // were scanned, and no prior blocks were scanned.
     {
-        CWallet wallet(Params());
+        auto wallet = std::make_unique<CWallet>(Params());
 
         JSONRPCRequest request;
         request.params.setArray();
         request.params.push_back((pathTemp / "wallet.backup").string());
-        vpwallets[0] = &wallet;
+        vpwallets[0] = std::move(wallet);
         ::importwallet(GlobalConfig::GetConfig(), request);
 
-        BOOST_CHECK_EQUAL(wallet.mapWallet.size(), 3U);
+        BOOST_CHECK_EQUAL(vpwallets[0]->mapWallet.size(), 3U);
         BOOST_CHECK_EQUAL(coinbaseTxns.size(), 103U);
-        for (size_t i = 0; i < coinbaseTxns.size(); ++i) {
-            bool found = wallet.GetWalletTx(coinbaseTxns[i].GetHash());
+        for(size_t i = 0; i < coinbaseTxns.size(); ++i)
+        {
+            bool found = vpwallets[0]->GetWalletTx(coinbaseTxns[i].GetHash());
             bool expected = i >= 100;
             BOOST_CHECK_EQUAL(found, expected);
         }

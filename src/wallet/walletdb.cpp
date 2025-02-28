@@ -774,7 +774,8 @@ void MaybeCompactWalletDB() {
         return;
     }
 
-    for (CWalletRef pwallet : vpwallets) {
+    for(const auto& pwallet : vpwallets)
+    {
         CWalletDBWrapper &dbh = pwallet->GetDBHandle();
 
         unsigned int nUpdateCounter = dbh.nUpdateCounter;

@@ -186,7 +186,7 @@ void Shutdown() {
     StopRPC();
     StopHTTPServer();
 #ifdef ENABLE_WALLET
-    for (CWalletRef pwallet : vpwallets) {
+    for(const auto& pwallet : vpwallets) {
         pwallet->Flush(false);
     }
 #endif
@@ -235,7 +235,7 @@ void Shutdown() {
     g_blockReadCache.reset();
 
 #ifdef ENABLE_WALLET
-    for (CWalletRef pwallet : vpwallets) {
+    for(const auto& pwallet : vpwallets) {
         pwallet->Flush(true);
     }
 #endif
@@ -261,9 +261,6 @@ void Shutdown() {
 #endif
     UnregisterAllValidationInterfaces();
 #ifdef ENABLE_WALLET
-    for (CWalletRef pwallet : vpwallets) {
-        delete pwallet;
-    }
     vpwallets.clear();
 #endif
     ShutdownFrozenTXO();
@@ -3949,7 +3946,8 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     uiInterface.InitMessage(_("Done loading"));
 
 #ifdef ENABLE_WALLET
-    for (CWalletRef pwallet : vpwallets) {
+    for(const auto& pwallet : vpwallets)
+    {
         pwallet->postInitProcess(scheduler);
     }
 #endif
