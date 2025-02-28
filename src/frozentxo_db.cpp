@@ -5,6 +5,7 @@
 
 #include "serialize.h"
 
+#include <memory>
 #include <mutex>
 
 
@@ -918,7 +919,8 @@ void CFrozenTXODB::Init(std::size_t cache_size)
         throw std::logic_error("Connection to FrozenTXODB has already been initialized!");
     }
 
-    frozenTXODB.reset( new CFrozenTXODB(cache_size) );
+    std::unique_ptr<CFrozenTXODB> tmp(new CFrozenTXODB{cache_size});
+    frozenTXODB.swap(tmp);
 }
 
 CFrozenTXODB& CFrozenTXODB::Instance()
