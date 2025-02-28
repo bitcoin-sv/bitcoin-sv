@@ -35,6 +35,7 @@ public:
                 base = buffer.data();
             } else {
                 bufsize = 30000;
+                // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
                 base = new char[bufsize];
             }
             char *p = base;
@@ -72,7 +73,7 @@ public:
             // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             LogPrintf("leveldb: %s", base);
             if (base != buffer.data()) {
-                delete[] base;
+                delete[] base; // NOLINT(cppcoreguidelines-owning-memory)
             }
             break;
         }
@@ -89,6 +90,7 @@ static leveldb::Options GetOptions(size_t nCacheSize, size_t nMaxFileSize, size_
     options.compression = leveldb::kNoCompression;
     options.max_open_files = nMaxFiles; // NOLINT(*-narrowing-conversions)
     options.max_file_size = nMaxFileSize;
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     options.info_log = new CBitcoinLevelDBLogger();
     if (leveldb::kMajorVersion > 1 ||
         (leveldb::kMajorVersion == 1 && leveldb::kMinorVersion >= 16)) {

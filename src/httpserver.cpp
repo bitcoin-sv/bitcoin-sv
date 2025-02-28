@@ -436,7 +436,8 @@ static void httpevent_callback_fn(evutil_socket_t, short, void *data) {
     // Static handler: simply call inner handler
     HTTPEvent* self = static_cast<HTTPEvent*>(data);
     self->handler();
-    if (self->deleteWhenTriggered) delete self;
+    if(self->deleteWhenTriggered)
+        delete self; // NOLINT(cppcoreguidelines-owning-memory)
 }
 
 HTTPEvent::HTTPEvent(struct event_base *base, bool _deleteWhenTriggered,
