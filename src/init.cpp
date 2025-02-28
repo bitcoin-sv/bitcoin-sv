@@ -13,6 +13,7 @@
 #include "block_index_store.h"
 #include "block_index_store_loader.h"
 #include "block_read_cache.h"
+#include "cfile_util.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "compat/sanity.h"
@@ -3157,9 +3158,9 @@ static bool LockDataDirectory(bool probeOnly)
     // Make sure only a single Bitcoin process is using the data directory.
     fs::path pathLockFile = GetDataDir() / ".lock";
     // empty lock file; created if it doesn't exist.
-    FILE* file = fsbridge::fopen(pathLockFile, "a");
+    UniqueCFile file{fsbridge::fopen(pathLockFile, "a")};
     if(file)
-        std::ignore = fclose(file);
+        file.reset();
 
     try
     {
