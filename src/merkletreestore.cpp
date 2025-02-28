@@ -4,9 +4,11 @@
 #include "merkletreestore.h"
 
 #include "block_file_access.h"
-#include "util.h"
-#include "config.h"
+#include "cfile_util.h"
 #include "clientversion.h"
+#include "config.h"
+#include "util.h"
+
 #include <regex>
 
 /* Global state of Merkle Tree factory.
@@ -25,27 +27,31 @@ fs::path CMerkleTreeStore::GetDataFilename(int merkleTreeFileSuffix) const
     return (merkleStorePath / strprintf("%s%08u.dat", "mrk", merkleTreeFileSuffix));
 }
 
-FILE* CMerkleTreeStore::OpenMerkleTreeFile(const MerkleTreeDiskPosition& merkleTreeDiskPosition, bool fReadOnly) const
+UniqueCFile CMerkleTreeStore::OpenMerkleTreeFile(
+    const MerkleTreeDiskPosition& merkleTreeDiskPosition,
+    bool fReadOnly) const
 {
     fs::path path = GetDataFilename(merkleTreeDiskPosition.fileSuffix);
     fs::create_directories(path.parent_path());
-    FILE* file = fsbridge::fopen(path, "rb+");
-    if (!file && !fReadOnly)
+    UniqueCFile file{fsbridge::fopen(path, "rb+")};
+    if(!file && !fReadOnly)
     {
-        file = fsbridge::fopen(path, "wb+");
+        file.reset(fsbridge::fopen(path, "wb+"));
     }
-    if (!file)
+
+    if(!file)
     {
         LogPrintf("Unable to open file %s\n", path.string());
         return nullptr;
     }
+
     if (merkleTreeDiskPosition.fileOffset)
     {
         // NOLINTNEXTLINE(*-narrowing-conversions)
-        if (fseek(file, merkleTreeDiskPosition.fileOffset, SEEK_SET))
+        if(fseek(file.get(), merkleTreeDiskPosition.fileOffset, SEEK_SET))
         {
             LogPrintf("Unable to seek to position %u of %s\n", merkleTreeDiskPosition.fileOffset, path.string());
-            std::ignore = fclose(file);
+            file.reset();
             return nullptr;
         }
     }
