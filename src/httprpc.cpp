@@ -104,11 +104,13 @@ static bool multiUserAuthorized(const std::string& strUserPass) {
             static const unsigned int KEY_SIZE = 32;
             std::array<uint8_t, KEY_SIZE> out{};
 
+            // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
             CHMAC_SHA256(reinterpret_cast<const uint8_t *>(strSalt.c_str()),
                          strSalt.size())
                 .Write(reinterpret_cast<const uint8_t *>(strPass.c_str()),
                        strPass.size())
                 .Finalize(out.data());
+            // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
             const std::string strHashFromPass = HexStr(out.begin(), out.end());
 
             if (TimingResistantEqual(strHashFromPass, strHash)) {

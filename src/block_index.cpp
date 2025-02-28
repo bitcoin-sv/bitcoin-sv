@@ -65,9 +65,11 @@ namespace
 
 std::mutex& CBlockIndex::GetMutex() const
 {
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
     return blockIndexMutexes[hash_byte(reinterpret_cast<std::size_t>(this)) %
                              blockIndexMutexes.size()];
+    // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
 }
 
 CBlockIndex *CBlockIndex::GetAncestor(int32_t height)
@@ -348,6 +350,7 @@ bool CBlockIndex::PopulateBlockIndexBlockDiskMetaDataNL(
         size += chunk.Size();
     } while(!stream.EndOfStream());
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     hasher.Finalize(reinterpret_cast<uint8_t*>(&hash));
 
     SetBlockIndexFileMetaDataIfNotSetNL(CDiskBlockMetaData{hash, size}, notifyDirty);

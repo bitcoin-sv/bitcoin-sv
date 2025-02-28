@@ -67,6 +67,7 @@ void CBlockHeaderAndShortTxIDs::FillShortTxIDSelector() const {
     CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
     stream << header << nonce;
     CSHA256 hasher;
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     hasher.Write(reinterpret_cast<uint8_t*>(&(*stream.begin())),
                  stream.end() - stream.begin());
     uint256 shorttxidhash;

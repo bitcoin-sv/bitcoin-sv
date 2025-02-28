@@ -131,6 +131,7 @@ static std::string RequestMethodString(HTTPRequest::RequestMethod m) {
 
 /** HTTP request callback */
 static void http_request_cb(struct evhttp_request *req, void *arg) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     Config &config = *reinterpret_cast<Config *>(arg);
 
     std::shared_ptr<HTTPRequest> hreq { std::make_shared<HTTPRequest>(req) };
@@ -489,8 +490,10 @@ std::string HTTPRequest::ReadBody() {
      * better to not copy into an intermediate string but use a stream
      * abstraction to consume the evbuffer on the fly in the parsing algorithm.
      */
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast
     // NOLINTNEXTLINE(*-narrowing-conversions)
     const char* data = reinterpret_cast<const char*>(evbuffer_pullup(buf, size));
+    // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast
     // returns nullptr in case of empty buffer.
     if (!data) {
         return "";

@@ -24,6 +24,7 @@ CBanDB::CBanDB(const CChainParams &chainParams) : chainParams(chainParams) {
 bool CBanDB::Write(const banmap_t &banSet) {
     // Generate random temporary filename
     unsigned short randv = 0;
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     GetRandBytes(reinterpret_cast<uint8_t*>(&randv), sizeof(randv));
     std::string tmpfn = strprintf("banlist.dat.%04x", randv);
 
@@ -76,6 +77,7 @@ bool CBanDB::Read(banmap_t &banSet) {
 
     // read data and checksum from file
     try {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
         filein.read(reinterpret_cast<char*>(vchData.data()), vchData.size());
         filein >> hashIn;
     } catch (const std::exception &e) {
@@ -117,6 +119,7 @@ CAddrDB::CAddrDB(const CChainParams &chainParams) : chainParams(chainParams) {
 bool CAddrDB::Write(const CAddrMan &addr) {
     // Generate random temporary filename
     unsigned short randv = 0;
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     GetRandBytes(reinterpret_cast<uint8_t*>(&randv), sizeof(randv));
     std::string tmpfn = strprintf("peers.dat.%04x", randv);
 
@@ -168,6 +171,7 @@ bool CAddrDB::Read(CAddrMan &addr) {
 
     // read data and checksum from file
     try {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
         filein.read(reinterpret_cast<char*>(vchData.data()), vchData.size());
         filein >> hashIn;
     } catch (const std::exception &e) {

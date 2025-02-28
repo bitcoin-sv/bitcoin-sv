@@ -198,6 +198,7 @@ bool BlockFileAccess::WriteBlockToDisk(
     CVectorWriter{SER_DISK, CLIENT_VERSION, data, 0, block};
     metaData = { Hash(data.begin(), data.end()), data.size() };
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     fileout.write(reinterpret_cast<const char*>(data.data()), data.size());
 
     return true;
