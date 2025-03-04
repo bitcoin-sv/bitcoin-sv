@@ -188,6 +188,7 @@ void CMerkleTree::AddNodeAtLevel(const uint256& hash, size_t level)
     4567 after the merge. They become siblings and their parent is calculated and stored
     to Level 3.
 */
+// NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
 bool CMerkleTree::MergeSubTree(CMerkleTree&& subTree)
 {
     size_t currentTreeHeight = merkleTreeLevelsWithNodeHashes.size();

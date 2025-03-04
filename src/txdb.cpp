@@ -676,7 +676,7 @@ uint256 CoinsDB::GetBestBlock() const {
 bool CoinsDB::BatchWrite(
     const WPUSMutex::Lock& writeLock,
     const uint256& hashBlockIn,
-    CCoinsMap&& mapCoins)
+    CCoinsMap&& mapCoins) // NOLINT(cppcoreguidelines-rvalue-reference-param-not-moved)
 {
     assert( writeLock.GetLockType() == WPUSMutex::Lock::Type::write );
     std::unique_lock lock { mCoinsViewCacheMtx };

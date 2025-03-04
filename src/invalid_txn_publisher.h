@@ -366,7 +366,7 @@ public:
     CInvalidTxnPublisher& operator=(const CInvalidTxnPublisher&) = delete;
 
     // Puts invalid transaction on the queue
-    void Publish(InvalidTxnPublisher::InvalidTxnInfoWithTxn&& InvalidTxnInfo);
+    void Publish(const InvalidTxnPublisher::InvalidTxnInfoWithTxn&);
 
     // Removes locally stored invalid transactions
     int64_t ClearStored();

@@ -6376,7 +6376,7 @@ bool VerifyNewBlock(const Config& config,
 }
 
 std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
-    task::CCancellationToken&& token,
+    const task::CCancellationToken& token,
     const Config& config,
     const std::shared_ptr<const CBlock>& pblock,
     bool fForceProcessing,

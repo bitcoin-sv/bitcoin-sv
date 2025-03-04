@@ -293,7 +293,7 @@ public:
 
     // Atomically push a set of tasks to the task queue and wait until the tasks
     // have been processed.
-    void Synchronize(std::initializer_list<Task>&& tasks = {}, bool clearList = false)
+    void Synchronize(const std::initializer_list<Task>& tasks = {}, bool clearList = false)
     {
         std::promise<void> sync;
         bool success;

@@ -247,7 +247,7 @@ CInvalidTxnPublisher::~CInvalidTxnPublisher()
     mSinks.clear();
 }
 
-void CInvalidTxnPublisher::Publish(InvalidTxnPublisher::InvalidTxnInfoWithTxn&& invalidTxnInfo)
+void CInvalidTxnPublisher::Publish(const InvalidTxnPublisher::InvalidTxnInfoWithTxn& invalidTxnInfo)
 {
     if (mPublishCallback)
     {

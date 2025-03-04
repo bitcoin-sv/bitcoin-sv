@@ -167,7 +167,7 @@ BOOST_AUTO_TEST_CASE(publish_no_sinks)
 
     // publishing invalid transactions is still valid but they will just be
     // discarded
-    publisher.Publish( std::move(invalid) );
+    publisher.Publish(invalid);
 
     // ClearStored() is a no-op
     BOOST_CHECK_EQUAL(publisher.ClearStored(), 0);
@@ -190,7 +190,7 @@ BOOST_AUTO_TEST_CASE(publish_enough_space_for_info)
         {},
         item.GetInvalidTxnInfo().DynamicMemoryUsage() }; // we want enough queue space for the whole transaction
 
-    publisher.Publish( std::move(item) );
+    publisher.Publish(item);
 
     std::unique_lock lock{ mutex };
     using namespace std::chrono_literals;
@@ -221,7 +221,7 @@ BOOST_AUTO_TEST_CASE(publish_missing_some_space_for_info)
         {},
         expected.DynamicMemoryUsage() }; // last collided item won't be able to go into cache
 
-    publisher.Publish( std::move(item) );
+    publisher.Publish(item);
 
     std::unique_lock lock{ mutex };
     using namespace std::chrono_literals;
@@ -247,7 +247,7 @@ BOOST_AUTO_TEST_CASE(publish_not_enough_space_for_info)
         1 }; // cache is to small to send anything
 
 
-    publisher.Publish( std::move(item) );
+    publisher.Publish(item);
 
     std::unique_lock lock{ mutex };
     using namespace std::chrono_literals;
