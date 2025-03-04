@@ -3169,7 +3169,7 @@ public:
             {
             public:
                 LeaveCriticalSectionGuard( CCoinsViewCache& view )
-                    : mView{ view }
+                    : mView{ &view }
                 {
                     LEAVE_CRITICAL_SECTION(cs_main)
                 }
@@ -3177,12 +3177,12 @@ public:
                 {
                     // Make sure that we aren't holding view locked before
                     // re-obtaining cs_main as that could cause a dead lock.
-                    mView.ForceDetach();
+                    mView->ForceDetach();
                     ENTER_CRITICAL_SECTION(cs_main)
                 }
 
             private:
-                CCoinsViewCache& mView;
+                CCoinsViewCache* mView;
             } csGuard{ view };
 
             if (!checkScripts( token, nTime2, nInputs, blockundo, mostWorkBlockHeight ))
