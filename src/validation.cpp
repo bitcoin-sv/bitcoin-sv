@@ -4550,21 +4550,23 @@ static bool ActivateBestChainStep(
 
         class RAIIUpdateMempool
         {
-            const Config& config;
+            const Config* config;
+            // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
             const CJournalChangeSetPtr& changeSet;
             bool fBlocksDisconnected = false;
             bool fDisconnectFailed = false;
             DisconnectedBlockTransactions disconnectpool;
-            CValidationState& state;
+            CValidationState* state;
+
         public:
             RAIIUpdateMempool(
                 const Config& c,
                 const CJournalChangeSetPtr& cs,
                 const CBlockIndex* pindexFork,
                 CValidationState& st)
-                :config{c}
+                :config{&c}
                 ,changeSet{cs}
-                ,state{ st }
+                ,state{&st}
             {
                 auto needTipDisconnect = [&]{ return chainActive.Tip() && chainActive.Tip() != pindexFork; };
 
@@ -4580,7 +4582,7 @@ static bool ActivateBestChainStep(
                         // we are diconnecting until we reach the fork point
                         do
                         {
-                            if (!DisconnectTip(config, state, &disconnectpool, changeSet)) {
+                            if(!DisconnectTip(*config, *state, &disconnectpool, changeSet)) {
                                 // This is likely a fatal error.
                                 fDisconnectFailed = true;
                                 return;
@@ -4603,9 +4605,9 @@ static bool ActivateBestChainStep(
                 if(std::uncaught_exceptions())
                 {
                     RemoveSoftConsensusFreezeBlocksFromActiveChainTipNL(
-                        config,
+                        *config,
                         changeSet,
-                        state,
+                        *state,
                         disconnectpool);
                 }
 
@@ -4616,7 +4618,7 @@ static bool ActivateBestChainStep(
             {
                 if(fBlocksDisconnected) {
                     changeSet->updateForReorg();
-                    mempool.AddToMempoolForReorg(config, disconnectpool, changeSet);
+                    mempool.AddToMempoolForReorg(*config, disconnectpool, changeSet);
                     fBlocksDisconnected = false;
                 }
             }
