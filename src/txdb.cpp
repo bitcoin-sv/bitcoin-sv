@@ -98,8 +98,10 @@ struct CDataStreamInput_NoScr : TBase
         return *this;
     }
 
+    // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
     const std::size_t maxScriptSize;
     std::optional<std::size_t>& actualScriptSize;
+    // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
     bool wasUnserializeScriptCalled{};
 };
 

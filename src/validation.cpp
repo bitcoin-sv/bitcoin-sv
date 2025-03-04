@@ -3760,6 +3760,7 @@ private:
         }
     }
 
+    // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
     const Config& config;
     const CBlock& block;
     CValidationState& state;
@@ -3767,6 +3768,7 @@ private:
     CCoinsViewCache& view;
     std::int32_t mostWorkBlockHeight;
     const arith_uint256& mostWorkOnChain;
+    // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
     bool fJustCheck;
     bool parallelBlockValidation;
     bool parallelTxnValidation;

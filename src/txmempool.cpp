@@ -81,8 +81,10 @@ using namespace mining;
     private:
         uint256 GetBestBlock() const override { assert(!"Should not be used!"); return {}; }
 
+        // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
         const CTxMemPool& mempool;
         const CoinsDBView& mDBView;
+        // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
     };
 
 /**
@@ -164,7 +166,9 @@ namespace {
 class CEnsureNonNullChangeSet
 {
     CJournalChangeSetPtr replacement;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const CJournalChangeSetPtr& cs;
+
 public:
     CEnsureNonNullChangeSet(CTxMemPool& theMempool,  const CJournalChangeSetPtr& changeSet)
         : replacement(changeSet ? nullptr : theMempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::UNKNOWN))
