@@ -140,13 +140,25 @@ static bool CheckWarmup(HTTPRequest *req) {
 
 struct CHeadersData
 {
-    CHeadersData(const CBlockIndex* pblockIndex)
-    : pblockIndex(pblockIndex)
+    CHeadersData(const CBlockIndex* pblockIndex):pblockIndex_(pblockIndex)
     {}
 
-    const CBlockIndex* const pblockIndex;
-    std::optional<uint256> nextBlockHash;
-    std::optional<CDiskBlockMetaData> diskBlockMetaData;
+    const CBlockIndex* GetBlockIndex() const { return pblockIndex_; }
+
+    std::optional<uint256> NextBlockHash() const { return nextBlockHash_; }
+    void NextBlockHash(const std::optional<uint256>& nextBlockHash)
+    { nextBlockHash_ = nextBlockHash; }
+
+    std::optional<CDiskBlockMetaData> DiskBlockMetaData() const
+    { return diskBlockMetaData_; }
+
+    void DiskBlockMetaData(const std::optional<CDiskBlockMetaData>& diskBlockMetaData)
+    { diskBlockMetaData_ = diskBlockMetaData; }
+
+private:
+    const CBlockIndex* pblockIndex_;
+    std::optional<uint256> nextBlockHash_;
+    std::optional<CDiskBlockMetaData> diskBlockMetaData_;
 };
 
 static bool rest_headers(Config &config, HTTPRequest *req,
@@ -198,7 +210,10 @@ static bool rest_headers(Config &config, HTTPRequest *req,
         while (pindex != nullptr && chainActive.Contains(pindex)) {
             auto& hd = headers.emplace_back(pindex);
             CDiskBlockMetaData diskBlockMetaData = pindex->GetDiskBlockMetaData();
-            hd.diskBlockMetaData = diskBlockMetaData.diskDataHash.IsNull() ? std::nullopt : std::optional<CDiskBlockMetaData>{ diskBlockMetaData };
+            hd.DiskBlockMetaData(
+                diskBlockMetaData.diskDataHash.IsNull()
+                    ? std::nullopt
+                    : std::optional<CDiskBlockMetaData>{diskBlockMetaData});
 
             pindex = chainActive.Next(pindex);
 
@@ -206,7 +221,7 @@ static bool rest_headers(Config &config, HTTPRequest *req,
             {
                 // pindex now points to next block.
                 // Store hash of the this block as the next block hash of previous block.
-                hd.nextBlockHash = pindex->GetBlockHash();
+                hd.NextBlockHash(pindex->GetBlockHash());
             }
 
             if (headers.size() == size_t(count))
@@ -218,7 +233,7 @@ static bool rest_headers(Config &config, HTTPRequest *req,
 
     CDataStream ssHeader(SER_NETWORK, PROTOCOL_VERSION);
     for (const CHeadersData& headersData : headers) {
-        ssHeader << headersData.pblockIndex->GetBlockHeader();
+        ssHeader << headersData.GetBlockIndex()->GetBlockHeader();
     }
 
     switch (rf) {
@@ -247,8 +262,8 @@ static bool rest_headers(Config &config, HTTPRequest *req,
                 jWritter.writeBeginObject();
                 if(showExtended)
                 {
-                    CDiskBlockMetaData diskBlockMetaData = headersData.pblockIndex->GetDiskBlockMetaData();
-                    auto reader = headersData.pblockIndex->GetDiskBlockStreamReader(diskBlockMetaData.diskDataHash.IsNull());
+                    CDiskBlockMetaData diskBlockMetaData = headersData.GetBlockIndex()->GetDiskBlockMetaData();
+                    auto reader = headersData.GetBlockIndex()->GetDiskBlockStreamReader(diskBlockMetaData.diskDataHash.IsNull());
                     const CTransaction* coinbaseTx = nullptr;
                     try
                     {
@@ -265,7 +280,7 @@ static bool rest_headers(Config &config, HTTPRequest *req,
                     std::optional<std::vector<uint256>> coinbaseMerkleProof;
                     if(coinbaseTx) // Merkle proof for CB is only needed if we were able to get CB txn
                     {
-                        if(CMerkleTreeRef merkleTree=pMerkleTreeFactory->GetMerkleTree(config, *headersData.pblockIndex, currentChainHeight))
+                        if(CMerkleTreeRef merkleTree=pMerkleTreeFactory->GetMerkleTree(config, *headersData.GetBlockIndex(), currentChainHeight))
                         {
                             coinbaseMerkleProof = merkleTree->GetMerkleProof(0, false).merkleTreeHashes;
                         }
@@ -276,18 +291,18 @@ static bool rest_headers(Config &config, HTTPRequest *req,
                         }
                     }
 
-                    writeBlockHeaderEnhancedJSONFields(jWritter, headersData.pblockIndex, confirmations,
-                        headersData.nextBlockHash,
-                        headersData.diskBlockMetaData,
+                    writeBlockHeaderEnhancedJSONFields(jWritter, headersData.GetBlockIndex(), confirmations,
+                        headersData.NextBlockHash(),
+                        headersData.DiskBlockMetaData(),
                         coinbaseMerkleProof,
                         coinbaseTx,
                         config);
                 }
                 else
                 {
-                    writeBlockHeaderJSONFields(jWritter, headersData.pblockIndex, confirmations,
-                        headersData.nextBlockHash,
-                        headersData.diskBlockMetaData);
+                    writeBlockHeaderJSONFields(jWritter, headersData.GetBlockIndex(), confirmations,
+                        headersData.NextBlockHash(),
+                        headersData.DiskBlockMetaData());
                 }
                 --confirmations;
                 jWritter.writeEndObject();
