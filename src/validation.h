@@ -230,8 +230,9 @@ constexpr std::int32_t DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION = 3;
 /** Default for -detectselfishmining. */
 static const bool DEFAULT_DETECT_SELFISH_MINING = false;
 
+extern const CScript COINBASE_FLAGS;
+
 // NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
-extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
 extern const std::string strMessageMagic;

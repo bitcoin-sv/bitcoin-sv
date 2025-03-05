@@ -14,6 +14,7 @@
 /* Global state of Merkle Tree factory.
  * Merkle Trees are stored in memory cache and on disk when requested (RPC).
  */
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 std::unique_ptr<CMerkleTreeFactory> pMerkleTreeFactory = nullptr;
 
 CMerkleTreeStore::CMerkleTreeStore(const fs::path& storePath, size_t leveldbCacheSize)

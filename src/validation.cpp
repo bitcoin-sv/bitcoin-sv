@@ -91,6 +91,7 @@ using namespace mining;
 /**
  * Global state
  */
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 CCriticalSection cs_main; // NOLINT(cert-err58-cpp)
 
 BlockIndexStore mapBlockIndex;
@@ -117,11 +118,12 @@ CBlockValidationStatus blockValidationStatus;
 Amount maxTxFee = DEFAULT_TRANSACTION_MAXFEE;
 
 CTxMemPool mempool; // NOLINT(cert-err58-cpp)
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 static void CheckBlockIndex(const Consensus::Params &consensusParams);
 
 /** Constant stuff for coinbase transactions we create: */
-CScript COINBASE_FLAGS; // NOLINT(cert-err58-cpp)
+const CScript COINBASE_FLAGS; // NOLINT(cert-err58-cpp)
 
 // NOLINTNEXTLINE(cert-err58-cpp)
 const std::string strMessageMagic = "Bitcoin Signed Message:\n";
@@ -224,8 +226,10 @@ const CBlockIndex *FindForkInGlobalIndex(const CChain &chain,
     return chain.Genesis();
 }
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 std::unique_ptr<CoinsDB> pcoinsTip;
 std::unique_ptr<CBlockTreeDB> pblocktree;
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 /**
  * Test whether the given transaction is final for the given height and time.

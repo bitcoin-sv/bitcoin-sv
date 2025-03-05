@@ -9,7 +9,7 @@
 #include "rpc/http_response.h"
 #include "rpc/webhook_client.h"
 
-SafeMode safeMode; // NOLINT(cert-err58-cpp)
+static SafeMode safeMode; // NOLINT(cert-err58-cpp)
 
 bool SafeMode::IsBlockPartOfExistingSafeModeFork(const CBlockIndex* pindexNew) const
 {

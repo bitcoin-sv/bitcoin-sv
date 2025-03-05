@@ -12,7 +12,6 @@ Checks: '-*,
          cppcoreguidelines*,
          -cppcoreguidelines-avoid-do-while,
          -cppcoreguidelines-avoid-magic-numbers,
-         -cppcoreguidelines-avoid-non-const-global-variables,
          -cppcoreguidelines-init-variables,
          -cppcoreguidelines-macro-usage,
          -cppcoreguidelines-macro-to-enum,
@@ -28,6 +27,8 @@ CheckOptions:
   - key:             cppcoreguidelines-pro-type-member-init.IgnoreArrays
     value:           'true'
   - key:             cppcoreguidelines-virtual-class-destructor.IgnoreDestructors
+    value:           'true'
+  - key:             cppcoreguidelines-avoid-non-const-global-variables.AllowInternalLinkage
     value:           'true'
 ...
 

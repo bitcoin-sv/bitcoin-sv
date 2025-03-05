@@ -55,18 +55,22 @@ struct HTTPPathHandler
 
 /** HTTP module state */
 
-//! libevent event loop
-static struct event_base *eventBase = 0;
-//! HTTP server
-struct evhttp *eventHTTP = 0;
+namespace
+{
+    //! libevent event loop
+    struct event_base *eventBase = 0;
+    //! HTTP server
+    struct evhttp *eventHTTP = 0;
+}
+
 //! List of subnets to allow RPC connections from
 static std::vector<CSubNet> rpc_allow_subnets;
 //! Work queue for handling longer requests off the event loop thread
 static std::unique_ptr<CThreadPool<CQueueAdaptor>> pWorkQueue {nullptr};
 //! Handlers for (sub)paths
-std::vector<HTTPPathHandler> pathHandlers;
+static std::vector<HTTPPathHandler> pathHandlers;
 //! Bound listening sockets
-std::vector<evhttp_bound_socket *> boundSockets;
+static std::vector<evhttp_bound_socket *> boundSockets;
 
 /** Check if a network address is allowed to access the HTTP server */
 static bool ClientAllowed(const CNetAddr &netaddr) {
@@ -365,8 +369,8 @@ bool InitHTTPServer(Config &config) {
     return true;
 }
 
-std::thread threadHTTP;
-std::future<bool> threadResult;
+static std::thread threadHTTP;
+static std::future<bool> threadResult;
 
 bool StartHTTPServer() {
     LogPrint(BCLog::HTTP, "Starting HTTP server\n");

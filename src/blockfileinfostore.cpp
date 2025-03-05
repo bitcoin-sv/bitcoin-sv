@@ -8,13 +8,15 @@
 #include "block_file_access.h"
 #include "block_file_info.h"
 #include "config.h"
-#include "util.h"
-#include "txdb.h"  // CBlockTreeDB
 #include "consensus/validation.h" // CValidationState
+#include "txdb.h"  // CBlockTreeDB
+
+#include <algorithm>
 
 /** Access to info about block files */
-// NOLINTNEXTLINE(cert-err58-cpp)
-std::unique_ptr<CBlockFileInfoStore> pBlockFileInfoStore = std::make_unique<CBlockFileInfoStore>();
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+std::unique_ptr<CBlockFileInfoStore> pBlockFileInfoStore = // NOLINT(cert-err58-cpp)
+    std::make_unique<CBlockFileInfoStore>();
 
 void CBlockFileInfoStore::FindNextFileWithEnoughEmptySpace(const Config &config,
     uint64_t nAddSize, unsigned int& nFile)

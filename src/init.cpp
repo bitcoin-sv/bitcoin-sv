@@ -90,6 +90,7 @@ static const bool DEFAULT_REST_ENABLE = false;
 static const bool DEFAULT_DISABLE_SAFEMODE = false;
 static const bool DEFAULT_STOPAFTERBLOCKIMPORT = false;
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 std::unique_ptr<CConnman> g_connman;
 std::unique_ptr<PeerLogicValidation> peerLogic;
 
@@ -97,6 +98,7 @@ std::unique_ptr<PeerLogicValidation> peerLogic;
 CCriticalSection cs_zmqNotificationInterface; // NOLINT(cert-err58-cpp)
 std::unique_ptr<CZMQNotificationInterface> pzmqNotificationInterface;
 #endif
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 #ifdef WIN32
 // Win32 LevelDB doesn't use filedescriptors, and the ones used for accessing
@@ -139,8 +141,8 @@ enum BindFlags {
 //
 
 // NOLINTNEXTLINE(cert-err58-cpp)
-std::shared_ptr<task::CCancellationSource> shutdownSource(task::CCancellationSource::Make());
-std::atomic<bool> fDumpMempoolLater(false);
+static std::shared_ptr<task::CCancellationSource> shutdownSource(task::CCancellationSource::Make());
+static std::atomic<bool> fDumpMempoolLater(false);
 
 void StartShutdown() {
     shutdownSource->Cancel();

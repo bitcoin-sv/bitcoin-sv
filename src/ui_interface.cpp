@@ -5,6 +5,7 @@
 #include "ui_interface.h"
 #include "util.h"
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 CClientUIInterface uiInterface; // NOLINT(cert-err58-cpp)
 
 bool InitError(const std::string &str) {
