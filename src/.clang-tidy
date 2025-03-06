@@ -7,7 +7,7 @@ Checks: '-*,
 
          cert-*,
 
-         -clang-analyzer-*
+         clang-analyzer-*
          
          cppcoreguidelines*,
          -cppcoreguidelines-avoid-do-while,

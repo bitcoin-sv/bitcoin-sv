@@ -170,7 +170,8 @@ static bool rest_headers(Config &config, HTTPRequest *req,
     std::string param;
     const RetFormat rf = ParseDataFormat(param, strURIPart);
     std::vector<std::string> path;
-    boost::split(path, param, boost::is_any_of("/"));
+    boost::split(path, param,
+                 [](const char c) { return c == '/'; });
 
     if (path.size() != 2) {
         return RESTERR(req, HTTP_BAD_REQUEST, "No header count specified. Use "
@@ -590,7 +591,8 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
     std::vector<std::string> uriParts;
     if (param.length() > 1) {
         std::string strUriParams = param.substr(1);
-        boost::split(uriParts, strUriParams, boost::is_any_of("/"));
+        boost::split(uriParts, strUriParams,
+                     [](const char c) { return c == '/'; });
     }
 
     // throw exception in case of a empty request
