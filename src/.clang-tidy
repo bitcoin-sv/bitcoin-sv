@@ -15,6 +15,26 @@ Checks: '-*,
          -cppcoreguidelines-macro-usage,
          -cppcoreguidelines-macro-to-enum,
          -cppcoreguidelines-non-private-member-variables-in-classes,
+
+         -clang-analyzer-deadcode.DeadStores,
+
+         -*-narrowing-conversions,
+
+         -bugprone-implicit-widening-of-multiplication-result,
+         -bugprone-switch-missing-default-case,
+
+         -cert-err58-cpp,
+
+         -cppcoreguidelines-avoid-c-arrays,
+         -cppcoreguidelines-init-variables,
+         -cppcoreguidelines-prefer-member-initializer,
+         -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+         -cppcoreguidelines-pro-bounds-constant-array-index,
+         -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+         -cppcoreguidelines-rvalue-reference-param-not-moved,
+       
+         -performance-unnecessary-value-param,
+
       '
 
 WarningsAsErrors: '*'
