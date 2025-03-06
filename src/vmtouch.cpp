@@ -67,6 +67,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <boost/thread/thread.hpp> // boost::thread::interrupt
 
 // Takes ownership of result of opendir() and closes it in destructor.
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CAutoCloseDir : public boost::noncopyable {
   DIR * dir;
   std::function<void(const std::string& message)> warning;
@@ -87,6 +88,7 @@ public:
 };
 
 // Takes ownership of memory mapped region and unmaps it in destructor unless Release() is called
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CAutoMunmap : public boost::noncopyable {
   void* mem = nullptr;
   uint64_t len_of_range = 0;

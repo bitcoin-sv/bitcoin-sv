@@ -15,7 +15,6 @@ Checks: '-*,
          -cppcoreguidelines-macro-usage,
          -cppcoreguidelines-macro-to-enum,
          -cppcoreguidelines-non-private-member-variables-in-classes,
-         -cppcoreguidelines-special-member-functions,
       '
 
 WarningsAsErrors: '*'

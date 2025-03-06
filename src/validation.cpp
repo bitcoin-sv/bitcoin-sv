@@ -3185,6 +3185,12 @@ public:
                     ENTER_CRITICAL_SECTION(cs_main)
                 }
 
+                LeaveCriticalSectionGuard(const LeaveCriticalSectionGuard& ) = delete;
+                const LeaveCriticalSectionGuard& operator=( const LeaveCriticalSectionGuard& ) = delete;
+                
+                LeaveCriticalSectionGuard(LeaveCriticalSectionGuard&& ) = delete;
+                const LeaveCriticalSectionGuard& operator=(LeaveCriticalSectionGuard&&) = delete;
+
             private:
                 CCoinsViewCache* mView;
             } csGuard{ view };
@@ -4168,6 +4174,11 @@ public:
         ConnectToPoolEntryRemovedEvent();
     }
 
+    ConnectTrace(const ConnectTrace&) = delete;
+    ConnectTrace& operator=(const ConnectTrace&) = delete;
+    ConnectTrace(ConnectTrace&&) = delete;
+    ConnectTrace& operator=(ConnectTrace&&) = delete;
+
     ~ConnectTrace()
     {
         DisconnectFromPoolEntryRemovedEvent();
@@ -4604,6 +4615,11 @@ static bool ActivateBestChainStep(
                 }
             }
 
+            RAIIUpdateMempool(const RAIIUpdateMempool&) = delete;
+            RAIIUpdateMempool& operator=(const RAIIUpdateMempool&) = delete;
+            RAIIUpdateMempool(RAIIUpdateMempool&&) = delete;
+            RAIIUpdateMempool& operator=(RAIIUpdateMempool&&) = delete;
+
             ~RAIIUpdateMempool() // NOLINT(bugprone-exception-escape)
             {
                 if(std::uncaught_exceptions())
@@ -4863,6 +4879,12 @@ namespace
     {
     public:
         CCacheScopedGuard(CBlockIndex** guarding) : mGuarding{guarding} {}
+
+        CCacheScopedGuard(const CCacheScopedGuard&) = delete;
+        CCacheScopedGuard& operator=(const CCacheScopedGuard&) = delete;
+        CCacheScopedGuard(CCacheScopedGuard&&) = delete;
+        CCacheScopedGuard& operator=(CCacheScopedGuard&&) = delete;
+
         ~CCacheScopedGuard()
         {
             if(mGuarding)
