@@ -136,7 +136,7 @@ public:
     template<typename Stream>
     void Unserialize(Stream &s)
     {
-        std::uint8_t v;
+        std::uint8_t v{};
         ::Unserialize(s, v);
         this->isValid = ( RecordType(v) == RT );
     }
@@ -239,7 +239,7 @@ public:
     template<typename Stream>
     void Unserialize(Stream &s) const
     {
-        std::uint8_t black_list_and_policy_expires_flag;
+        std::uint8_t black_list_and_policy_expires_flag{};
         s >> black_list_and_policy_expires_flag;
 
         frozenTXOData->blacklist = static_cast<decltype(frozenTXOData->blacklist)>(black_list_and_policy_expires_flag & 0x7f);

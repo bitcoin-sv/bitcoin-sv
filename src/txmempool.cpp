@@ -1265,7 +1265,7 @@ void CTxMemPool::RemoveFrozenNL(const mining::CJournalChangeSetPtr& changeSet)
     setEntries spendingFrozenTXOs;
     for(const auto& spentTXO: mapNextTx.get<by_prevout>())
     {
-        std::uint8_t effectiveBlacklist;
+        std::uint8_t effectiveBlacklist{};
         if(!frozenTXOCheck.Check(spentTXO.outpoint, effectiveBlacklist))
         {
             // Is this input spent by confiscation transaction?
@@ -3022,7 +3022,7 @@ void CTxMemPool::DoInitMempoolTxDB()
     OpenMempoolTxDB();
     try
     {
-        uint64_t version;
+        uint64_t version{};
         DumpFileID instanceId;
         CAutoFile file{OpenDumpFile(version, instanceId), SER_DISK, CLIENT_VERSION};
 
@@ -3098,7 +3098,7 @@ UniqueCFile CTxMemPool::OpenDumpFile(uint64_t& version_, DumpFileID& instanceId_
         throw std::runtime_error("Failed to open mempool file from disk");
     }
 
-    uint64_t version;
+    uint64_t version{};
     DumpFileID instanceId { boost::uuids::nil_uuid() };
 
     file >> version;
@@ -3144,7 +3144,7 @@ bool CTxMemPool::LoadMempool(const Config &config,
         // NOLINTNEXTLINE(*-narrowing-conversions)
         int64_t nExpiryTimeout = config.GetMemPoolExpiry();
 
-        uint64_t version;
+        uint64_t version{};
         DumpFileID instanceId;
         CAutoFile file{OpenDumpFile(version, instanceId), SER_DISK, CLIENT_VERSION};
 
@@ -3153,7 +3153,7 @@ bool CTxMemPool::LoadMempool(const Config &config,
         int64_t failed = 0;
         int64_t nNow = GetTime();
 
-        uint64_t num;
+        uint64_t num{};
         file >> num;
         // A pointer to the TxIdTracker.
         const auto& pTxIdTracker = g_connman->GetTxIdTracker();
@@ -3161,8 +3161,6 @@ bool CTxMemPool::LoadMempool(const Config &config,
         while (num--) {
             bool txFromMemory = true;
             CTransactionRef tx;
-            int64_t nTime;
-            int64_t nFeeDelta;
 
             if (version >= MEMPOOL_DUMP_HAS_ON_DISK_TXS) {
                 file >> txFromMemory;
@@ -3180,7 +3178,11 @@ bool CTxMemPool::LoadMempool(const Config &config,
             else {
                 file >> tx;
             }
+
+            int64_t nTime{};
             file >> nTime;
+            
+            int64_t nFeeDelta{};
             file >> nFeeDelta;
             if (nFeeDelta != 0) {
                 const auto& txid = tx->GetId();

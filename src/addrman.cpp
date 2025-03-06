@@ -200,11 +200,11 @@ void CAddrMan::MakeTried(CAddrInfo &info, int nId)
     // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
 }
 
-void CAddrMan::Good_(const CService &addr, int64_t nTime) {
-    int nId;
-
+void CAddrMan::Good_(const CService &addr, int64_t nTime)
+{
     nLastGood = nTime;
 
+    int nId{};
     CAddrInfo *pinfo = Find(addr, &nId);
 
     // if not found, bail out
@@ -255,7 +255,7 @@ bool CAddrMan::Add_(const CAddress &addr, const CNetAddr &source,
     if (!addr.IsRoutable()) return false;
 
     bool fNew = false;
-    int nId;
+    int nId{};
     CAddrInfo *pinfo = Find(addr, &nId);
 
     // Do not set a penalty for a source's self-announcement

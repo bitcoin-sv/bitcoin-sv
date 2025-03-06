@@ -113,8 +113,8 @@ void CBlockIndex::BuildSkipNL()
 
 arith_uint256 GetBlockProof(const CBlockIndex &block) {
     arith_uint256 bnTarget;
-    bool fNegative;
-    bool fOverflow;
+    bool fNegative{};
+    bool fOverflow{};
     bnTarget.SetCompact(block.GetBits(), &fNegative, &fOverflow);
     if (fNegative || fOverflow || bnTarget == 0) {
         return 0;

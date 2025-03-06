@@ -365,7 +365,7 @@ static bool rest_block(const Config &config, HTTPRequest *req,
     }
 
     std::optional<uint256> nextBlockHash;
-    int confirmations;
+    int confirmations{};
     {
         LOCK(cs_main);
 
@@ -617,7 +617,7 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
 
         for (size_t i = (fCheckMemPool) ? 1 : 0; i < uriParts.size(); i++) {
             uint256 txid;
-            int32_t nOutput;
+            int32_t nOutput{};
             std::string strTxid = uriParts[i].substr(0, uriParts[i].find('-'));
             std::string strOutput =
                 uriParts[i].substr(uriParts[i].find('-') + 1);

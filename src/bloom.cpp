@@ -157,7 +157,7 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransaction &tx) {
         CScript::const_iterator pc = txout.scriptPubKey.begin();
         std::vector<uint8_t> data;
         while (pc < txout.scriptPubKey.end()) {
-            opcodetype opcode;
+            opcodetype opcode{};
             if (!txout.scriptPubKey.GetOp(pc, opcode, data)) {
                 break;
             }
@@ -167,7 +167,7 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransaction &tx) {
                     insert(COutPoint(txid, i));
                 } else if ((nFlags & BLOOM_UPDATE_MASK) ==
                            BLOOM_UPDATE_P2PUBKEY_ONLY) {
-                    txnouttype type;
+                    txnouttype type{};
                     std::vector<std::vector<uint8_t>> vSolutions;
 
                     // called as script is before genesis, should be the same as after genesis
@@ -197,7 +197,7 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransaction &tx) {
         CScript::const_iterator pc = txin.scriptSig.begin();
         std::vector<uint8_t> data;
         while (pc < txin.scriptSig.end()) {
-            opcodetype opcode;
+            opcodetype opcode{};
             if (!txin.scriptSig.GetOp(pc, opcode, data)) {
                 break;
             }

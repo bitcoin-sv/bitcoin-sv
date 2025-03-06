@@ -458,7 +458,7 @@ bool CBlockTreeDB::WriteFlag(const std::string &name, bool fValue) {
 }
 
 bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue) {
-    char ch;
+    char ch{};
     if (!Read(std::make_pair(DB_FLAG, name), ch)) return false;
     fValue = ch == '1';
     return true;

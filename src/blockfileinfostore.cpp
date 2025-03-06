@@ -247,7 +247,7 @@ void CBlockFileInfoStore::FindFilesToPrune(
     // so we should leave a buffer under our target to account for another
     // allocation before the next pruning.
     uint64_t nBuffer = BLOCKFILE_CHUNK_SIZE + UNDOFILE_CHUNK_SIZE;
-    uint64_t nBytesToPrune;
+    uint64_t nBytesToPrune{};
     int count = 0;
 
     if (nCurrentUsage + nBuffer >= nPruneTarget) {

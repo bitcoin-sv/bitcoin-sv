@@ -568,7 +568,7 @@ static bool CheckTransactionCommon(const CTransaction& tx,
 
     // No need to count sigops after Genesis, because sigops are unlimited
     if (!IsProtocolActive(era, ProtocolName::Genesis)) {
-        bool sigOpCountError;
+        bool sigOpCountError{};
         uint64_t nSigOpCount = GetSigOpCountWithoutP2SH(tx, era, sigOpCountError);
         if (sigOpCountError || nSigOpCount > maxTxSigOpsCountConsensusBeforeGenesis) {
             return state.DoS(100, false, REJECT_INVALID, "bad-txn-sigops");
@@ -1121,7 +1121,7 @@ CTxnValResult TxnValidation(
     // be mined yet.
     CValidationState ctxState;
     bool isFinal = true;
-    unsigned int lockTimeFlags;
+    unsigned int lockTimeFlags{};
     {
         const CBlockIndex* tip = chainActive.Tip();
         int32_t height { tip->GetHeight() };
@@ -1260,7 +1260,7 @@ CTxnValResult TxnValidation(
             return Result{state, pTxInputData, vCoinsToUncache};
         }
     }
-    bool sigOpCountError;
+    bool sigOpCountError{};
     const uint64_t nSigOpsCount{
         GetTransactionSigOpCount(config, tx, view, true, era, sigOpCountError)
     };
@@ -3159,7 +3159,7 @@ public:
 
         std::atomic_size_t nInputs = 0;
 
-        int64_t nTime4; // This is set inside scope below
+        int64_t nTime4{}; // This is set inside scope below
 
         if (parallelBlockValidation)
         {
@@ -3379,7 +3379,7 @@ private:
                 // GetTransactionSigOpCount counts 2 types of sigops:
                 // * legacy (always)
                 // * p2sh (when P2SH enabled)
-                bool sigOpCountError;
+                bool sigOpCountError{};
                 uint64_t txSigOpsCount = GetTransactionSigOpCount(config, tx, shard, flags & SCRIPT_VERIFY_P2SH, era, sigOpCountError);
                 if (sigOpCountError || txSigOpsCount > maxTxSigOpsCountConsensusBeforeGenesis) {
                     return state.DoS(100, false, REJECT_INVALID, "bad-txn-sigops");
@@ -4266,7 +4266,7 @@ static bool ConnectTip(
     // Apply the block atomically to the chain state.
     int64_t nTime2 = GetTimeMicros();
     nTimeReadFromDisk += nTime2 - nTime1;
-    int64_t nTime3;
+    int64_t nTime3{};
     LogPrint(BCLog::BENCH, "  - Load block from disk: %.2fms [%.2fs]\n",
              (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
     {
@@ -4906,8 +4906,8 @@ bool ActivateBestChain(
                 break;
             }
 
-            const CBlockIndex *pindexFork;
-            bool fInitialDownload;
+            const CBlockIndex* pindexFork{};
+            bool fInitialDownload{};
             {
                 LOCK(cs_main);
 
@@ -5730,7 +5730,7 @@ bool CheckBlock(const Config &config, const CBlock &block,
 
     // Check the merkle root.
     if (validationOptions.shouldValidateMerkleRoot()) {
-        bool mutated;
+        bool mutated{};
         uint256 hashMerkleRoot2 = BlockMerkleRoot(block, &mutated);
         if (block.hashMerkleRoot != hashMerkleRoot2) {
             return state.CorruptionOrDoS("bad-txnmrklroot", "hashMerkleRoot mismatch");
@@ -5813,7 +5813,7 @@ bool CheckBlock(const Config &config, const CBlock &block,
         if (!IsProtocolActive(era, ProtocolName::Genesis)) {
             // Count the sigops for the current transaction. If the total sigops
             // count is too high, the the block is invalid.
-            bool sigOpCountError;
+            bool sigOpCountError{};
             nSigOps += GetSigOpCountWithoutP2SH(*tx, era, sigOpCountError);
             if (sigOpCountError || nSigOps > nMaxSigOpsCountConsensusBeforeGenesis) {
                 auto result = state.DoS(100, false, REJECT_INVALID, "bad-blk-sigops",
@@ -7669,7 +7669,7 @@ double GuessVerificationProgress(const ChainTxData &data, const CBlockIndex *pin
 
     int64_t nNow = time(nullptr);
 
-    double fTxTotal;
+    double fTxTotal{};
     if (pindex->GetChainTx() <= data.nTxCount) {
         // NOLINTNEXTLINE(*-narrowing-conversions)
         fTxTotal = data.nTxCount + (nNow - data.nTime) * data.dTxRate;

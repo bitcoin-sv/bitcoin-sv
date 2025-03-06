@@ -144,9 +144,10 @@ uint32_t CalculateNextWorkRequired(const CBlockIndex *pindexPrev,
     return bnNew.GetCompact();
 }
 
-bool CheckProofOfWork(uint256 hash, uint32_t nBits, const Config &config) {
-    bool fNegative;
-    bool fOverflow;
+bool CheckProofOfWork(uint256 hash, uint32_t nBits, const Config &config)
+{
+    bool fNegative{};
+    bool fOverflow{};
     arith_uint256 bnTarget;
 
     bnTarget.SetCompact(nBits, &fNegative, &fOverflow);

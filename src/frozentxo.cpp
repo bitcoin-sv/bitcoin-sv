@@ -49,7 +49,7 @@ bool CFrozenTXOCheck::Check(const COutPoint& outpoint, std::uint8_t& effectiveBl
         return true;
     }
 
-    CFrozenTXODB::FrozenTXOData::Blacklist effective_blacklist;
+    CFrozenTXODB::FrozenTXOData::Blacklist effective_blacklist{};
     if(IsCheckOnBlock())
     {
         // When validating block, we only consider TXOs frozen on consensus blacklist
@@ -106,7 +106,7 @@ void CFrozenTXOCheck::LogAttemptToSpendFrozenTXO(const COutPoint& outpoint, cons
 
 bool CFrozenTXOCheck::Check(const COutPoint& outpoint, const CTransaction& tx, std::int64_t receivedTime) const
 {
-    std::uint8_t effectiveBlacklist;
+    std::uint8_t effectiveBlacklist{};
     bool result = Check(outpoint, effectiveBlacklist);
     if(!result)
     {

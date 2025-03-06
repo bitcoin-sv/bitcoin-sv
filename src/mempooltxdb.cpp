@@ -20,7 +20,7 @@ CMempoolTxDB::CMempoolTxDB(const fs::path& dbPath_, size_t nCacheSize_, bool fMe
       fMemory{fMemory_},
       wrapper{std::make_unique<CDBWrapper>(dbPath, nCacheSize, fMemory, fWipe)}
 {
-    uint64_t storedValue;
+    uint64_t storedValue{};
     if (wrapper->Read(DB_DISK_USAGE, storedValue))
     {
         diskUsage.store(storedValue);
@@ -296,7 +296,7 @@ public:
     void Synchronize(const std::initializer_list<Task>& tasks = {}, bool clearList = false)
     {
         std::promise<void> sync;
-        bool success;
+        bool success{};
         if (!clearList && tasks.size() == 0)
         {
             success = PushWait(Task{SyncTask{&sync}});

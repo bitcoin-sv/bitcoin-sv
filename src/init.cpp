@@ -2129,7 +2129,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         if (find(categories.begin(), categories.end(), std::string("0")) ==
             categories.end()) {
             for (const auto &cat : categories) {
-                BCLog::LogFlags flag;
+                BCLog::LogFlags flag{};
                 if (!GetLogCategory(flag, cat)) {
                     InitWarning(
                         strprintf(_("Unsupported logging category %s=%s."),
@@ -2143,7 +2143,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     // Now remove the logging categories which were explicitly excluded
     if (gArgs.IsArgSet("-debugexclude")) {
         for (const std::string &cat : gArgs.GetArgs("-debugexclude")) {
-            BCLog::LogFlags flag;
+            BCLog::LogFlags flag{};
             if (!GetLogCategory(flag, cat)) {
                 InitWarning(strprintf(_("Unsupported logging category %s=%s."),
                                       "-debugexclude", cat));
@@ -3257,7 +3257,7 @@ void preloadChainStateThreadFunction()
 
 void preloadChainState(boost::thread_group &threadGroup)
 {
-    int64_t preload;
+    int64_t preload{};
     preload = gArgs.GetArg("-preload", 0);
     if (preload == 0)
     {

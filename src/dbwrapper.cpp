@@ -28,8 +28,8 @@ public:
         }
         std::array<char, 500> buffer{};
         for (int iter = 0; iter < 2; iter++) {
-            char *base;
-            int bufsize;
+            char* base{};
+            int bufsize{};
             if (iter == 0) {
                 bufsize = sizeof(buffer);
                 base = buffer.data();
