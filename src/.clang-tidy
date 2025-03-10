@@ -16,8 +16,6 @@ Checks: '-*,
          -cppcoreguidelines-macro-to-enum,
          -cppcoreguidelines-non-private-member-variables-in-classes,
 
-         -clang-analyzer-deadcode.DeadStores,
-
          -*-narrowing-conversions,
 
          -bugprone-implicit-widening-of-multiplication-result,
