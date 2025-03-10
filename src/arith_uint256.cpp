@@ -6,6 +6,7 @@
 #include "arith_uint256.h"
 #include "crypto/common.h"
 #include "uint256.h"
+#include <cstddef>
 #include <string>
 
 template <unsigned int BITS>
@@ -220,13 +221,13 @@ uint32_t arith_uint256::GetCompact(bool fNegative) const {
 uint256 ArithToUint256(const arith_uint256 &a) {
     uint256 b;
     for (int x = 0; x < a.WIDTH; ++x)
-        WriteLE32(b.begin() + x * 4, a.pn[x]);
+        WriteLE32(b.begin() + static_cast<ptrdiff_t>(x * 4), a.pn[x]);
     return b;
 }
 arith_uint256 UintToArith256(const uint256 &a) {
     arith_uint256 b;
     for (int x = 0; x < b.WIDTH; ++x)
-        b.pn[x] = ReadLE32(a.begin() + x * 4);
+        b.pn[x] = ReadLE32(a.begin() + static_cast<ptrdiff_t>(x * 4));
     return b;
 }
 

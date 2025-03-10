@@ -6,6 +6,7 @@
 #include "crypto/common.h"
 #include "crypto/hmac_sha512.h"
 #include "pubkey.h"
+#include <cstddef>
 
 inline uint32_t ROTL32(uint32_t x, int8_t r) {
     return (x << r) | (x >> (32 - r));
@@ -24,10 +25,10 @@ unsigned int MurmurHash3(unsigned int nHashSeed,
 
         //----------
         // body
-        const uint8_t *blocks = &vDataToHash[0] + nblocks * 4;
+        const uint8_t *blocks = &vDataToHash[0] + static_cast<ptrdiff_t>(nblocks * 4);
 
         for (int i = -nblocks; i; i++) {
-            uint32_t k1 = ReadLE32(blocks + i * 4);
+            uint32_t k1 = ReadLE32(blocks + static_cast<ptrdiff_t>(i * 4));
 
             k1 *= c1;
             k1 = ROTL32(k1, 15);
@@ -40,7 +41,8 @@ unsigned int MurmurHash3(unsigned int nHashSeed,
 
         //----------
         // tail
-        const uint8_t *tail = (const uint8_t *)(&vDataToHash[0] + nblocks * 4);
+        const uint8_t* tail = (const uint8_t*)(&vDataToHash[0] +
+                                               static_cast<ptrdiff_t>(nblocks * 4));
 
         uint32_t k1 = 0;
 

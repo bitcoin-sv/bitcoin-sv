@@ -18,7 +18,6 @@ Checks: '-*,
 
          -*-narrowing-conversions,
 
-         -bugprone-implicit-widening-of-multiplication-result,
          -bugprone-switch-missing-default-case,
 
          -cppcoreguidelines-avoid-c-arrays,
