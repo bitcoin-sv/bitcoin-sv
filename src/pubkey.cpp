@@ -30,17 +30,14 @@ namespace
 static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
                                          secp256k1_ecdsa_signature *sig,
                                          const uint8_t *input,
-                                         size_t inputlen) {
-    size_t rpos, rlen, spos, slen;
-    size_t pos = 0;
-    size_t lenbyte;
-    uint8_t tmpsig[64] = {0};
-    int overflow = 0;
-
+                                         size_t inputlen)
+{
     /* Hack to initialize sig with a correctly-parsed but invalid signature. */
+    uint8_t tmpsig[64]{};
     secp256k1_ecdsa_signature_parse_compact(ctx, sig, tmpsig);
 
     /* Sequence tag byte */
+    size_t pos{};
     if (pos == inputlen || input[pos] != 0x30) {
         return 0;
     }
@@ -50,7 +47,8 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
     if (pos == inputlen) {
         return 0;
     }
-    lenbyte = input[pos++];
+
+    size_t lenbyte{input[pos++]};
     if (lenbyte & 0x80) {
         lenbyte -= 0x80;
         if (pos + lenbyte > inputlen) {
@@ -70,6 +68,7 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
         return 0;
     }
     lenbyte = input[pos++];
+    size_t rlen{};
     if (lenbyte & 0x80) {
         lenbyte -= 0x80;
         if (pos + lenbyte > inputlen) {
@@ -94,7 +93,8 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
     if (rlen > inputlen - pos) {
         return 0;
     }
-    rpos = pos;
+
+    size_t rpos{pos};
     pos += rlen;
 
     /* Integer tag byte for S */
@@ -108,6 +108,7 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
         return 0;
     }
     lenbyte = input[pos++];
+    size_t slen{};
     if (lenbyte & 0x80) {
         lenbyte -= 0x80;
         if (pos + lenbyte > inputlen) {
@@ -132,7 +133,6 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
     if (slen > inputlen - pos) {
         return 0;
     }
-    spos = pos;
 
     /* Ignore leading zeroes in R */
     while (rlen > 0 && input[rpos] == 0) {
@@ -140,6 +140,7 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
         rpos++;
     }
     /* Copy R value */
+    int overflow{};
     if (rlen > 32) {
         overflow = 1;
     } else {
@@ -147,6 +148,7 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
     }
 
     /* Ignore leading zeroes in S */
+    size_t spos{pos};
     while (slen > 0 && input[spos] == 0) {
         slen--;
         spos++;
