@@ -18,8 +18,6 @@ Checks: '-*,
 
          -*-narrowing-conversions,
 
-         -bugprone-switch-missing-default-case,
-
          -cppcoreguidelines-avoid-c-arrays,
          -cppcoreguidelines-init-variables,
          -cppcoreguidelines-prefer-member-initializer,
