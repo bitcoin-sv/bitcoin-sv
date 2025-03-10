@@ -24,7 +24,6 @@ Checks: '-*,
          -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
          -cppcoreguidelines-pro-bounds-constant-array-index,
          -cppcoreguidelines-pro-bounds-pointer-arithmetic,
-         -cppcoreguidelines-rvalue-reference-param-not-moved,
       '
 
 WarningsAsErrors: '*'
@@ -32,11 +31,13 @@ HeaderFilterRegex: '.*'
 CheckOptions:    
   - key:             bugprone-implicit-widening-of-multiplication-result.IgnoreConstantIntExpr
     value:           'true'
+  - key:             cppcoreguidelines-avoid-non-const-global-variables.AllowInternalLinkage
+    value:           'true'
   - key:             cppcoreguidelines-pro-type-member-init.IgnoreArrays
     value:           'true'
-  - key:             cppcoreguidelines-virtual-class-destructor.IgnoreDestructors
+  - key:             cppcoreguidelines-rvalue-reference-param-not-moved.AllowPartialMove
     value:           'true'
-  - key:             cppcoreguidelines-avoid-non-const-global-variables.AllowInternalLinkage
+  - key:             cppcoreguidelines-virtual-class-destructor.IgnoreDestructors
     value:           'true'
 ...
 

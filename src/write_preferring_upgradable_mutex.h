@@ -120,7 +120,6 @@ public:
             mLockType = Type::unlocked;
         }
 
-        // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
         void AssignNL(Lock&& other)
         {
             assert( mLockType == Type::unlocked );
