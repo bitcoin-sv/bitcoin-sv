@@ -30,9 +30,6 @@ Checks: '-*,
          -cppcoreguidelines-pro-bounds-constant-array-index,
          -cppcoreguidelines-pro-bounds-pointer-arithmetic,
          -cppcoreguidelines-rvalue-reference-param-not-moved,
-       
-         -performance-unnecessary-value-param,
-
       '
 
 WarningsAsErrors: '*'
