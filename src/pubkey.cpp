@@ -11,6 +11,7 @@
 namespace
 {
     /* Global secp256k1_context object used for verification. */
+    // NOLINTNEXTLINE(cert-err58-cpp)
     const ecc_guard secp256k1_context_verify{ecc_guard::operation::verify};
 
 } // namespace

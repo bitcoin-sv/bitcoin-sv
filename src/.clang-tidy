@@ -21,8 +21,6 @@ Checks: '-*,
          -bugprone-implicit-widening-of-multiplication-result,
          -bugprone-switch-missing-default-case,
 
-         -cert-err58-cpp,
-
          -cppcoreguidelines-avoid-c-arrays,
          -cppcoreguidelines-init-variables,
          -cppcoreguidelines-prefer-member-initializer,
