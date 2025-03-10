@@ -246,8 +246,8 @@ class CSipHasher {
 private:
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint64_t v[4];
-    uint64_t tmp;
-    int count;
+    uint64_t tmp{};
+    int count{};
 
 public:
     /** Construct a SipHash calculator initialized with 128-bit key (k0, k1) */

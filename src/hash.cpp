@@ -115,8 +115,6 @@ CSipHasher::CSipHasher(uint64_t k0, uint64_t k1) {
     v[1] = 0x646f72616e646f6dULL ^ k1;
     v[2] = 0x6c7967656e657261ULL ^ k0;
     v[3] = 0x7465646279746573ULL ^ k1;
-    count = 0;
-    tmp = 0;
 }
 
 CSipHasher &CSipHasher::Write(uint64_t data) {
