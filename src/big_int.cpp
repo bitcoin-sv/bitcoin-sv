@@ -423,6 +423,7 @@ namespace
     {
         void operator()(const char* p) const { ::OPENSSL_free((void*)p); }
     };
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     using unique_str_ptr = std::unique_ptr<const char[], empty_str_deleter>;
     static_assert(sizeof(unique_str_ptr) == sizeof(const char*));
 

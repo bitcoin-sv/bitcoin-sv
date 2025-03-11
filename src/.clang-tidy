@@ -7,8 +7,6 @@ Checks: '-*,
 
          cert-*,
 
-         clang-analyzer-*
-         
          cppcoreguidelines*,
          -cppcoreguidelines-avoid-do-while,
          -cppcoreguidelines-avoid-magic-numbers,
@@ -18,7 +16,6 @@ Checks: '-*,
 
          -*-narrowing-conversions,
 
-         -cppcoreguidelines-avoid-c-arrays,
          -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
          -cppcoreguidelines-pro-bounds-constant-array-index,
          -cppcoreguidelines-pro-bounds-pointer-arithmetic,

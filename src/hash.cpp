@@ -76,9 +76,13 @@ unsigned int MurmurHash3(unsigned int nHashSeed,
     return h1;
 }
 
-void BIP32Hash(const ChainCode &chainCode, unsigned int nChild, uint8_t header,
-               const uint8_t data[32], uint8_t output[64]) {
-    uint8_t num[4];
+void BIP32Hash(const ChainCode& chainCode,
+               unsigned int nChild,
+               uint8_t header,
+               const uint8_t data[32], // NOLINT(cppcoreguidelines-avoid-c-arrays)
+               uint8_t output[64])     // NOLINT(cppcoreguidelines-avoid-c-arrays)
+{
+    std::array<uint8_t, 4> num{}; 
     num[0] = (nChild >> 24) & 0xFF;
     num[1] = (nChild >> 16) & 0xFF;
     num[2] = (nChild >> 8) & 0xFF;
@@ -86,7 +90,7 @@ void BIP32Hash(const ChainCode &chainCode, unsigned int nChild, uint8_t header,
     CHMAC_SHA512(chainCode.begin(), chainCode.size())
         .Write(&header, 1)
         .Write(data, 32)
-        .Write(num, 4)
+        .Write(num.data(), num.size())
         .Finalize(output);
 }
 

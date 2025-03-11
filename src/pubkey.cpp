@@ -33,8 +33,8 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
                                          size_t inputlen)
 {
     /* Hack to initialize sig with a correctly-parsed but invalid signature. */
-    uint8_t tmpsig[64]{};
-    secp256k1_ecdsa_signature_parse_compact(ctx, sig, tmpsig);
+    std::array<uint8_t, 64> tmpsig{};
+    secp256k1_ecdsa_signature_parse_compact(ctx, sig, tmpsig.data());
 
     /* Sequence tag byte */
     size_t pos{};
@@ -144,7 +144,7 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
     if (rlen > 32) {
         overflow = 1;
     } else {
-        memcpy(tmpsig + 32 - rlen, input + rpos, rlen);
+        memcpy(tmpsig.data() + 32 - rlen, input + rpos, rlen);
     }
 
     /* Ignore leading zeroes in S */
@@ -157,17 +157,17 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
     if (slen > 32) {
         overflow = 1;
     } else {
-        memcpy(tmpsig + 64 - slen, input + spos, slen);
+        memcpy(tmpsig.data() + 64 - slen, input + spos, slen);
     }
 
     if (!overflow) {
-        overflow = !secp256k1_ecdsa_signature_parse_compact(ctx, sig, tmpsig);
+        overflow = !secp256k1_ecdsa_signature_parse_compact(ctx, sig, tmpsig.data());
     }
     if (overflow) {
         /* Overwrite the result again with a correctly-parsed but invalid
            signature if parsing failed. */
-        memset(tmpsig, 0, 64);
-        secp256k1_ecdsa_signature_parse_compact(ctx, sig, tmpsig);
+        memset(tmpsig.data(), 0, 64);
+        secp256k1_ecdsa_signature_parse_compact(ctx, sig, tmpsig.data());
     }
     return 1;
 }
@@ -228,15 +228,17 @@ bool CPubKey::RecoverCompact(const uint256 &hash,
     {
         return false;
     }
-    uint8_t pub[65];
+   
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, 65> pub;
     size_t publen = 65;
     secp256k1_ec_pubkey_serialize(secp256k1_context_verify.get(),
-                                  pub,
+                                  pub.data(),
                                   &publen,
                                   &pubkey,
                                   fComp ? SECP256K1_EC_COMPRESSED
                                         : SECP256K1_EC_UNCOMPRESSED);
-    Set(pub, pub + publen);
+    Set(pub.data(), pub.data() + publen);
     return true;
 }
 
@@ -255,14 +257,16 @@ bool CPubKey::Decompress() {
     {
         return false;
     }
-    uint8_t pub[65];
+
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, 65> pub;
     size_t publen = 65;
     secp256k1_ec_pubkey_serialize(secp256k1_context_verify.get(),
-                                  pub,
+                                  pub.data(),
                                   &publen,
                                   &pubkey,
                                   SECP256K1_EC_UNCOMPRESSED);
-    Set(pub, pub + publen);
+    Set(pub.data(), pub.data() + publen);
     return true;
 }
 
@@ -271,32 +275,43 @@ bool CPubKey::Derive(CPubKey &pubkeyChild, ChainCode &ccChild,
     assert(IsValid());
     assert((nChild >> 31) == 0);
     assert(begin() + 33 == end());
-    uint8_t out[64];
-    BIP32Hash(cc, nChild, *begin(), begin() + 1, out);
-    memcpy(ccChild.begin(), out + 32, 32);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, 64> out;
+    BIP32Hash(cc,
+              nChild,
+              *begin(),
+              std::span<const uint8_t, 32>{begin() + 1, end()},
+              out);
+    memcpy(ccChild.begin(), out.data() + 32, 32);
     secp256k1_pubkey pubkey;
-    if(!secp256k1_ec_pubkey_parse(
-           secp256k1_context_verify.get(), &pubkey, &(*this)[0], size()))
+    if(!secp256k1_ec_pubkey_parse(secp256k1_context_verify.get(),
+                                  &pubkey,
+                                  &(*this)[0],
+                                  size()))
     {
         return false;
     }
-    if(!secp256k1_ec_pubkey_tweak_add(
-           secp256k1_context_verify.get(), &pubkey, out))
+
+    if(!secp256k1_ec_pubkey_tweak_add(secp256k1_context_verify.get(),
+                                      &pubkey,
+                                      out.data()))
     {
         return false;
     }
-    uint8_t pub[33];
+
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, 33> pub;
     size_t publen = 33;
     secp256k1_ec_pubkey_serialize(secp256k1_context_verify.get(),
-                                  pub,
+                                  pub.data(),
                                   &publen,
                                   &pubkey,
                                   SECP256K1_EC_COMPRESSED);
-    pubkeyChild.Set(pub, pub + publen);
+    pubkeyChild.Set(pub.data(), pub.data() + publen);
     return true;
 }
 
-void CExtPubKey::Encode(uint8_t code[BIP32_EXTKEY_SIZE]) const {
+void CExtPubKey::Encode(uint8_t code[BIP32_EXTKEY_SIZE]) const { // NOLINT(cppcoreguidelines-avoid-c-arrays)
     code[0] = nDepth;
     memcpy(code + 1, vchFingerprint, 4);
     code[5] = (nChild >> 24) & 0xFF;
@@ -308,7 +323,7 @@ void CExtPubKey::Encode(uint8_t code[BIP32_EXTKEY_SIZE]) const {
     memcpy(code + 41, pubkey.begin(), 33);
 }
 
-void CExtPubKey::Decode(const uint8_t code[BIP32_EXTKEY_SIZE]) {
+void CExtPubKey::Decode(const uint8_t code[BIP32_EXTKEY_SIZE]) { // NOLINT(cppcoreguidelines-avoid-c-arrays)
     nDepth = code[0];
     memcpy(vchFingerprint, code + 1, 4);
     nChild = (code[5] << 24) | (code[6] << 16) | (code[7] << 8) | code[8];
