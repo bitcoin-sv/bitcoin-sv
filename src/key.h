@@ -11,6 +11,7 @@
 #include "support/allocators/secure.h"
 #include "uint256.h"
 
+#include <array>
 #include <stdexcept>
 #include <vector>
 
@@ -144,48 +145,43 @@ public:
     bool Load(CPrivKey &privkey, CPubKey &vchPubKey, bool fSkipCheck);
 };
 
-struct CExtKey {
+struct CExtKey
+{
     uint8_t nDepth;
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    uint8_t vchFingerprint[4];
+    std::array<uint8_t, 4> vchFingerprint;
     unsigned int nChild;
     ChainCode chaincode;
     CKey key;
 
-    friend bool operator==(const CExtKey &a, const CExtKey &b) {
-        return a.nDepth == b.nDepth &&
-               memcmp(&a.vchFingerprint[0], &b.vchFingerprint[0],
-                      sizeof(vchFingerprint)) == 0 &&
-               a.nChild == b.nChild && a.chaincode == b.chaincode &&
-               a.key == b.key;
-    }
+    friend bool operator==(const CExtKey& a, const CExtKey& b) = default;
 
     void Encode(std::span<uint8_t, BIP32_EXTKEY_SIZE>) const;
     void Decode(std::span<const uint8_t, BIP32_EXTKEY_SIZE>);
     bool Derive(CExtKey &out, unsigned int nChild) const;
     CExtPubKey Neuter() const;
     void SetMaster(const uint8_t *seed, unsigned int nSeedLen);
-    template <typename Stream> void Serialize(Stream &s) const {
-        unsigned int len = BIP32_EXTKEY_SIZE;
+
+    template<typename Stream>
+    void Serialize(Stream& s) const
+    {
+        const unsigned int len = BIP32_EXTKEY_SIZE;
         ::WriteCompactSize(s, len);
-        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-        uint8_t code[BIP32_EXTKEY_SIZE];
-        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+        std::array<uint8_t, BIP32_EXTKEY_SIZE> code;
         Encode(code);
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
-        s.write((const char *)&code[0], len);
+        s.write((const char *)code.data(), len);
     }
-    template <typename Stream> void Unserialize(Stream &s) {
-        unsigned int len = ::ReadCompactSize(s);
-        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-        uint8_t code[BIP32_EXTKEY_SIZE];
-        if (len != BIP32_EXTKEY_SIZE)
+
+    template<typename Stream>
+    void Unserialize(Stream& s)
+    {
+        const unsigned int len = ::ReadCompactSize(s);
+        if(len != BIP32_EXTKEY_SIZE)
             throw std::runtime_error("Invalid extended key size\n");
+        
+        std::array<uint8_t, BIP32_EXTKEY_SIZE> code;
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
-        s.read((char *)&code[0], len);
-        // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+        s.read((char *)code.data(), len);
         Decode(code);
     }
 };

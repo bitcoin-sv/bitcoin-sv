@@ -311,10 +311,11 @@ bool CKey::Derive(CKey &keyChild, ChainCode &ccChild, unsigned int nChild,
     return ret;
 }
 
-bool CExtKey::Derive(CExtKey &out, unsigned int _nChild) const {
+bool CExtKey::Derive(CExtKey& out, unsigned int _nChild) const
+{
     out.nDepth = nDepth + 1;
     CKeyID id = key.GetPubKey().GetID();
-    memcpy(&out.vchFingerprint[0], &id, 4);
+    memcpy(out.vchFingerprint.data(), &id, vchFingerprint.size());
     out.nChild = _nChild;
     return key.Derive(out.key, out.chaincode, _nChild, chaincode);
 }
@@ -330,13 +331,16 @@ void CExtKey::SetMaster(const uint8_t *seed, unsigned int nSeedLen) {
     memcpy(chaincode.begin(), &vout[32], 32);
     nDepth = 0;
     nChild = 0;
-    memset(vchFingerprint, 0, sizeof(vchFingerprint));
+    memset(vchFingerprint.data(), 0, vchFingerprint.size());
 }
 
-CExtPubKey CExtKey::Neuter() const {
+CExtPubKey CExtKey::Neuter() const
+{
     CExtPubKey ret;
     ret.nDepth = nDepth;
-    memcpy(&ret.vchFingerprint[0], &vchFingerprint[0], 4);
+    memcpy(&ret.vchFingerprint[0],
+           vchFingerprint.data(),
+           vchFingerprint.size());
     ret.nChild = nChild;
     ret.pubkey = key.GetPubKey();
     ret.chaincode = chaincode;
@@ -346,7 +350,9 @@ CExtPubKey CExtKey::Neuter() const {
 void CExtKey::Encode(const std::span<uint8_t, BIP32_EXTKEY_SIZE> code) const
 {
     code[0] = nDepth;
-    memcpy(code.data() + 1, vchFingerprint, 4);
+    memcpy(code.data() + 1,
+           vchFingerprint.data(),
+           vchFingerprint.size());
     code[5] = (nChild >> 24) & 0xFF;
     code[6] = (nChild >> 16) & 0xFF;
     code[7] = (nChild >> 8) & 0xFF;
@@ -360,7 +366,9 @@ void CExtKey::Encode(const std::span<uint8_t, BIP32_EXTKEY_SIZE> code) const
 void CExtKey::Decode(const std::span<const uint8_t, BIP32_EXTKEY_SIZE> code)
 {
     nDepth = code[0];
-    memcpy(vchFingerprint, code.data() + 1, 4);
+    memcpy(vchFingerprint.data(),
+           code.data() + 1,
+           vchFingerprint.size());
     nChild = (code[5] << 24) | (code[6] << 16) | (code[7] << 8) | code[8];
     memcpy(chaincode.begin(), code.data() + 9, 32);
     key.Set(code.data() + 42, code.data() + BIP32_EXTKEY_SIZE, true);
