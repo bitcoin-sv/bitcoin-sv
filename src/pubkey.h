@@ -36,14 +36,13 @@ public:
 typedef uint256 ChainCode;
 
 /** An encapsulated public key. */
-class CPubKey {
-private:
+class CPubKey
+{
     /**
      * Just store the serialized data.
      * Its length can very cheaply be computed from the first byte.
      */
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    uint8_t vch[65];
+    std::array<uint8_t, 65> vch;
 
     //! Compute the length of a pubkey with a given first byte.
     static unsigned int GetLen(uint8_t chHeader) {
@@ -60,12 +59,12 @@ public:
     CPubKey() { Invalidate(); }
 
     //! Initialize a public key using begin/end iterators to byte data.
-    template <typename T> void Set(const T pbegin, const T pend) {
+    template<typename T>
+    void Set(const T pbegin, const T pend)
+    {
         auto len = pend == pbegin ? 0u : GetLen(pbegin[0]);
-        if (len && len == (pend - pbegin))
-            // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-            memcpy(vch, (uint8_t *)&pbegin[0], len);
+        if(len && len == (pend - pbegin))
+            memcpy(vch.data(), (uint8_t*)&pbegin[0], len);
         else
             Invalidate();
     }
@@ -81,26 +80,24 @@ public:
 
     //! Simple read-only vector-like interface to the pubkey data.
     unsigned int size() const { return GetLen(vch[0]); }
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-    const uint8_t *begin() const { return vch; }
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-*)
-    const uint8_t *end() const { return vch + size(); }
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-*)
-    const uint8_t &operator[](unsigned int pos) const { return vch[pos]; }
+    const uint8_t* begin() const { return vch.begin(); }
+    const uint8_t* end() const { return vch.begin() + size(); }
+    const uint8_t& operator[](unsigned int pos) const { return vch[pos]; }
 
     //! Comparator implementation.
-    friend bool operator==(const CPubKey &a, const CPubKey &b) {
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-        return a.vch[0] == b.vch[0] && memcmp(a.vch, b.vch, a.size()) == 0;
+    friend bool operator==(const CPubKey& a, const CPubKey& b)
+    {
+        return a.vch[0] == b.vch[0] && memcmp(a.vch.data(),
+                                              b.vch.data(),
+                                              a.size()) == 0;
     }
-    friend bool operator!=(const CPubKey &a, const CPubKey &b) {
-        return !(a == b);
-    }
-    friend bool operator<(const CPubKey &a, const CPubKey &b) {
+
+    friend bool operator<(const CPubKey& a, const CPubKey& b)
+    {
         return a.vch[0] < b.vch[0] ||
-               // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-               (a.vch[0] == b.vch[0] && memcmp(a.vch, b.vch, a.size()) < 0);
+               (a.vch[0] == b.vch[0] && memcmp(a.vch.data(),
+                                               b.vch.data(),
+                                               a.size()) < 0);
     }
 
     //! Implement serialization, as if this was a byte vector.
@@ -108,13 +105,13 @@ public:
         unsigned int len = size();
         ::WriteCompactSize(s, len);
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
-        s.write((char *)vch, len);
+        s.write((char *)vch.data(), len);
     }
     template <typename Stream> void Unserialize(Stream &s) {
         unsigned int len = ::ReadCompactSize(s);
         if (len <= 65) {
             // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
-            s.read((char *)vch, len);
+            s.read((char *)vch.data(), len);
         } else {
             // invalid pubkey, skip available data
             char dummy; // NOLINT(cppcoreguidelines-init-variables)
@@ -126,11 +123,13 @@ public:
 
     //! Get the KeyID of this public key (hash of its serialization)
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-*)
-    CKeyID GetID() const { return CKeyID(Hash160(vch, vch + size())); }
+    CKeyID GetID() const { return CKeyID(Hash160(vch.data(),
+                                                 vch.data() + size())); }
 
     //! Get the 256-bit hash of this public key.
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-*)
-    uint256 GetHash() const { return Hash(vch, vch + size()); }
+    uint256 GetHash() const { return Hash(vch.data(),
+                                          vch.data() + size()); }
 
     /*
      * Check syntactic correctness.
