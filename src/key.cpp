@@ -343,25 +343,27 @@ CExtPubKey CExtKey::Neuter() const {
     return ret;
 }
 
-void CExtKey::Encode(uint8_t code[BIP32_EXTKEY_SIZE]) const {
+void CExtKey::Encode(const std::span<uint8_t, BIP32_EXTKEY_SIZE> code) const
+{
     code[0] = nDepth;
-    memcpy(code + 1, vchFingerprint, 4);
+    memcpy(code.data() + 1, vchFingerprint, 4);
     code[5] = (nChild >> 24) & 0xFF;
     code[6] = (nChild >> 16) & 0xFF;
     code[7] = (nChild >> 8) & 0xFF;
     code[8] = (nChild >> 0) & 0xFF;
-    memcpy(code + 9, chaincode.begin(), 32);
+    memcpy(code.data() + 9, chaincode.begin(), 32);
     code[41] = 0;
     assert(key.size() == 32);
-    memcpy(code + 42, key.begin(), 32);
+    memcpy(code.data() + 42, key.begin(), 32);
 }
 
-void CExtKey::Decode(const uint8_t code[BIP32_EXTKEY_SIZE]) {
+void CExtKey::Decode(const std::span<const uint8_t, BIP32_EXTKEY_SIZE> code)
+{
     nDepth = code[0];
-    memcpy(vchFingerprint, code + 1, 4);
+    memcpy(vchFingerprint, code.data() + 1, 4);
     nChild = (code[5] << 24) | (code[6] << 16) | (code[7] << 8) | code[8];
-    memcpy(chaincode.begin(), code + 9, 32);
-    key.Set(code + 42, code + BIP32_EXTKEY_SIZE, true);
+    memcpy(chaincode.begin(), code.data() + 9, 32);
+    key.Set(code.data() + 42, code.data() + BIP32_EXTKEY_SIZE, true);
 }
 
 bool ECC_InitSanityCheck() {

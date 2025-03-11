@@ -102,10 +102,11 @@ void RunTest(const TestVector &test) {
     CExtPubKey pubkey;
     key.SetMaster(&seed[0], seed.size());
     pubkey = key.Neuter();
-    for (const TestDerivation &derive : test.vDerive) {
-        std::array<uint8_t, 74> data{};
-        key.Encode(data.data());
-        pubkey.Encode(data.data());
+    for(const TestDerivation& derive : test.vDerive)
+    {
+        std::array<uint8_t, BIP32_EXTKEY_SIZE> data{};
+        key.Encode(data);
+        pubkey.Encode(data);
 
         // Test private key
         CBitcoinExtKey b58key;

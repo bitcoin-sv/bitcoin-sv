@@ -187,10 +187,8 @@ struct CExtPubKey {
                a.pubkey == b.pubkey;
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    void Encode(uint8_t code[BIP32_EXTKEY_SIZE]) const;
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    void Decode(const uint8_t code[BIP32_EXTKEY_SIZE]);
+    void Encode(std::span<uint8_t, BIP32_EXTKEY_SIZE>) const;
+    void Decode(std::span<const uint8_t, BIP32_EXTKEY_SIZE>);
     bool Derive(CExtPubKey &out, unsigned int nChild) const;
 
     void Serialize(CSizeComputer &s) const {

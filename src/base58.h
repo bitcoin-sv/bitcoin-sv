@@ -22,6 +22,7 @@
 #include "script/standard.h"
 #include "support/allocators/zeroafterfree.h"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -134,7 +135,8 @@ public:
         if (vchData.size() == Size) {
             // If base58 encoded data does not hold an ext key, return a
             // !IsValid() key
-            ret.Decode(&vchData[0]);
+            ret.Decode(std::span<const uint8_t, Size>{vchData.begin(),
+                                                      vchData.size()});
         }
         return ret;
     }
