@@ -283,13 +283,24 @@ bool CKey::Derive(CKey &keyChild, ChainCode &ccChild, unsigned int nChild,
     assert(IsValid());
     assert(IsCompressed());
     std::vector<uint8_t, secure_allocator<uint8_t>> vout(64);
-    if ((nChild >> 31) == 0) {
+    if((nChild >> 31) == 0)
+    {
         CPubKey pubkey = GetPubKey();
         assert(pubkey.begin() + 33 == pubkey.end());
-        BIP32Hash(cc, nChild, *pubkey.begin(), pubkey.begin() + 1, vout.data());
-    } else {
+        BIP32Hash(cc,
+                  nChild,
+                  *pubkey.begin(),
+                  std::span<const uint8_t, 32>{pubkey.begin() + 1, 32},
+                  std::span<uint8_t, 64>{vout});
+    }
+    else
+    {
         assert(begin() + 32 == end());
-        BIP32Hash(cc, nChild, 0, begin(), vout.data());
+        BIP32Hash(cc,
+                  nChild,
+                  0,
+                  std::span<const uint8_t, 32>{begin(), 32},
+                  std::span<uint8_t, 64>{vout});
     }
     memcpy(ccChild.begin(), vout.data() + 32, 32);
     memcpy((uint8_t *)keyChild.begin(), begin(), 32);

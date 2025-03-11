@@ -13,6 +13,7 @@
 #include "uint256.h"
 #include "version.h"
 
+#include <span>
 #include <vector>
 
 typedef uint256 ChainCode;
@@ -237,9 +238,11 @@ uint256 SerializeHash(const T &obj, int nType = SER_GETHASH,
 unsigned int MurmurHash3(unsigned int nHashSeed,
                          const std::vector<uint8_t> &vDataToHash);
 
-void BIP32Hash(const ChainCode &chainCode, unsigned int nChild, uint8_t header,
-               // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-               const uint8_t data[32], uint8_t output[64]);
+void BIP32Hash(const ChainCode& chainCode,
+               unsigned int nChild,
+               uint8_t header,
+               std::span<const uint8_t, 32> data,
+               std::span<uint8_t, 64> output);
 
 /** SipHash-2-4 */
 class CSipHasher {

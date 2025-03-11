@@ -77,10 +77,10 @@ unsigned int MurmurHash3(unsigned int nHashSeed,
 }
 
 void BIP32Hash(const ChainCode& chainCode,
-               unsigned int nChild,
-               uint8_t header,
-               const uint8_t data[32], // NOLINT(cppcoreguidelines-avoid-c-arrays)
-               uint8_t output[64])     // NOLINT(cppcoreguidelines-avoid-c-arrays)
+               const unsigned int nChild,
+               const uint8_t header,
+               const std::span<const uint8_t, 32> data,
+               const std::span<uint8_t, 64> output)
 {
     std::array<uint8_t, 4> num{}; 
     num[0] = (nChild >> 24) & 0xFF;
@@ -89,9 +89,9 @@ void BIP32Hash(const ChainCode& chainCode,
     num[3] = (nChild >> 0) & 0xFF;
     CHMAC_SHA512(chainCode.begin(), chainCode.size())
         .Write(&header, 1)
-        .Write(data, 32)
+        .Write(data.data(), data.size())
         .Write(num.data(), num.size())
-        .Finalize(output);
+        .Finalize(output.data());
 }
 
 #define ROTL(x, b) (uint64_t)(((x) << (b)) | ((x) >> (64 - (b))))
