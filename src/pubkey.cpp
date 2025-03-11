@@ -314,7 +314,7 @@ bool CPubKey::Derive(CPubKey &pubkeyChild, ChainCode &ccChild,
 void CExtPubKey::Encode(const std::span<uint8_t, BIP32_EXTKEY_SIZE> code) const
 {
     code[0] = nDepth;
-    memcpy(code.data() + 1, vchFingerprint, 4);
+    memcpy(code.data() + 1, vchFingerprint.data(), 4);
     code[5] = (nChild >> 24) & 0xFF;
     code[6] = (nChild >> 16) & 0xFF;
     code[7] = (nChild >> 8) & 0xFF;
@@ -327,7 +327,7 @@ void CExtPubKey::Encode(const std::span<uint8_t, BIP32_EXTKEY_SIZE> code) const
 void CExtPubKey::Decode(const std::span<const uint8_t, BIP32_EXTKEY_SIZE> code)
 {
     nDepth = code[0];
-    memcpy(vchFingerprint, code.data() + 1, 4);
+    memcpy(vchFingerprint.data(), code.data() + 1, 4);
     nChild = (code[5] << 24) | (code[6] << 16) | (code[7] << 8) | code[8];
     memcpy(chaincode.begin(), code.data() + 9, 32);
     pubkey.Set(code.data() + 41,
@@ -337,7 +337,7 @@ void CExtPubKey::Decode(const std::span<const uint8_t, BIP32_EXTKEY_SIZE> code)
 bool CExtPubKey::Derive(CExtPubKey &out, unsigned int _nChild) const {
     out.nDepth = nDepth + 1;
     CKeyID id = pubkey.GetID();
-    memcpy(&out.vchFingerprint[0], &id, 4);
+    memcpy(out.vchFingerprint.data(), &id, 4);
     out.nChild = _nChild;
     return pubkey.Derive(out.pubkey, out.chaincode, _nChild, chaincode);
 }

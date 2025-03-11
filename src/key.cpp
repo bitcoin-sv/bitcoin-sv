@@ -338,7 +338,7 @@ CExtPubKey CExtKey::Neuter() const
 {
     CExtPubKey ret;
     ret.nDepth = nDepth;
-    memcpy(&ret.vchFingerprint[0],
+    memcpy(ret.vchFingerprint.data(),
            vchFingerprint.data(),
            vchFingerprint.size());
     ret.nChild = nChild;
