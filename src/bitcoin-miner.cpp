@@ -52,7 +52,10 @@ bool static ScanHash(const CBlockHeader *pblock, uint32_t &nNonce, uint256 *phas
         // Write the last 4 bytes of the block header (the nonce) to a copy of
         // the double-SHA256 state, and compute the result.
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
-        CHash256(hasher).Write((unsigned char *)&nNonce, 4).Finalize((unsigned char *)phash);
+        CHash256(hasher)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
+            .Write((unsigned char*)&nNonce, 4)
+            .Finalize(CHash256::span{phash->begin(), CHash256::OUTPUT_SIZE});
 
         // Return the nonce if the hash has at least some zero bits,
         // caller will check if it has enough to reach the target
@@ -159,7 +162,7 @@ static void CalculateNextMerkleRoot(uint256 &merkle_root, const uint256 &merkle_
     CHash256()
         .Write(merkle_root.begin(), merkle_root.size())
         .Write(merkle_branch.begin(), merkle_branch.size())
-        .Finalize(hash.begin());
+        .Finalize(CHash256::span{hash.begin(), CHash256::OUTPUT_SIZE});
     merkle_root = hash;
 }
 
@@ -256,7 +259,9 @@ static bool CpuMineBlockHasher(CBlockHeader *pblock, vector<unsigned char>& coin
             // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             memcpy(pbytes + offset_extra_nonce, &nExtraNonce, sizeof(nExtraNonce));
             uint256 hash;
-            CHash256().Write(pbytes, coinbaseBytes.size()).Finalize(hash.begin());
+            CHash256()
+                .Write(pbytes, coinbaseBytes.size())
+                .Finalize(CHash256::span{hash.begin(), CHash256::OUTPUT_SIZE});
 
             pblock->hashMerkleRoot = CalculateMerkleRoot(hash, merkleproof);
         }

@@ -12,6 +12,7 @@
 #include "hash.h"
 #include "util.h"
 
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -88,7 +89,8 @@ public:
 
         // After reading the last transactions, we can finalize the hash.
         if (EndOfStream() && mCalculateDiskBlockMetadata) {
-            hasher.Finalize(reinterpret_cast<uint8_t*>(&diskBlockMetaData.diskDataHash));
+            hasher.Finalize(CHash256::span{diskBlockMetaData.diskDataHash.begin(),
+                                           CHash256::OUTPUT_SIZE});
         }
 
         return *mTransaction;

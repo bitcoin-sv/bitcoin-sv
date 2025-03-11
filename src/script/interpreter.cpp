@@ -24,6 +24,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <hash.h>
 #include <optional>
 #include <utility>
 #include <variant>
@@ -1435,7 +1436,8 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         } else if (opcode == OP_HASH256) {
                             CHash256()
                                 .Write(vch.GetElement().data(), vch.size())
-                                .Finalize(vchHash.data());
+                                .Finalize(CHash256::span{vchHash.data(),
+                                                         CHash256::OUTPUT_SIZE});
                         }
                         stack.pop_back();
                         stack.push_back(std::move(vchHash));

@@ -20,6 +20,7 @@
 #include "validation.h"
 #include "versionbits.h"
 #include "invalid_txn_publisher.h"
+#include <cstdint>
 #include <iomanip>
 #include <limits>
 #include <queue>
@@ -133,7 +134,7 @@ void CalculateNextMerkleRoot(uint256 &merkle_root, const uint256 &merkle_branch)
     CHash256()
         .Write(merkle_root.begin(), merkle_root.size())
         .Write(merkle_branch.begin(), merkle_branch.size())
-        .Finalize(hash.begin());
+        .Finalize(CHash256::span{hash.begin(), CHash256::OUTPUT_SIZE});
     merkle_root = hash;
 }
 

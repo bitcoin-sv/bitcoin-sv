@@ -10,6 +10,7 @@
 #include "pubkey.h"
 #include "random.h"
 
+#include <cstdint>
 #include <secp256k1.h>
 #include <secp256k1_recovery.h>
 
@@ -234,9 +235,9 @@ bool CKey::VerifyPubKey(const CPubKey &pubkey) const {
     GetRandBytes(rnd, sizeof(rnd));
     uint256 hash;
     CHash256()
-        .Write((uint8_t *)str.data(), str.size())
+        .Write((uint8_t*)str.data(), str.size())
         .Write(rnd, sizeof(rnd))
-        .Finalize(hash.begin());
+        .Finalize(CHash256::span{hash.begin(), CHash256::OUTPUT_SIZE});
     std::vector<uint8_t> vchSig;
     Sign(hash, vchSig);
     return pubkey.Verify(hash, vchSig);

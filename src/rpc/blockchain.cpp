@@ -1630,7 +1630,8 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
 
     if (!hasDiskBlockMetaData)
     {
-        hasher.Finalize(reinterpret_cast<uint8_t *>(&metadata.diskDataHash));
+        hasher.Finalize(CHash256::span{metadata.diskDataHash.begin(),
+                        CHash256::OUTPUT_SIZE});
         blockIndex.SetBlockIndexFileMetaDataIfNotSet(metadata, mapBlockIndex);
     }
 

@@ -4,6 +4,8 @@
 // Copyright (c) 2020-2021 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include <cstdint>
+#include <hash.h>
 #include <net/net_message.h>
 #include <logging.h>
 
@@ -57,8 +59,9 @@ uint64_t CNetMessage::Read(const Config& config, const uint8_t* p, uint64_t nByt
 const uint256& CNetMessage::GetMessageHash() const
 {
     assert(Complete());
-    if (data_hash.IsNull()) {
-        hasher.Finalize(data_hash.begin());
+    if(data_hash.IsNull())
+    {
+        hasher.Finalize(CHash256::span{data_hash.begin(), CHash256::OUTPUT_SIZE});
     }
     return data_hash;
 }

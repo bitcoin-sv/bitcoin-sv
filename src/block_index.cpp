@@ -3,15 +3,15 @@
 
 #include "block_index.h"
 
-#include "block_file_access.h"
+#include "abort_node.h"
 #include "async_file_reader.h"
+#include "block_file_access.h"
 #include "blockfileinfostore.h"
 #include "blockstreams.h"
-#include "config.h"
 #include "clientversion.h"
+#include "config.h"
+#include "hash.h"
 #include "pow.h"
-#include "warnings.h"
-#include "abort_node.h"
 
 /** Turn the lowest '1' bit in the binary representation of a number into a '0'.
  */
@@ -350,8 +350,7 @@ bool CBlockIndex::PopulateBlockIndexBlockDiskMetaDataNL(
         size += chunk.Size();
     } while(!stream.EndOfStream());
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-    hasher.Finalize(reinterpret_cast<uint8_t*>(&hash));
+    hasher.Finalize(CHash256::span{hash.begin(), CHash256::OUTPUT_SIZE});
 
     SetBlockIndexFileMetaDataIfNotSetNL(CDiskBlockMetaData{hash, size}, notifyDirty);
 

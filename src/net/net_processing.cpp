@@ -2001,7 +2001,7 @@ static bool ProcessAuthChMessage(const Config& config,
         CHash256()
             .Write(msg.begin(), msg.size()) // (a)
             .Write(reinterpret_cast<uint8_t*>(&nClientNonce), 8) // (b)
-            .Finalize(hash.begin());
+            .Finalize(CHash256::span{hash.begin(), CHash256::OUTPUT_SIZE});
 
         // Get the current MinerID from this node
         std::optional<CPubKey> pubKeyOpt = g_BlockDatarefTracker->get_current_minerid();
@@ -2197,7 +2197,7 @@ static bool ProcessAuthRespMessage(const CNodePtr& pfrom,
         CHash256()
             .Write(msgHash.begin(), msgHash.size()) // (a)
             .Write(reinterpret_cast<uint8_t*>(&nClientNonce), 8) // (b)
-            .Finalize(hash.begin());
+            .Finalize(CHash256::span{hash.begin(), CHash256::OUTPUT_SIZE});
         // Execute verification.
         if (!recvPubKey.Verify(hash, vSign)) {
             throw std::runtime_error("authresp message signature failed to verify.");
