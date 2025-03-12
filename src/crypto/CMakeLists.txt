@@ -38,6 +38,11 @@ if(CRYPTO_USE_ASM)
 	target_compile_definitions(crypto PRIVATE USE_ASM)
 endif()
 
+if(ENABLE_CLANG_TIDY)
+    include(ClangTidy)
+    AddClangTidy(crypto)
+endif()
+
 # Dependencies
 target_link_libraries(crypto ${OPENSSL_CRYPTO_LIBRARY})
 

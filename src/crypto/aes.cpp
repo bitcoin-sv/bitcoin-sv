@@ -9,7 +9,7 @@
 #include <cstring>
 
 extern "C" {
-#include "crypto/ctaes/ctaes.c"
+#include "crypto/ctaes/ctaes.c" // NOLINT(bugprone-suspicious-include)
 }
 
 AES128Encrypt::AES128Encrypt(const uint8_t key[16]) {
