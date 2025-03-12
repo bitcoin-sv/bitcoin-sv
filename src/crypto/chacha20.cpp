@@ -15,14 +15,14 @@ constexpr static inline uint32_t rotl32(uint32_t v, int c) {
 }
 
 #define QUARTERROUND(a, b, c, d)                                               \
-    a += b;                                                                    \
-    d = rotl32(d ^ a, 16);                                                     \
-    c += d;                                                                    \
-    b = rotl32(b ^ c, 12);                                                     \
-    a += b;                                                                    \
-    d = rotl32(d ^ a, 8);                                                      \
-    c += d;                                                                    \
-    b = rotl32(b ^ c, 7);
+    a += (b);                                                                  \
+    (d) = rotl32((d) ^ (a), 16);                                               \
+    (c) += (d);                                                                \
+    (b) = rotl32((b) ^ (c), 12);                                               \
+    (a) += (b);                                                                \
+    (d) = rotl32((d) ^ (a), 8);                                                \
+    (c) += (d);                                                                \
+    (b) = rotl32((b) ^ (c), 7);
 
 static const uint8_t sigma[] = "expand 32-byte k";
 static const uint8_t tau[] = "expand 16-byte k";
