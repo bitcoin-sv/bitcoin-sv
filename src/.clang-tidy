@@ -17,7 +17,6 @@ Checks: '-*,
          -cppcoreguidelines-non-private-member-variables-in-classes,
 
          -bugprone-macro-parentheses,
-         -bugprone-suspicious-string-compare,
 
          -cppcoreguidelines-avoid-c-arrays,
          -cppcoreguidelines-init-variables,

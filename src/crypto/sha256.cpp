@@ -241,14 +241,20 @@ bool SelfTest(TransformType tr) {
     memcpy(buf, init, sizeof(buf));
     // Process nothing, and check we remain in the initial state.
     tr(buf, nullptr, 0);
-    if (memcmp(buf, init, sizeof(buf))) return false;
+    if(memcmp(buf, init, sizeof(buf)) != 0)
+        return false;
+
     // Process the padded empty string (unaligned)
     tr(buf, in1 + 1, 1);
-    if (memcmp(buf, out1, sizeof(buf))) return false;
+    if(memcmp(buf, out1, sizeof(buf)) != 0)
+        return false;
+
     // Process 64 spaces (unaligned)
     memcpy(buf, init, sizeof(buf));
     tr(buf, in2 + 1, 2);
-    if (memcmp(buf, out2, sizeof(buf))) return false;
+    if(memcmp(buf, out2, sizeof(buf)) != 0)
+        return false;
+
     return true;
 }
 
