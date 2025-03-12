@@ -16,7 +16,6 @@ Checks: '-*,
 
          -*-narrowing-conversions,
 
-         -cppcoreguidelines-pro-bounds-constant-array-index,
          -cppcoreguidelines-pro-bounds-pointer-arithmetic,
       '
 

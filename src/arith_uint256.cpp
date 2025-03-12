@@ -14,6 +14,8 @@ base_uint<BITS>::base_uint(const std::string &str) {
     SetHex(str);
 }
 
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
+
 template <unsigned int BITS>
 base_uint<BITS> &base_uint<BITS>::operator<<=(unsigned int shift) {
     base_uint<BITS> a(*this);
@@ -230,6 +232,8 @@ arith_uint256 UintToArith256(const uint256 &a) {
         b.pn[x] = ReadLE32(a.begin() + static_cast<ptrdiff_t>(x * 4));
     return b;
 }
+
+// NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
 
 std::ostream& operator<<(std::ostream& os, const arith_uint256& a)
 {
