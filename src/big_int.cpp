@@ -281,6 +281,7 @@ bsv::bint& bsv::bint::operator&=(const bint& other)
                   rbegin(bytes_other), [](auto byte_other, auto byte_this) {
                       return byte_other & byte_this;
                   });
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         BN_bin2bn(bytes_other.data(), bytes_other.size(), value_.get());
     }
     else
@@ -289,6 +290,7 @@ bsv::bint& bsv::bint::operator&=(const bint& other)
                   rbegin(bytes_this), [](auto byte_this, auto byte_other) {
                       return byte_this & byte_other;
                   });
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         BN_bin2bn(bytes_this.data(), bytes_this.size(), value_.get());
     }
 
@@ -320,6 +322,7 @@ bsv::bint& bsv::bint::operator|=(const bint& other)
                   rbegin(bytes_this), [](auto byte_other, auto byte_this) {
                       return byte_other | byte_this;
                   });
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         BN_bin2bn(bytes_this.data(), bytes_this.size(), value_.get());
     }
     else
@@ -328,6 +331,7 @@ bsv::bint& bsv::bint::operator|=(const bint& other)
                   rbegin(bytes_other), [](auto byte_this, auto byte_other) {
                       return byte_this | byte_other;
                   });
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         BN_bin2bn(bytes_other.data(), bytes_other.size(), value_.get());
     }
 
@@ -532,6 +536,7 @@ bsv::bint bsv::bint::deserialize(span<const uint8_t> s)
     tmp[2] = (size >> 8) & 0xff;
     tmp[3] = (size >> 0) & 0xff;
     reverse_copy(begin(s), end(s), begin(tmp) + length_in_bytes);
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     auto p{BN_mpi2bn(tmp.data(), tmp.size(), nullptr)};
     bint b;
     b.value_.reset(p);
