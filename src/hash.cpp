@@ -25,9 +25,12 @@ unsigned int MurmurHash3(unsigned int nHashSeed,
 
         //----------
         // body
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const uint8_t *blocks = &vDataToHash[0] + static_cast<ptrdiff_t>(nblocks * 4);
 
-        for (int i = -nblocks; i; i++) {
+        for(int i = -nblocks; i; i++)
+        {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             uint32_t k1 = ReadLE32(blocks + static_cast<ptrdiff_t>(i * 4));
 
             k1 *= c1;
@@ -41,12 +44,14 @@ unsigned int MurmurHash3(unsigned int nHashSeed,
 
         //----------
         // tail
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const uint8_t* tail = (const uint8_t*)(&vDataToHash[0] +
                                                static_cast<ptrdiff_t>(nblocks * 4));
 
         uint32_t k1 = 0;
 
         switch (vDataToHash.size() & 3) {
+            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             case 3:
                 k1 ^= tail[2] << 16;
             // FALLTHROUGH
@@ -59,6 +64,7 @@ unsigned int MurmurHash3(unsigned int nHashSeed,
                 k1 = ROTL32(k1, 15);
                 k1 *= c2;
                 h1 ^= k1;
+            // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             default:
                 break;
         }
@@ -146,6 +152,7 @@ CSipHasher &CSipHasher::Write(const uint8_t *data, size_t size) {
     int c = count;
 
     while (size--) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         t |= uint64_t(*(data++)) << (8 * (c % 8));
         c++;
         if ((c & 7) == 0) {

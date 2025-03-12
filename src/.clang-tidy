@@ -15,8 +15,6 @@ Checks: '-*,
          -cppcoreguidelines-non-private-member-variables-in-classes,
 
          -*-narrowing-conversions,
-
-         -cppcoreguidelines-pro-bounds-pointer-arithmetic,
       '
 
 WarningsAsErrors: '*'

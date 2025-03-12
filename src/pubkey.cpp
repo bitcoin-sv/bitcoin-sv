@@ -16,6 +16,8 @@ namespace
 
 } // namespace
 
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
 /**
  * This function is taken from the libsecp256k1 distribution and implements DER
  * parsing for ECDSA signatures, while supporting an arbitrary subset of format
@@ -310,6 +312,8 @@ bool CPubKey::Derive(CPubKey &pubkeyChild, ChainCode &ccChild,
     pubkeyChild.Set(pub.data(), pub.data() + publen);
     return true;
 }
+
+// NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
 void CExtPubKey::Encode(const std::span<uint8_t, BIP32_EXTKEY_SIZE> code) const
 {
