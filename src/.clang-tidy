@@ -21,7 +21,6 @@ Checks: '-*,
          -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
          -cppcoreguidelines-pro-bounds-pointer-arithmetic,
          -cppcoreguidelines-pro-bounds-constant-array-index,
-         -cppcoreguidelines-pro-type-member-init,
       '
 
 WarningsAsErrors: '*'

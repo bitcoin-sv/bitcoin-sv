@@ -12,6 +12,7 @@ extern "C" {
 #include "crypto/ctaes/ctaes.c" // NOLINT(bugprone-suspicious-include)
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 AES128Encrypt::AES128Encrypt(const uint8_t key[16]) {
     AES128_init(&ctx, key);
 }
@@ -25,6 +26,7 @@ void AES128Encrypt::Encrypt(uint8_t ciphertext[16],
     AES128_encrypt(&ctx, 1, ciphertext, plaintext);
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 AES128Decrypt::AES128Decrypt(const uint8_t key[16]) {
     AES128_init(&ctx, key);
 }
@@ -38,6 +40,7 @@ void AES128Decrypt::Decrypt(uint8_t plaintext[16],
     AES128_decrypt(&ctx, 1, plaintext, ciphertext);
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 AES256Encrypt::AES256Encrypt(const uint8_t key[32]) {
     AES256_init(&ctx, key);
 }
@@ -51,6 +54,7 @@ void AES256Encrypt::Encrypt(uint8_t ciphertext[16],
     AES256_encrypt(&ctx, 1, ciphertext, plaintext);
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 AES256Decrypt::AES256Decrypt(const uint8_t key[32]) {
     AES256_init(&ctx, key);
 }
