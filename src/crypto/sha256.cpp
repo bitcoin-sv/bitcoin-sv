@@ -282,34 +282,40 @@ std::string SHA256AutoDetect() {
 
 ////// SHA-256
 
-CSHA256::CSHA256() : bytes(0) {
-    sha256::Initialize(s);
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+CSHA256::CSHA256()
+{
+    sha256::Initialize(s.data());
 }
 
-CSHA256 &CSHA256::Write(const uint8_t *data, size_t len) {
-    if (len == 0) {
-        return *this;    
-    }
+CSHA256& CSHA256::Write(const uint8_t* data, size_t len)
+{
+    if(len == 0)
+        return *this;
+
     assert(data);
-    const uint8_t *end = data + len;
+    const uint8_t* end = data + len;
     size_t bufsize = bytes % 64;
-    if (bufsize && bufsize + len >= 64) {
+    if(bufsize && bufsize + len >= 64)
+    {
         // Fill the buffer, and process it.
-        memcpy(buf + bufsize, data, 64 - bufsize);
+        memcpy(buf.data() + bufsize, data, 64 - bufsize);
         bytes += 64 - bufsize;
         data += 64 - bufsize;
-        Transform(s, buf, 1);
+        Transform(s.data(), buf.data(), 1);
         bufsize = 0;
     }
-    if (end - data >= 64) {
+    if(end - data >= 64)
+    {
         size_t blocks = (end - data) / 64;
-        Transform(s, data, blocks);
+        Transform(s.data(), data, blocks);
         data += 64 * blocks;
         bytes += 64 * blocks;
     }
-    if (end > data) {
+    if(end > data)
+    {
         // Fill the buffer with what remains.
-        memcpy(buf + bufsize, data, end - data);
+        memcpy(buf.data() + bufsize, data, end - data);
         bytes += end - data;
     }
     return *this;
@@ -333,8 +339,9 @@ void CSHA256::Finalize(uint8_t hash[OUTPUT_SIZE])
     WriteBE32(hash + 28, s[7]);
 }
 
-CSHA256 &CSHA256::Reset() {
+CSHA256& CSHA256::Reset()
+{
     bytes = 0;
-    sha256::Initialize(s);
+    sha256::Initialize(s.data());
     return *this;
 }
