@@ -5,17 +5,16 @@
 #ifndef BITCOIN_CRYPTO_SHA1_H
 #define BITCOIN_CRYPTO_SHA1_H
 
+#include <array>
 #include <cstdint>
 #include <cstdlib>
 
 /** A hasher class for SHA1. */
 class CSHA1 {
 private:
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    uint32_t s[5];
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    uint8_t buf[64];
-    uint64_t bytes;
+    std::array<uint32_t, 5> s;
+    std::array<uint8_t, 64> buf;
+    uint64_t bytes{};
 
 public:
     static const size_t OUTPUT_SIZE = 20;
