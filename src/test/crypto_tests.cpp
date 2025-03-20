@@ -229,7 +229,7 @@ void TestAES256CBC(const std::string &hexkey, const std::string &hexiv,
 void TestChaCha20(const std::string &hexkey, uint64_t nonce, uint64_t seek,
                   const std::string &hexout) {
     std::vector<uint8_t> key = ParseHex(hexkey);
-    ChaCha20 rng(key.data(), key.size());
+    ChaCha20 rng(key);
     rng.SetIV(nonce);
     rng.Seek(seek);
     std::vector<uint8_t> out = ParseHex(hexout);

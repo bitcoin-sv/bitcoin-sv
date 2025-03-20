@@ -30,25 +30,29 @@ static const uint8_t sigma[] = "expand 32-byte k";
 static const uint8_t tau[] = "expand 16-byte k";
 // NOLINTEND(cppcoreguidelines-avoid-c-arrays)
 
-void ChaCha20::SetKey(const uint8_t *k, size_t keylen) {
+void ChaCha20::SetKey(std::span<const uint8_t> k)
+{
     const uint8_t *constants;
 
-    input[4] = ReadLE32(k + 0);
-    input[5] = ReadLE32(k + 4);
-    input[6] = ReadLE32(k + 8);
-    input[7] = ReadLE32(k + 12);
-    if (keylen == 32) {
+    input[4] = ReadLE32(k.data() + 0);
+    input[5] = ReadLE32(k.data() + 4);
+    input[6] = ReadLE32(k.data()  + 8);
+    input[7] = ReadLE32(k.data()  + 12);
+    if(k.size() == 32)
+    {
         // recommended
-        k += 16;
+        k = k.subspan(16);
         constants = sigma;
-    } else {
+    }
+    else
+    {
         // keylen == 16
         constants = tau;
     }
-    input[8] = ReadLE32(k + 0);
-    input[9] = ReadLE32(k + 4);
-    input[10] = ReadLE32(k + 8);
-    input[11] = ReadLE32(k + 12);
+    input[8] = ReadLE32(k.data()  + 0);
+    input[9] = ReadLE32(k.data()  + 4);
+    input[10] = ReadLE32(k.data()  + 8);
+    input[11] = ReadLE32(k.data()  + 12);
     input[0] = ReadLE32(constants + 0);
     input[1] = ReadLE32(constants + 4);
     input[2] = ReadLE32(constants + 8);
@@ -59,12 +63,16 @@ void ChaCha20::SetKey(const uint8_t *k, size_t keylen) {
     input[15] = 0;
 }
 
-ChaCha20::ChaCha20() {
-    memset(input, 0, sizeof(input));
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+ChaCha20::ChaCha20()
+{
+    memset(input.data(), 0, input.size());
 }
 
-ChaCha20::ChaCha20(const uint8_t *k, size_t keylen) {
-    SetKey(k, keylen);
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+ChaCha20::ChaCha20(const std::span<const uint8_t> k)
+{
+    SetKey(k);
 }
 
 void ChaCha20::SetIV(uint64_t iv) {
