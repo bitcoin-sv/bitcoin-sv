@@ -5,26 +5,26 @@
 #ifndef BITCOIN_CRYPTO_RIPEMD160_H
 #define BITCOIN_CRYPTO_RIPEMD160_H
 
+#include <array>
 #include <cstdint>
 #include <cstdlib>
 
 /** A hasher class for RIPEMD-160. */
-class CRIPEMD160 {
-private:
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    uint32_t s[5];
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    uint8_t buf[64];
-    uint64_t bytes;
+class CRIPEMD160
+{
+    std::array<uint32_t, 5> s;
+    std::array<uint8_t, 64> buf;
+    uint64_t bytes{};
 
 public:
     static const size_t OUTPUT_SIZE = 20;
 
     CRIPEMD160();
-    CRIPEMD160 &Write(const uint8_t *data, size_t len);
+
+    CRIPEMD160& Write(const uint8_t* data, size_t len);
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     void Finalize(uint8_t hash[OUTPUT_SIZE]);
-    CRIPEMD160 &Reset();
+    CRIPEMD160& Reset();
 };
 
 #endif // BITCOIN_CRYPTO_RIPEMD160_H
