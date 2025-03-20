@@ -243,34 +243,42 @@ namespace sha512 {
 
 ////// SHA-512
 
-CSHA512::CSHA512() : bytes(0) {
-    sha512::Initialize(s);
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+CSHA512::CSHA512() 
+{
+    sha512::Initialize(s.data());
 }
 
-CSHA512 &CSHA512::Write(const uint8_t *data, size_t len) {
-    if (len == 0) {
-        return *this;    
-    }
+CSHA512& CSHA512::Write(const uint8_t* data, size_t len)
+{
+    if(len == 0)
+        return *this;
+
     assert(data);
-    const uint8_t *end = data + len;
+    const uint8_t* end = data + len;
     size_t bufsize = bytes % 128;
-    if (bufsize && bufsize + len >= 128) {
+    if(bufsize && bufsize + len >= 128)
+    {
         // Fill the buffer, and process it.
-        memcpy(buf + bufsize, data, 128 - bufsize);
+        memcpy(buf.data() + bufsize, data, 128 - bufsize);
         bytes += 128 - bufsize;
         data += 128 - bufsize;
-        sha512::Transform(s, buf);
+        sha512::Transform(s.data(), buf.data());
         bufsize = 0;
     }
-    while (end >= data + 128) {
+
+    while(end >= data + 128)
+    {
         // Process full chunks directly from the source.
-        sha512::Transform(s, data);
+        sha512::Transform(s.data(), data);
         data += 128;
         bytes += 128;
     }
-    if (end > data) {
+
+    if(end > data)
+    {
         // Fill the buffer with what remains.
-        memcpy(buf + bufsize, data, end - data);
+        memcpy(buf.data() + bufsize, data, end - data);
         bytes += end - data;
     }
     return *this;
@@ -294,8 +302,9 @@ void CSHA512::Finalize(uint8_t hash[OUTPUT_SIZE])
     WriteBE64(hash + 56, s[7]);
 }
 
-CSHA512 &CSHA512::Reset() {
+CSHA512& CSHA512::Reset()
+{
     bytes = 0;
-    sha512::Initialize(s);
+    sha512::Initialize(s.data());
     return *this;
 }
