@@ -3,8 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "aes.h"
-#include "crypto/common.h"
 
+#include <array>
 #include <cassert>
 #include <cstring>
 
@@ -13,7 +13,8 @@ extern "C" {
 }
 
 // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-AES128Encrypt::AES128Encrypt(const uint8_t key[16]) {
+AES128Encrypt::AES128Encrypt(const uint8_t key[16]) // NOLINT(cppcoreguidelines-avoid-c-arrays)
+{
     AES128_init(&ctx, key);
 }
 
@@ -21,13 +22,15 @@ AES128Encrypt::~AES128Encrypt() {
     memset(&ctx, 0, sizeof(ctx));
 }
 
-void AES128Encrypt::Encrypt(uint8_t ciphertext[16],
-                            const uint8_t plaintext[16]) const {
+void AES128Encrypt::Encrypt(uint8_t ciphertext[16], // NOLINT(cppcoreguidelines-avoid-c-arrays)
+                            const uint8_t plaintext[16]) const // NOLINT(cppcoreguidelines-avoid-c-arrays)
+{
     AES128_encrypt(&ctx, 1, ciphertext, plaintext);
 }
 
 // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-AES128Decrypt::AES128Decrypt(const uint8_t key[16]) {
+AES128Decrypt::AES128Decrypt(const uint8_t key[16]) // NOLINT(cppcoreguidelines-avoid-c-arrays)
+{
     AES128_init(&ctx, key);
 }
 
@@ -35,13 +38,15 @@ AES128Decrypt::~AES128Decrypt() {
     memset(&ctx, 0, sizeof(ctx));
 }
 
-void AES128Decrypt::Decrypt(uint8_t plaintext[16],
-                            const uint8_t ciphertext[16]) const {
+void AES128Decrypt::Decrypt(uint8_t plaintext[16], // NOLINT(cppcoreguidelines-avoid-c-arrays)
+                            const uint8_t ciphertext[16]) const // NOLINT(cppcoreguidelines-avoid-c-arrays)
+{
     AES128_decrypt(&ctx, 1, plaintext, ciphertext);
 }
 
 // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-AES256Encrypt::AES256Encrypt(const uint8_t key[32]) {
+AES256Encrypt::AES256Encrypt(const uint8_t key[32]) // NOLINT(cppcoreguidelines-avoid-c-arrays)
+{
     AES256_init(&ctx, key);
 }
 
@@ -49,13 +54,15 @@ AES256Encrypt::~AES256Encrypt() {
     memset(&ctx, 0, sizeof(ctx));
 }
 
-void AES256Encrypt::Encrypt(uint8_t ciphertext[16],
-                            const uint8_t plaintext[16]) const {
+void AES256Encrypt::Encrypt(uint8_t ciphertext[16], // NOLINT(cppcoreguidelines-avoid-c-arrays)
+                            const uint8_t plaintext[16]) const // NOLINT(cppcoreguidelines-avoid-c-arrays)
+{
     AES256_encrypt(&ctx, 1, ciphertext, plaintext);
 }
 
 // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-AES256Decrypt::AES256Decrypt(const uint8_t key[32]) {
+AES256Decrypt::AES256Decrypt(const uint8_t key[32]) // NOLINT(cppcoreguidelines-avoid-c-arrays)
+{
     AES256_init(&ctx, key);
 }
 
@@ -63,48 +70,62 @@ AES256Decrypt::~AES256Decrypt() {
     memset(&ctx, 0, sizeof(ctx));
 }
 
-void AES256Decrypt::Decrypt(uint8_t plaintext[16],
-                            const uint8_t ciphertext[16]) const {
+void AES256Decrypt::Decrypt(uint8_t plaintext[16], // NOLINT(cppcoreguidelines-avoid-c-arrays)
+                            const uint8_t ciphertext[16]) const // NOLINT(cppcoreguidelines-avoid-c-arrays)
+{
     AES256_decrypt(&ctx, 1, plaintext, ciphertext);
 }
 
-template <typename T>
-static int CBCEncrypt(const T &enc, const uint8_t iv[AES_BLOCKSIZE],
-                      const uint8_t *data, int size, bool pad, uint8_t *out) {
+template<typename T>
+static int CBCEncrypt(const T& enc,
+                      const uint8_t iv[AES_BLOCKSIZE], // NOLINT(cppcoreguidelines-avoid-c-arrays)
+                      const uint8_t* data,
+                      int size,
+                      bool pad,
+                      uint8_t* out)
+{
     int written = 0;
     int padsize = size % AES_BLOCKSIZE;
-    uint8_t mixed[AES_BLOCKSIZE];
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, AES_BLOCKSIZE> mixed;
 
     if (!data || !size || !out) return 0;
 
     if (!pad && padsize != 0) return 0;
 
-    memcpy(mixed, iv, AES_BLOCKSIZE);
+    memcpy(mixed.data(), iv, AES_BLOCKSIZE);
 
     // Write all but the last block
     while (written + AES_BLOCKSIZE <= size) {
         for (int i = 0; i != AES_BLOCKSIZE; i++)
             mixed[i] ^= *data++;
-        enc.Encrypt(out + written, mixed);
-        memcpy(mixed, out + written, AES_BLOCKSIZE);
+        enc.Encrypt(out + written, mixed.data());
+        memcpy(mixed.data(), out + written, AES_BLOCKSIZE);
         written += AES_BLOCKSIZE;
     }
-    if (pad) {
+
+    if(pad)
+    {
         // For all that remains, pad each byte with the value of the remaining
         // space. If there is none, pad by a full block.
         for (int i = 0; i != padsize; i++)
             mixed[i] ^= *data++;
         for (int i = padsize; i != AES_BLOCKSIZE; i++)
             mixed[i] ^= AES_BLOCKSIZE - padsize;
-        enc.Encrypt(out + written, mixed);
+        enc.Encrypt(out + written, mixed.data());
         written += AES_BLOCKSIZE;
     }
     return written;
 }
 
-template <typename T>
-static int CBCDecrypt(const T &dec, const uint8_t iv[AES_BLOCKSIZE],
-                      const uint8_t *data, int size, bool pad, uint8_t *out) {
+template<typename T>
+static int CBCDecrypt(const T& dec,
+                      const uint8_t iv[AES_BLOCKSIZE], // NOLINT(cppcoreguidelines-avoid-c-arrays)
+                      const uint8_t* data,
+                      int size,
+                      bool pad,
+                      uint8_t* out)
+{
     uint8_t padsize = 0;
     int written = 0;
     bool fail = false;
@@ -142,10 +163,11 @@ static int CBCDecrypt(const T &dec, const uint8_t iv[AES_BLOCKSIZE],
     return written * !fail;
 }
 
-AES256CBCEncrypt::AES256CBCEncrypt(const uint8_t key[AES256_KEYSIZE],
-                                   const uint8_t ivIn[AES_BLOCKSIZE],
+AES256CBCEncrypt::AES256CBCEncrypt(const uint8_t key[AES256_KEYSIZE], // NOLINT(cppcoreguidelines-avoid-c-arrays)
+                                   const uint8_t ivIn[AES_BLOCKSIZE], // NOLINT(cppcoreguidelines-avoid-c-arrays)
                                    bool padIn)
-    : enc(key), pad(padIn) {
+    : enc(key), pad(padIn)
+{
     memcpy(iv, ivIn, AES_BLOCKSIZE);
 }
 
@@ -158,10 +180,11 @@ AES256CBCEncrypt::~AES256CBCEncrypt() {
     memset(iv, 0, sizeof(iv));
 }
 
-AES256CBCDecrypt::AES256CBCDecrypt(const uint8_t key[AES256_KEYSIZE],
-                                   const uint8_t ivIn[AES_BLOCKSIZE],
+AES256CBCDecrypt::AES256CBCDecrypt(const uint8_t key[AES256_KEYSIZE], // NOLINT(cppcoreguidelines-avoid-c-arrays)
+                                   const uint8_t ivIn[AES_BLOCKSIZE], // NOLINT(cppcoreguidelines-avoid-c-arrays)
                                    bool padIn)
-    : dec(key), pad(padIn) {
+    : dec(key), pad(padIn)
+{
     memcpy(iv, ivIn, AES_BLOCKSIZE);
 }
 
@@ -174,8 +197,8 @@ AES256CBCDecrypt::~AES256CBCDecrypt() {
     memset(iv, 0, sizeof(iv));
 }
 
-AES128CBCEncrypt::AES128CBCEncrypt(const uint8_t key[AES128_KEYSIZE],
-                                   const uint8_t ivIn[AES_BLOCKSIZE],
+AES128CBCEncrypt::AES128CBCEncrypt(const uint8_t key[AES128_KEYSIZE], // NOLINT(cppcoreguidelines-avoid-c-arrays)
+                                   const uint8_t ivIn[AES_BLOCKSIZE], // NOLINT(cppcoreguidelines-avoid-c-arrays)
                                    bool padIn)
     : enc(key), pad(padIn) {
     memcpy(iv, ivIn, AES_BLOCKSIZE);
@@ -190,8 +213,8 @@ int AES128CBCEncrypt::Encrypt(const uint8_t *data, int size,
     return CBCEncrypt(enc, iv, data, size, pad, out);
 }
 
-AES128CBCDecrypt::AES128CBCDecrypt(const uint8_t key[AES128_KEYSIZE],
-                                   const uint8_t ivIn[AES_BLOCKSIZE],
+AES128CBCDecrypt::AES128CBCDecrypt(const uint8_t key[AES128_KEYSIZE], // NOLINT(cppcoreguidelines-avoid-c-arrays)
+                                   const uint8_t ivIn[AES_BLOCKSIZE], // NOLINT(cppcoreguidelines-avoid-c-arrays)
                                    bool padIn)
     : dec(key), pad(padIn) {
     memcpy(iv, ivIn, AES_BLOCKSIZE);

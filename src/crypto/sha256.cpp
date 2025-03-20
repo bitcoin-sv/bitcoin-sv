@@ -5,8 +5,9 @@
 #include "crypto/sha256.h"
 #include "crypto/common.h"
 
-#include <atomic>
+#include <array>
 #include <cassert>
+#include <cstdint>
 #include <cstring>
 
 #if defined(__x86_64__) || defined(__amd64__)
@@ -218,6 +219,7 @@ namespace sha256 {
 typedef void (*TransformType)(uint32_t *, const unsigned char *, size_t);
 
 bool SelfTest(TransformType tr) {
+    // NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays)
     static const unsigned char in1[65] = {0, 0x80};
     static const unsigned char in2[129] = {
         0,  32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,   32, 32,
@@ -237,22 +239,24 @@ bool SelfTest(TransformType tr) {
     static const uint32_t out2[8] = {0xce4153b0ul, 0x147c2a86ul, 0x3ed4298eul,
                                      0xe0676bc8ul, 0x79fc77a1ul, 0x2abe1f49ul,
                                      0xb2b055dful, 0x1069523eul};
-    uint32_t buf[8];
-    memcpy(buf, init, sizeof(buf));
+    // NOLINTEND(cppcoreguidelines-avoid-c-arrays)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint32_t, 8> buf;
+    memcpy(buf.data(), init, sizeof(buf));
     // Process nothing, and check we remain in the initial state.
-    tr(buf, nullptr, 0);
-    if(memcmp(buf, init, sizeof(buf)) != 0)
+    tr(buf.data(), nullptr, 0);
+    if(memcmp(buf.data(), init, sizeof(buf)) != 0)
         return false;
 
     // Process the padded empty string (unaligned)
-    tr(buf, in1 + 1, 1);
-    if(memcmp(buf, out1, sizeof(buf)) != 0)
+    tr(buf.data(), in1 + 1, 1);
+    if(memcmp(buf.data(), out1, sizeof(buf)) != 0)
         return false;
 
     // Process 64 spaces (unaligned)
-    memcpy(buf, init, sizeof(buf));
-    tr(buf, in2 + 1, 2);
-    if(memcmp(buf, out2, sizeof(buf)) != 0)
+    memcpy(buf.data(), init, sizeof(buf));
+    tr(buf.data(), in2 + 1, 2);
+    if(memcmp(buf.data(), out2, sizeof(buf)) != 0)
         return false;
 
     return true;
@@ -311,12 +315,14 @@ CSHA256 &CSHA256::Write(const uint8_t *data, size_t len) {
     return *this;
 }
 
-void CSHA256::Finalize(uint8_t hash[OUTPUT_SIZE]) {
-    static const uint8_t pad[64] = {0x80};
-    uint8_t sizedesc[8];
-    WriteBE64(sizedesc, bytes << 3);
-    Write(pad, 1 + ((119 - (bytes % 64)) % 64));
-    Write(sizedesc, 8);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+void CSHA256::Finalize(uint8_t hash[OUTPUT_SIZE])
+{
+    static const std::array<uint8_t, 64> pad = {0x80};
+    std::array<uint8_t, 8> sizedesc{};
+    WriteBE64(sizedesc.data(), bytes << 3);
+    Write(pad.data(), 1 + ((119 - (bytes % 64)) % 64));
+    Write(sizedesc.data(), 8);
     WriteBE32(hash, s[0]);
     WriteBE32(hash + 4, s[1]);
     WriteBE32(hash + 8, s[2]);

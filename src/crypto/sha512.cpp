@@ -6,6 +6,7 @@
 
 #include "crypto/common.h"
 
+#include <array>
 #include <cassert>
 #include <cstring>
 
@@ -275,12 +276,14 @@ CSHA512 &CSHA512::Write(const uint8_t *data, size_t len) {
     return *this;
 }
 
-void CSHA512::Finalize(uint8_t hash[OUTPUT_SIZE]) {
-    static const uint8_t pad[128] = {0x80};
-    uint8_t sizedesc[16] = {0x00};
-    WriteBE64(sizedesc + 8, bytes << 3);
-    Write(pad, 1 + ((239 - (bytes % 128)) % 128));
-    Write(sizedesc, 16);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+void CSHA512::Finalize(uint8_t hash[OUTPUT_SIZE])
+{
+    static const std::array<uint8_t, 128> pad = {0x80};
+    std::array<uint8_t, 16> sizedesc = {0x00};
+    WriteBE64(sizedesc.data() + 8, bytes << 3);
+    Write(pad.data(), 1 + ((239 - (bytes % pad.size())) % pad.size()));
+    Write(sizedesc.data(), 16);
     WriteBE64(hash, s[0]);
     WriteBE64(hash + 8, s[1]);
     WriteBE64(hash + 16, s[2]);

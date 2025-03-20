@@ -18,7 +18,9 @@
 
 namespace sha256_sse4 {
 ATTRIBUTE_NO_SANITIZE_ADDRESS
-void Transform(uint32_t *s, const unsigned char *chunk, size_t blocks) {
+void Transform(uint32_t *s, const unsigned char *chunk, size_t blocks)
+{
+    // NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays)
     static const uint32_t K256 alignas(16)[] = {
         0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1,
         0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
@@ -42,6 +44,7 @@ void Transform(uint32_t *s, const unsigned char *chunk, size_t blocks) {
     uint64_t tbl;
     uint64_t inp_end, inp;
     uint32_t xfer alignas(16)[4];
+    // NOLINTEND(cppcoreguidelines-avoid-c-arrays)
 
     __asm__ __volatile__(
         "shl    $0x6,%2;"

@@ -8,6 +8,7 @@
 #include "crypto/chacha20.h"
 #include "crypto/common.h"
 
+#include <array>
 #include <cstring>
 
 constexpr static inline uint32_t rotl32(uint32_t v, int c) {
@@ -24,8 +25,10 @@ constexpr static inline uint32_t rotl32(uint32_t v, int c) {
     (c) += (d);                                                                \
     (b) = rotl32((b) ^ (c), 7);
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays)
 static const uint8_t sigma[] = "expand 32-byte k";
 static const uint8_t tau[] = "expand 16-byte k";
+// NOLINTEND(cppcoreguidelines-avoid-c-arrays)
 
 void ChaCha20::SetKey(const uint8_t *k, size_t keylen) {
     const uint8_t *constants;
@@ -80,7 +83,8 @@ void ChaCha20::Output(uint8_t *c, size_t bytes) {
     uint32_t j0, j1, j2, j3, j4, j5, j6, j7, j8, j9, j10, j11, j12, j13, j14,
         j15;
     uint8_t *ctarget = nullptr;
-    uint8_t tmp[64];
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, 64> tmp;
     unsigned int i;
 
     if (!bytes) {
@@ -107,7 +111,7 @@ void ChaCha20::Output(uint8_t *c, size_t bytes) {
     for (;;) {
         if (bytes < 64) {
             ctarget = c;
-            c = tmp;
+            c = tmp.data();
         }
         x0 = j0;
         x1 = j1;

@@ -181,6 +181,7 @@ CSHA1 &CSHA1::Write(const uint8_t *data, size_t len) {
     return *this;
 }
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays)
 void CSHA1::Finalize(uint8_t hash[OUTPUT_SIZE]) {
     static const uint8_t pad[64] = {0x80};
     uint8_t sizedesc[8];
@@ -193,6 +194,7 @@ void CSHA1::Finalize(uint8_t hash[OUTPUT_SIZE]) {
     WriteBE32(hash + 12, s[3]);
     WriteBE32(hash + 16, s[4]);
 }
+// NOLINTEND(cppcoreguidelines-avoid-c-arrays)
 
 CSHA1 &CSHA1::Reset() {
     bytes = 0;

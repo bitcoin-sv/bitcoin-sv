@@ -6,7 +6,9 @@
 
 #include <cstring>
 
-CHMAC_SHA512::CHMAC_SHA512(const uint8_t *key, size_t keylen) {
+// NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays)
+CHMAC_SHA512::CHMAC_SHA512(const uint8_t *key, size_t keylen)
+{
     uint8_t rkey[128];
     if (keylen <= 128) {
         memcpy(rkey, key, keylen);
@@ -30,3 +32,4 @@ void CHMAC_SHA512::Finalize(uint8_t hash[OUTPUT_SIZE]) {
     inner.Finalize(temp);
     outer.Write(temp, 64).Finalize(hash);
 }
+// NOLINTEND(cppcoreguidelines-avoid-c-arrays)
