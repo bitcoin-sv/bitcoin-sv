@@ -19,7 +19,6 @@ class CSHA512
 
 public:
     static const size_t OUTPUT_SIZE = 64;
-
     using span = std::span<uint8_t, OUTPUT_SIZE>;
 
     CSHA512();

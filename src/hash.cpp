@@ -98,7 +98,7 @@ void BIP32Hash(const ChainCode& chainCode,
         .Write(&header, 1)
         .Write(data.data(), data.size())
         .Write(num.data(), num.size())
-        .Finalize(output.data());
+        .Finalize(output);
 }
 
 #define ROTL(x, b) (uint64_t)(((x) << (b)) | ((x) >> (64 - (b))))

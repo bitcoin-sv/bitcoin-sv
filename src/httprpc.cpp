@@ -115,7 +115,7 @@ static bool multiUserAuthorized(const std::string& strUserPass) {
                          strSalt.size())
                 .Write(reinterpret_cast<const uint8_t *>(strPass.c_str()),
                        strPass.size())
-                .Finalize(out.data());
+                .Finalize(out);
             // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
             const std::string strHashFromPass = HexStr(out.begin(), out.end());
 

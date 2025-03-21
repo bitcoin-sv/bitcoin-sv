@@ -21,7 +21,7 @@ CHMAC_SHA256::CHMAC_SHA256(const uint8_t* key, const size_t keylen)
     {
         CSHA256()
             .Write(key, keylen)
-            .Finalize(CSHA256::span{rkey.data(), keylen});
+            .Finalize(CSHA256::span{rkey.data(), CSHA256::OUTPUT_SIZE});
         memset(rkey.data() + 32, 0, 32);
     }
 
@@ -34,8 +34,7 @@ CHMAC_SHA256::CHMAC_SHA256(const uint8_t* key, const size_t keylen)
     inner.Write(rkey.data(), rkey.size());
 }
 
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-void CHMAC_SHA256::Finalize(uint8_t hash[OUTPUT_SIZE])
+void CHMAC_SHA256::Finalize(const span hash)
 {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     std::array<uint8_t, 32> temp;

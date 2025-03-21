@@ -34,12 +34,11 @@ CHMAC_SHA512::CHMAC_SHA512(const uint8_t *key, size_t keylen)
     inner.Write(rkey.data(), 128);
 }
 
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-void CHMAC_SHA512::Finalize(uint8_t hash[OUTPUT_SIZE])
+void CHMAC_SHA512::Finalize(const span hash)
 {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     std::array<uint8_t, 64> temp;
     inner.Finalize(temp);
-    outer.Write(temp.data(), 64).Finalize(CSHA512::span{hash, CSHA512::OUTPUT_SIZE});
+    outer.Write(temp.data(), 64).Finalize(hash);
 }
 

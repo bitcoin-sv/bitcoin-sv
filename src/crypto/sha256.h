@@ -20,8 +20,7 @@ class CSHA256
 
 public:
     static const size_t OUTPUT_SIZE = 32;
-    //using span = std::span<uint8_t, OUTPUT_SIZE>;
-    using span = std::span<uint8_t>;
+    using span = std::span<uint8_t, OUTPUT_SIZE>;
 
     CSHA256();
     CSHA256& Write(const uint8_t* data, size_t len);

@@ -321,13 +321,15 @@ bool CExtKey::Derive(CExtKey& out, unsigned int _nChild) const
     return key.Derive(out.key, out.chaincode, _nChild, chaincode);
 }
 
-void CExtKey::SetMaster(const uint8_t *seed, unsigned int nSeedLen) {
+void CExtKey::SetMaster(const uint8_t *seed, unsigned int nSeedLen)
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     static const uint8_t hashkey[] = {'B', 'i', 't', 'c', 'o', 'i',
                                       'n', ' ', 's', 'e', 'e', 'd'};
     std::vector<uint8_t, secure_allocator<uint8_t>> vout(64);
     CHMAC_SHA512(hashkey, sizeof(hashkey))
         .Write(seed, nSeedLen)
-        .Finalize(vout.data());
+        .Finalize(CHMAC_SHA512::span{vout.begin(), CHMAC_SHA512::OUTPUT_SIZE});
     key.Set(&vout[0], &vout[32], true);
     memcpy(chaincode.begin(), &vout[32], 32);
     nDepth = 0;
