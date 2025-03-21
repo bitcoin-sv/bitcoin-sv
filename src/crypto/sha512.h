@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdlib>
+#include <span>
 
 /** A hasher class for SHA-512. */
 class CSHA512
@@ -19,11 +20,12 @@ class CSHA512
 public:
     static const size_t OUTPUT_SIZE = 64;
 
+    using span = std::span<uint8_t, OUTPUT_SIZE>;
+
     CSHA512();
 
     CSHA512& Write(const uint8_t* data, size_t len);
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    void Finalize(uint8_t hash[OUTPUT_SIZE]);
+    void Finalize(span hash);
     CSHA512& Reset();
 };
 

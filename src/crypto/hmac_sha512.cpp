@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "crypto/hmac_sha512.h"
+#include "crypto/sha256.h"
 
 #include <cstring>
 
@@ -18,7 +19,9 @@ CHMAC_SHA512::CHMAC_SHA512(const uint8_t *key, size_t keylen)
     }
     else
     {
-        CSHA512().Write(key, keylen).Finalize(rkey.data());
+        CSHA512()
+            .Write(key, keylen)
+            .Finalize(CSHA512::span{rkey.data(), CSHA512::OUTPUT_SIZE});
         memset(rkey.data() + 64, 0, 64);
     }
 
@@ -36,6 +39,7 @@ void CHMAC_SHA512::Finalize(uint8_t hash[OUTPUT_SIZE])
 {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     std::array<uint8_t, 64> temp;
-    inner.Finalize(temp.data());
-    outer.Write(temp.data(), 64).Finalize(hash);
+    inner.Finalize(temp);
+    outer.Write(temp.data(), 64).Finalize(CSHA512::span{hash, CSHA512::OUTPUT_SIZE});
 }
+

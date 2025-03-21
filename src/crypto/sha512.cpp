@@ -284,22 +284,21 @@ CSHA512& CSHA512::Write(const uint8_t* data, size_t len)
     return *this;
 }
 
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-void CSHA512::Finalize(uint8_t hash[OUTPUT_SIZE])
+void CSHA512::Finalize(const span hash)
 {
     static const std::array<uint8_t, 128> pad = {0x80};
     std::array<uint8_t, 16> sizedesc = {0x00};
     WriteBE64(sizedesc.data() + 8, bytes << 3);
     Write(pad.data(), 1 + ((239 - (bytes % pad.size())) % pad.size()));
     Write(sizedesc.data(), 16);
-    WriteBE64(hash, s[0]);
-    WriteBE64(hash + 8, s[1]);
-    WriteBE64(hash + 16, s[2]);
-    WriteBE64(hash + 24, s[3]);
-    WriteBE64(hash + 32, s[4]);
-    WriteBE64(hash + 40, s[5]);
-    WriteBE64(hash + 48, s[6]);
-    WriteBE64(hash + 56, s[7]);
+    WriteBE64(hash.data(), s[0]);
+    WriteBE64(hash.data() + 8, s[1]);
+    WriteBE64(hash.data() + 16, s[2]);
+    WriteBE64(hash.data() + 24, s[3]);
+    WriteBE64(hash.data() + 32, s[4]);
+    WriteBE64(hash.data() + 40, s[5]);
+    WriteBE64(hash.data() + 48, s[6]);
+    WriteBE64(hash.data() + 56, s[7]);
 }
 
 CSHA512& CSHA512::Reset()
