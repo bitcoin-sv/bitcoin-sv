@@ -7,6 +7,7 @@
 #include "crypto/common.h"
 
 #include <cassert>
+#include <cstdint>
 #include <cstring>
 
 // Internal implementation code.
@@ -190,7 +191,12 @@ CSHA1& CSHA1::Write(const uint8_t* data, size_t len)
 }
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-void CSHA1::Finalize(uint8_t hash[OUTPUT_SIZE])
+void CSHA1::Finalize(uint8_t hash[])
+{
+    Finalize(span{hash, OUTPUT_SIZE});
+}
+
+void CSHA1::Finalize(const span hash)
 {
     static const std::array<uint8_t, 64> pad = {0x80};
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
@@ -198,11 +204,11 @@ void CSHA1::Finalize(uint8_t hash[OUTPUT_SIZE])
     WriteBE64(sizedesc.data(), bytes << 3);
     Write(pad.data(), 1 + ((119 - (bytes % 64)) % 64));
     Write(sizedesc.data(), 8);
-    WriteBE32(hash, s[0]);
-    WriteBE32(hash + 4, s[1]);
-    WriteBE32(hash + 8, s[2]);
-    WriteBE32(hash + 12, s[3]);
-    WriteBE32(hash + 16, s[4]);
+    WriteBE32(hash.data(), s[0]);
+    WriteBE32(hash.data() + 4, s[1]);
+    WriteBE32(hash.data() + 8, s[2]);
+    WriteBE32(hash.data() + 12, s[3]);
+    WriteBE32(hash.data() + 16, s[4]);
 }
 
 CSHA1& CSHA1::Reset()

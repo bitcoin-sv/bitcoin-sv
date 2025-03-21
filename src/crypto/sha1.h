@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdlib>
+#include <span>
 
 /** A hasher class for SHA1. */
 class CSHA1 {
@@ -18,12 +19,15 @@ private:
 
 public:
     static const size_t OUTPUT_SIZE = 20;
+    using span = std::span<uint8_t, OUTPUT_SIZE>;
 
     CSHA1();
-    CSHA1 &Write(const uint8_t *data, size_t len);
+
+    CSHA1& Write(const uint8_t* data, size_t len);
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    void Finalize(uint8_t hash[OUTPUT_SIZE]);
-    CSHA1 &Reset();
+    void Finalize(uint8_t hash[]);
+    void Finalize(span hash);
+    CSHA1& Reset();
 };
 
 #endif // BITCOIN_CRYPTO_SHA1_H

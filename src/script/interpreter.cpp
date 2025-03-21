@@ -1425,7 +1425,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         } else if (opcode == OP_SHA1) {
                             CSHA1()
                                 .Write(vch.GetElement().data(), vch.size())
-                                .Finalize(vchHash.data());
+                                .Finalize(CSHA1::span{vchHash.data(), CSHA1::OUTPUT_SIZE});
                         } else if (opcode == OP_SHA256) {
                             CSHA256()
                                 .Write(vch.GetElement().data(), vch.size())
