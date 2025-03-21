@@ -55,9 +55,9 @@ class CHash160
 
 public:
     static const size_t OUTPUT_SIZE = CRIPEMD160::OUTPUT_SIZE;
+    using span = std::span<uint8_t, OUTPUT_SIZE>;
 
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    void Finalize(uint8_t hash[OUTPUT_SIZE])
+    void Finalize(span hash)
     {
         std::array<uint8_t, CSHA256::OUTPUT_SIZE> buf;
         sha.Finalize(buf.data());
@@ -136,8 +136,7 @@ inline uint160 Hash160(const T1 pbegin, const T1 pend)
     CHash160()
         .Write(pbegin == pend ? pblank.data() : (const uint8_t*)&pbegin[0],
                static_cast<size_t>(pend - pbegin) * sizeof(pbegin[0]))
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
-        .Finalize((uint8_t*)&result);
+        .Finalize(CHash160::span{result});
     return result;
 }
 

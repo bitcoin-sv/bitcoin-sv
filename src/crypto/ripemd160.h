@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdlib>
+#include <span>
 
 /** A hasher class for RIPEMD-160. */
 class CRIPEMD160
@@ -18,12 +19,14 @@ class CRIPEMD160
 
 public:
     static const size_t OUTPUT_SIZE = 20;
+    using span=std::span<uint8_t, OUTPUT_SIZE>;
 
     CRIPEMD160();
 
     CRIPEMD160& Write(const uint8_t* data, size_t len);
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     void Finalize(uint8_t hash[OUTPUT_SIZE]);
+    void Finalize(span hash);
     CRIPEMD160& Reset();
 };
 

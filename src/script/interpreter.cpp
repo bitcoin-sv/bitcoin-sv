@@ -1420,7 +1420,8 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         if (opcode == OP_RIPEMD160) {
                             CRIPEMD160()
                                 .Write(vch.GetElement().data(), vch.size())
-                                .Finalize(vchHash.data());
+                                .Finalize(CRIPEMD160::span{vchHash.data(),
+                                                           CRIPEMD160::OUTPUT_SIZE});
                         } else if (opcode == OP_SHA1) {
                             CSHA1()
                                 .Write(vch.GetElement().data(), vch.size())
@@ -1432,7 +1433,8 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         } else if (opcode == OP_HASH160) {
                             CHash160()
                                 .Write(vch.GetElement().data(), vch.size())
-                                .Finalize(vchHash.data());
+                                .Finalize(CHash160::span{vchHash.data(),
+                                          CHash160::OUTPUT_SIZE});
                         } else if (opcode == OP_HASH256) {
                             CHash256()
                                 .Write(vch.GetElement().data(), vch.size())

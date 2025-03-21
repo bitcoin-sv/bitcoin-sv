@@ -15,7 +15,7 @@
 static const uint64_t BUFFER_SIZE = 1000 * 1000;
 
 static void RIPEMD160(benchmark::State &state) {
-    uint8_t hash[CRIPEMD160::OUTPUT_SIZE]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+    std::array<uint8_t, CRIPEMD160::OUTPUT_SIZE> hash{};
     std::vector<uint8_t> in(BUFFER_SIZE, 0);
     while (state.KeepRunning())
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
