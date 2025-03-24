@@ -535,6 +535,8 @@ libbitcoin_consensus_a_SOURCES = \
   uint256.h \
   utilstrencodings.cpp \
   utilstrencodings.h \
+  verify_script_flags.cpp \
+  verify_script_flags.h \
   version.h
 
 # common: shared between bitcoind and non-server tools

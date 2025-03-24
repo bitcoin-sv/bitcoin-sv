@@ -195,6 +195,7 @@ BITCOIN_TESTS =\
   test/util_tests.cpp \
   test/validation_scheduler_tests.cpp \
   test/validation_tests.cpp \
+  test/verify_script_flags_tests.cpp \
   test/webhook_client_tests.cpp
 
 if ENABLE_WALLET

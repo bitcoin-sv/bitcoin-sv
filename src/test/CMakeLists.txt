@@ -213,6 +213,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	util_tests.cpp
     validation_scheduler_tests.cpp
 	validation_tests.cpp
+    verify_script_flags_tests.cpp
     webhook_client_tests.cpp
 
 	# Tests generated from JSON

@@ -61,6 +61,7 @@
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 #include "validationinterface.h"
+#include "verify_script_flags.h"
 #include "versionbits.h"
 #include "warnings.h"
 #include "blockfileinfostore.h"
@@ -811,21 +812,12 @@ static bool CheckAncestorLimits(const CTxMemPool& pool,
                                     std::ref(errString));
 }
 
-uint32_t GetScriptVerifyFlags(const Config &config, ProtocolEra era)
+uint32_t GetScriptVerifyFlags(const Config& config, ProtocolEra era)
 {
-    // Get verification flags for overall script - individual UTXOs may need
-    // to add/remove flags (done by CheckInputScripts).
-    uint32_t scriptVerifyFlags { StandardScriptVerifyFlags(era) };
-    if (!config.GetChainParams().RequireStandard())
-    {
-        if (config.IsSetPromiscuousMempoolFlags())
-        {
-            scriptVerifyFlags = config.GetPromiscuousMempoolFlags();
-        }
-        scriptVerifyFlags |= SCRIPT_ENABLE_SIGHASH_FORKID;
-    }
-
-    return scriptVerifyFlags;
+    return GetScriptVerifyFlags(era,
+                                config.GetChainParams().RequireStandard(),
+                                config.IsSetPromiscuousMempoolFlags(),
+                                config.GetPromiscuousMempoolFlags());
 }
 
 size_t GetNumLowPriorityValidationThrs(size_t nTestingHCValue) {

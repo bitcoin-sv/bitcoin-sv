@@ -430,6 +430,8 @@ add_library(bitcoinconsensus
 	script/script_num.cpp
     taskcancellation.cpp
     taskcancellation.h
+    verify_script_flags.h
+    verify_script_flags.cpp
 )
 
 target_link_libraries(bitcoinconsensus common)
