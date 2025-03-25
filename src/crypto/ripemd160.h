@@ -24,8 +24,6 @@ public:
     CRIPEMD160();
 
     CRIPEMD160& Write(const uint8_t* data, size_t len);
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    void Finalize(uint8_t hash[OUTPUT_SIZE]);
     void Finalize(span hash);
     CRIPEMD160& Reset();
 };

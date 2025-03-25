@@ -190,12 +190,6 @@ CSHA1& CSHA1::Write(const uint8_t* data, size_t len)
     return *this;
 }
 
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-void CSHA1::Finalize(uint8_t hash[])
-{
-    Finalize(span{hash, OUTPUT_SIZE});
-}
-
 void CSHA1::Finalize(const span hash)
 {
     static const std::array<uint8_t, 64> pad = {0x80};

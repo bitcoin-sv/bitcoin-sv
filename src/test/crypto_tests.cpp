@@ -13,6 +13,7 @@
 #include "test/test_bitcoin.h"
 #include "utilstrencodings.h"
 
+#include <cstdint>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
@@ -28,7 +29,7 @@ void TestVector(const Hasher &h, const In &in, const Out &out) {
     hash.resize(out.size());
     {
         // Test that writing the whole input string at once works.
-        Hasher(h).Write((uint8_t *)&in[0], in.size()).Finalize(&hash[0]);
+        Hasher(h).Write((uint8_t *)&in[0], in.size()).Finalize(std::span<uint8_t, Hasher::OUTPUT_SIZE>{hash.data(), hash.size()});
         BOOST_CHECK(hash == out);
     }
     for (int i = 0; i < 32; i++) {
@@ -45,11 +46,11 @@ void TestVector(const Hasher &h, const In &in, const Out &out) {
                 // works.
                 Hasher(hasher)
                     .Write((uint8_t *)&in[pos], in.size() - pos)
-                    .Finalize(&hash[0]);
+                    .Finalize(std::span<uint8_t, Hasher::OUTPUT_SIZE>{hash.data(), hash.size()});
                 BOOST_CHECK(hash == out);
             }
         }
-        hasher.Finalize(&hash[0]);
+        hasher.Finalize(std::span<uint8_t, Hasher::OUTPUT_SIZE>{hash.data(), hash.size()});
         BOOST_CHECK(hash == out);
     }
 }

@@ -24,8 +24,6 @@ public:
     CSHA1();
 
     CSHA1& Write(const uint8_t* data, size_t len);
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    void Finalize(uint8_t hash[]);
     void Finalize(span hash);
     CSHA1& Reset();
 };

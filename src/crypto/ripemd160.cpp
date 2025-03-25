@@ -322,12 +322,6 @@ CRIPEMD160& CRIPEMD160::Write(const uint8_t* data, size_t len)
     return *this;
 }
 
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-void CRIPEMD160::Finalize(uint8_t hash[OUTPUT_SIZE])
-{
-    Finalize(span{hash, OUTPUT_SIZE});
-}
-
 void CRIPEMD160::Finalize(const span hash)
 {
     static const std::array<uint8_t, 64> pad = {0x80};
