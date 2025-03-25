@@ -1416,7 +1416,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
             "-txnvalidationschedulestrategy=<strategy>",
             "Set task scheduling strategy to use in parallel transaction validation."
-                      "Available strategies: CHAIN_DETECTOR (legacy), TOPO_SORT (default)");
+                      "Available strategies: CHAIN_DETECTOR (legacy, deprecated), TOPO_SORT (default)");
     strUsage += HelpMessageOpt(
         "-maxtxnvalidatorasynctasksrunduration=<n>",
         strprintf("Set the maximum validation duration for async tasks in a single run (default: %dms)",
@@ -2719,8 +2719,8 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     if (gArgs.IsArgSet("-txnvalidationschedulestrategy"))
     {
-        static_assert(DEFAULT_PTV_TASK_SCHEDULE_STRATEGY == PTVTaskScheduleStrategy::TOPO_SORT);
-        auto strategy = gArgs.GetArg("-txnvalidationschedulestrategy", "TOPO_SORT");
+        const std::string strategyStr { boost::to_upper_copy<std::string>(gArgs.GetArg("-txnvalidationschedulestrategy", "")) };
+        PTVTaskScheduleStrategy strategy { enum_cast<PTVTaskScheduleStrategy>(strategyStr) };
         if (std::string err; !config.SetPTVTaskScheduleStrategy(strategy, &err))
         {
             return InitError(err);

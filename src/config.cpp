@@ -97,6 +97,8 @@ void GlobalConfig::Reset()
     data->genesisGracefulPeriod = DEFAULT_GENESIS_GRACEFUL_ACTIVATION_PERIOD;
     data->chronicleGracefulPeriod = DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD;
 
+    data->mPTVTaskScheduleStrategy = DEFAULT_PTV_TASK_SCHEDULE_STRATEGY;
+
     data->mAcceptNonStandardOutput = true;
 
     data->mMaxCoinsViewCacheSize = 0;
@@ -950,25 +952,22 @@ bool GlobalConfig::GetValidationClockCPU() const {
     return data->mValidationClockCPU;
 }
 
-bool GlobalConfig::SetPTVTaskScheduleStrategy(std::string strategy, std::string *err)
+bool GlobalConfig::SetPTVTaskScheduleStrategy(PTVTaskScheduleStrategy strategy, std::string *err)
 {
-    if (strategy == "CHAIN_DETECTOR")
+    if(strategy != PTVTaskScheduleStrategy::UNKNOWN)
     {
-        data->mPTVTaskScheduleStrategy = PTVTaskScheduleStrategy::CHAIN_DETECTOR;
-        return true;
+        data->mPTVTaskScheduleStrategy = strategy;
     }
-    else if (strategy == "TOPO_SORT")
+    else
     {
-        data->mPTVTaskScheduleStrategy = PTVTaskScheduleStrategy::TOPO_SORT;
-        return true;
-    }
-
-    if (err)
-    {
-        *err = "Invalid value for task scheduling strategy. Available strategies are CHAIN_DETECTOR and TOPO_SORT. Got " + strategy;
+        if (err)
+        {
+            *err = "Invalid value for PTV task scheduling strategy";
+        }
+        return false;
     }
 
-    return false;
+    return true;
 }
 
 PTVTaskScheduleStrategy GlobalConfig::GetPTVTaskScheduleStrategy() const

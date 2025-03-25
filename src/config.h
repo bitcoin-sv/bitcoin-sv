@@ -250,7 +250,7 @@ public:
     virtual bool SetMaxTxnValidatorAsyncTasksRunDuration(int ms, std::string* err = nullptr) = 0;
     virtual bool SetMaxTxnChainValidationBudget(int ms, std::string* err = nullptr) = 0;
     virtual void SetValidationClockCPU(bool enable) = 0;
-    virtual bool SetPTVTaskScheduleStrategy(std::string strategy, std::string* err = nullptr) = 0;
+    virtual bool SetPTVTaskScheduleStrategy(PTVTaskScheduleStrategy strategy, std::string* err = nullptr) = 0;
     virtual bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) = 0;
     virtual bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) = 0;
     virtual bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) = 0;
@@ -513,7 +513,7 @@ public:
     void SetValidationClockCPU(bool enable) override;
     bool GetValidationClockCPU() const override;
     
-    bool SetPTVTaskScheduleStrategy(std::string strategy, std::string* err = nullptr) override;
+    bool SetPTVTaskScheduleStrategy(PTVTaskScheduleStrategy strategy, std::string* err = nullptr) override;
     PTVTaskScheduleStrategy GetPTVTaskScheduleStrategy() const override;
 
     bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) override;
@@ -1209,7 +1209,7 @@ public:
     void SetValidationClockCPU(bool enable) override {}
     bool GetValidationClockCPU() const override { return DEFAULT_VALIDATION_CLOCK_CPU; }
 
-    bool SetPTVTaskScheduleStrategy(std::string strategy, std::string* err = nullptr) override { return true; }
+    bool SetPTVTaskScheduleStrategy(PTVTaskScheduleStrategy strategy, std::string* err = nullptr) override { return true; }
     PTVTaskScheduleStrategy GetPTVTaskScheduleStrategy() const override { return DEFAULT_PTV_TASK_SCHEDULE_STRATEGY; }
 
     bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) override 

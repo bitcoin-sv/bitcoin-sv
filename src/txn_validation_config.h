@@ -4,15 +4,30 @@
 
 #pragma once
 
+#include "enum_cast.h"
+
 #include <chrono>
 
 enum class PTVTaskScheduleStrategy
 {
+    UNKNOWN,
     // Legacy chain detector (can't handle graphs, can't handle txn out-of-order).
     CHAIN_DETECTOR,
     // Schedules txn validation in topological order within one batch of transactions.
     TOPO_SORT
 };
+
+// Enable enum_cast for PTVTaskScheduleStrategy
+inline const enumTableT<PTVTaskScheduleStrategy>& enumTable(PTVTaskScheduleStrategy)
+{
+    static enumTableT<PTVTaskScheduleStrategy> table
+    {
+        { PTVTaskScheduleStrategy::UNKNOWN,        "UNKNOWN" },
+        { PTVTaskScheduleStrategy::CHAIN_DETECTOR, "CHAIN_DETECTOR" },
+        { PTVTaskScheduleStrategy::TOPO_SORT,      "TOPO_SORT" }
+    };
+    return table;
+}
 
 /** A default ratio for max number of standard transactions per thread. */
 static constexpr uint64_t DEFAULT_MAX_STD_TXNS_PER_THREAD_RATIO = 1000;
