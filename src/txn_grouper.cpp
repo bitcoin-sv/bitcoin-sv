@@ -28,13 +28,7 @@ auto TxnGrouper::GetGroups(const std::vector<CTransactionRef>& vtx) -> std::vect
             // Sort group to keep txns in the same order from the block
             if(internalGroup.size() > 1)
             {
-                // FIXME: Consider using parallel sort when it becomes available
-                std::sort(internalGroup.begin(), internalGroup.end(),
-                    [](const TxnAndIndex& i1, const TxnAndIndex& i2)
-                    {
-                        return i1.mIndex < i2.mIndex;
-                    }
-                );
+                std::sort(internalGroup.begin(), internalGroup.end());
             }
 
             groups.emplace_back(std::make_unique<TxnGroup>(std::move(internalGroup)));
@@ -120,7 +114,7 @@ void TxnGrouper::ScanDependencies(const std::vector<CTransactionRef>& vtx)
             if(txnNode->second.HasTransaction())
             {
                 // This must be a duplicate transaction within the block
-                txnNode = mNodes.emplace(txid, Node{txn, index});
+                txnNode = mNodes.emplace(txid, Node{index});
             }
             else
             {
@@ -128,12 +122,12 @@ void TxnGrouper::ScanDependencies(const std::vector<CTransactionRef>& vtx)
                 // NOTE: The only circumstance I can think where this would happen
                 // is if a previous transaction had a dependency to this transaction; ie; the 2
                 // transactions appear out of order in a block.
-                txnNode->second.SetTransaction(txn, index);
+                txnNode->second.SetTransaction(index);
             }
         }
         else
         {
-            txnNode = mNodes.emplace(txid, Node{txn, index});
+            txnNode = mNodes.emplace(txid, Node{index});
         }
 
         // Scan inputs for this transaction
@@ -167,6 +161,11 @@ void TxnGrouper::ScanDependencies(const std::vector<CTransactionRef>& vtx)
 
 void TxnGrouper::BuildGroupNonRecursive(const TxId& initialTxid, TxnGroup& group)
 {
+    if(! mNodes.contains(initialTxid))
+    {   
+        return;
+    }
+
     // Start list of dependencies to scan
     std::list<TxId> dependencies { initialTxid };
 
@@ -178,11 +177,8 @@ void TxnGrouper::BuildGroupNonRecursive(const TxId& initialTxid, TxnGroup& group
         const auto& range { mNodes.equal_range(txid) };
         for(auto txnNode = range.first; txnNode != range.second; ++txnNode)
         {
-            if(txnNode != mNodes.end() && !txnNode->second.GetProcessed())
+            if(txnNode != mNodes.end())
             {
-                // Ensure we don't visit any node more than once
-                txnNode->second.SetProcessed();
-
                 // If this node represents a txn from the block, add it to the group
                 if(txnNode->second.HasTransaction())
                 {
@@ -194,6 +190,9 @@ void TxnGrouper::BuildGroupNonRecursive(const TxId& initialTxid, TxnGroup& group
                 dependencies.insert(dependencies.end(), nodeDependencies.begin(), nodeDependencies.end());
             }
         }
+
+        // Don't need to consider this node again
+        mNodes.erase(range.first, range.second);
 
         // Finished processing this dependency
         dependencies.pop_front();

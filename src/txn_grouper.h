@@ -23,20 +23,8 @@ class TxnGrouper
 
     TxnGrouper() = default;
 
-    // Track transactions and their original position in the vtx
-    struct TxnAndIndex
-    {
-        TxnAndIndex() = default;
-        TxnAndIndex(const CTransactionRef& txn, size_t index)
-            : mTxn{txn}, mIndex{index}
-        {}
-
-        CTransactionRef mTxn {nullptr};
-        size_t mIndex {0};
-    };
-
     // Build dependecies between txns and return groups of dependent txns
-    using TxnGroup = std::vector<TxnAndIndex>;
+    using TxnGroup = std::vector<size_t>;
     using UPtrTxnGroup = std::unique_ptr<TxnGroup>;
     std::vector<UPtrTxnGroup> GetGroups(const std::vector<CTransactionRef>& vtx);
     std::vector<UPtrTxnGroup> GetNumGroups(const std::vector<CTransactionRef>& vtx, size_t numGroups, size_t minSize);
@@ -44,24 +32,19 @@ class TxnGrouper
   private:
 
     // A node within the dependency graph.
-    // Tracks transactions and their index (if they came from the block),
+    // Tracks transaction indexes (if they came from the block),
     // and maintains a list of other transaction IDs that either it depends on
     // or that depend on it.
     class Node
     {
       public:
         Node() = default;
-        Node(const CTransactionRef& txn, size_t index)
-            : mTxnAndIndex{txn, index}
-        {}
+        Node(size_t index) : mTxnIndex{index} {}
 
-        void SetProcessed() { mProcessed = true; }
-        bool GetProcessed() const { return mProcessed; }
-
-        // Set transaction ref
-        void SetTransaction(const CTransactionRef& txn, size_t index)
+        // Set transaction index within the vtx
+        void SetTransaction(size_t index)
         {
-            mTxnAndIndex = { txn, index };
+            mTxnIndex = index;
         }
 
         // Add a new dependency of ours
@@ -70,22 +53,19 @@ class TxnGrouper
             mDependencies.push_back(txid);
         }
 
-        // Get transaction and index
-        const TxnAndIndex& GetTransaction() const { return mTxnAndIndex; }
+        // Get transaction index (requires caller to have checked HasTransaction())
+        size_t GetTransaction() const { return mTxnIndex.value(); }
 
         // Do we contain a transaction from the block?
-        bool HasTransaction() const { return mTxnAndIndex.mTxn != nullptr; }
+        bool HasTransaction() const { return mTxnIndex.has_value(); }
 
         // Get dependencies
         const std::vector<TxId>& GetAllDependencies() const { return mDependencies; }
 
       private:
 
-        bool mProcessed {false};
-
-        // If this node is for a transaction in the block, keep the transction ref and
-        // its index in the block
-        TxnAndIndex mTxnAndIndex {};
+        // If this node is for a transaction in the block, keep its index in the block
+        std::optional<size_t> mTxnIndex {};
 
         // All dependencies (may contain duplicates)
         std::vector<TxId> mDependencies {};

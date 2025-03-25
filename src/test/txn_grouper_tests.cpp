@@ -7,6 +7,8 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <ranges>
+
 namespace
 {
     // Random TxId
@@ -51,20 +53,8 @@ namespace
 
     bool CheckTxnOrdering(const std::vector<TxnGrouper::UPtrTxnGroup>& groups)
     {
-        for(const auto& group : groups)
-        {
-            ssize_t lastIndex {-1};
-            for(const auto& txn : *group)
-            {
-                if(static_cast<ssize_t>(txn.mIndex) <= lastIndex)
-                {
-                    return false;
-                }
-                lastIndex = txn.mIndex; // NOLINT(*-narrowing-conversions)
-            }
-        }
-
-        return true;
+        return std::ranges::all_of(groups,
+            [](const auto& group) { return std::ranges::is_sorted(*group); });
     }
 
     struct RandomContextFixture {

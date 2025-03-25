@@ -3311,6 +3311,7 @@ private:
 
     bool BlockValidateTxns(size_t shardNum,
                            CCoinsViewCache::Shard& shard,
+                           const std::vector<CTransactionRef>& vtx,
                            const std::vector<TxnGrouper::UPtrTxnGroup>& groups,
                            const task::CCancellationToken& token,
                            ScriptChecker& control,
@@ -3345,13 +3346,13 @@ private:
         size_t smallestGroupSize { (*smallestGroup)->size() };
         bool parallelScriptChecks { groups.size() == 1 || group->size() >= (smallestGroupMultiplier * smallestGroupSize) };
 
-        for(const auto& txnAndIndex : *group)
+        for(const size_t txnIndex : *group)
         {
-            const CTransaction& tx { *txnAndIndex.mTxn };
+            const CTransaction& tx { *vtx[txnIndex] };
 
             CScopedInvalidTxSenderBlock dumper(
                 g_connman ? (&g_connman->getInvalidTxnPublisher()) : nullptr,
-                txnAndIndex.mTxn, pindex, state);
+                vtx[txnIndex], pindex, state);
 
             nInputs += tx.vin.size();
 
@@ -3472,7 +3473,7 @@ private:
             }
             else
             {
-                UpdateCoins(tx, shard, blockundo.vtxundo[txnAndIndex.mIndex - 1], pindex->GetHeight());
+                UpdateCoins(tx, shard, blockundo.vtxundo[txnIndex - 1], pindex->GetHeight());
             }
         }
 
@@ -3632,6 +3633,7 @@ private:
         int64_t validateStartTime { GetTimeMicros() };
         std::vector<bool> results { view.RunSharded(numGroups,
             std::bind(&BlockConnector::BlockValidateTxns, this, std::placeholders::_1, std::placeholders::_2,
+                std::cref(block.vtx),
                 std::cref(txnGroups),
                 std::cref(token),
                 std::ref(control),
