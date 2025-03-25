@@ -3,8 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "crypto/hmac_sha256.h"
+#include "crypto/sha256.h"
 
-#include <algorithm>
 #include <array>
 #include <cstring>
 
@@ -19,7 +19,9 @@ CHMAC_SHA256::CHMAC_SHA256(const uint8_t* key, const size_t keylen)
     }
     else
     {
-        CSHA256().Write(key, keylen).Finalize(rkey.data());
+        CSHA256()
+            .Write(key, keylen)
+            .Finalize(CSHA256::span{rkey.data(), keylen});
         memset(rkey.data() + 32, 0, 32);
     }
 
@@ -35,7 +37,9 @@ CHMAC_SHA256::CHMAC_SHA256(const uint8_t* key, const size_t keylen)
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
 void CHMAC_SHA256::Finalize(uint8_t hash[OUTPUT_SIZE])
 {
-    std::array<uint8_t, 32> temp{};
-    inner.Finalize(temp.data());
-    outer.Write(temp.data(), temp.size()).Finalize(hash);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, 32> temp;
+    inner.Finalize(temp);
+    outer.Write(temp.data(), temp.size())
+         .Finalize(hash);
 }

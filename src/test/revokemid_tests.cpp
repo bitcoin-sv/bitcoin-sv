@@ -35,7 +35,7 @@ namespace
             CSHA256()
                 .Write(reinterpret_cast<const uint8_t*>(encodedRevocationMessage.data()),
                        encodedRevocationMessage.size())
-                .Finalize(hashRevocationMessageBytes.data());
+                .Finalize(hashRevocationMessageBytes);
             const uint256 hashRevocationMessage{
                 std::vector<uint8_t>{std::begin(hashRevocationMessageBytes),
                                      std::end(hashRevocationMessageBytes)}};

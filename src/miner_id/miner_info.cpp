@@ -8,7 +8,7 @@
 #include <variant>
 
 #include "consensus/merkle.h"
-#include "hash.h"
+#include "crypto/sha256.h"
 #include "miner_id/miner_info_error.h"
 #include "miner_id/miner_info_ref.h"
 #include "primitives/block.h"
@@ -109,7 +109,7 @@ std::optional<miner_info_error> verify(const CBlock& block,
 
     uint256 expected_mmr_pbh_hash; 
     CSHA256().Write(buffer.data(), buffer.size())
-             .Finalize(expected_mmr_pbh_hash.begin());
+             .Finalize(CSHA256::span{expected_mmr_pbh_hash.begin(), CSHA256::OUTPUT_SIZE});
 
     const auto& mmr_pbh_hash = bb.mmr_pbh_hash();
     if(mmr_pbh_hash != expected_mmr_pbh_hash)

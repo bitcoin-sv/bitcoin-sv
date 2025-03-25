@@ -2,6 +2,8 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "miner_id/revokemid.h"
+
+#include "crypto/sha256.h"
 #include "key.h"
 #include "utilstrencodings.h"
 
@@ -61,8 +63,11 @@ namespace
     uint256 HashRevocationMessage(const RevokeMid& msg)
     {
         const auto& revocationMessage { msg.GetEncodedRevocationMessage() };
-        uint8_t hashRevocationMessage[CSHA256::OUTPUT_SIZE] {};
-        CSHA256().Write(reinterpret_cast<const uint8_t*>(revocationMessage.data()), revocationMessage.size()).Finalize(hashRevocationMessage);
+        std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashRevocationMessage;
+        CSHA256()
+            .Write(reinterpret_cast<const uint8_t *>(revocationMessage.data()),
+                   revocationMessage.size())
+            .Finalize(hashRevocationMessage);
         return uint256 { std::vector<uint8_t> {std::begin(hashRevocationMessage), std::end(hashRevocationMessage)} };
     }
 }

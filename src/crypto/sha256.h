@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdlib>
+#include <span>
 #include <string>
 
 /** A hasher class for SHA-256. */
@@ -19,11 +20,14 @@ class CSHA256
 
 public:
     static const size_t OUTPUT_SIZE = 32;
+    //using span = std::span<uint8_t, OUTPUT_SIZE>;
+    using span = std::span<uint8_t>;
 
     CSHA256();
     CSHA256& Write(const uint8_t* data, size_t len);
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     void Finalize(uint8_t hash[OUTPUT_SIZE]);
+    void Finalize(span hash);
     CSHA256& Reset();
 };
 

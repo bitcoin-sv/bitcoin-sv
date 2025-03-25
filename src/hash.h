@@ -32,9 +32,9 @@ public:
     void Finalize(span hash)
     {
         std::array<uint8_t, CSHA256::OUTPUT_SIZE> buf;
-        sha.Finalize(buf.data());
+        sha.Finalize(buf);
         sha.Reset().Write(buf.data(), CSHA256::OUTPUT_SIZE)
-                   .Finalize(hash.data());
+                   .Finalize(hash);
     }
 
     CHash256 &Write(const uint8_t *data, size_t len) {
@@ -60,7 +60,7 @@ public:
     void Finalize(span hash)
     {
         std::array<uint8_t, CSHA256::OUTPUT_SIZE> buf;
-        sha.Finalize(buf.data());
+        sha.Finalize(buf);
         CRIPEMD160().Write(buf.data(), CSHA256::OUTPUT_SIZE).Finalize(hash);
     }
 
@@ -84,7 +84,7 @@ inline uint256 Hash(const T1 pbegin, const T1 pend)
     CHash256()
         .Write(pbegin == pend ? pblank.data() : (const uint8_t*)&pbegin[0],
                static_cast<size_t>(pend - pbegin) * sizeof(pbegin[0]))
-        .Finalize(std::span<uint8_t, CHash256::OUTPUT_SIZE>{result});
+        .Finalize(CHash256::span{result});
     return result;
 }
 
@@ -95,12 +95,11 @@ inline uint256 Hash(const T1 p1begin, const T1 p1end, const T2 p2begin, const T2
     static const std::array<uint8_t, 1> pblank{};
     uint256 result;
     CHash256()
-        .Write(p1begin == p1end ? pblank.data() : (const uint8_t*)&p1begin[0],
+        .Write(p1begin == p1end ? pblank.data() : (const uint8_t *)&p1begin[0],
                static_cast<size_t>(p1end - p1begin) * sizeof(p1begin[0]))
-        .Write(p2begin == p2end ? pblank.data() : (const uint8_t*)&p2begin[0],
+        .Write(p2begin == p2end ? pblank.data() : (const uint8_t *)&p2begin[0],
                static_cast<size_t>(p2end - p2begin) * sizeof(p2begin[0]))
-        .Finalize(std::span<uint8_t, CHash256::OUTPUT_SIZE>{result.begin(),
-                                                            CHash256::OUTPUT_SIZE});
+        .Finalize(CHash256::span{result.begin(), CHash256::OUTPUT_SIZE});
     return result;
 }
 

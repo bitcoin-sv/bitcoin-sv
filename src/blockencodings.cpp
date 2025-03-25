@@ -4,10 +4,9 @@
 
 #include "blockencodings.h"
 #include "blockstreams.h"
-#include "clientversion.h"
 #include "config.h"
-#include "consensus/consensus.h"
 #include "consensus/validation.h"
+#include "crypto/sha256.h"
 #include "hash.h"
 #include "random.h"
 #include "streams.h"
@@ -71,7 +70,7 @@ void CBlockHeaderAndShortTxIDs::FillShortTxIDSelector() const {
     hasher.Write(reinterpret_cast<uint8_t*>(&(*stream.begin())),
                  stream.end() - stream.begin());
     uint256 shorttxidhash;
-    hasher.Finalize(shorttxidhash.begin());
+    hasher.Finalize(CSHA256::span{shorttxidhash.begin(), CSHA256::OUTPUT_SIZE});
     shorttxidk0 = shorttxidhash.GetUint64(0);
     shorttxidk1 = shorttxidhash.GetUint64(1);
 }

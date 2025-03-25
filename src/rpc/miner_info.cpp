@@ -815,7 +815,7 @@ UniValue revokeminerid(const Config& config, const JSONRPCRequest& request)
         },
         false, true);
 
-    uint8_t hash_sha256[CSHA256::OUTPUT_SIZE] {};
+    std::array<uint8_t, CSHA256::OUTPUT_SIZE> hash_sha256;
     CSHA256()
         .Write(reinterpret_cast<const uint8_t*>(compromisedMinerId.begin()), compromisedMinerId.size())
         .Finalize(hash_sha256);

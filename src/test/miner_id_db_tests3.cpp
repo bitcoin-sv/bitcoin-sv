@@ -109,7 +109,7 @@ namespace
         std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashPrevSignature{};
         CSHA256()
             .Write(reinterpret_cast<const uint8_t*>(&dataToSign[0]), dataToSign.size())
-            .Finalize(hashPrevSignature.data());
+            .Finalize(hashPrevSignature);
         std::vector<uint8_t> prevMinerIdSignature {};
         BOOST_CHECK(prevMinerIdKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashPrevSignature), std::end(hashPrevSignature)}), prevMinerIdSignature));
         return HexStr(prevMinerIdSignature);
@@ -131,7 +131,7 @@ namespace
         std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashPrevSignature{};
         CSHA256()
             .Write(reinterpret_cast<const uint8_t*>(&dataToSign[0]), dataToSign.size())
-            .Finalize(hashPrevSignature.data());
+            .Finalize(hashPrevSignature);
         std::vector<uint8_t> prevRevocationKeySignature {};
         BOOST_CHECK(prevRevocationKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashPrevSignature), std::end(hashPrevSignature)}), prevRevocationKeySignature));
         return HexStr(prevRevocationKeySignature);
@@ -145,7 +145,7 @@ namespace
         std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashSignature{};
         CSHA256()
             .Write(documentBytes.data(), documentBytes.size())
-            .Finalize(hashSignature.data());
+            .Finalize(hashSignature);
         std::vector<uint8_t> signature {};
         BOOST_CHECK(minerIdKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashSignature), std::end(hashSignature)}), signature));
         return signature;
@@ -162,7 +162,7 @@ namespace
         std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashForSigning{};
         CSHA256()
             .Write(dataToSign.data(), dataToSign.size())
-            .Finalize(hashForSigning.data());
+            .Finalize(hashForSigning);
         std::vector<uint8_t> sig1 {};
         BOOST_CHECK(revocationKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashForSigning), std::end(hashForSigning)}), sig1));
         std::vector<uint8_t> sig2 {};
@@ -334,7 +334,7 @@ namespace
         CSHA256()
             .Write(reinterpret_cast<const uint8_t*>(concatMerklePrevBlock.data()),
                    concatMerklePrevBlock.size())
-            .Finalize(hashConcatMerklePrevBlock.data());
+            .Finalize(hashConcatMerklePrevBlock);
         const std::vector hashConcatMerklePrevBlockBytes(hashConcatMerklePrevBlock.begin(),
                                                          hashConcatMerklePrevBlock.end());
 

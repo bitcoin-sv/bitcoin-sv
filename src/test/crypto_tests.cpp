@@ -10,7 +10,6 @@
 #include "crypto/sha1.h"
 #include "crypto/sha256.h"
 #include "crypto/sha512.h"
-#include "random.h"
 #include "test/test_bitcoin.h"
 #include "utilstrencodings.h"
 

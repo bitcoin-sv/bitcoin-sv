@@ -65,7 +65,7 @@ namespace
         std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashPrevSignature{};
         CSHA256()
             .Write(reinterpret_cast<const uint8_t*>(dataToSign.data()), dataToSign.size())
-            .Finalize(hashPrevSignature.data());
+            .Finalize(hashPrevSignature);
         std::vector<uint8_t> prevMinerIdSignature {};
         BOOST_CHECK(prevMinerIdKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashPrevSignature), std::end(hashPrevSignature)}), prevMinerIdSignature));
         return HexStr(prevMinerIdSignature);
@@ -79,7 +79,7 @@ namespace
         std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashSignature{};
         CSHA256()
             .Write(documentBytes.data(), documentBytes.size())
-            .Finalize(hashSignature.data());
+            .Finalize(hashSignature);
         std::vector<uint8_t> signature {};
         BOOST_CHECK(minerIdKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashSignature), std::end(hashSignature)}), signature));
         return signature;
