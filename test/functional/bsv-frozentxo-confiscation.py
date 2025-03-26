@@ -271,7 +271,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
                 err_str = "bad-txns-inputs-missingorspent"
             assert_equal(node.rpc.submitblock(ToHex(block)), err_str)
             node.send_message(msg_block(block))
-            wait_until(lambda: check_for_log_msg(node.rpc, f"received block {block.hash}"
+            wait_until(lambda: check_for_log_msg(node.rpc, f"Received block for {block.hash}"
                                                  or f"ConnectBlock {block.hash} failed"))
             assert_equal(best_hash, node.rpc.getbestblockhash())
 
@@ -347,7 +347,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         block = self.make_block_with_tx(node, confiscate_tx)
         assert_equal(node.rpc.submitblock(ToHex(block)), "bad-txns-nonfinal")
         node.send_message(msg_block(block))
-        wait_until(lambda: check_for_log_msg(node.rpc, f"received block {block.hash}"))
+        wait_until(lambda: check_for_log_msg(node.rpc, f"Received block for {block.hash}"))
         assert_equal(best_hash, node.rpc.getbestblockhash())
 
         # coinbase confiscation tx

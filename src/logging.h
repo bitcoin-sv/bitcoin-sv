@@ -53,6 +53,7 @@ enum LogFlags : uint32_t {
     NET = NETCONN | NETMSGALL,
     DOUBLESPEND = (1 << 25),
     MINERID = (1 << 26),
+    BLOCKSRC = (1 << 27),
     ALL = ~uint32_t(0),
 };
 

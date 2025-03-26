@@ -3686,7 +3686,16 @@ static bool ProcessCompactBlockMessage(
     CBlockHeaderAndShortTxIDs cmpctblock;
     vRecv >> cmpctblock;
 
-    LogPrint(BCLog::NETMSG, "Got compact block for %s from peer=%d\n", cmpctblock.header.GetHash().ToString(), pfrom->id);
+    if(LogAcceptCategory(BCLog::NETMSG | BCLog::BLOCKSRC))
+    {
+        std::stringstream src {};
+        src << "peer=" << pfrom->id;
+        if(fLogIPs)
+        {
+            src << " (" << pfrom->GetAssociation().GetPeerAddr().ToString() << ")";
+        }
+        LogPrintf("Received compact block for %s from %s\n", cmpctblock.header.GetHash().ToString(), src.str());
+    }
 
     {
         LOCK(cs_main);
@@ -3962,7 +3971,16 @@ static void ProcessBlockMessage(const Config& config,
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
     vRecv >> *pblock;
     
-    LogPrint(BCLog::NETMSG, "received block %s peer=%d\n", pblock->GetHash().ToString(), pfrom->id);
+    if(LogAcceptCategory(BCLog::NETMSG | BCLog::BLOCKSRC))
+    {
+        std::stringstream src {};
+        src << "peer=" << pfrom->id;
+        if(fLogIPs)
+        {
+            src << " (" << pfrom->GetAssociation().GetPeerAddr().ToString() << ")";
+        }
+        LogPrintf("Received block for %s from %s\n", pblock->GetHash().ToString(), src.str());
+    }
 
     // Process all blocks from whitelisted peers, even if not requested,
     // unless we're still syncing with the network. Such an unrequested
