@@ -16,7 +16,6 @@ Checks: '-*,
          -cppcoreguidelines-macro-to-enum,
          -cppcoreguidelines-non-private-member-variables-in-classes,
 
-         -cppcoreguidelines-init-variables,
          -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
          -cppcoreguidelines-pro-bounds-pointer-arithmetic,
          -cppcoreguidelines-pro-bounds-constant-array-index,

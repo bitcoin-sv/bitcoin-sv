@@ -40,9 +40,11 @@ void Transform(uint32_t *s, const unsigned char *chunk, size_t blocks)
                                                      0xffffffff, 0xffffffff};
     static const uint32_t SHUF_DC00 alignas(16)[] = {0xffffffff, 0xffffffff,
                                                      0x03020100, 0x0b0a0908};
+    // NOLINTBEGIN(cppcoreguidelines-init-variables)
     uint32_t a, b, c, d, f, g, h, y0, y1, y2;
     uint64_t tbl;
     uint64_t inp_end, inp;
+    // NOLINTEND(cppcoreguidelines-init-variables)
     uint32_t xfer alignas(16)[4];
     // NOLINTEND(cppcoreguidelines-avoid-c-arrays)
 

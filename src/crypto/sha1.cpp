@@ -48,8 +48,10 @@ namespace sha1 {
     /** Perform a SHA-1 transformation, processing a 64-byte chunk. */
     void Transform(uint32_t *s, const uint8_t *chunk) {
         uint32_t a = s[0], b = s[1], c = s[2], d = s[3], e = s[4];
+        // NOLINTBEGIN(cppcoreguidelines-init-variables)
         uint32_t w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13,
             w14, w15;
+        // NOLINTEND(cppcoreguidelines-init-variables)
 
         Round(a, b, c, d, e, f1(b, c, d), k1, w0 = ReadBE32(chunk + 0));
         Round(e, a, b, c, d, f1(a, b, c), k1, w1 = ReadBE32(chunk + 4));

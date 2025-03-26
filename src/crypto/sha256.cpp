@@ -70,8 +70,10 @@ namespace sha256 {
         while (blocks--) {
             uint32_t a = s[0], b = s[1], c = s[2], d = s[3], e = s[4], f = s[5],
                      g = s[6], h = s[7];
+            // NOLINTBEGIN(cppcoreguidelines-init-variables)
             uint32_t w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13,
                 w14, w15;
+            // NOLINTEND(cppcoreguidelines-init-variables)
 
             Round(a, b, c, d, e, f, g, h, 0x428a2f98, w0 = ReadBE32(chunk + 0));
             Round(h, a, b, c, d, e, f, g, 0x71374491, w1 = ReadBE32(chunk + 4));
@@ -268,6 +270,7 @@ TransformType Transform = sha256::Transform;
 
 std::string SHA256AutoDetect() {
 #if defined(USE_ASM) && (defined(__x86_64__) || defined(__amd64__))
+    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
     uint32_t eax, ebx, ecx, edx;
     if (__get_cpuid(1, &eax, &ebx, &ecx, &edx) && (ecx >> 19) & 1) {
         Transform = sha256_sse4::Transform;

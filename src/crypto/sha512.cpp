@@ -59,8 +59,10 @@ namespace sha512 {
     void Transform(uint64_t *s, const uint8_t *chunk) {
         uint64_t a = s[0], b = s[1], c = s[2], d = s[3], e = s[4], f = s[5],
                  g = s[6], h = s[7];
+        // NOLINTBEGIN(cppcoreguidelines-init-variables)
         uint64_t w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13,
             w14, w15;
+        // NOLINTEND(cppcoreguidelines-init-variables)
 
         Round(a, b, c, d, e, f, g, h, 0x428a2f98d728ae22ull,
               w0 = ReadBE64(chunk + 0));

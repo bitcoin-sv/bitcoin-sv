@@ -32,7 +32,7 @@ static const uint8_t tau[] = "expand 16-byte k";
 
 void ChaCha20::SetKey(std::span<const uint8_t> k)
 {
-    const uint8_t *constants;
+    const uint8_t* constants{};
 
     input[4] = ReadLE32(k.data() + 0);
     input[5] = ReadLE32(k.data() + 4);
@@ -85,15 +85,18 @@ void ChaCha20::Seek(uint64_t pos) {
     input[13] = pos >> 32;
 }
 
-void ChaCha20::Output(uint8_t *c, size_t bytes) {
+void ChaCha20::Output(uint8_t *c, size_t bytes)
+{
+    // NOLINTBEGIN(cppcoreguidelines-init-variables)
     uint32_t x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14,
         x15;
     uint32_t j0, j1, j2, j3, j4, j5, j6, j7, j8, j9, j10, j11, j12, j13, j14,
         j15;
+    // NOLINTEND(cppcoreguidelines-init-variables)
     uint8_t *ctarget = nullptr;
+
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     std::array<uint8_t, 64> tmp;
-    unsigned int i;
 
     if (!bytes) {
         return;
@@ -137,7 +140,7 @@ void ChaCha20::Output(uint8_t *c, size_t bytes) {
         x13 = j13;
         x14 = j14;
         x15 = j15;
-        for (i = 20; i > 0; i -= 2) {
+        for(unsigned int i = 20; i > 0; i -= 2) {
             QUARTERROUND(x0, x4, x8, x12)
             QUARTERROUND(x1, x5, x9, x13)
             QUARTERROUND(x2, x6, x10, x14)
@@ -188,7 +191,7 @@ void ChaCha20::Output(uint8_t *c, size_t bytes) {
 
         if (bytes <= 64) {
             if (bytes < 64) {
-                for (i = 0; i < bytes; ++i) {
+                for (unsigned int i = 0; i < bytes; ++i) {
                     ctarget[i] = c[i];
                 }
             }
