@@ -636,9 +636,6 @@ void PruneAndFlush();
 /** Prune block files up to a given height */
 void PruneBlockFilesManual(int32_t nPruneUpToHeight);
 
-/** Check if DAA HF has activated. */
-bool IsDAAEnabled(const Config &config, int32_t nHeight);
-
 /**
  * Helper to return the script flags which should be checked for a block with given parent
  */

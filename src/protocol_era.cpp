@@ -20,8 +20,9 @@ const enumTableT<ProtocolName>& enumTable(ProtocolName)
     return table;
 }
 
-// Get protocol activation states for the given block height
-ProtocolEra GetProtocolEra(const Config& config, int32_t nHeight)
+ProtocolEra GetProtocolEra(const int32_t genesis_activation_height, 
+                           const int32_t chronicle_activation_height,
+                           const int32_t nHeight)
 {
     if(nHeight == MEMPOOL_HEIGHT)
     {
@@ -30,15 +31,21 @@ ProtocolEra GetProtocolEra(const Config& config, int32_t nHeight)
             "Use the overload that takes Coin as parameter.");
     }
 
-    if(nHeight < config.GetGenesisActivationHeight())
-    {   
+    if(nHeight < genesis_activation_height)
         return ProtocolEra::PreGenesis;
-    }
-    if(nHeight < config.GetChronicleActivationHeight())
-    {   
+
+    if(nHeight < chronicle_activation_height)
         return ProtocolEra::PostGenesis;
-    }
+
     return ProtocolEra::PostChronicle;
+}
+
+// Get protocol activation states for the given block height
+ProtocolEra GetProtocolEra(const Config& config, int32_t nHeight)
+{
+    return GetProtocolEra(config.GetGenesisActivationHeight(), 
+                          config.GetChronicleActivationHeight(), 
+                          nHeight);
 }
 
 // Get protocol activation status for the given coin at a particular mining height.

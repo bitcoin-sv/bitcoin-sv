@@ -27,6 +27,10 @@ enum class ProtocolEra
     PostGenesis,
     PostChronicle
 };      
+
+ProtocolEra GetProtocolEra(const int32_t genesis_activation_height, 
+                           const int32_t chronicle_activation_height,
+                           const int32_t nHeight);
             
 // Get protocol activation status for the given block height.
 ProtocolEra GetProtocolEra(const Config& config, int32_t nHeight);

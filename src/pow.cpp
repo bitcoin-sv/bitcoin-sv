@@ -6,10 +6,10 @@
 
 #include "pow.h"
 #include "arith_uint256.h"
-#include "chain.h"
 #include "config.h"
 #include "consensus/params.h"
 #include "primitives/block.h"
+#include "verify_script_flags.h"
 #include "uint256.h"
 #include "validation.h"
 
@@ -92,9 +92,11 @@ static uint32_t GetNextEDAWorkRequired(const CBlockIndex *pindexPrev,
     return nPow.GetCompact();
 }
 
-uint32_t GetNextWorkRequired(const CBlockIndex *pindexPrev,
-                             const CBlockHeader *pblock, const Config &config) {
-    const Consensus::Params &params = config.GetChainParams().GetConsensus();
+uint32_t GetNextWorkRequired(const CBlockIndex* pindexPrev,
+                             const CBlockHeader* pblock,
+                             const Config& config)
+{
+    const Consensus::Params& params = config.GetChainParams().GetConsensus();
 
     // Genesis block
     if (pindexPrev == nullptr) {
@@ -106,7 +108,8 @@ uint32_t GetNextWorkRequired(const CBlockIndex *pindexPrev,
         return pindexPrev->GetBits();
     }
 
-    if (IsDAAEnabled(config, pindexPrev->GetHeight())) {
+    if(pindexPrev->GetHeight() >= params.daaHeight)
+    {
         return GetNextCashWorkRequired(pindexPrev, pblock, config);
     }
 

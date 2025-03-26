@@ -81,6 +81,7 @@
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/thread.hpp>
 #include <cstddef>
+#include <cstdint>
 #include <variant>
 
 #if defined(NDEBUG)
@@ -656,14 +657,6 @@ std::string FormatStateMessage(const CValidationState &state) {
         "%s%s (code %i)", state.GetRejectReason(),
         state.GetDebugMessage().empty() ? "" : ", " + state.GetDebugMessage(),
         state.GetRejectCode());
-}
-
-static bool IsUAHFenabled(const Config &config, int32_t nHeight) {
-    return nHeight >= config.GetChainParams().GetConsensus().uahfHeight;
-}
-
-bool IsDAAEnabled(const Config &config, int32_t nHeight) {
-    return nHeight >= config.GetChainParams().GetConsensus().daaHeight;
 }
 
 // Used to avoid mempool polluting consensus critical paths if CCoinsViewMempool
@@ -2956,53 +2949,11 @@ uint32_t GetBlockScriptFlags(const Config& config, const CBlockIndex* pChainTip)
     const Consensus::Params &consensusparams =
         config.GetChainParams().GetConsensus();
 
-    uint32_t flags = SCRIPT_VERIFY_NONE;
-
-    // P2SH didn't become active until Apr 1 2012
-    if (pChainTip->GetMedianTimePast() >= P2SH_ACTIVATION_TIME) {
-        flags |= SCRIPT_VERIFY_P2SH;
-    }
-
-    // Start enforcing the DERSIG (BIP66) rule
-    if ((pChainTip->GetHeight() + 1) >= consensusparams.BIP66Height) {
-        flags |= SCRIPT_VERIFY_DERSIG;
-    }
-
-    // Start enforcing CHECKLOCKTIMEVERIFY (BIP65) rule
-    if ((pChainTip->GetHeight() + 1) >= consensusparams.BIP65Height) {
-        flags |= SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY;
-    }
-
-    // Start enforcing BIP112 (CSV).
-    if ((pChainTip->GetHeight() + 1) >= consensusparams.CSVHeight) {
-        flags |= SCRIPT_VERIFY_CHECKSEQUENCEVERIFY;
-    }
-
-    // If the UAHF is enabled, we start accepting replay protected txns
-    if (IsUAHFenabled(config, pChainTip->GetHeight())) {
-        flags |= SCRIPT_VERIFY_STRICTENC;
-        flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
-    }
-
-    // If the DAA HF is enabled, we start rejecting transaction that use a high
-    // s in their signature. We also make sure that signature that are supposed
-    // to fail (for instance in multisig or other forms of smart contracts) are
-    // null.
-    if (IsDAAEnabled(config, pChainTip->GetHeight())) {
-        flags |= SCRIPT_VERIFY_LOW_S;
-        flags |= SCRIPT_VERIFY_NULLFAIL;
-    }
-
-    if (IsProtocolActive(GetProtocolEra(config, pChainTip->GetHeight() + 1), ProtocolName::Genesis)) {
-        flags |= SCRIPT_GENESIS;
-        flags |= SCRIPT_VERIFY_SIGPUSHONLY;
-    }
-
-    if (IsProtocolActive(GetProtocolEra(config, pChainTip->GetHeight() + 1), ProtocolName::Chronicle)) {
-        flags |= SCRIPT_CHRONICLE;
-    }
-
-    return flags;
+    const auto height = pChainTip->GetHeight();
+    return GetBlockScriptFlags(consensusparams,
+                               height,
+                               pChainTip->GetMedianTimePast(),
+                               GetProtocolEra(config, height + 1));
 }
 
 static int64_t nTimeCheck = 0;

@@ -8,3 +8,13 @@ uint32_t GetScriptVerifyFlags(ProtocolEra,
                               bool require_standard,
                               bool is_prom_mempool_flags=false,
                               uint64_t prom_mempool_flags=0);
+
+namespace Consensus
+{
+    struct Params;
+}
+
+uint32_t GetBlockScriptFlags(const Consensus::Params&,
+                             int32_t height,
+                             int64_t median_time_past,
+                             ProtocolEra);
