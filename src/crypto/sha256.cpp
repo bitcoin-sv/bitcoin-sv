@@ -220,10 +220,10 @@ namespace sha256 {
 
 typedef void (*TransformType)(uint32_t *, const unsigned char *, size_t);
 
-bool SelfTest(TransformType tr) {
-    // NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays)
-    static const unsigned char in1[65] = {0, 0x80};
-    static const unsigned char in2[129] = {
+bool SelfTest(TransformType tr)
+{
+    static const std::array<unsigned char, 65> in1 = {0, 0x80};
+    static const std::array<unsigned char, 129> in2 = {
         0,  32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,   32, 32,
         32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,   32, 32,
         32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,   32, 32,
@@ -232,33 +232,32 @@ bool SelfTest(TransformType tr) {
         0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,    0,  0,
         0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,    0,  0,
         0,  0,  0,  0,  0,  0,  0,  0,  2,  0};
-    static const uint32_t init[8] = {0x6a09e667ul, 0xbb67ae85ul, 0x3c6ef372ul,
-                                     0xa54ff53aul, 0x510e527ful, 0x9b05688cul,
-                                     0x1f83d9abul, 0x5be0cd19ul};
-    static const uint32_t out1[8] = {0xe3b0c442ul, 0x98fc1c14ul, 0x9afbf4c8ul,
-                                     0x996fb924ul, 0x27ae41e4ul, 0x649b934cul,
-                                     0xa495991bul, 0x7852b855ul};
-    static const uint32_t out2[8] = {0xce4153b0ul, 0x147c2a86ul, 0x3ed4298eul,
-                                     0xe0676bc8ul, 0x79fc77a1ul, 0x2abe1f49ul,
-                                     0xb2b055dful, 0x1069523eul};
-    // NOLINTEND(cppcoreguidelines-avoid-c-arrays)
+    static const std::array<uint32_t, 8> init = {
+        0x6a09e667ul, 0xbb67ae85ul, 0x3c6ef372ul, 0xa54ff53aul,
+        0x510e527ful, 0x9b05688cul, 0x1f83d9abul, 0x5be0cd19ul};
+    static const std::array<uint32_t, 8> out1 = {
+        0xe3b0c442ul, 0x98fc1c14ul, 0x9afbf4c8ul, 0x996fb924ul,
+        0x27ae41e4ul, 0x649b934cul, 0xa495991bul, 0x7852b855ul};
+    static const std::array<uint32_t, 8> out2 = {
+        0xce4153b0ul, 0x147c2a86ul, 0x3ed4298eul, 0xe0676bc8ul,
+        0x79fc77a1ul, 0x2abe1f49ul, 0xb2b055dful, 0x1069523eul};
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     std::array<uint32_t, 8> buf;
-    memcpy(buf.data(), init, sizeof(buf));
+    memcpy(buf.data(), init.data(), sizeof(buf));
     // Process nothing, and check we remain in the initial state.
     tr(buf.data(), nullptr, 0);
-    if(memcmp(buf.data(), init, sizeof(buf)) != 0)
+    if(memcmp(buf.data(), init.data(), sizeof(buf)) != 0)
         return false;
 
     // Process the padded empty string (unaligned)
-    tr(buf.data(), in1 + 1, 1);
-    if(memcmp(buf.data(), out1, sizeof(buf)) != 0)
+    tr(buf.data(), in1.data() + 1, 1);
+    if(memcmp(buf.data(), out1.data(), sizeof(buf)) != 0)
         return false;
 
     // Process 64 spaces (unaligned)
-    memcpy(buf.data(), init, sizeof(buf));
-    tr(buf.data(), in2 + 1, 2);
-    if(memcmp(buf.data(), out2, sizeof(buf)) != 0)
+    memcpy(buf.data(), init.data(), sizeof(buf));
+    tr(buf.data(), in2.data() + 1, 2);
+    if(memcmp(buf.data(), out2.data(), sizeof(buf)) != 0)
         return false;
 
     return true;

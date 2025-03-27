@@ -42,11 +42,13 @@ void ChaCha20::SetKey(std::span<const uint8_t> k)
     {
         // recommended
         k = k.subspan(16);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         constants = sigma;
     }
     else
     {
         // keylen == 16
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         constants = tau;
     }
     input[8] = ReadLE32(k.data()  + 0);
