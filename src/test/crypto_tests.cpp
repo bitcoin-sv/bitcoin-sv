@@ -112,11 +112,11 @@ void TestAES256(const std::string &hexkey, const std::string &hexin,
     assert(key.size() == 32);
     assert(in.size() == 16);
     assert(correctout.size() == 16);
-    AES256Encrypt enc(&key[0]);
+    AES256Encrypt enc(AES256Encrypt::cspan{key});
     buf.resize(correctout.size());
     enc.Encrypt(&buf[0], &in[0]);
     BOOST_CHECK(buf == correctout);
-    AES256Decrypt dec(&key[0]);
+    AES256Decrypt dec(AES256Decrypt::cspan{key});
     dec.Decrypt(&buf[0], &buf[0]);
     BOOST_CHECK(buf == in);
 }
@@ -188,7 +188,9 @@ void TestAES256CBC(const std::string &hexkey, const std::string &hexiv,
     std::vector<uint8_t> realout(in.size() + AES_BLOCKSIZE);
 
     // Encrypt the plaintext and verify that it equals the cipher
-    AES256CBCEncrypt enc(&key[0], &iv[0], pad);
+    AES256CBCEncrypt enc(AES256CBCEncrypt::key_span{key},
+                         AES256CBCEncrypt::block_span{iv},
+                         pad);
     int size = enc.Encrypt(&in[0],
                            in.size(), // NOLINT(*-narrowing-conversions)
                            &realout[0]);
@@ -199,7 +201,9 @@ void TestAES256CBC(const std::string &hexkey, const std::string &hexiv,
 
     // Decrypt the cipher and verify that it equals the plaintext
     std::vector<uint8_t> decrypted(correctout.size());
-    AES256CBCDecrypt dec(&key[0], &iv[0], pad);
+    AES256CBCDecrypt dec(AES256CBCDecrypt::key_span{key},
+                         AES256CBCDecrypt::block_span{iv},
+                         pad);
     size = dec.Decrypt(&correctout[0],
                        correctout.size(), // NOLINT(*-narrowing-conversions)
                        &decrypted[0]);

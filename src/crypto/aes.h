@@ -54,51 +54,80 @@ public:
 };
 
 /** An encryption class for AES-256. */
-class AES256Encrypt {
-private:
+class AES256Encrypt
+{
     AES256_ctx ctx;
 
 public:
-    AES256Encrypt(const uint8_t key[32]);
+    using cspan = std::span<const uint8_t, 32>;
+
+    AES256Encrypt(cspan key);
+    AES256Encrypt(const AES256Encrypt&) = default;
+    AES256Encrypt& operator=(const AES256Encrypt&) = default;
+    AES256Encrypt(AES256Encrypt&&) = delete;
+    AES256Encrypt& operator=(AES256Encrypt&&) = delete;
     ~AES256Encrypt();
     void Encrypt(uint8_t ciphertext[16], const uint8_t plaintext[16]) const;
 };
 
 /** A decryption class for AES-256. */
-class AES256Decrypt {
-private:
+class AES256Decrypt
+{
     AES256_ctx ctx;
 
 public:
-    AES256Decrypt(const uint8_t key[32]);
+    using cspan = std::span<const uint8_t, 32>;
+
+    AES256Decrypt(cspan key);
+    AES256Decrypt(const AES256Decrypt&) = default;
+    AES256Decrypt& operator=(const AES256Decrypt&) = default;
+    AES256Decrypt(AES256Decrypt&&) = delete;
+    AES256Decrypt& operator=(AES256Decrypt&&) = delete;
     ~AES256Decrypt();
+
     void Decrypt(uint8_t plaintext[16], const uint8_t ciphertext[16]) const;
 };
 
-class AES256CBCEncrypt {
+class AES256CBCEncrypt
+{
 public:
-    AES256CBCEncrypt(const uint8_t key[AES256_KEYSIZE],
-                     const uint8_t ivIn[AES_BLOCKSIZE], bool padIn);
+    using key_span = std::span<const uint8_t, AES256_KEYSIZE>;
+    using block_span = std::span<const uint8_t, AES_BLOCKSIZE>;
+
+    AES256CBCEncrypt(key_span key, block_span iv, bool pad);
+    AES256CBCEncrypt(const AES256CBCEncrypt&) = default;
+    AES256CBCEncrypt& operator=(const AES256CBCEncrypt&) = default;
+    AES256CBCEncrypt(AES256CBCEncrypt&&) = delete;
+    AES256CBCEncrypt& operator=(AES256CBCEncrypt&&) = delete;
     ~AES256CBCEncrypt();
+
     int Encrypt(const uint8_t *data, int size, uint8_t *out) const;
 
 private:
-    const AES256Encrypt enc;
-    const bool pad;
-    uint8_t iv[AES_BLOCKSIZE];
+    AES256Encrypt enc;
+    bool pad;
+    std::array<uint8_t, AES_BLOCKSIZE> iv;
 };
 
-class AES256CBCDecrypt {
+class AES256CBCDecrypt
+{
 public:
-    AES256CBCDecrypt(const uint8_t key[AES256_KEYSIZE],
-                     const uint8_t ivIn[AES_BLOCKSIZE], bool padIn);
+    using key_span = std::span<const uint8_t, AES256_KEYSIZE>;
+    using block_span = std::span<const uint8_t, AES_BLOCKSIZE>;
+
+    AES256CBCDecrypt(key_span key, block_span iv, bool pad);
+    AES256CBCDecrypt(const AES256CBCDecrypt&) = default;
+    AES256CBCDecrypt& operator=(const AES256CBCDecrypt&) = default;
+    AES256CBCDecrypt(AES256CBCDecrypt&&) = delete;
+    AES256CBCDecrypt& operator=(AES256CBCDecrypt&&) = delete;
     ~AES256CBCDecrypt();
-    int Decrypt(const uint8_t *data, int size, uint8_t *out) const;
+
+    int Decrypt(const uint8_t* data, int size, uint8_t* out) const;
 
 private:
-    const AES256Decrypt dec;
-    const bool pad;
-    uint8_t iv[AES_BLOCKSIZE];
+    AES256Decrypt dec;
+    bool pad;
+    std::array<uint8_t, AES_BLOCKSIZE> iv;
 };
 
 class AES128CBCEncrypt
