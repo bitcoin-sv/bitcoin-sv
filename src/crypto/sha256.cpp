@@ -54,6 +54,7 @@ namespace sha256 {
 
     /** Initialize SHA-256 state. */
     inline void Initialize(uint32_t *s) {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         s[0] = 0x6a09e667ul;
         s[1] = 0xbb67ae85ul;
         s[2] = 0x3c6ef372ul;
@@ -62,12 +63,14 @@ namespace sha256 {
         s[5] = 0x9b05688cul;
         s[6] = 0x1f83d9abul;
         s[7] = 0x5be0cd19ul;
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     /** Perform a number of SHA-256 transformations, processing 64-byte chunks.
      */
     void Transform(uint32_t *s, const unsigned char *chunk, size_t blocks) {
         while (blocks--) {
+            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             uint32_t a = s[0], b = s[1], c = s[2], d = s[3], e = s[4], f = s[5],
                      g = s[6], h = s[7];
             // NOLINTBEGIN(cppcoreguidelines-init-variables)
@@ -213,6 +216,7 @@ namespace sha256 {
             s[6] += g;
             s[7] += h;
             chunk += 64;
+            // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         }
     }
 
@@ -296,6 +300,7 @@ CSHA256& CSHA256::Write(const uint8_t* data, size_t len)
         return *this;
 
     assert(data);
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     const uint8_t* end = data + len;
     size_t bufsize = bytes % 64;
     if(bufsize && bufsize + len >= 64)
@@ -314,6 +319,8 @@ CSHA256& CSHA256::Write(const uint8_t* data, size_t len)
         data += 64 * blocks;
         bytes += 64 * blocks;
     }
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
     if(end > data)
     {
         // Fill the buffer with what remains.

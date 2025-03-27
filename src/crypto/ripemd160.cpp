@@ -30,11 +30,13 @@ namespace ripemd160 {
 
     /** Initialize RIPEMD-160 state. */
     inline void Initialize(uint32_t *s) {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         s[0] = 0x67452301ul;
         s[1] = 0xEFCDAB89ul;
         s[2] = 0x98BADCFEul;
         s[3] = 0x10325476ul;
         s[4] = 0xC3D2E1F0ul;
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     inline uint32_t rol(uint32_t x, int i) {
@@ -90,7 +92,9 @@ namespace ripemd160 {
     }
 
     /** Perform a RIPEMD-160 transformation, processing a 64-byte chunk. */
-    void Transform(uint32_t *s, const uint8_t *chunk) {
+    void Transform(uint32_t *s, const uint8_t *chunk)
+    {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         uint32_t a1 = s[0], b1 = s[1], c1 = s[2], d1 = s[3], e1 = s[4];
         uint32_t a2 = a1, b2 = b1, c2 = c1, d2 = d1, e2 = e1;
         uint32_t w0 = ReadLE32(chunk + 0), w1 = ReadLE32(chunk + 4),
@@ -101,6 +105,7 @@ namespace ripemd160 {
                  w10 = ReadLE32(chunk + 40), w11 = ReadLE32(chunk + 44);
         uint32_t w12 = ReadLE32(chunk + 48), w13 = ReadLE32(chunk + 52),
                  w14 = ReadLE32(chunk + 56), w15 = ReadLE32(chunk + 60);
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         R11(a1, b1, c1, d1, e1, w0, 11);
         R12(a2, b2, c2, d2, e2, w5, 8);
@@ -267,12 +272,14 @@ namespace ripemd160 {
         R51(b1, c1, d1, e1, a1, w13, 6);
         R52(b2, c2, d2, e2, a2, w11, 11);
 
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         uint32_t t = s[0];
         s[0] = s[1] + c1 + d2;
         s[1] = s[2] + d1 + e2;
         s[2] = s[3] + e1 + a2;
         s[3] = s[4] + a1 + b2;
         s[4] = t + b1 + c2;
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
 } // namespace ripemd160
@@ -293,6 +300,7 @@ CRIPEMD160& CRIPEMD160::Write(const uint8_t* data, size_t len)
         return *this;
 
     assert(data);
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     const uint8_t* end = data + len;
     size_t bufsize = bytes % 64;
     if(bufsize && bufsize + len >= 64)
@@ -312,6 +320,7 @@ CRIPEMD160& CRIPEMD160::Write(const uint8_t* data, size_t len)
         bytes += 64;
         data += 64;
     }
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
     if(end > data)
     {

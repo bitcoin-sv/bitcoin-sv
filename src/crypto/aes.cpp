@@ -95,6 +95,7 @@ static int CBCEncrypt(const T& enc,
 
     memcpy(mixed.data(), iv, AES_BLOCKSIZE);
 
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     // Write all but the last block
     while (written + AES_BLOCKSIZE <= size) {
         for (int i = 0; i != AES_BLOCKSIZE; i++)
@@ -164,6 +165,7 @@ static int CBCDecrypt(const T& dec,
         written -= padsize;
     }
     return written * !fail;
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 }
 
 // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)

@@ -45,6 +45,7 @@ namespace sha512 {
 
     /** Initialize SHA-256 state. */
     inline void Initialize(uint64_t *s) {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         s[0] = 0x6a09e667f3bcc908ull;
         s[1] = 0xbb67ae8584caa73bull;
         s[2] = 0x3c6ef372fe94f82bull;
@@ -53,10 +54,13 @@ namespace sha512 {
         s[5] = 0x9b05688c2b3e6c1full;
         s[6] = 0x1f83d9abfb41bd6bull;
         s[7] = 0x5be0cd19137e2179ull;
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     /** Perform one SHA-512 transformation, processing a 128-byte chunk. */
-    void Transform(uint64_t *s, const uint8_t *chunk) {
+    void Transform(uint64_t *s, const uint8_t *chunk)
+    {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         uint64_t a = s[0], b = s[1], c = s[2], d = s[3], e = s[4], f = s[5],
                  g = s[6], h = s[7];
         // NOLINTBEGIN(cppcoreguidelines-init-variables)
@@ -237,6 +241,7 @@ namespace sha512 {
         s[5] += f;
         s[6] += g;
         s[7] += h;
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
 } // namespace sha512
@@ -257,6 +262,7 @@ CSHA512& CSHA512::Write(const uint8_t* data, size_t len)
         return *this;
 
     assert(data);
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     const uint8_t* end = data + len;
     size_t bufsize = bytes % 128;
     if(bufsize && bufsize + len >= 128)
@@ -276,6 +282,7 @@ CSHA512& CSHA512::Write(const uint8_t* data, size_t len)
         data += 128;
         bytes += 128;
     }
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
     if(end > data)
     {

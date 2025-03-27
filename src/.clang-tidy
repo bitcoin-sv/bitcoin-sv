@@ -7,7 +7,7 @@ Checks: '-*,
 
          cert-*,
 
--clang-analyzer-*,
+         clang-analyzer-*,
 
          cppcoreguidelines*,
          -cppcoreguidelines-avoid-do-while,
@@ -15,8 +15,6 @@ Checks: '-*,
          -cppcoreguidelines-macro-usage,
          -cppcoreguidelines-macro-to-enum,
          -cppcoreguidelines-non-private-member-variables-in-classes,
-
-         -cppcoreguidelines-pro-bounds-pointer-arithmetic,
       '
 
 WarningsAsErrors: '*'

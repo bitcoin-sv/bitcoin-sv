@@ -55,10 +55,12 @@ void ChaCha20::SetKey(std::span<const uint8_t> k)
     input[9] = ReadLE32(k.data()  + 4);
     input[10] = ReadLE32(k.data()  + 8);
     input[11] = ReadLE32(k.data()  + 12);
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     input[0] = ReadLE32(constants + 0);
     input[1] = ReadLE32(constants + 4);
     input[2] = ReadLE32(constants + 8);
     input[3] = ReadLE32(constants + 12);
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     input[12] = 0;
     input[13] = 0;
     input[14] = 0;
@@ -174,6 +176,7 @@ void ChaCha20::Output(uint8_t *c, size_t bytes)
             ++j13;
         }
 
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         WriteLE32(c + 0, x0);
         WriteLE32(c + 4, x1);
         WriteLE32(c + 8, x2);
@@ -190,10 +193,12 @@ void ChaCha20::Output(uint8_t *c, size_t bytes)
         WriteLE32(c + 52, x13);
         WriteLE32(c + 56, x14);
         WriteLE32(c + 60, x15);
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         if (bytes <= 64) {
             if (bytes < 64) {
                 for (unsigned int i = 0; i < bytes; ++i) {
+                    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                     ctarget[i] = c[i];
                 }
             }
@@ -202,6 +207,7 @@ void ChaCha20::Output(uint8_t *c, size_t bytes)
             return;
         }
         bytes -= 64;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         c += 64;
     }
 }

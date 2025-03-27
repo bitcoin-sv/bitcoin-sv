@@ -33,11 +33,13 @@ namespace sha1 {
 
     /** Initialize SHA-1 state. */
     inline void Initialize(uint32_t *s) {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         s[0] = 0x67452301ul;
         s[1] = 0xEFCDAB89ul;
         s[2] = 0x98BADCFEul;
         s[3] = 0x10325476ul;
         s[4] = 0xC3D2E1F0ul;
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     const uint32_t k1 = 0x5A827999ul;
@@ -46,7 +48,9 @@ namespace sha1 {
     const uint32_t k4 = 0xCA62C1D6ul;
 
     /** Perform a SHA-1 transformation, processing a 64-byte chunk. */
-    void Transform(uint32_t *s, const uint8_t *chunk) {
+    void Transform(uint32_t *s, const uint8_t *chunk)
+    {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         uint32_t a = s[0], b = s[1], c = s[2], d = s[3], e = s[4];
         // NOLINTBEGIN(cppcoreguidelines-init-variables)
         uint32_t w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13,
@@ -143,6 +147,7 @@ namespace sha1 {
         s[2] += c;
         s[3] += d;
         s[4] += e;
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
 } // namespace sha1
@@ -163,6 +168,7 @@ CSHA1& CSHA1::Write(const uint8_t* data, size_t len)
         return *this;
 
     assert(data);
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     const uint8_t* end = data + len;
     size_t bufsize = bytes % 64;
     if(bufsize && bufsize + len >= 64)
@@ -182,6 +188,7 @@ CSHA1& CSHA1::Write(const uint8_t* data, size_t len)
         bytes += 64;
         data += 64;
     }
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
     if(end > data)
     {
