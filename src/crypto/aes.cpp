@@ -98,6 +98,7 @@ static int CBCEncrypt(const T& enc,
     // Write all but the last block
     while (written + AES_BLOCKSIZE <= size) {
         for (int i = 0; i != AES_BLOCKSIZE; i++)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             mixed[i] ^= *data++;
         enc.Encrypt(out + written, mixed.data());
         memcpy(mixed.data(), out + written, AES_BLOCKSIZE);
@@ -109,8 +110,10 @@ static int CBCEncrypt(const T& enc,
         // For all that remains, pad each byte with the value of the remaining
         // space. If there is none, pad by a full block.
         for (int i = 0; i != padsize; i++)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             mixed[i] ^= *data++;
         for (int i = padsize; i != AES_BLOCKSIZE; i++)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             mixed[i] ^= AES_BLOCKSIZE - padsize;
         enc.Encrypt(out + written, mixed.data());
         written += AES_BLOCKSIZE;

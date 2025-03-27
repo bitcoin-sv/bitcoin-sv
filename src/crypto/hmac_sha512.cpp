@@ -26,10 +26,12 @@ CHMAC_SHA512::CHMAC_SHA512(const uint8_t *key, size_t keylen)
     }
 
     for (int n = 0; n < 128; n++)
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         rkey[n] ^= 0x5c;
     outer.Write(rkey.data(), 128);
 
     for (int n = 0; n < 128; n++)
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         rkey[n] ^= 0x5c ^ 0x36;
     inner.Write(rkey.data(), 128);
 }
