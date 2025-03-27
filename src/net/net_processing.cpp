@@ -1968,6 +1968,15 @@ static bool ProcessAuthChMessage(const Config& config,
     if (pfrom->fAuthConnEstablished) {
         return true;
     }
+
+    // Limit message spamming
+    if(pfrom->authRateLimit += 1)
+    {
+        LogPrint(BCLog::MINERID | BCLog::NETCONN, "authch rate limit exceeded from peer=%d\n", pfrom->id);
+        Misbehaving(pfrom, 10, "authch-rate-limit");
+        return false;
+    }
+
     using namespace authconn;
     uint32_t nVersion {0};
     uint32_t nMsgLen {0};
@@ -2110,6 +2119,15 @@ static bool ProcessAuthRespMessage(const CNodePtr& pfrom,
     if (pfrom->fAuthConnEstablished) {
         return true;
     }
+
+    // Limit message spamming
+    if(pfrom->authRateLimit += 1)
+    {
+        LogPrint(BCLog::MINERID | BCLog::NETCONN, "authresp rate limit exceeded from peer=%d\n", pfrom->id);
+        Misbehaving(pfrom, 10, "authresp-rate-limit");
+        return false;
+    }
+
     using namespace authconn;
     std::vector<uint8_t> vPubKey {};
     uint64_t nClientNonce {0};
@@ -2203,7 +2221,7 @@ static bool ProcessAuthRespMessage(const CNodePtr& pfrom,
             throw std::runtime_error("authresp message signature failed to verify.");
         }
     } catch(std::exception& e) {
-        LogPrint(BCLog::NETCONN, "peer=%d Failed to process authresp: (%s); disconnecting\n", pfrom->id, e.what());
+        LogPrint(BCLog::NETCONN, "peer=%d Failed to process authresp: (%s)\n", pfrom->id, e.what());
         connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
             .Make(NetMsgType::REJECT, strCommand, REJECT_AUTH_CONN_SETUP, std::string(e.what())));
 	    // We still connect if authentication failed.

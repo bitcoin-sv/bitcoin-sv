@@ -17,6 +17,7 @@
 #include "fs.h"
 #include "hash.h"
 #include "invalid_txn_publisher.h"
+#include "leaky_bucket.h"
 #include "limitedmap.h"
 #include "net/association.h"
 #include "net/authconn.h"
@@ -1035,6 +1036,9 @@ public:
     bool protoconfReceived {false};
     /** Maximum size for data that is allowed to be sent to the client */
     uint32_t maxRecvPayloadLength {0};
+
+    /** AuthCh and AuthResp msg rate limiter (an average of 1 every 10 minutes over an hour) */
+    LeakyBucket<std::chrono::minutes> authRateLimit { 6, std::chrono::minutes{10} };
 
     /**
      * Number of outgoing response messages created by processing specific types of P2P requests
