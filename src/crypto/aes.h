@@ -11,18 +11,27 @@ extern "C" {
 #include "crypto/ctaes/ctaes.h"
 }
 
+#include <span>
+
 static const int AES_BLOCKSIZE = 16;
 static const int AES128_KEYSIZE = 16;
 static const int AES256_KEYSIZE = 32;
 
 /** An encryption class for AES-128. */
-class AES128Encrypt {
-private:
+class AES128Encrypt
+{
     AES128_ctx ctx;
 
 public:
-    AES128Encrypt(const uint8_t key[16]);
+    using cspan = std::span<const uint8_t, 16>;
+
+    AES128Encrypt(cspan);
+    AES128Encrypt(const AES128Encrypt&) = default;
+    AES128Encrypt& operator=(const AES128Encrypt&) = default;
+    AES128Encrypt(AES128Encrypt&&) = delete;
+    AES128Encrypt& operator=(AES128Encrypt&&) = delete;
     ~AES128Encrypt();
+
     void Encrypt(uint8_t ciphertext[16], const uint8_t plaintext[16]) const;
 };
 
@@ -85,17 +94,27 @@ private:
     uint8_t iv[AES_BLOCKSIZE];
 };
 
-class AES128CBCEncrypt {
+class AES128CBCEncrypt
+{
 public:
-    AES128CBCEncrypt(const uint8_t key[AES128_KEYSIZE],
-                     const uint8_t ivIn[AES_BLOCKSIZE], bool padIn);
+    using key_span = std::span<const uint8_t, AES128_KEYSIZE>;
+    using block_span = std::span<const uint8_t, AES_BLOCKSIZE>;
+
+    AES128CBCEncrypt(key_span key,
+                     block_span iv,
+                     bool padIn);
+    AES128CBCEncrypt(const AES128CBCEncrypt&) = default;
+    AES128CBCEncrypt& operator=(const AES128CBCEncrypt&) = default;
+    AES128CBCEncrypt(AES128CBCEncrypt&&) = delete;
+    AES128CBCEncrypt& operator=(AES128CBCEncrypt&&) = delete;
     ~AES128CBCEncrypt();
-    int Encrypt(const uint8_t *data, int size, uint8_t *out) const;
+
+    int Encrypt(const uint8_t* data, int size, uint8_t* out) const;
 
 private:
-    const AES128Encrypt enc;
-    const bool pad;
-    uint8_t iv[AES_BLOCKSIZE];
+    AES128Encrypt enc;
+    bool pad;
+    std::array<uint8_t, AES_BLOCKSIZE> iv;
 };
 
 class AES128CBCDecrypt {

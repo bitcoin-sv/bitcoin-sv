@@ -92,7 +92,7 @@ void TestAES128(const std::string &hexkey, const std::string &hexin,
     assert(key.size() == 16);
     assert(in.size() == 16);
     assert(correctout.size() == 16);
-    AES128Encrypt enc(&key[0]);
+    AES128Encrypt enc(AES128Encrypt::cspan{key});
     buf.resize(correctout.size());
     buf2.resize(correctout.size());
     enc.Encrypt(&buf[0], &in[0]);
@@ -131,7 +131,8 @@ void TestAES128CBC(const std::string &hexkey, const std::string &hexiv,
     std::vector<uint8_t> realout(in.size() + AES_BLOCKSIZE);
 
     // Encrypt the plaintext and verify that it equals the cipher
-    AES128CBCEncrypt enc(&key[0], &iv[0], pad);
+    AES128CBCEncrypt enc(AES128CBCEncrypt::key_span{key},
+                         AES128CBCEncrypt::block_span{iv}, pad);
     int size = enc.Encrypt(&in[0],
                            in.size(),    // NOLINT(*-narrowing-conversions)
                            &realout[0]);
