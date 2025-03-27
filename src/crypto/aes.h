@@ -36,13 +36,20 @@ public:
 };
 
 /** A decryption class for AES-128. */
-class AES128Decrypt {
-private:
+class AES128Decrypt
+{
     AES128_ctx ctx;
 
 public:
-    AES128Decrypt(const uint8_t key[16]);
+    using cspan = std::span<const uint8_t, 16>;
+
+    AES128Decrypt(cspan key);
+    AES128Decrypt(const AES128Decrypt&) = default;
+    AES128Decrypt& operator=(const AES128Decrypt&) = default;
+    AES128Decrypt(AES128Decrypt&&) = delete;
+    AES128Decrypt& operator=(AES128Decrypt&&) = delete;
     ~AES128Decrypt();
+
     void Decrypt(uint8_t plaintext[16], const uint8_t ciphertext[16]) const;
 };
 
@@ -117,17 +124,25 @@ private:
     std::array<uint8_t, AES_BLOCKSIZE> iv;
 };
 
-class AES128CBCDecrypt {
+class AES128CBCDecrypt
+{
 public:
-    AES128CBCDecrypt(const uint8_t key[AES128_KEYSIZE],
-                     const uint8_t ivIn[AES_BLOCKSIZE], bool padIn);
+    using key_span = std::span<const uint8_t, AES128_KEYSIZE>;
+    using block_span = std::span<const uint8_t, AES_BLOCKSIZE>;
+
+    AES128CBCDecrypt(key_span key, block_span iv, bool padIn);
+    AES128CBCDecrypt(const AES128CBCDecrypt&) = default;
+    AES128CBCDecrypt& operator=(const AES128CBCDecrypt&) = default;
+    AES128CBCDecrypt(AES128CBCDecrypt&&) = delete;
+    AES128CBCDecrypt& operator=(AES128CBCDecrypt&&) = delete;
     ~AES128CBCDecrypt();
-    int Decrypt(const uint8_t *data, int size, uint8_t *out) const;
+
+    int Decrypt(const uint8_t* data, int size, uint8_t* out) const;
 
 private:
-    const AES128Decrypt dec;
-    const bool pad;
-    uint8_t iv[AES_BLOCKSIZE];
+    AES128Decrypt dec;
+    bool pad;
+    std::array<uint8_t, AES_BLOCKSIZE> iv;
 };
 
 #endif // BITCOIN_CRYPTO_AES_H
