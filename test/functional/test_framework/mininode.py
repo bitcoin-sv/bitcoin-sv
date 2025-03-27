@@ -1448,10 +1448,10 @@ class msg_authresp():
 
     def __init__(self):
         self.nPubKeyLen = 0
-        self.pubKey = None
+        self.pubKey = bytearray()
         self.nClientNonce = 0
         self.nSignLen = 0
-        self.sign = None
+        self.sign = bytearray()
 
     def deserialize(self, f):
         self.nPubKeyLen = struct.unpack("<I", f.read(1))[0]
@@ -1463,10 +1463,10 @@ class msg_authresp():
     def serialize(self):
         return b"".join((
             struct.pack("<I", self.nPubKeyLen),
-            ser_string(ser_byte_array(self.PubKey)),
+            ser_string(self.pubKey),
             struct.pack("<Q", self.nClientNonce),
             struct.pack("<I", self.nSignLen),
-            ser_string(ser_byte_array(self.sign)),
+            ser_string(self.sign),
         ))
 
     def __repr__(self):
