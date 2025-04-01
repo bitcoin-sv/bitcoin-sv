@@ -325,7 +325,7 @@ void CExtPubKey::Encode(const std::span<uint8_t, BIP32_EXTKEY_SIZE> code) const
     code[8] = (nChild >> 0) & 0xFF;
     memcpy(code.data() + 9, chaincode.begin(), 32);
     assert(pubkey.size() == 33);
-    memcpy(code.data() + 41, pubkey.begin(), 33);
+    memcpy(code.data() + 41, pubkey.data(), 33);
 }
 
 void CExtPubKey::Decode(const std::span<const uint8_t, BIP32_EXTKEY_SIZE> code)

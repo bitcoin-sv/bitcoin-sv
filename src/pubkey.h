@@ -42,7 +42,12 @@ class CPubKey
      * Just store the serialized data.
      * Its length can very cheaply be computed from the first byte.
      */
-    std::array<uint8_t, 65> vch;
+    using value_type = std::array<uint8_t, 65>;
+    using const_iterator = value_type::const_iterator;
+    using pointer = value_type::pointer;
+    using const_pointer = value_type::const_pointer;
+    value_type vch;
+
 
     //! Compute the length of a pubkey with a given first byte.
     static unsigned int GetLen(uint8_t chHeader) {
@@ -80,8 +85,10 @@ public:
 
     //! Simple read-only vector-like interface to the pubkey data.
     unsigned int size() const { return GetLen(vch[0]); }
-    const uint8_t* begin() const { return vch.begin(); }
-    const uint8_t* end() const { return vch.begin() + size(); }
+    const_iterator begin() const noexcept { return vch.begin(); }
+    const_iterator end() const noexcept { return vch.begin() + size(); }
+    pointer data() noexcept { return vch.data(); }
+    const_pointer data() const noexcept { return vch.data(); }
     const uint8_t& operator[](unsigned int pos) const { return vch[pos]; }
 
     //! Comparator implementation.

@@ -195,7 +195,7 @@ CPubKey CKey::GetPubKey() const {
         secp256k1_context_sign.get(), &pubkey, begin());
     assert(ret);
     secp256k1_ec_pubkey_serialize(secp256k1_context_sign.get(),
-                                  (uint8_t*)result.begin(),
+                                  result.data(),
                                   &clen,
                                   &pubkey,
                                   fCompressed ? SECP256K1_EC_COMPRESSED
