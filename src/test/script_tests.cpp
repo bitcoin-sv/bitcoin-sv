@@ -3922,7 +3922,7 @@ BOOST_AUTO_TEST_CASE(VerifyScript_lows)
     }
 }
 
-BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid_relax)
+BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid_chronicle)
 {
     using namespace std;
 
@@ -4005,32 +4005,34 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid_relax)
          {}},
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_ALL,
-         {SCRIPT_ERR_MUST_USE_FORKID},
+         SCRIPT_ERR_MUST_USE_FORKID,
          {}},
-        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
-         SIGHASH_ALL,
-         {},
-         std::make_optional<malleability::status>()},
-        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
-         SIGHASH_ALL | SIGHASH_FORKID,
-         {},
-         std::make_optional<malleability::status>(malleability::disallowed)},
-        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
-         SIGHASH_ALL | SIGHASH_FORKID,
-         {},
-         std::make_optional<malleability::status>(malleability::disallowed)},
+        {SCRIPT_VERIFY_STRICTENC
+         | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_CHRONICLE,
+          SIGHASH_ALL | SIGHASH_FORKID,
+          {},
+          malleability::disallowed },
+         {SCRIPT_VERIFY_STRICTENC
+          | SCRIPT_ENABLE_SIGHASH_FORKID,
+          SIGHASH_ALL | SIGHASH_FORKID,
+          {},
+          std::make_optional<malleability::status>(malleability::disallowed)},
+       {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
+        SIGHASH_ALL | SIGHASH_FORKID,
+        {},
+        std::make_optional<malleability::status>(malleability::disallowed)},
        
-        // relax flag
         // Pre-Chronicle
-        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
-         SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
-         { SCRIPT_ERR_ILLEGAL_CHRONICLE },
-         {}},
-        // Post-Chronicle
-        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
-         SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
-         {},
-         std::make_optional<malleability::status>()},
+       {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
+        SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
+        SCRIPT_ERR_ILLEGAL_CHRONICLE,
+        {}},
+       // Post-Chronicle
+       {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
+        SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
+        {},
+        std::make_optional<malleability::status>()},
     };
     for(const auto& [flags, sighash, exp_error, exp_mall] : test_data)
     {
