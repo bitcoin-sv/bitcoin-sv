@@ -12,9 +12,9 @@
 // default constructor
 static_assert(SigHashType{}.isDefined());
 
-static_assert(!SigHashType{}.hasRelax());
-static_assert(SigHashType{}.withRelax().hasRelax());
-static_assert(!SigHashType{}.withRelax(false).hasRelax());
+static_assert(!SigHashType{}.hasChronicle());
+static_assert(SigHashType{}.withChronicle().hasChronicle());
+static_assert(!SigHashType{}.withChronicle(false).hasChronicle());
 
 static_assert(!SigHashType{}.hasForkId());
 static_assert(SigHashType{}.withForkId().hasForkId());
@@ -41,9 +41,9 @@ static_assert(SigHashType{0x21}.isDefined());
 static_assert(SigHashType{0x41}.isDefined());
 static_assert(SigHashType{0x81}.isDefined());
 
-static_assert(SigHashType{0x20}.hasRelax());
-static_assert(SigHashType{0x20}.withRelax().hasRelax());
-static_assert(!SigHashType{0x20}.withRelax(false).hasRelax());
+static_assert(SigHashType{0x20}.hasChronicle());
+static_assert(SigHashType{0x20}.withChronicle().hasChronicle());
+static_assert(!SigHashType{0x20}.withChronicle(false).hasChronicle());
 
 static_assert(SigHashType{0x40}.hasForkId());
 static_assert(SigHashType{0x40}.withForkId().hasForkId());
@@ -62,7 +62,7 @@ static_assert(SigHashType{0xe3}.getBaseType() == BaseSigHashType::SINGLE);
 
 static_assert(SigHashType{0x81}.getRawSigHashType() == (SIGHASH_ANYONECANPAY | SIGHASH_ALL));
 static_assert(SigHashType{0x42}.getRawSigHashType() == (SIGHASH_FORKID | SIGHASH_NONE));
-static_assert(SigHashType{0x23}.getRawSigHashType() == (SIGHASH_RELAX | SIGHASH_SINGLE));
+static_assert(SigHashType{0x23}.getRawSigHashType() == (SIGHASH_CHRONICLE | SIGHASH_SINGLE));
 
 BOOST_FIXTURE_TEST_SUITE(sighashtype_tests, BasicTestingSetup)
 
@@ -70,14 +70,14 @@ static void CheckSigHashType(SigHashType t,
                              BaseSigHashType baseType,
                              bool isDefined,
                              uint32_t forkValue,
-                             bool hasRelax,
+                             bool hasChronicle,
                              bool hasForkId,
                              bool hasAnyoneCanPay)
 {
     BOOST_CHECK(t.getBaseType() == baseType);
     BOOST_CHECK_EQUAL(t.isDefined(), isDefined);
     BOOST_CHECK_EQUAL(t.getForkValue(), forkValue);
-    BOOST_CHECK_EQUAL(t.hasRelax(), hasRelax);
+    BOOST_CHECK_EQUAL(t.hasChronicle(), hasChronicle);
     BOOST_CHECK_EQUAL(t.hasForkId(), hasForkId);
     BOOST_CHECK_EQUAL(t.hasAnyoneCanPay(), hasAnyoneCanPay);
 }
@@ -98,52 +98,52 @@ BOOST_AUTO_TEST_CASE(sighash_construction_test)
 
     for (BaseSigHashType baseType : baseTypes) {
         for (uint32_t forkValue : forkValues) {
-            for (bool hasRelax : relaxFlagValues) {
+            for (bool hasChronicle : relaxFlagValues) {
                 for (bool hasForkId : forkIdFlagValues) {
                     for (bool hasAnyoneCanPay : anyoneCanPayFlagValues) {
                         const SigHashType t =
                             SigHashType()
                                 .withBaseType(baseType)
                                 .withForkValue(forkValue)
-                                .withRelax(hasRelax)
+                                .withChronicle(hasChronicle)
                                 .withForkId(hasForkId)
                                 .withAnyoneCanPay(hasAnyoneCanPay);
 
                         bool isDefined = baseType != BaseSigHashType::UNSUPPORTED;
                         CheckSigHashType(t, baseType, isDefined, forkValue,
-                                         hasRelax, hasForkId, hasAnyoneCanPay);
+                                         hasChronicle, hasForkId, hasAnyoneCanPay);
 
                         // Also check all possible alterations.
-                        CheckSigHashType(t.withRelax(hasRelax), baseType,
-                                         isDefined, forkValue, hasRelax, hasForkId,
+                        CheckSigHashType(t.withChronicle(hasChronicle), baseType,
+                                         isDefined, forkValue, hasChronicle, hasForkId,
                                          hasAnyoneCanPay);
-                        CheckSigHashType(t.withRelax(!hasRelax), baseType,
-                                         isDefined, forkValue, !hasRelax, hasForkId,
+                        CheckSigHashType(t.withChronicle(!hasChronicle), baseType,
+                                         isDefined, forkValue, !hasChronicle, hasForkId,
                                          hasAnyoneCanPay);
                         CheckSigHashType(t.withForkId(hasForkId), baseType,
-                                         isDefined, forkValue, hasRelax, hasForkId,
+                                         isDefined, forkValue, hasChronicle, hasForkId,
                                          hasAnyoneCanPay);
                         CheckSigHashType(t.withForkId(!hasForkId), baseType,
-                                         isDefined, forkValue, hasRelax, !hasForkId,
+                                         isDefined, forkValue, hasChronicle, !hasForkId,
                                          hasAnyoneCanPay);
                         CheckSigHashType(t.withAnyoneCanPay(hasAnyoneCanPay),
-                                         baseType, isDefined, forkValue, hasRelax, hasForkId,
+                                         baseType, isDefined, forkValue, hasChronicle, hasForkId,
                                          hasAnyoneCanPay);
                         CheckSigHashType(t.withAnyoneCanPay(!hasAnyoneCanPay),
-                                         baseType, isDefined, forkValue, hasRelax, hasForkId,
+                                         baseType, isDefined, forkValue, hasChronicle, hasForkId,
                                          !hasAnyoneCanPay);
 
                         for (BaseSigHashType newBaseType : baseTypes) {
                             bool isNewDefined = newBaseType != BaseSigHashType::UNSUPPORTED;
                             CheckSigHashType(t.withBaseType(newBaseType),
                                              newBaseType, isNewDefined, forkValue,
-                                             hasRelax, hasForkId, hasAnyoneCanPay);
+                                             hasChronicle, hasForkId, hasAnyoneCanPay);
                         }
 
                         for (uint32_t newForkValue : forkValues) {
                             CheckSigHashType(t.withForkValue(newForkValue),
                                              baseType, isDefined, newForkValue,
-                                             hasRelax, hasForkId, hasAnyoneCanPay);
+                                             hasChronicle, hasForkId, hasAnyoneCanPay);
                         }
                     }
                 }
@@ -162,18 +162,18 @@ BOOST_AUTO_TEST_CASE(sighash_serialization_test)
             uint32_t rawType = sigHashType | (forkValue << 8);
 
             uint32_t baseType = rawType & 0x1f;
-            bool hasRelax = (rawType & SIGHASH_RELAX) != 0;
+            bool hasChronicle = (rawType & SIGHASH_CHRONICLE) != 0;
             bool hasForkId = (rawType & SIGHASH_FORKID) != 0;
             bool hasAnyoneCanPay = (rawType & SIGHASH_ANYONECANPAY) != 0;
 
-            uint32_t noflag = sigHashType & ~(SIGHASH_RELAX | SIGHASH_FORKID | SIGHASH_ANYONECANPAY);
+            uint32_t noflag = sigHashType & ~(SIGHASH_CHRONICLE | SIGHASH_FORKID | SIGHASH_ANYONECANPAY);
             bool isDefined = (noflag != 0) && (noflag <= SIGHASH_SINGLE);
 
             const SigHashType tbase(rawType);
 
             // Check deserialization.
             CheckSigHashType(tbase, BaseSigHashType(baseType), isDefined,
-                             forkValue, hasRelax, hasForkId, hasAnyoneCanPay);
+                             forkValue, hasChronicle, hasForkId, hasAnyoneCanPay);
 
             // Check raw value.
             BOOST_CHECK_EQUAL(tbase.getRawSigHashType(), rawType);

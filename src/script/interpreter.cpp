@@ -275,29 +275,31 @@ std::variant<ScriptError, malleability::status> CheckSignatureEncoding(
         if(!GetHashType(vchSig).isDefined())
             return SCRIPT_ERR_SIG_HASHTYPE;
 
-        const bool usesRelax = GetHashType(vchSig).hasRelax();
+        const bool usesChronicle = GetHashType(vchSig).hasChronicle();
         const bool usesForkId = GetHashType(vchSig).hasForkId();
         const bool chronicleEnabled = flags & SCRIPT_CHRONICLE;
         const bool forkIdEnabled = flags & SCRIPT_ENABLE_SIGHASH_FORKID;
         if(!forkIdEnabled && usesForkId)
             return SCRIPT_ERR_ILLEGAL_FORKID;
-        if(!chronicleEnabled && usesRelax)
-            return SCRIPT_ERR_ILLEGAL_RELAX;
+        if(!chronicleEnabled && usesChronicle)
+            return SCRIPT_ERR_ILLEGAL_CHRONICLE;
+
+        if(forkIdEnabled && !usesForkId)
+            return SCRIPT_ERR_MUST_USE_FORKID;
 
         if(forkIdEnabled)
         {
-            if(!chronicleEnabled)
+            if(chronicleEnabled)
             {
-                if(!usesForkId)
+                if(!usesChronicle)
                 {
-                    // Pre-Chronicle ForkID is mandatory
-                    return SCRIPT_ERR_MUST_USE_FORKID;
+                    // Post-Chronicle, strict malleability rules enforced if Chronicle sighash bit unset
+                    ms |= malleability::disallowed;
                 }
             }
-
-            if(usesForkId && !usesRelax)
+            else
             {
-                // Strict malleability rules enforced if ForkID set and Relax unset
+                // Pre-Chronicle still enforce strict malleability rules
                 ms |= malleability::disallowed;
             }
         }

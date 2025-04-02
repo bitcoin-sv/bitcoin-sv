@@ -75,8 +75,8 @@ typedef enum ScriptError_t
     SCRIPT_ERR_ILLEGAL_FORKID,
     SCRIPT_ERR_MUST_USE_FORKID,
 
-    /** malleability control */
-    SCRIPT_ERR_ILLEGAL_RELAX,
+    /** Chronicle malleability control */
+    SCRIPT_ERR_ILLEGAL_CHRONICLE,
 
     SCRIPT_ERR_BIG_INT,
 

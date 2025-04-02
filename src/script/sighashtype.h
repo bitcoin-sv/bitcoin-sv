@@ -15,7 +15,7 @@ enum {
     SIGHASH_ALL = 1,
     SIGHASH_NONE = 2,
     SIGHASH_SINGLE = 3,
-    SIGHASH_RELAX = 0x20,
+    SIGHASH_CHRONICLE = 0x20,
     SIGHASH_FORKID = 0x40,
     SIGHASH_ANYONECANPAY = 0x80,
 };
@@ -54,9 +54,9 @@ public:
         return SigHashType((forkId << 8) | (sigHash & 0xff));
     }
 
-    constexpr SigHashType withRelax(bool relax = true) const {
-        return SigHashType((sigHash & ~SIGHASH_RELAX) |
-                           (relax ? SIGHASH_RELAX : 0));
+    constexpr SigHashType withChronicle(bool chronicle = true) const {
+        return SigHashType((sigHash & ~SIGHASH_CHRONICLE) |
+                           (chronicle ? SIGHASH_CHRONICLE : 0));
     }
 
     constexpr SigHashType withForkId(bool forkId = true) const {
@@ -77,12 +77,12 @@ public:
 
     constexpr bool isDefined() const {
         const auto baseType =
-            BaseSigHashType(sigHash & ~(SIGHASH_RELAX | SIGHASH_FORKID | SIGHASH_ANYONECANPAY));
+            BaseSigHashType(sigHash & ~(SIGHASH_CHRONICLE | SIGHASH_FORKID | SIGHASH_ANYONECANPAY));
         return baseType >= BaseSigHashType::ALL &&
                baseType <= BaseSigHashType::SINGLE;
     }
 
-    constexpr bool hasRelax() const { return (sigHash & SIGHASH_RELAX) != 0; }
+    constexpr bool hasChronicle() const { return (sigHash & SIGHASH_CHRONICLE) != 0; }
     constexpr bool hasForkId() const { return (sigHash & SIGHASH_FORKID) != 0; }
     constexpr bool hasAnyoneCanPay() const { return (sigHash & SIGHASH_ANYONECANPAY) != 0; }
 
