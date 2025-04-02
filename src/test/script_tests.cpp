@@ -3807,16 +3807,19 @@ BOOST_AUTO_TEST_CASE(EvalScript_lows)
          | SCRIPT_VERIFY_STRICTENC
          | SCRIPT_ENABLE_SIGHASH_FORKID,
          high_s_min(),
-         {}, 
-         make_optional<malleability::status>(malleability::high_s)},
+         {},
+         malleability::high_s},
     };
     for(const auto& [flags, s, exp_error, exp_mall] : test_data)
     {
         const Config& config = GlobalConfig::GetConfig();
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        
-        const auto script{make_op_checksig_script(SIGHASH_ALL, s)};
+
+        const auto script{make_op_checksig_script(SIGHASH_ALL
+                                                  | SIGHASH_FORKID
+                                                  | SIGHASH_CHRONICLE,
+                                                  s)};
         const auto status = EvalScript(config,
                                        false,
                                        source->GetToken(),
@@ -3884,8 +3887,9 @@ BOOST_AUTO_TEST_CASE(VerifyScript_lows)
          | SCRIPT_ENABLE_SIGHASH_FORKID
          | SCRIPT_CHRONICLE,
          high_s_min(),
-         SIGHASH_ALL,
-         SCRIPT_ERR_OK, malleability::high_s},
+         SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
+         {},
+         malleability::high_s},
 
         {SCRIPT_VERIFY_LOW_S
          | SCRIPT_ENABLE_SIGHASH_FORKID
