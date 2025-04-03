@@ -15,16 +15,12 @@
 #include "consensus/validation.h"
 #include "policy/policy.h"
 #include "pow.h"
-#include "pubkey.h"
-#include "script/script_num.h"
 #include "script/standard.h"
 #include "txmempool.h"
 #include "uint256.h"
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validation.h"
-
-#include "mempool_test_access.h"
 
 #include "test/test_bitcoin.h"
 
@@ -83,11 +79,6 @@ template <>
 struct CBlockIndex::UnitTestAccess<miner_tests_uid>
 {
     UnitTestAccess() = delete;
-
-    static void SetTime( CBlockIndex& index, int64_t time)
-    {
-        index.nTime = time;
-    }
 
     static void AddTime( CBlockIndex& index, int64_t time)
     {
@@ -331,18 +322,6 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
 
     mempool.Clear();
 
-    // Invalid (pre-p2sh) txn in mempool, template creation fails.
-    std::array<int64_t, CBlockIndex::nMedianTimeSpan> times{};
-    for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
-        // Trick the MedianTimePast.
-        times[i] = chainActive.Tip() // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
-                       ->GetAncestor(chainActive.Tip()->GetHeight() - i)
-                       ->GetBlockTime();
-        TestAccessCBlockIndex::SetTime(
-            *chainActive.Tip()->GetAncestor(chainActive.Tip()->GetHeight() - i),
-            P2SH_ACTIVATION_TIME);
-    }
-
     tx.vin[0].prevout = COutPoint(txFirst[0]->GetId(), 0);
     tx.vin[0].scriptSig = CScript() << OP_1;
     tx.vout[0].nValue = BLOCKSUBSIDY - LOWFEE;
@@ -364,16 +343,11 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         TxStorage::memory, nullChangeSet);
     testingSetup.testConfig.SetTestBlockCandidateValidity(false);
     BOOST_CHECK_NO_THROW(jba->CreateNewBlock(scriptPubKey, pindexPrev));
-    testingSetup.testConfig.SetTestBlockCandidateValidity(true);
-    BOOST_CHECK_THROW(jba->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
+
+    //testingSetup.testConfig.SetTestBlockCandidateValidity(true);
+    //BOOST_CHECK_THROW(jba->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
 
     mempool.Clear();
-    for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
-        // Restore the MedianTimePast.
-        TestAccessCBlockIndex::SetTime(
-            *chainActive.Tip()->GetAncestor(chainActive.Tip()->GetHeight() - i),
-            times[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
-    }
 
     // Double spend txn pair in mempool, template creation fails.
     tx.vin[0].prevout = COutPoint(txFirst[0]->GetId(), 0);

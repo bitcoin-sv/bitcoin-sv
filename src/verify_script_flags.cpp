@@ -6,6 +6,8 @@
 #include "policy/policy.h"
 #include "protocol_era.h"
 
+#include <cstdint>
+
 uint32_t GetScriptVerifyFlags(const ProtocolEra era,
                               const bool require_standard,
                               const bool is_prom_mempool_flags,
@@ -29,13 +31,12 @@ uint32_t GetScriptVerifyFlags(const ProtocolEra era,
 
 uint32_t GetBlockScriptFlags(const Consensus::Params& consensus_params,
                              const int32_t height,
-                             const int64_t median_time_past,
                              const ProtocolEra protocol_era)
 {
     uint32_t flags = SCRIPT_VERIFY_NONE;
 
-    // P2SH didn't become active until Apr 1 2012
-    if(median_time_past >= P2SH_ACTIVATION_TIME)
+    // P2SH became active on Apr 1 2012, block height 173,805 (mainnet)
+    if(height >= consensus_params.p2shHeight)
         flags |= SCRIPT_VERIFY_P2SH;
 
     // Start enforcing the DERSIG (BIP66) rule

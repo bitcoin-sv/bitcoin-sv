@@ -16,5 +16,4 @@ namespace Consensus
 
 uint32_t GetBlockScriptFlags(const Consensus::Params&,
                              int32_t height,
-                             int64_t median_time_past,
                              ProtocolEra);

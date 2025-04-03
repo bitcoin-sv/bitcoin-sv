@@ -2952,7 +2952,6 @@ uint32_t GetBlockScriptFlags(const Config& config, const CBlockIndex* pChainTip)
     const auto height = pChainTip->GetHeight();
     return GetBlockScriptFlags(consensusparams,
                                height,
-                               pChainTip->GetMedianTimePast(),
                                GetProtocolEra(config, height + 1));
 }
 

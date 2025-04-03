@@ -14,6 +14,7 @@
 #include "utilstrencodings.h"
 
 #include <cassert>
+#include <cstdint>
 
 #include "chainparamsseeds.h"
 
@@ -26,6 +27,11 @@
 #define CHRONICLE_ACTIVATION_STN                250
 #define CHRONICLE_ACTIVATION_TESTNET            1621670
 #define CHRONICLE_ACTIVATION_REGTEST            15000
+
+constexpr int32_t P2SH_ACTIVATION_MAIN{173'805};
+constexpr int32_t P2SH_ACTIVATION_STN{1};
+constexpr int32_t P2SH_ACTIVATION_TESTNET{519};
+constexpr int32_t P2SH_ACTIVATION_REGTEST{1};
 
 static CBlock CreateGenesisBlock(const char *pszTimestamp,
                                  const CScript &genesisOutputScript,
@@ -134,6 +140,8 @@ public:
 
         // TBD, Chronicle Upgrade
         consensus.chronicleHeight = CHRONICLE_ACTIVATION_MAIN;
+        
+        consensus.p2shHeight = P2SH_ACTIVATION_MAIN;
 
         /**
          * The message start string is designed to be unlikely to occur in
@@ -293,6 +301,8 @@ public:
 
         // TBD, Chronicle Upgrade
         consensus.chronicleHeight = CHRONICLE_ACTIVATION_STN;
+        
+        consensus.p2shHeight = P2SH_ACTIVATION_STN;
 
         /**
          * The message start string is designed to be unlikely to occur in
@@ -407,6 +417,8 @@ public:
 
         // TBD, Chronicle Upgrade
         consensus.chronicleHeight = CHRONICLE_ACTIVATION_TESTNET;
+        
+        consensus.p2shHeight = P2SH_ACTIVATION_TESTNET;
 
         diskMagic[0] = 0x0b;
         diskMagic[1] = 0x11;
@@ -532,6 +544,8 @@ public:
 
         // TBD, Chronicle Upgrade
         consensus.chronicleHeight = CHRONICLE_ACTIVATION_REGTEST;
+
+        consensus.p2shHeight = P2SH_ACTIVATION_REGTEST;
 
         diskMagic[0] = 0xfa;
         diskMagic[1] = 0xbf;

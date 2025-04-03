@@ -36,6 +36,8 @@ struct Params {
       */
     int32_t genesisHeight;
     int32_t chronicleHeight;
+    int32_t p2shHeight;
+
     /** Proof of work parameters */
     uint256 powLimit;
     bool fPowAllowMinDifficultyBlocks;
