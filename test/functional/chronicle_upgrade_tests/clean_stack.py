@@ -2,7 +2,7 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from chronicle_upgrade_tests.test_base import ChronicleHeightTestsCase
-from test_framework.script import OP_TRUE, SIGHASH_ALL, SIGHASH_FORKID, SIGHASH_RELAX
+from test_framework.script import OP_TRUE, SIGHASH_ALL, SIGHASH_FORKID, SIGHASH_CHRONICLE
 
 """
 P2P txns that don't leave a clean stack are rejected until we hit one block below
@@ -19,29 +19,41 @@ class CleanStackTestCase(ChronicleHeightTestsCase):
     _UTXO_KEY = ChronicleHeightTestsCase.make_key()
 
     def get_transactions_for_test(self, tx_collection, coinbases):
+        SIGHASH_MALLEABLE = SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE
+        SIGHASH_NON_MALLEABLE = SIGHASH_ALL | SIGHASH_FORKID
+
         # Before Chronicle
         if tx_collection.label == "PRE_CHRONICLE":
             utxos, _ = self.utxos["PRE_CHRONICLE"]
 
             # Txn created without clean stack, properly signed
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID, unlocking_script=[OP_TRUE])])
+            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE])])
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
 
             # Txn created without clean stack, signed with Chronicle malleability allowed
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL, unlocking_script=[OP_TRUE])])
+            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE])])
             tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Txn created without clean stack signed with mixed malleability flags
+            # Txns created without clean stack signed with mixed malleability flags
             tx = self.new_transaction(self._UTXO_KEY, [
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX),
-                self.Input(utxos.pop(), SIGHASH_ALL, unlocking_script=[OP_TRUE]),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE]),
             ])
             tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_RELAX)',
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            tx = self.new_transaction(self._UTXO_KEY, [
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE]),
+            ])
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
 
         # Block before Chronicle grace period
@@ -49,107 +61,131 @@ class CleanStackTestCase(ChronicleHeightTestsCase):
             utxos, _ = self.utxos["CHRONICLE_PRE_GRACE"]
 
             # Txn created without clean stack, properly signed
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID, unlocking_script=[OP_TRUE])])
+            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE])])
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
 
             # Txn created without clean stack, signed with Chronicle malleability allowed
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL, unlocking_script=[OP_TRUE])])
+            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE])])
             tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Txn created without clean stack signed with mixed malleability flags
+            # Txns created without clean stack signed with mixed malleability flags
             tx = self.new_transaction(self._UTXO_KEY, [
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX),
-                self.Input(utxos.pop(), SIGHASH_ALL, unlocking_script=[OP_TRUE]),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE]),
             ])
             tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_RELAX)',
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            tx = self.new_transaction(self._UTXO_KEY, [
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE]),
+            ])
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
 
         # Start of Chronicle grace period
         elif tx_collection.label == "CHRONICLE_GRACE_BEGIN":
             utxos, _ = self.utxos["CHRONICLE_GRACE_BEGIN"]
 
-            # A txn without a clean stack signed without ForkID and without Relax might be accepted after Chronicle
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL, unlocking_script=[OP_TRUE])])
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
-                                 block_reject_reason=b'blk-bad-inputs')
-
-            # A txn without a clean stack signed without ForkID and with Relax might be accepted after Chronicle
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_RELAX, unlocking_script=[OP_TRUE])])
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_RELAX)',
-                                 block_reject_reason=b'blk-bad-inputs')
-
-            # A txn without a clean stack signed with ForkID and without Relax is always a policy failure
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID, unlocking_script=[OP_TRUE])])
+            # A txn without a clean stack signed as non-malleable is always a policy failure
+            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE])])
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
 
-            # A txn without a clean stack signed with ForkID and with Relax might be accepted after Chronicle
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE])])
+            # A txn without a clean stack signed as malleability allowed might be accepted after Chronicle
+            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE])])
             tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_RELAX)',
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Txn created without clean stack, all inputs indicating malleability allowed
+            # Txn created without clean stack, all inputs indicating non-malleable, is always a policy failure
             tx = self.new_transaction(self._UTXO_KEY, [
-                self.Input(utxos.pop(), SIGHASH_ALL),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_RELAX),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE]),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE]),
             ])
             tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
+
+            # Txn created without clean stack, all inputs indicating malleability allowed, might be accepted after Chronicle
+            tx = self.new_transaction(self._UTXO_KEY, [
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE]),
+            ])
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Txn created without clean stack signed with mixed malleability flags
+            # Txns created without clean stack signed with mixed malleability flags, might be accepted after Chronicle
             tx = self.new_transaction(self._UTXO_KEY, [
-                self.Input(utxos.pop(), SIGHASH_ALL),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE]),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE]),
             ])
             tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            tx = self.new_transaction(self._UTXO_KEY, [
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE]),
+            ])
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
 
         # Block before Chronicle activation
         elif tx_collection.label == "CHRONICLE_PRE_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_PRE_ACTIVATION"]
 
-            # A txn without a clean stack signed without ForkID and without Relax can be accepted for mining into the next block
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL, unlocking_script=[OP_TRUE])])
-            tx_collection.add_tx(tx)
-
-            # A txn without a clean stack signed without ForkID and with Relax can be accepted for mining into the next block
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_RELAX, unlocking_script=[OP_TRUE])])
-            tx_collection.add_tx(tx)
-
-            # A txn without a clean stack signed with ForkID and without Relax is always a policy failure
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID, unlocking_script=[OP_TRUE])])
+            # A txn without a clean stack signed as non-malleable is always a policy failure
+            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE])])
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
 
-            # A txn without a clean stack signed with ForkID and with Relax can be accepted for mining into the next block
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE])])
+            # A txn without a clean stack signed as malleability allowed can be accepted for mining into the next block
+            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE])])
             tx_collection.add_tx(tx)
 
-            # Txn created without clean stack, all inputs indicating malleability allowed can be accepted for mining into the next block
+            # Txn created without clean stack, all inputs indicating non-malleable, is a policy failure
             tx = self.new_transaction(self._UTXO_KEY, [
-                self.Input(utxos.pop(), SIGHASH_ALL),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_RELAX),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE]),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE]),
+            ])
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
+
+            # Txn created without clean stack, all inputs indicating malleability allowed, can be accepted for mining into the next block
+            tx = self.new_transaction(self._UTXO_KEY, [
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE]),
             ])
             tx_collection.add_tx(tx)
 
-            # Txn created without clean stack signed with mixed malleability flags is a policy failure
+            # Txns created without clean stack signed with mixed malleability flags, is a policy failure
             tx = self.new_transaction(self._UTXO_KEY, [
-                self.Input(utxos.pop(), SIGHASH_ALL),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE]),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE]),
+            ])
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
+
+            tx = self.new_transaction(self._UTXO_KEY, [
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE]),
             ])
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
@@ -158,36 +194,45 @@ class CleanStackTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_ACTIVATION"]
 
-            # A txn without a clean stack signed without ForkID and without Relax; accepted
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL, unlocking_script=[OP_TRUE])])
-            tx_collection.add_tx(tx)
-
-            # A txn without a clean stack signed without ForkID and with Relax; accepted
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_RELAX, unlocking_script=[OP_TRUE])])
-            tx_collection.add_tx(tx)
-
-            # A txn without a clean stack signed with ForkID and without Relax; policy failure
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID, unlocking_script=[OP_TRUE])])
+            # A txn without a clean stack signed as non-malleable; policy failure
+            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE])])
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
 
-            # A txn without a clean stack signed with ForkID and with Relax; accepted
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE])])
+            # A txn without a clean stack signed as malleability allowed; accepted
+            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE])])
             tx_collection.add_tx(tx)
+
+            # Txn created without clean stack, all inputs indicating non-malleable; policy failure
+            tx = self.new_transaction(self._UTXO_KEY, [
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE]),
+            ])
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
 
             # Txn created without clean stack, all inputs indicating malleability allowed; accepted
             tx = self.new_transaction(self._UTXO_KEY, [
-                self.Input(utxos.pop(), SIGHASH_ALL),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_RELAX),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE]),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE]),
             ])
             tx_collection.add_tx(tx)
 
-            # Txn created without clean stack signed with mixed malleability flags; policy failure
+            # Txns created without clean stack signed with mixed malleability flags; policy failure
             tx = self.new_transaction(self._UTXO_KEY, [
-                self.Input(utxos.pop(), SIGHASH_ALL),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE]),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE]),
+            ])
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
+
+            tx = self.new_transaction(self._UTXO_KEY, [
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE]),
             ])
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
@@ -196,30 +241,40 @@ class CleanStackTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_POST_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_POST_ACTIVATION"]
 
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL, unlocking_script=[OP_TRUE])])
-            tx_collection.add_tx(tx)
-
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_RELAX, unlocking_script=[OP_TRUE])])
-            tx_collection.add_tx(tx)
-
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID, unlocking_script=[OP_TRUE])])
+            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE])])
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
 
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE])])
+            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE])])
             tx_collection.add_tx(tx)
 
             tx = self.new_transaction(self._UTXO_KEY, [
-                self.Input(utxos.pop(), SIGHASH_ALL),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_RELAX),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE]),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE]),
+            ])
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
+
+            tx = self.new_transaction(self._UTXO_KEY, [
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE]),
             ])
             tx_collection.add_tx(tx)
 
             tx = self.new_transaction(self._UTXO_KEY, [
-                self.Input(utxos.pop(), SIGHASH_ALL),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE]),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE]),
+            ])
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
+
+            tx = self.new_transaction(self._UTXO_KEY, [
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE]),
             ])
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
@@ -228,30 +283,40 @@ class CleanStackTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_GRACE_END":
             utxos, _ = self.utxos["CHRONICLE_GRACE_END"]
 
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL, unlocking_script=[OP_TRUE])])
-            tx_collection.add_tx(tx)
-
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_RELAX, unlocking_script=[OP_TRUE])])
-            tx_collection.add_tx(tx)
-
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID, unlocking_script=[OP_TRUE])])
+            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE])])
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
 
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE])])
+            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE])])
             tx_collection.add_tx(tx)
 
             tx = self.new_transaction(self._UTXO_KEY, [
-                self.Input(utxos.pop(), SIGHASH_ALL),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_RELAX),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE]),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE]),
+            ])
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
+
+            tx = self.new_transaction(self._UTXO_KEY, [
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE]),
             ])
             tx_collection.add_tx(tx)
 
             tx = self.new_transaction(self._UTXO_KEY, [
-                self.Input(utxos.pop(), SIGHASH_ALL),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE]),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE]),
+            ])
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
+
+            tx = self.new_transaction(self._UTXO_KEY, [
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE]),
             ])
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
@@ -260,30 +325,40 @@ class CleanStackTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "POST_CHRONICLE":
             utxos, _ = self.utxos["POST_CHRONICLE"]
 
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL, unlocking_script=[OP_TRUE])])
-            tx_collection.add_tx(tx)
-
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_RELAX, unlocking_script=[OP_TRUE])])
-            tx_collection.add_tx(tx)
-
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID, unlocking_script=[OP_TRUE])])
+            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE])])
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
 
-            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE])])
+            tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE])])
             tx_collection.add_tx(tx)
 
             tx = self.new_transaction(self._UTXO_KEY, [
-                self.Input(utxos.pop(), SIGHASH_ALL),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_RELAX),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE]),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE]),
+            ])
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
+
+            tx = self.new_transaction(self._UTXO_KEY, [
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE]),
             ])
             tx_collection.add_tx(tx)
 
             tx = self.new_transaction(self._UTXO_KEY, [
-                self.Input(utxos.pop(), SIGHASH_ALL),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID),
-                self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX, unlocking_script=[OP_TRUE]),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE, unlocking_script=[OP_TRUE]),
+            ])
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
+
+            tx = self.new_transaction(self._UTXO_KEY, [
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_MALLEABLE),
+                self.Input(utxos.pop(), SIGHASH_NON_MALLEABLE, unlocking_script=[OP_TRUE]),
             ])
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)')
