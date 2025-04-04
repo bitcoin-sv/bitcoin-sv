@@ -2,12 +2,12 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from chronicle_upgrade_tests.test_base import ChronicleHeightTestsCase
-from test_framework.script import SIGHASH_ALL, SIGHASH_FORKID, SIGHASH_RELAX
+from test_framework.script import SIGHASH_ALL, SIGHASH_FORKID, SIGHASH_CHRONICLE
 from test_framework.key import SECP256K1_ORDER_HALF
 
 """
 Test that High-S signatures are invalid before Chronicle but accepted afterwards
-provided they are signed without ForkID.
+provided they are appropriately signed.
 """
 
 
@@ -41,52 +41,37 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
         return tx_low, tx_high
 
     def get_transactions_for_test(self, tx_collection, coinbases):
+        SIGHASH_MALLEABLE = SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE
+        SIGHASH_NON_MALLEABLE = SIGHASH_ALL | SIGHASH_FORKID
+
         # Before Chronicle
         if tx_collection.label == "PRE_CHRONICLE":
             utxos, _ = self.utxos["PRE_CHRONICLE"]
 
-            # Signed without ForkID, without Relax; Both are rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL])
+            # Signed malleable; Both are rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_MALLEABLE])
             tx_collection.add_tx(tx_low,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Signed without ForkID, with Relax; Both are rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_RELAX])
-            tx_collection.add_tx(tx_low,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_RELAX)',
-                                 block_reject_reason=b'blk-bad-inputs')
-            tx_collection.add_tx(tx_high,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
-                                 block_reject_reason=b'blk-bad-inputs')
-
-            # Signed with ForkID, without Relax; Low-S signature is accepted, High-S signature is rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_FORKID])
+            # Signed non-malleable; Low-S signature is accepted, High-S signature is rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NON_MALLEABLE])
             tx_collection.add_tx(tx_low)
-            tx_collection.add_tx(tx_high,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
-                                 block_reject_reason=b'blk-bad-inputs')
-
-            # Signed with ForkID, with Relax; Both are rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX])
-            tx_collection.add_tx(tx_low,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_RELAX)',
-                                 block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
 
             # Signed with mixed malleability flags; Both are rejected
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_ALL,
-                SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX
+                SIGHASH_MALLEABLE,
+                SIGHASH_NON_MALLEABLE,
+                SIGHASH_MALLEABLE
             ])
             tx_collection.add_tx(tx_low,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
@@ -94,12 +79,12 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
 
             # All signed with malleability allowed flags; Both are rejected
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_ALL,
-                SIGHASH_ALL | SIGHASH_RELAX,
-                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX
+                SIGHASH_MALLEABLE,
+                SIGHASH_MALLEABLE,
+                SIGHASH_MALLEABLE
             ])
             tx_collection.add_tx(tx_low,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
@@ -109,48 +94,30 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_PRE_GRACE":
             utxos, _ = self.utxos["CHRONICLE_PRE_GRACE"]
 
-            # Signed without ForkID, without Relax; Both are rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL])
+            # Signed malleable; Both are rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_MALLEABLE])
             tx_collection.add_tx(tx_low,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Signed without ForkID, with Relax; Both are rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_RELAX])
-            tx_collection.add_tx(tx_low,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_RELAX)',
-                                 block_reject_reason=b'blk-bad-inputs')
-            tx_collection.add_tx(tx_high,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
-                                 block_reject_reason=b'blk-bad-inputs')
-
-            # Signed with ForkID, without Relax; Low-S signature is accepted, High-S signature is rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_FORKID])
+            # Signed non-malleable; Low-S signature is accepted, High-S signature is rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NON_MALLEABLE])
             tx_collection.add_tx(tx_low)
-            tx_collection.add_tx(tx_high,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
-                                 block_reject_reason=b'blk-bad-inputs')
-
-            # Signed with ForkID, with Relax; Both are rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX])
-            tx_collection.add_tx(tx_low,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_RELAX)',
-                                 block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
 
             # Signed with mixed malleability flags; Both are rejected
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_ALL,
-                SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX
+                SIGHASH_MALLEABLE,
+                SIGHASH_NON_MALLEABLE,
+                SIGHASH_MALLEABLE
             ])
             tx_collection.add_tx(tx_low,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
@@ -158,12 +125,12 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
 
             # All signed with malleability allowed flags; Both are rejected
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_ALL,
-                SIGHASH_ALL | SIGHASH_RELAX,
-                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX
+                SIGHASH_MALLEABLE,
+                SIGHASH_MALLEABLE,
+                SIGHASH_MALLEABLE
             ])
             tx_collection.add_tx(tx_low,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
@@ -173,48 +140,30 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_GRACE_BEGIN":
             utxos, _ = self.utxos["CHRONICLE_GRACE_BEGIN"]
 
-            # Signed without ForkID, without Relax; Both are soft rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL])
+            # Signed malleable; Both are soft rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_MALLEABLE])
             tx_collection.add_tx(tx_low,
-                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Signed without ForkID, with Relax; Both are soft rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_RELAX])
-            tx_collection.add_tx(tx_low,
-                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_RELAX)',
-                                 block_reject_reason=b'blk-bad-inputs')
-            tx_collection.add_tx(tx_high,
-                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
-                                 block_reject_reason=b'blk-bad-inputs')
-
-            # Signed with ForkID, without Relax; Low-S signature is accepted, High-S signature is rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_FORKID])
+            # Signed non-malleable; Low-S signature is accepted, High-S signature is rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NON_MALLEABLE])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Signed with ForkID, with Relax; Both are soft rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX])
-            tx_collection.add_tx(tx_low,
-                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_RELAX)',
-                                 block_reject_reason=b'blk-bad-inputs')
-            tx_collection.add_tx(tx_high,
-                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
-                                 block_reject_reason=b'blk-bad-inputs')
-
             # Signed with mixed malleability flags; Low-S signature is soft rejected, High-S signature is rejected
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_ALL,
-                SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX
+                SIGHASH_MALLEABLE,
+                SIGHASH_NON_MALLEABLE,
+                SIGHASH_MALLEABLE
             ])
             tx_collection.add_tx(tx_low,
-                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
@@ -222,12 +171,12 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
 
             # All signed with malleability allowed flags; Both are soft rejected
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_ALL,
-                SIGHASH_ALL | SIGHASH_RELAX,
-                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX
+                SIGHASH_MALLEABLE,
+                SIGHASH_MALLEABLE,
+                SIGHASH_MALLEABLE
             ])
             tx_collection.add_tx(tx_low,
-                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
@@ -237,33 +186,23 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_PRE_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_PRE_ACTIVATION"]
 
-            # Signed without ForkID, without Relax; Both are accepted for mining into the next block
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL])
+            # Signed malleable; Both are accepted for mining into the next block
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_MALLEABLE])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
 
-            # Signed without ForkID, with Relax; Both are accepted for mining into the next block
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_RELAX])
-            tx_collection.add_tx(tx_low)
-            tx_collection.add_tx(tx_high)
-
-            # Signed with ForkID, without Relax; Low-S signature is accepted, High-S signature is rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_FORKID])
+            # Signed non-malleable; Low-S signature is accepted, High-S signature is rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NON_MALLEABLE])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Signed with ForkID, with Relax; Both are accepted for mining into the next block
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX])
-            tx_collection.add_tx(tx_low)
-            tx_collection.add_tx(tx_high)
-
             # Signed with mixed malleability flags; Low-S signature is accepted, High-S signature is rejected
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_ALL,
-                SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX
+                SIGHASH_MALLEABLE,
+                SIGHASH_NON_MALLEABLE,
+                SIGHASH_MALLEABLE
             ])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
@@ -272,9 +211,9 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
 
             # All signed with malleability allowed flags; Both are accepted for mining into the next block
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_ALL,
-                SIGHASH_ALL | SIGHASH_RELAX,
-                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX
+                SIGHASH_MALLEABLE,
+                SIGHASH_MALLEABLE,
+                SIGHASH_MALLEABLE
             ])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
@@ -283,33 +222,23 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_ACTIVATION"]
 
-            # Signed without ForkID, without Relax; Both are accepted
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL])
+            # Signed malleable; Both are accepted
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_MALLEABLE])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
 
-            # Signed without ForkID, with Relax; Both are accepted
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_RELAX])
-            tx_collection.add_tx(tx_low)
-            tx_collection.add_tx(tx_high)
-
-            # Signed with ForkID, without Relax; Low-S signature is accepted, High-S signature is rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_FORKID])
+            # Signed non-malleable; Low-S signature is accepted, High-S signature is rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NON_MALLEABLE])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Signed with ForkID, with Relax; Both are accepted
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX])
-            tx_collection.add_tx(tx_low)
-            tx_collection.add_tx(tx_high)
-
             # Signed with mixed malleability flags; Low-S signature is accepted, High-S signature is rejected
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_ALL,
-                SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX
+                SIGHASH_MALLEABLE,
+                SIGHASH_NON_MALLEABLE,
+                SIGHASH_MALLEABLE
             ])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
@@ -318,9 +247,9 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
 
             # All signed with malleability allowed flags; Both are accepted
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_ALL,
-                SIGHASH_ALL | SIGHASH_RELAX,
-                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX
+                SIGHASH_MALLEABLE,
+                SIGHASH_MALLEABLE,
+                SIGHASH_MALLEABLE
             ])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
@@ -329,33 +258,23 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_POST_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_POST_ACTIVATION"]
 
-            # Signed without ForkID, without Relax; Both are accepted
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL])
+            # Signed malleable; Both are accepted
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_MALLEABLE])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
 
-            # Signed without ForkID, with Relax; Both are accepted
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_RELAX])
-            tx_collection.add_tx(tx_low)
-            tx_collection.add_tx(tx_high)
-
-            # Signed with ForkID, without Relax; Low-S signature is accepted, High-S signature is rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_FORKID])
+            # Signed non-malleable; Low-S signature is accepted, High-S signature is rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NON_MALLEABLE])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Signed with ForkID, with Relax; Both are accepted
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX])
-            tx_collection.add_tx(tx_low)
-            tx_collection.add_tx(tx_high)
-
             # Signed with mixed malleability flags; Low-S signature is accepted, High-S signature is rejected
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_ALL,
-                SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX
+                SIGHASH_MALLEABLE,
+                SIGHASH_NON_MALLEABLE,
+                SIGHASH_MALLEABLE
             ])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
@@ -364,9 +283,9 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
 
             # All signed with malleability allowed flags; Both are accepted
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_ALL,
-                SIGHASH_ALL | SIGHASH_RELAX,
-                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX
+                SIGHASH_MALLEABLE,
+                SIGHASH_MALLEABLE,
+                SIGHASH_MALLEABLE
             ])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
@@ -375,33 +294,23 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_GRACE_END":
             utxos, _ = self.utxos["CHRONICLE_GRACE_END"]
 
-            # Signed without ForkID, without Relax; Both are accepted
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL])
+            # Signed malleable; Both are accepted
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_MALLEABLE])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
 
-            # Signed without ForkID, with Relax; Both are accepted
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_RELAX])
-            tx_collection.add_tx(tx_low)
-            tx_collection.add_tx(tx_high)
-
-            # Signed with ForkID, without Relax; Low-S signature is accepted, High-S signature is rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_FORKID])
+            # Signed non-malleable; Low-S signature is accepted, High-S signature is rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NON_MALLEABLE])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Signed with ForkID, with Relax; Both are accepted
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX])
-            tx_collection.add_tx(tx_low)
-            tx_collection.add_tx(tx_high)
-
             # Signed with mixed malleability flags; Low-S signature is accepted, High-S signature is rejected
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_ALL,
-                SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX
+                SIGHASH_MALLEABLE,
+                SIGHASH_NON_MALLEABLE,
+                SIGHASH_MALLEABLE
             ])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
@@ -410,9 +319,9 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
 
             # All signed with malleability allowed flags; Both are accepted
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_ALL,
-                SIGHASH_ALL | SIGHASH_RELAX,
-                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX
+                SIGHASH_MALLEABLE,
+                SIGHASH_MALLEABLE,
+                SIGHASH_MALLEABLE
             ])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
@@ -421,33 +330,23 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "POST_CHRONICLE":
             utxos, _ = self.utxos["POST_CHRONICLE"]
 
-            # Signed without ForkID, without Relax; Both are accepted
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL])
+            # Signed malleable; Both are accepted
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_MALLEABLE])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
 
-            # Signed without ForkID, with Relax; Both are accepted
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_RELAX])
-            tx_collection.add_tx(tx_low)
-            tx_collection.add_tx(tx_high)
-
-            # Signed with ForkID, without Relax; Low-S signature is accepted, High-S signature is rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_FORKID])
+            # Signed non-malleable; Low-S signature is accepted, High-S signature is rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NON_MALLEABLE])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Signed with ForkID, with Relax; Both are accepted
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX])
-            tx_collection.add_tx(tx_low)
-            tx_collection.add_tx(tx_high)
-
             # Signed with mixed malleability flags; Low-S signature is accepted, High-S signature is rejected
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_ALL,
-                SIGHASH_ALL | SIGHASH_FORKID,
-                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX
+                SIGHASH_MALLEABLE,
+                SIGHASH_NON_MALLEABLE,
+                SIGHASH_MALLEABLE
             ])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
@@ -456,9 +355,9 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
 
             # All signed with malleability allowed flags; Both are accepted
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_ALL,
-                SIGHASH_ALL | SIGHASH_RELAX,
-                SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_RELAX
+                SIGHASH_MALLEABLE,
+                SIGHASH_MALLEABLE,
+                SIGHASH_MALLEABLE
             ])
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
