@@ -4325,78 +4325,80 @@ BOOST_AUTO_TEST_CASE(EvalScript_minimal_encoding)
     const vector<test_args> test_data
     {
         // Pre-Chronicle
-        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
+        {SCRIPT_VERIFY_STRICTENC
+         | SCRIPT_ENABLE_SIGHASH_FORKID,
          {OP_PUSHDATA1, 0}, // Non-minimal encoding - could have used OP_0
          SIGHASH_ALL | SIGHASH_FORKID,
-         {}, {malleability::disallowed}},
+         {}, malleability::disallowed},
 
-        {SCRIPT_VERIFY_MINIMALDATA
-         | SCRIPT_VERIFY_STRICTENC
-         | SCRIPT_ENABLE_SIGHASH_FORKID,
+        {SCRIPT_VERIFY_STRICTENC
+         | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_VERIFY_MINIMALDATA, // added
          {OP_PUSHDATA1, 0},
          SIGHASH_ALL,
-         {SCRIPT_ERR_MINIMALDATA}, {}},
+         SCRIPT_ERR_MINIMALDATA, {}},
 
-        {SCRIPT_VERIFY_MINIMALDATA
-         | SCRIPT_VERIFY_STRICTENC
-         | SCRIPT_ENABLE_SIGHASH_FORKID,
+        {SCRIPT_VERIFY_STRICTENC
+         | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_VERIFY_MINIMALDATA,
          {OP_PUSHDATA1, 0},
          SIGHASH_ALL | SIGHASH_FORKID,
-         {SCRIPT_ERR_MINIMALDATA}, {}},
+         SCRIPT_ERR_MINIMALDATA, {}},
 
-        {SCRIPT_VERIFY_MINIMALDATA
-         | SCRIPT_VERIFY_STRICTENC
-         | SCRIPT_ENABLE_SIGHASH_FORKID,
-         {OP_PUSHDATA1, 0}, // Non-minimal encoding (use OP_0)
+        {SCRIPT_VERIFY_STRICTENC
+         | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_VERIFY_MINIMALDATA,
+         {2, 0, 0 }, // Non-minimal encoded (2 bytes of raw data)
          SIGHASH_ALL | SIGHASH_FORKID,
-         {SCRIPT_ERR_MINIMALDATA}, {}},
+         {}, malleability::disallowed},
         
-        {SCRIPT_VERIFY_MINIMALDATA
-         | SCRIPT_VERIFY_STRICTENC
-         | SCRIPT_ENABLE_SIGHASH_FORKID,
-         {2, 0, 0 }, // Minimal encoded (2 bytes of raw data)
-         SIGHASH_ALL | SIGHASH_FORKID,
-         {}, {malleability::disallowed}},
-        
-        {SCRIPT_VERIFY_MINIMALDATA
-         | SCRIPT_VERIFY_STRICTENC
-         | SCRIPT_ENABLE_SIGHASH_FORKID,
+        {SCRIPT_VERIFY_STRICTENC
+         | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_VERIFY_MINIMALDATA,
          {2, 0, 0, OP_1ADD}, // OP_1ADD ensures CScriptNum can be created from the stack
          SIGHASH_ALL | SIGHASH_FORKID,
-         {SCRIPT_ERR_SCRIPTNUM_MINENCODE}, {}},
+         SCRIPT_ERR_SCRIPTNUM_MINENCODE, {}},
 
         // Post Chronicle
-        {SCRIPT_VERIFY_MINIMALDATA
-         | SCRIPT_VERIFY_STRICTENC
+        {SCRIPT_VERIFY_STRICTENC
          | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_VERIFY_MINIMALDATA
          | SCRIPT_CHRONICLE,
          {OP_PUSHDATA1, 0, OP_1ADD}, // Non-minimal encoding (use OP_0)
-         SIGHASH_ALL,
-         {}, {malleability::non_minimal_push}},
+         SIGHASH_ALL, // no SIGHASH_FORKID
+         SCRIPT_ERR_MUST_USE_FORKID, {}},
 
-        {SCRIPT_VERIFY_MINIMALDATA
-         | SCRIPT_VERIFY_STRICTENC
+        {SCRIPT_VERIFY_STRICTENC
          | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_VERIFY_MINIMALDATA
          | SCRIPT_CHRONICLE,
          {OP_PUSHDATA1, 0, OP_1ADD},
          SIGHASH_ALL | SIGHASH_FORKID,
-         {}, {malleability::non_minimal_push | malleability::disallowed}},
+         {}, malleability::non_minimal_push | malleability::disallowed},
 
-        {SCRIPT_VERIFY_MINIMALDATA
-         | SCRIPT_VERIFY_STRICTENC
+        {SCRIPT_VERIFY_STRICTENC
          | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_VERIFY_MINIMALDATA
+         | SCRIPT_CHRONICLE,
+         {OP_PUSHDATA1, 0, OP_1ADD},
+         SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE, // added
+         {}, malleability::non_minimal_push},
+
+        {SCRIPT_VERIFY_STRICTENC
+         | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_VERIFY_MINIMALDATA
          | SCRIPT_CHRONICLE,
          {2, 0, 0, OP_1ADD}, // Minimal encoded (2 bytes of raw data)
          SIGHASH_ALL,
-         {}, {malleability::non_minimal_scriptnum}},
+         SCRIPT_ERR_MUST_USE_FORKID, {}},
         
-        {SCRIPT_VERIFY_MINIMALDATA
-         | SCRIPT_VERIFY_STRICTENC
+        {SCRIPT_VERIFY_STRICTENC
          | SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_VERIFY_MINIMALDATA
          | SCRIPT_CHRONICLE,
          {2, 0, 0, OP_1ADD},
          SIGHASH_ALL | SIGHASH_FORKID,
-         {}, {malleability::disallowed | malleability::non_minimal_scriptnum}},
+         {}, malleability::disallowed | malleability::non_minimal_scriptnum},
     };
     for(const auto& [flags, s, sig_hash, exp_error, exp_mall] : test_data)
     {
@@ -4448,28 +4450,28 @@ BOOST_AUTO_TEST_CASE(VerifyScript_minimal_encoding)
          SIGHASH_ALL | SIGHASH_FORKID,
          SCRIPT_ERR_OK, malleability::disallowed},
 
-        {SCRIPT_VERIFY_MINIMALDATA
-         | SCRIPT_ENABLE_SIGHASH_FORKID,
+        {SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_VERIFY_MINIMALDATA,
          {OP_PUSHDATA1, 1, 1},
          SIGHASH_ALL,
          SCRIPT_ERR_MINIMALDATA, malleability::non_malleable},
 
-        {SCRIPT_VERIFY_MINIMALDATA
-         | SCRIPT_ENABLE_SIGHASH_FORKID,
+        {SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_VERIFY_MINIMALDATA,
          {OP_PUSHDATA1, 1, 1},
          SIGHASH_ALL | SIGHASH_FORKID,
          SCRIPT_ERR_MINIMALDATA, malleability::non_malleable},
 
         // Post Chronicle
-        {SCRIPT_VERIFY_MINIMALDATA
-         | SCRIPT_ENABLE_SIGHASH_FORKID
+        {SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_VERIFY_MINIMALDATA
          | SCRIPT_CHRONICLE,
          {OP_PUSHDATA1, 1, 1},
          SIGHASH_ALL,
-         SCRIPT_ERR_OK, malleability::non_minimal_push},
+         SCRIPT_ERR_MUST_USE_FORKID, {}},
 
-        {SCRIPT_VERIFY_MINIMALDATA
-         | SCRIPT_ENABLE_SIGHASH_FORKID
+        {SCRIPT_ENABLE_SIGHASH_FORKID
+         | SCRIPT_VERIFY_MINIMALDATA
          | SCRIPT_CHRONICLE,
          {OP_PUSHDATA1, 1, 1},
          SIGHASH_ALL | SIGHASH_FORKID,
