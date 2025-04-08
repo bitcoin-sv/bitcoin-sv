@@ -153,7 +153,7 @@ static const std::vector<uint8_t>& high_s_min()
     return v;
 }
 
-std::vector<uint8_t> make_op_checksig_script(const int sighash,
+std::vector<uint8_t> make_op_checksig_script(const uint8_t sighash,
                                              const std::vector<uint8_t>& s)
 {
     const auto rs_len{32};
@@ -184,7 +184,7 @@ std::vector<uint8_t> make_op_checksig_script(const int sighash,
     return script;
 }
 
-std::vector<uint8_t> make_op_check_multi_sig_script(const int sighash,
+std::vector<uint8_t> make_op_check_multi_sig_script(const uint8_t sighash,
                                                     const std::vector<uint8_t>& s)
 {
     const auto rs_len{32};
@@ -3861,7 +3861,7 @@ BOOST_AUTO_TEST_CASE(VerifyScript_lows)
 
     using test_args = tuple<uint32_t,               // flags
                             vector<uint8_t>,        // unlocking script
-                            int,                    // sighash
+                            uint8_t,                // sighash
                             ScriptError,            // expect error
                             malleability::status>;  // expected malleability_status
     const vector<test_args> test_data
@@ -3927,7 +3927,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid_chronicle)
     using namespace std;
 
     using test_args = tuple<uint32_t,   // flags
-                            int,        // sighash 
+                            uint8_t,    // sighash 
                             std::optional<ScriptError>,
                             std::optional<malleability::status>>;
     const vector<test_args> test_data 
@@ -3935,15 +3935,15 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid_chronicle)
         {0,
          0,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {0,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {0,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
 
         {SCRIPT_VERIFY_STRICTENC,
          0,
@@ -3956,11 +3956,11 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid_chronicle)
         {SCRIPT_VERIFY_STRICTENC,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_CHRONICLE,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {SCRIPT_VERIFY_STRICTENC,
          SIGHASH_ALL | SIGHASH_FORKID,
          SCRIPT_ERR_ILLEGAL_FORKID,
@@ -3973,27 +3973,27 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid_chronicle)
         {SCRIPT_ENABLE_SIGHASH_FORKID,
          0,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          0,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
 
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_FORKID,
@@ -4017,11 +4017,11 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid_chronicle)
           | SCRIPT_ENABLE_SIGHASH_FORKID,
           SIGHASH_ALL | SIGHASH_FORKID,
           {},
-          std::make_optional<malleability::status>(malleability::disallowed)},
+          malleability::disallowed},
        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
         SIGHASH_ALL | SIGHASH_FORKID,
         {},
-        std::make_optional<malleability::status>(malleability::disallowed)},
+        malleability::disallowed},
        
         // Pre-Chronicle
        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
@@ -4032,7 +4032,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid_chronicle)
        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
         SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
         {},
-        std::make_optional<malleability::status>()},
+        malleability::non_malleable},
     };
     for(const auto& [flags, sighash, exp_error, exp_mall] : test_data)
     {
@@ -4067,12 +4067,12 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid_chronicle)
     }
 }
 
-BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid_relax)
+BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid_chronicle)
 {
     using namespace std;
 
     using test_args = tuple<uint32_t,   // flags
-                            int,        // sighash 
+                            uint8_t,    // sighash 
                             std::optional<ScriptError>,
                             std::optional<malleability::status>>;
     const vector<test_args> test_data 
@@ -4080,15 +4080,15 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid_relax)
         {0,
          0,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {0,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {0,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
 
         {SCRIPT_VERIFY_STRICTENC,
          0,
@@ -4101,11 +4101,11 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid_relax)
         {SCRIPT_VERIFY_STRICTENC,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_CHRONICLE,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {SCRIPT_VERIFY_STRICTENC,
          SIGHASH_ALL | SIGHASH_FORKID,
          SCRIPT_ERR_ILLEGAL_FORKID,
@@ -4118,27 +4118,27 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid_relax)
         {SCRIPT_ENABLE_SIGHASH_FORKID,
          0,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          0,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          SIGHASH_ALL,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
         {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
 
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_FORKID,
@@ -4150,32 +4150,32 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid_relax)
          {}},
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_ALL,
-         {SCRIPT_ERR_MUST_USE_FORKID},
+         SCRIPT_ERR_MUST_USE_FORKID,
          {}},
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          SIGHASH_ALL,
-         {},
-         std::make_optional<malleability::status>()},
+         SCRIPT_ERR_MUST_USE_FORKID,
+         {}},
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability::status>(malleability::disallowed)},
+         malleability::disallowed},
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         std::make_optional<malleability::status>(malleability::disallowed)},
+         malleability::disallowed},
         
         // chronicle flag
         // Pre-Chronicle
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
-         { SCRIPT_ERR_ILLEGAL_CHRONICLE },
+         SCRIPT_ERR_ILLEGAL_CHRONICLE,
          {}},
         // Post-Chronicle
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
          {},
-         std::make_optional<malleability::status>()},
+         malleability::non_malleable},
     };
     for(const auto& [flags, sighash, exp_error, exp_mall] : test_data)
     {
@@ -4210,20 +4210,17 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid_relax)
     }
 }
 
-BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checksig_forkid_relax)
+BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checksig_forkid_chronicle)
 {
     using namespace std;
         
     const Config& config = GlobalConfig::GetConfig();
     auto source = task::CCancellationSource::Make();
     
-    using test_args = tuple<vector<int>,   // sighashes
+    using test_args = tuple<vector<uint8_t>,   // sighashes
                             malleability::status>;
     const vector<test_args> test_data
     {
-        {{SIGHASH_ALL,
-          SIGHASH_ALL | SIGHASH_FORKID},
-          malleability::disallowed},
         {{SIGHASH_ALL | SIGHASH_FORKID,
           SIGHASH_ALL | SIGHASH_FORKID},
           malleability::disallowed},
@@ -4271,13 +4268,10 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checkmultisig_forkid_relax)
     const Config& config = GlobalConfig::GetConfig();
     auto source = task::CCancellationSource::Make();
     
-    using test_args = tuple<vector<int>,   // sighashes
+    using test_args = tuple<vector<uint8_t>,   // sighashes
                             malleability::status>;
     const vector<test_args> test_data
     {
-        {{SIGHASH_ALL,
-          SIGHASH_ALL | SIGHASH_FORKID},
-          malleability::disallowed},
         {{SIGHASH_ALL | SIGHASH_FORKID,
           SIGHASH_ALL | SIGHASH_FORKID},
           malleability::disallowed},
@@ -4325,7 +4319,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_minimal_encoding)
 
     using test_args = tuple<uint32_t,           // flags
                             vector<uint8_t>,    // pushdata script
-                            int,                // sighash
+                            uint8_t,             // sighash
                             std::optional<ScriptError>,
                             std::optional<malleability::status>>;
     const vector<test_args> test_data
@@ -4445,7 +4439,7 @@ BOOST_AUTO_TEST_CASE(VerifyScript_minimal_encoding)
 
     using test_args = tuple<uint32_t,               // flags
                             vector<uint8_t>,        // unlocking script
-                            int,                    // sighash
+                            uint8_t,                // sighash
                             ScriptError,            // expect error
                             malleability::status>;  // expected malleability_status
     const vector<test_args> test_data
