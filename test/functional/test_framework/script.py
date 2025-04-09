@@ -864,7 +864,7 @@ def FindAndDelete(script, sig):
     return CScript(r)
 
 
-def SignatureHash(script, txTo, inIdx, hashtype):
+def SignatureHash_OTDA(script, txTo, inIdx, hashtype):
     """Consensus-correct SignatureHash
 
     Returns (hash, err) to precisely match the consensus-critical behavior of
@@ -919,8 +919,7 @@ def SignatureHash(script, txTo, inIdx, hashtype):
 # Note that this corresponds to sigversion == 1 in EvalScript, which is used
 # for version 0 witnesses.
 
-
-def SignatureHashForkId(script, txTo, inIdx, hashtype, amount):
+def SignatureHash_NTDA(script, txTo, inIdx, hashtype, amount):
 
     hashPrevouts = 0
     hashSequence = 0
@@ -960,3 +959,13 @@ def SignatureHashForkId(script, txTo, inIdx, hashtype, amount):
     ss += struct.pack("<I", hashtype)
 
     return hash256(ss)
+
+
+def SignatureHash(script, txTo, inIdx, hashtype, amount=None):
+    use_forkid_tda = (hashtype & SIGHASH_FORKID) and not (hashtype & SIGHASH_CHRONICLE)
+    if use_forkid_tda:
+        if amount is None:
+            raise ValueError("Amount must be provided for NTDA signature hash")
+        return SignatureHash_NTDA(script, txTo, inIdx, hashtype, amount)
+    else:
+        return SignatureHash_OTDA(script, txTo, inIdx, hashtype)

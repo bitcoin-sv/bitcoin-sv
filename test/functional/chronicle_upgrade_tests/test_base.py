@@ -5,7 +5,7 @@
 from test_framework.height_based_test_framework import HeightBasedTestsCase, HeightBasedSimpleTestsCase
 from test_framework.key import CECKey
 from test_framework.mininode import CTransaction, COutPoint, CTxIn, CTxOut
-from test_framework.script import CScript, OP_CHECKSIG, SignatureHash, SIGHASH_FORKID, SIGHASH_CHRONICLE
+from test_framework.script import CScript, OP_CHECKSIG, SignatureHash
 
 
 class ChronicleHeightTestsCase(HeightBasedTestsCase):
