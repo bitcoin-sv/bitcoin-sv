@@ -35,7 +35,7 @@ import itertools
 from test_framework.blocktools import create_block, create_coinbase
 from test_framework.key import CECKey
 from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block
-from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
+from test_framework.script import CScript, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until
 
@@ -145,7 +145,7 @@ def create_tx(utxos, n_outputs, fee_delta=0):
         tx.vout.append(CTxOut(amount_per_output, CScript([k.get_pubkey(), OP_CHECKSIG])))
 
     for input_ndx, (utxo, input) in enumerate(zip(utxos, tx.vin)):
-        sighash = SignatureHashForkId(utxo.tx.vout[utxo.ndx].scriptPubKey, tx, input_ndx, SIGHASH_ALL | SIGHASH_FORKID, utxo.tx.vout[utxo.ndx].nValue)
+        sighash = SignatureHash(utxo.tx.vout[utxo.ndx].scriptPubKey, tx, input_ndx, SIGHASH_ALL | SIGHASH_FORKID, utxo.tx.vout[utxo.ndx].nValue)
         input.scriptSig = CScript([utxo.key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
     tx.rehash()

@@ -17,7 +17,7 @@ from test_framework.mininode import CBlock, CBlockHeader, COIN, COutPoint, \
 from test_framework.script import CScript, hash160, OP_2DUP, OP_CHECKSIG, \
     OP_CHECKMULTISIG, OP_CHECKMULTISIGVERIFY, OP_CHECKSIGVERIFY, OP_ELSE, \
     OP_ENDIF, OP_EQUAL, OP_FALSE, OP_HASH160, OP_IF, OP_INVALIDOPCODE, \
-    OP_RETURN, OP_TRUE, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
+    OP_RETURN, OP_TRUE, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import assert_equal
 
@@ -468,9 +468,7 @@ class FullBlockTest(ComparisonTestFramework):
             tx.vin.append(CTxIn(COutPoint(b39.vtx[i].sha256, 0), b''))
             # Note: must pass the redeem_script (not p2sh_script) to the
             # signature hash function
-            sighash = SignatureHashForkId(
-                redeem_script, tx, 1, SIGHASH_ALL | SIGHASH_FORKID,
-                lastAmount)
+            sighash = SignatureHash(redeem_script, tx, 1, SIGHASH_ALL | SIGHASH_FORKID, lastAmount)
             sig = self.coinbase_key.sign(
                 sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
             scriptSig = CScript([sig, redeem_script])

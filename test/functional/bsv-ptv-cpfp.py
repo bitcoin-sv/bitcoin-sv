@@ -5,7 +5,7 @@
 from test_framework.blocktools import create_block, create_coinbase
 from test_framework.key import CECKey
 from test_framework.mininode import CTransaction, msg_tx, ToHex, CTxIn, COutPoint, CTxOut, msg_block, COIN, mininode_lock
-from test_framework.script import CScript, OP_DROP, OP_TRUE, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
+from test_framework.script import CScript, OP_DROP, OP_TRUE, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, wait_for_ptv_completion, check_mempool_equals
 from decimal import Decimal
@@ -89,7 +89,7 @@ class PtvCpfp(BitcoinTestFramework):
     # Sign a transaction, using the key we know about.
     # This signs input 0 in tx, which is assumed to be spending output n in spend_tx
     def sign_tx(self, tx, spend_tx, n):
-        sighash = SignatureHashForkId(
+        sighash = SignatureHash(
             spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
         tx.vin[0].scriptSig = CScript(
             [self.coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])

@@ -2,7 +2,7 @@ from genesis_upgrade_tests.test_base import GenesisHeightBasedSimpleTestsCase
 from test_framework.height_based_test_framework import SimpleTestDefinition
 from test_framework.key import CECKey
 from test_framework.cdefs import MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS
-from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, \
+from test_framework.script import CScript, SignatureHash, SIGHASH_ALL, \
     SIGHASH_FORKID, OP_0, OP_1, OP_CHECKMULTISIG
 
 
@@ -19,8 +19,7 @@ def makePubKeys(numOfKeys):
 
 
 def make_unlock_script(tx, tx_to_spend):
-    sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
-                                  tx_to_spend.vout[0].nValue)
+    sighash = SignatureHash(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
     sig = MaxMultiSigTest.THE_KEY.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
     return CScript([OP_0, sig])
 
@@ -89,8 +88,7 @@ class MaxMultiSigTest(GenesisHeightBasedSimpleTestsCase):
 
 
 def make_unlock_script_for_default(tx, tx_to_spend):
-    sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
-                                  tx_to_spend.vout[0].nValue)
+    sighash = SignatureHash(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
     sig = MaxMultiSigTestPolicyNotSet.THE_KEY.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
     return CScript([OP_0, sig])
 

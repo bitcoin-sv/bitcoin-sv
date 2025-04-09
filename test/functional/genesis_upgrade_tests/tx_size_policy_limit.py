@@ -6,8 +6,7 @@ from test_framework.cdefs import DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS, MAX_T
 from genesis_upgrade_tests.test_base import GenesisHeightTestsCaseBase
 from test_framework.key import CECKey
 from test_framework.mininode import CTransaction, COutPoint, CTxIn, CTxOut
-from test_framework.script import CScript, OP_FALSE, OP_RETURN, SignatureHashForkId, SIGHASH_ALL, \
-    SIGHASH_FORKID
+from test_framework.script import CScript, OP_FALSE, OP_RETURN, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID
 
 SIMPLE_OUTPUT_SCRIPT = CScript([OP_FALSE, OP_RETURN]) # Output script used by spend transactions. Could be anything that is standard, but OP_FALSE OP_RETURN is the easiest to create.
 NEW_MAX_TX_SIZE_POLICY = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS * 2
@@ -28,7 +27,7 @@ def new_transaction(utxokey, utxo, target_tx_size):
         tx.vin[0].scriptSig = b''
         tx.vout.append(CTxOut(tx_to_spend.vout[0].nValue - 2 * target_tx_size, SIMPLE_OUTPUT_SCRIPT))
         tx.vout.append(CTxOut(1, CScript([OP_FALSE, OP_RETURN] + [bytes(1) * padding_size])))
-        sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
+        sighash = SignatureHash(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
         sig = utxokey.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
         tx.vin[0].scriptSig = CScript([sig])
         tx.rehash()

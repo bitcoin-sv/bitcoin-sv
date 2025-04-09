@@ -19,7 +19,7 @@ from .mininode import CBlock, CBlockHeader, COIN, CTransaction, CTxIn, \
 
 from .script import CScript, hash160, OP_FALSE, OP_TRUE, OP_CHECKSIG, \
     OP_DUP, OP_RETURN, OP_EQUAL, OP_EQUALVERIFY, OP_HASH160
-from test_framework.script import SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
+from test_framework.script import SignatureHash, SIGHASH_ALL, SIGHASH_FORKID
 
 from .util import assert_equal, hash256, satoshi_round, hex_str_to_bytes, wait_until
 
@@ -310,7 +310,7 @@ def sign_tx(tx, spend_tx, n, private_key):
     if (scriptPubKey[0] == OP_TRUE):  # an anyone-can-spend
         tx.vin[0].scriptSig = CScript()
         return
-    sighash = SignatureHashForkId(
+    sighash = SignatureHash(
         spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
     tx.vin[0].scriptSig = CScript(
         [private_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
@@ -380,7 +380,7 @@ class TxCreator:
 
         sighash_flags |= SIGHASH_FORKID
 
-        sighash = SignatureHashForkId(spend_txout.scriptPubKey, tx, n, sighash_flags, spend_txout.nValue)
+        sighash = SignatureHash(spend_txout.scriptPubKey, tx, n, sighash_flags, spend_txout.nValue)
 
         tx.vin[n].scriptSig = CScript([
             private_key.sign(sighash) + bytes(bytearray([sighash_flags])),

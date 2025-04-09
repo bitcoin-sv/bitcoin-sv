@@ -9,7 +9,7 @@ Test RPC function verifyscript
 from test_framework.blocktools import create_block, create_coinbase, create_transaction, create_tx
 from test_framework.key import CECKey
 from test_framework.mininode import CTransaction, CTxIn, COutPoint, CTxOut, ToHex, COIN
-from test_framework.script import CScript, hash160, SignatureHashForkId, OP_CHECKSIG, OP_DROP, OP_DUP, OP_EQUALVERIFY, OP_FALSE, OP_HASH160, OP_MUL, OP_TRUE, SIGHASH_ALL, SIGHASH_FORKID
+from test_framework.script import CScript, hash160, SignatureHash, OP_CHECKSIG, OP_DROP, OP_DUP, OP_EQUALVERIFY, OP_FALSE, OP_HASH160, OP_MUL, OP_TRUE, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.util import assert_equal, assert_raises_rpc_error, bytes_to_hex_str
 from test_framework.test_framework import BitcoinTestFramework
 
@@ -64,7 +64,7 @@ class BSV_RPC_verifyscript (BitcoinTestFramework):
 
     # Sign input 0 in tx spending n-th output from spend_tx using self.prvkey
     def sign_tx(self, tx, spend_tx, n):
-        sighash = SignatureHashForkId(spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
+        sighash = SignatureHash(spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
         tx.vin[0].scriptSig = CScript([self.prvkey.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID])), self.pubkey])
 
     def verifyscript_check(self, node, expected_result, scripts, *args):

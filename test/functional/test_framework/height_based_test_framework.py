@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from test_framework.blocktools import create_block, create_coinbase, create_transaction
 from test_framework.mininode import msg_block, msg_tx, ToHex, CTransaction, CTxIn, COutPoint, CTxOut, COIN
-from test_framework.script import CScript, OP_CHECKSIG, OP_TRUE, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, \
+from test_framework.script import CScript, OP_CHECKSIG, OP_TRUE, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID, \
     OP_FALSE, OP_RETURN
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, try_rpc, loghash
@@ -90,8 +90,8 @@ class HeightBasedTestsCase:
 
             if self.COINBASE_KEY:
                 tx.rehash()
-                sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
-                                              tx_to_spend.vout[0].nValue)
+                sighash = SignatureHash(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
+                                        tx_to_spend.vout[0].nValue)
                 sig = self._coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
                 tx.vin[0].scriptSig = CScript([sig])
             else:

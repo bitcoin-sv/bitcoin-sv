@@ -19,7 +19,7 @@ from test_framework.mininode import COutPoint, CTransaction, CTxIn, CTxOut, \
     msg_block, ToHex
 from test_framework.script import CScript, hash160, OP_2DUP, OP_CHECKSIG, \
     OP_CHECKSIGVERIFY, OP_EQUAL, OP_HASH160, OP_TRUE, SIGHASH_ALL, \
-    SIGHASH_FORKID, SignatureHashForkId
+    SIGHASH_FORKID, SignatureHash
 from test_framework.test_framework import ComparisonTestFramework
 
 
@@ -186,8 +186,7 @@ class FullBlockTest(ComparisonTestFramework):
             spent_p2sh_tx.vin.append(CTxIn(COutPoint(p2sh_tx.sha256, 0), b''))
             spent_p2sh_tx.vout.append(CTxOut(1, output_script))
             # Sign the transaction using the redeem script
-            sighash = SignatureHashForkId(
-                redeem_script, spent_p2sh_tx, 0, SIGHASH_ALL | SIGHASH_FORKID, p2sh_tx.vout[0].nValue)
+            sighash = SignatureHash(redeem_script, spent_p2sh_tx, 0, SIGHASH_ALL | SIGHASH_FORKID, p2sh_tx.vout[0].nValue)
             sig = private_key.sign(sighash) + \
                 bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
             spent_p2sh_tx.vin[0].scriptSig = CScript([sig, redeem_script])

@@ -12,7 +12,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, connect_nodes_bi, connect_nodes, sync_blocks, disconnect_nodes_bi, p2p_port
 from test_framework.key import CECKey
 from test_framework.blocktools import create_block, create_coinbase
-from test_framework.script import hash160, CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
+from test_framework.script import hash160, CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.mininode import CTransaction, CTxOut, CTxIn, COutPoint, ToHex, NetworkThread, NodeConn, NodeConnCB, msg_dsdetected, BlockDetails, CBlockHeader, DSMerkleProof, MerkleProofNode, FromHex, CBlock
 from test_framework.authproxy import JSONRPCException
 
@@ -202,7 +202,7 @@ class User:
         return tx
 
     def __sign_tx(self, sign_tx, spend_tx, n):
-        sighash = SignatureHashForkId(spend_tx.vout[n].scriptPubKey, sign_tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
+        sighash = SignatureHash(spend_tx.vout[n].scriptPubKey, sign_tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
         sign_tx.vin[0].scriptSig = CScript([self.key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID])), self.pubkey])
 
 #

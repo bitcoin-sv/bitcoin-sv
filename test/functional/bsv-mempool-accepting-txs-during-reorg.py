@@ -8,7 +8,7 @@ from test_framework.key import CECKey
 from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block, \
     msg_headers
 from test_framework.script import CScript, OP_DROP, OP_CHECKSIG, SIGHASH_ALL, SIGHASH_FORKID, \
-    SignatureHashForkId, OP_MUL
+    SignatureHash, OP_MUL
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_mempool_equals
 
@@ -92,8 +92,8 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
             output.nValue -= fee_per_output
 
         for input, (parent_tx, n) in zip(tx.vin, outpoints):
-            sighash = SignatureHashForkId(parent_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
-                                          parent_tx.vout[n].nValue)
+            sighash = SignatureHash(parent_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
+                                    parent_tx.vout[n].nValue)
             input.scriptSig = CScript([self.private_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
         tx.rehash()

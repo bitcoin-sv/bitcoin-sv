@@ -14,7 +14,7 @@ from test_framework.mininode import COutPoint, CTransaction, CTxIn, CTxOut, \
     ToHex
 from test_framework.script import CScript, hash160, OP_2DUP, OP_CHECKSIG, \
     OP_CHECKSIGVERIFY, OP_EQUAL, OP_FALSE, OP_HASH160, OP_RETURN, \
-    SignatureHashForkId, SIGHASH_FORKID, SIGHASH_ALL
+    SignatureHash, SIGHASH_FORKID, SIGHASH_ALL
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import assert_equal, assert_raises_rpc_error
 
@@ -48,7 +48,7 @@ class P2SH(ComparisonTestFramework):
             CTxIn(COutPoint(p2sh_tx_to_spend.sha256, 0), b''))
         spent_p2sh_tx.vout.append(CTxOut(p2sh_tx_to_spend.vout[0].nValue - 100, output_script))
         # Sign the transaction using the redeem script
-        sighash = SignatureHashForkId(
+        sighash = SignatureHash(
             self.redeem_script, spent_p2sh_tx, 0, SIGHASH_ALL | SIGHASH_FORKID, p2sh_tx_to_spend.vout[0].nValue)
         sig = privateKey.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
         spent_p2sh_tx.vin[0].scriptSig = CScript([sig, self.redeem_script])

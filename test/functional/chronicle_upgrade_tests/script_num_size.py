@@ -2,7 +2,7 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from chronicle_upgrade_tests.test_base import ChronicleHeightTestsCase
-from test_framework.script import CScript, OP_1ADD, OP_DROP, OP_TRUE, OP_DUP, OP_MUL, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
+from test_framework.script import CScript, OP_1ADD, OP_DROP, OP_TRUE, OP_DUP, OP_MUL, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.mininode import CTransaction, COutPoint, CTxIn, CTxOut
 from test_framework.cdefs import MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS, ONE_KILOBYTE
 from test_framework.key import CECKey
@@ -33,7 +33,7 @@ def new_transactions(key, utxo, script_num_size, locking_script=[OP_1ADD, OP_DRO
     tx1 = CTransaction()
     tx1.vin.append(CTxIn(COutPoint(tx_to_spend.sha256, n), b''))
     tx1.vout.append(CTxOut(tx_to_spend.vout[0].nValue - 100_000, CScript([bytearray([42] * script_num_size)] + locking_script)))
-    sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx1, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
+    sighash = SignatureHash(tx_to_spend.vout[0].scriptPubKey, tx1, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
     sig = key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
     tx1.vin[0].scriptSig = CScript([sig])
     tx1.rehash()

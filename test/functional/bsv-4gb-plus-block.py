@@ -28,7 +28,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.comptool import logger
 from test_framework.mininode import MY_VERSION, NodeConnCB, CTxOut, msg_tx, msg_block
 from test_framework.util import wait_until, check_for_log_msg, connect_nodes, disconnect_nodes_bi, sync_blocks
-from test_framework.script import CScript, OP_TRUE, OP_FALSE, OP_RETURN, OP_DROP, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
+from test_framework.script import CScript, OP_TRUE, OP_FALSE, OP_RETURN, OP_DROP, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.cdefs import ONE_MEGABYTE, ONE_GIGABYTE
 from test_framework.key import CECKey
 from test_framework.blocktools import create_block, create_coinbase, create_tx
@@ -101,7 +101,7 @@ class BigBlockTests(BitcoinTestFramework):
         return coinbase_tx
 
     def sign_tx(self, tx, spendtx, n):
-        sighash = SignatureHashForkId(spendtx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spendtx.vout[n].nValue)
+        sighash = SignatureHash(spendtx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spendtx.vout[n].nValue)
         tx.vin[0].scriptSig = CScript([self.coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
     # Generate some large transactions and put them in the mempool

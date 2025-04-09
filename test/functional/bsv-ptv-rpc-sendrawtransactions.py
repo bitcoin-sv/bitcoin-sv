@@ -33,7 +33,7 @@ Test a new rpc interface sendrawtransactions which allows a bulk submit of trans
 """
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.key import CECKey
-from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
+from test_framework.script import CScript, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
 from test_framework.blocktools import create_transaction, PreviousSpendableOutput
 from test_framework.blocktools import create_coinbase, create_block
 from test_framework.util import assert_equal, assert_greater_than_or_equal, assert_raises_rpc_error, wait_until
@@ -67,7 +67,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
     # Sign a transaction, using the key we know about.
     # This signs input 0 in tx, which is assumed to be spending output n in spend_tx
     def sign_tx(self, tx, spend_tx, n, *, key):
-        sighash = SignatureHashForkId(
+        sighash = SignatureHash(
             spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
         tx.vin[0].scriptSig = CScript(
             [key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])

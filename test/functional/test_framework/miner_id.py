@@ -18,7 +18,7 @@ from pathlib import Path
 from bip32utils import BIP32Key
 from io import BytesIO
 from .mininode import sha256, hex_str_to_bytes, bytes_to_hex_str, ser_uint256, COutPoint, ToHex, CTransaction
-from .script import SignatureHashForkId, CScript, SIGHASH_ALL, SIGHASH_FORKID, OP_0, OP_FALSE, OP_RETURN, CTxOut
+from .script import SignatureHash, CScript, SIGHASH_ALL, SIGHASH_FORKID, OP_0, OP_FALSE, OP_RETURN, CTxOut
 from .util import hashToHex, satoshi_round, assert_equal
 from .blocktools import create_coinbase, create_block
 import copy
@@ -95,7 +95,7 @@ class MinerIdKeys:
             t = txns_to_spend[hashToHex(vin.prevout.hash)]
             p = t.vout[n].scriptPubKey
             a = t.vout[n].nValue
-            sighash = SignatureHashForkId(p, tx_to_sign, i, SIGHASH_ALL | SIGHASH_FORKID, a)
+            sighash = SignatureHash(p, tx_to_sign, i, SIGHASH_ALL | SIGHASH_FORKID, a)
             signature = self.signingKey().sign_digest_deterministic(sighash, sigencode=ecdsa.util.sigencode_der)
             vin.scriptSig = CScript([signature + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID])), self.publicKeyBytes()])
 

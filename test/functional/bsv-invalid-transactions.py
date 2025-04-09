@@ -8,7 +8,7 @@ import socket
 from test_framework.blocktools import create_block, create_coinbase
 from test_framework.key import CECKey
 from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block
-from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
+from test_framework.script import CScript, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_mempool_equals
 
@@ -69,7 +69,7 @@ def create_parent_tx(tx_to_spend, key_for_tx_to_spend, n_outputs, invalidity=Non
     if invalidity == "bad_signature":
         sighash = b"\xff" * 32
     else:
-        sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
+        sighash = SignatureHash(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
 
     tx.vin[0].scriptSig = CScript([key_for_tx_to_spend.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
@@ -94,14 +94,14 @@ def create_children_txs(parent_tx1, keys1, parent_tx2, keys2, invalidity=None):
         tx.vout.append(CTxOut(amount, CScript([k.get_pubkey(), OP_CHECKSIG])))
         tx.calc_sha256()
 
-        sighash1 = SignatureHashForkId(parent_tx1.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, parent_tx1.vout[n].nValue)
+        sighash1 = SignatureHash(parent_tx1.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, parent_tx1.vout[n].nValue)
         tx.vin[0].scriptSig = CScript([key1.sign(sighash1) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
         if invalidity == "bad_signature":
             sighash2 = b"\xff" * 32
         else:
-            sighash2 = SignatureHashForkId(parent_tx2.vout[n].scriptPubKey, tx, 1, SIGHASH_ALL | SIGHASH_FORKID,
-                                           parent_tx2.vout[n].nValue)
+            sighash2 = SignatureHash(parent_tx2.vout[n].scriptPubKey, tx, 1, SIGHASH_ALL | SIGHASH_FORKID,
+                                     parent_tx2.vout[n].nValue)
 
         tx.vin[1].scriptSig = CScript([key2.sign(sighash2) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 

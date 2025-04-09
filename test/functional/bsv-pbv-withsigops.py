@@ -33,7 +33,7 @@ from test_framework.mininode import CTransaction, msg_block, NetworkThread, \
     NodeConn, NodeConnCB
 from test_framework.script import CScript, hash160, OP_CHECKSIG, OP_DROP, \
     OP_DUP, OP_EQUALVERIFY, OP_HASH160, OP_TRUE, SIGHASH_FORKID, SIGHASH_ALL, \
-    SignatureHashForkId
+    SignatureHash
 from test_framework.test_framework import BitcoinTestFramework, ChainManager
 from test_framework.util import p2p_port, assert_equal, wait_until
 
@@ -57,7 +57,7 @@ class PBVWithSigOps(BitcoinTestFramework):
         self.chain = ChainManager()
 
     def sign_expensive_tx(self, tx, spend_tx, n, sigChecks):
-        sighash = SignatureHashForkId(
+        sighash = SignatureHash(
             spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
 
         tx.vin[0].scriptSig = CScript(
