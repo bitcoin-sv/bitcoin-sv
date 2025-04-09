@@ -9,6 +9,7 @@
 #include "consensus/merkle.h"
 #include "pow.h"
 #include "uint256.h"
+#include "test_bitcoin.h"
 
 #include <vector>
 #include <chrono>

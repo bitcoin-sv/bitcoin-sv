@@ -2,18 +2,13 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "chain.h"
-#include "chainparams.h"
-#include "config.h"
-#include "pow.h"
-#include "random.h"
-#include "test/test_bitcoin.h"
-#include "util.h"
 #include "block_index_store.h"
+#include "chain.h"
+#include "pow.h"
+#include "test/dummy_config.h"
+#include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
-
-#include <map>
 
 namespace{ class pow_tests_uid; } // only used as unique identifier
 

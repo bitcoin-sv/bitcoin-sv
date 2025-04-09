@@ -6,8 +6,10 @@
 #include "data/tx_valid.json.h"
 #include "test/test_bitcoin.h"
 
+#include "chainparams.h"
 #include "checkqueuepool.h"
 #include "clientversion.h"
+#include "config.h"
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "key.h"
@@ -20,12 +22,11 @@
 #include "script/sign.h"
 #include "script/standard.h"
 #include "taskcancellation.h"
+#include "test/dummy_config.h"
 #include "test/jsonutil.h"
 #include "test/scriptflags.h"
 #include "utilstrencodings.h"
 #include "validation.h" // For CheckRegularTransaction
-#include "chainparams.h"
-#include "config.h"
 
 #include <cstdint>
 #include <map>

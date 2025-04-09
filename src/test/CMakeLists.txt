@@ -103,6 +103,8 @@ add_test_to_suite(bitcoin test_bitcoin
     dsdetected_tests.cpp
 	dstencode_tests.cpp
     dstxn_serialiser_tests.cpp
+    dummy_config.h
+    dummy_config.cpp
 	enum_cast_tests.cpp
 	excessiveblock_tests.cpp
 	eviction_candidates_tracker_tests.cpp

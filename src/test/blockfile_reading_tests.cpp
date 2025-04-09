@@ -1,23 +1,22 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include "test/test_bitcoin.h"
+#include "block_file_access.h"
+#include "blockfileinfostore.h"
+#include "chainparams.h"
+#include "config.h"
+#include "consensus/validation.h"
+#include "hash.h"
+#include "protocol.h"
 #include "serialize.h"
 #include "stream_test_helpers.h"
-#include "protocol.h"
-#include "blockfileinfostore.h"
-#include "block_file_access.h"
-#include "consensus/validation.h"
-#include "config.h"
-#include "chainparams.h"
+#include "test/dummy_config.h"
+#include "test/test_bitcoin.h"
 #include "validation.h"
-#include "hash.h"
 
 #include <boost/test/unit_test.hpp>
 #include <boost/filesystem.hpp>
 
-#include <exception>
-#include <iostream>
 #include <string>
 #include <optional>
 #include <vector>

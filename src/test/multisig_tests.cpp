@@ -14,13 +14,11 @@
 #include "script/sighashtype.h"
 #include "script/sign.h"
 #include "taskcancellation.h"
+#include "test/dummy_config.h"
 #include "test/test_bitcoin.h"
 #include "uint256.h"
-#include "chainparams.h"
-#include "config.h"
 
 #include <boost/test/unit_test.hpp>
-#include <variant>
 
 typedef std::vector<uint8_t> valtype;
 
