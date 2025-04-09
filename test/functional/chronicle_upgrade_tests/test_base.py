@@ -5,7 +5,7 @@
 from test_framework.height_based_test_framework import HeightBasedTestsCase, HeightBasedSimpleTestsCase
 from test_framework.key import CECKey
 from test_framework.mininode import CTransaction, COutPoint, CTxIn, CTxOut
-from test_framework.script import CScript, OP_CHECKSIG, SignatureHashForkId, SignatureHash, SIGHASH_FORKID
+from test_framework.script import CScript, OP_CHECKSIG, SignatureHash, SIGHASH_FORKID, SIGHASH_CHRONICLE
 
 
 class ChronicleHeightTestsCase(HeightBasedTestsCase):
@@ -83,8 +83,7 @@ class ChronicleHeightTestsCase(HeightBasedTestsCase):
             unlocking_script = inp.unlocking_script
             n, tx_to_spend = utxo
 
-            sighash = SignatureHashForkId(tx_to_spend.vout[n].scriptPubKey, tx, index, hash_type, tx_to_spend.vout[n].nValue) \
-                if hash_type & SIGHASH_FORKID else SignatureHash(tx_to_spend.vout[n].scriptPubKey, tx, index, hash_type)
+            sighash = SignatureHash(tx_to_spend.vout[n].scriptPubKey, tx, index, hash_type, tx_to_spend.vout[n].nValue)
             sig = sign_txn_input(sighash, hash_type) if sign_fn is None else sign_fn(sighash, hash_type)
             tx_input.scriptSig = CScript(unlocking_script + [sig])
 
