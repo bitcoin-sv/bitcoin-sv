@@ -32,18 +32,24 @@ std::variant<ScriptError, malleability::status> CheckSignatureEncoding(
     const std::vector<uint8_t>& sig,
     uint32_t flags);
 
+enum class TxDigestAlgorithm
+{
+    ORIGINAL,
+    BIP_143
+};
+
 uint256 SignatureHash(const CScript &scriptCode, const CTransaction &txTo,
                       unsigned int nIn, SigHashType sigHashType,
                       const Amount amount,
                       const PrecomputedTransactionData *cache = nullptr,
-                      bool enabledSighashForkid = true);
+                      const std::optional<TxDigestAlgorithm> forceTDA = {});
 
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class BaseSignatureChecker {
 public:
     virtual bool CheckSig(const std::vector<uint8_t> &scriptSig,
                           const std::vector<uint8_t> &vchPubKey,
-                          const CScript &scriptCode, bool enabledSighashForkid) const {
+                          const CScript &scriptCode) const {
         return false;
     }
 
@@ -101,7 +107,7 @@ public:
 
     bool CheckSig(const std::vector<uint8_t> &scriptSig,
                   const std::vector<uint8_t> &vchPubKey,
-                  const CScript &scriptCode, bool enabledSighashForkid) const override;
+                  const CScript &scriptCode) const override;
     bool CheckLockTime(const CScriptNum &nLockTime) const override;
     bool CheckSequence(const CScriptNum &nSequence) const override;
     int32_t Version() const override;

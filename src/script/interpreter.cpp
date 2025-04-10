@@ -1476,8 +1476,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         // Remove signature for pre-fork scripts
                         CleanupScriptCode(scriptCode, vchSig.GetElement(), flags);
 
-                        bool fSuccess = checker.CheckSig(vchSig.GetElement(), vchPubKey.GetElement(),
-                                                         scriptCode, flags & SCRIPT_ENABLE_SIGHASH_FORKID);
+                        bool fSuccess = checker.CheckSig(vchSig.GetElement(), vchPubKey.GetElement(), scriptCode);
 
                         if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) && vchSig.size())
                             return SCRIPT_ERR_SIG_NULLFAIL;
@@ -1591,8 +1590,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                             }
 
                             // Check signature
-                            bool fOk = checker.CheckSig(vchSig.GetElement(), vchPubKey.GetElement(),
-                                                        scriptCode, flags & SCRIPT_ENABLE_SIGHASH_FORKID);
+                            bool fOk = checker.CheckSig(vchSig.GetElement(), vchPubKey.GetElement(), scriptCode);
 
                             if (fOk) {
                                 isig++;
@@ -1979,8 +1977,20 @@ PrecomputedTransactionData::PrecomputedTransactionData(
 uint256 SignatureHash(const CScript &scriptCode, const CTransaction &txTo,
                       unsigned int nIn, SigHashType sigHashType,
                       const Amount amount,
-                      const PrecomputedTransactionData *cache, bool enabledSighashForkid) {
-    if (sigHashType.hasForkId() && enabledSighashForkid) {
+                      const PrecomputedTransactionData* cache,
+                      const std::optional<TxDigestAlgorithm> forceTDA)
+{
+    auto PickTDA = [&sigHashType, &forceTDA]()
+    {
+        if(forceTDA)
+            return *forceTDA;
+        else if(sigHashType.hasForkId() && !sigHashType.hasChronicle())
+            return TxDigestAlgorithm::BIP_143;
+        return TxDigestAlgorithm::ORIGINAL;
+    };
+
+    if (PickTDA() == TxDigestAlgorithm::BIP_143)
+    {
         uint256 hashPrevouts;
         uint256 hashSequence;
         uint256 hashOutputs;
@@ -2060,7 +2070,8 @@ bool TransactionSignatureChecker::VerifySignature(
 
 bool TransactionSignatureChecker::CheckSig(
     const std::vector<uint8_t> &vchSigIn, const std::vector<uint8_t> &vchPubKey,
-    const CScript &scriptCode, bool enabledSighashForkid) const {
+    const CScript &scriptCode) const
+{
     CPubKey pubkey(vchPubKey);
     if (!pubkey.IsValid()) {
         return false;
@@ -2074,8 +2085,7 @@ bool TransactionSignatureChecker::CheckSig(
     SigHashType sigHashType = GetHashType(vchSig);
     vchSig.pop_back();
 
-    uint256 sighash = SignatureHash(scriptCode, *txTo, nIn, sigHashType, amount,
-                                    this->txdata, enabledSighashForkid);
+    uint256 sighash = SignatureHash(scriptCode, *txTo, nIn, sigHashType, amount, this->txdata);
 
     if (!VerifySignature(vchSig, pubkey, sighash)) {
         return false;

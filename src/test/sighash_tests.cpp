@@ -147,20 +147,17 @@ BOOST_AUTO_TEST_CASE(sighash_test) {
         RandomScript(scriptCode);
         int nIn = InsecureRandRange(txTo.vin.size()); // NOLINT(*-narrowing-conversions)
 
-        uint256 shref =
-            SignatureHashOld(scriptCode, CTransaction(txTo), nIn, nHashType);
-        uint256 shold = SignatureHash(scriptCode, CTransaction(txTo), nIn,
-                                      sigHashType, Amount(0), nullptr, 0);
+        uint256 shref = SignatureHashOld(scriptCode, CTransaction(txTo), nIn, nHashType);
+        uint256 shold = SignatureHash(scriptCode, CTransaction(txTo), nIn, sigHashType, Amount(0), nullptr, TxDigestAlgorithm::ORIGINAL);
         BOOST_CHECK(shold == shref);
 
-        // Check the impact of the forkid flag.
-        uint256 shreg = SignatureHash(scriptCode, CTransaction(txTo), nIn,
-                                      sigHashType, Amount(0));
-        if (sigHashType.hasForkId()) {
-            BOOST_CHECK(nHashType & SIGHASH_FORKID);
+        // Check the impact of the forkid & chronicle flags
+        uint256 shreg = SignatureHash(scriptCode, CTransaction(txTo), nIn, sigHashType, Amount(0));
+        if (sigHashType.hasForkId() && !sigHashType.hasChronicle()) {
+            BOOST_CHECK((nHashType & SIGHASH_FORKID) && !(nHashType & SIGHASH_CHRONICLE));
             BOOST_CHECK(shreg != shref);
         } else {
-            BOOST_CHECK((nHashType & SIGHASH_FORKID) == 0);
+            BOOST_CHECK(! ((nHashType & SIGHASH_FORKID) && !(nHashType & SIGHASH_CHRONICLE)));
             BOOST_CHECK(shreg == shref);
         }
 
@@ -239,7 +236,7 @@ BOOST_AUTO_TEST_CASE(sighash_from_data) {
         uint256 shreg = SignatureHash(scriptCode, *tx, nIn, sigHashType, Amount(0));
         BOOST_CHECK_MESSAGE(shreg.GetHex() == sigHashRegHex, strTest);
 
-        uint256 shold = SignatureHash(scriptCode, *tx, nIn, sigHashType, Amount(0), nullptr, 0);
+        uint256 shold = SignatureHash(scriptCode, *tx, nIn, sigHashType, Amount(0), nullptr, TxDigestAlgorithm::ORIGINAL);
         BOOST_CHECK_MESSAGE(shold.GetHex() == sigHashOldHex, strTest);
     }
 }

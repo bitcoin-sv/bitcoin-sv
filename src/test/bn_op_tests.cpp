@@ -1021,8 +1021,7 @@ namespace
     {
         bool CheckSig(const std::vector<uint8_t>& scriptsig,
                       const std::vector<uint8_t>& pubkey,
-                      const CScript&,
-                      bool enabledSighashForkid) const override
+                      const CScript&) const override
         {
             return scriptsig == pubkey;
         }

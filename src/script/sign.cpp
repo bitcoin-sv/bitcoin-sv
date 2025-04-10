@@ -293,7 +293,7 @@ static std::vector<valtype> CombineMultisig(
                 continue;
             }
 
-            if (checker.CheckSig(sig, pubkey, scriptPubKey, true)) {
+            if (checker.CheckSig(sig, pubkey, scriptPubKey)) {
                 sigs[pubkey] = sig;
                 break;
             }
@@ -434,7 +434,8 @@ public:
 
     bool CheckSig(const std::vector<uint8_t> &scriptSig,
                   const std::vector<uint8_t> &vchPubKey,
-                  const CScript &scriptCode, bool enabledSighashForkid) const override {
+                  const CScript &scriptCode) const override
+    {
         return true;
     }
 };
