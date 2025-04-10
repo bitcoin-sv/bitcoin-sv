@@ -19,8 +19,8 @@
 #include "primitives/transaction.h"
 #include "protocol_era.h"
 #include "rpc/client_utils.h"
+#include "script/interpreter.h"
 #include "script/malleability_status.h"
-#include "script/script_error.h"
 #include "script/sign.h"
 #include "taskcancellation.h"
 #include "univalue.h"
@@ -29,7 +29,6 @@
 #include "utilstrencodings.h"
 
 #include <cstdio>
-#include <variant>
 
 #include <boost/algorithm/string.hpp>
 
@@ -695,11 +694,13 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                           prevPubKey,
                           sigdata);
         }
+        constexpr bool consensus{true};
+        const uint32_t flags{MandatoryScriptVerifyFlags(ActiveEra)};
+        const script_params params{make_script_params(config, flags, consensus)};
         for(const CTransaction& txv : txVariants)
         {
             // ... and merge in other signatures:
-            sigdata = CombineSignatures(config,
-                                        true,
+            sigdata = CombineSignatures(params,
                                         prevPubKey,
                                         MutableTransactionSignatureChecker(&mergedTx,
                                                                            i,

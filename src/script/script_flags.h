@@ -7,6 +7,8 @@
 #ifndef BITCOIN_SCRIPT_SCRIPTFLAGS_H
 #define BITCOIN_SCRIPT_SCRIPTFLAGS_H
 
+#include <cstdint>
+
 /** Script verification flags */
 enum {
     SCRIPT_VERIFY_NONE = 0,
@@ -111,5 +113,20 @@ enum {
     // Not actual flag. Used for marking largest flag value.
     SCRIPT_FLAG_LAST = (1U << 22)
 };
+
+constexpr bool IsUtxoAfterGenesis(uint32_t flags)
+{
+    return (flags & SCRIPT_UTXO_AFTER_GENESIS) != 0;
+}
+static_assert(!IsUtxoAfterGenesis(0));
+static_assert(IsUtxoAfterGenesis(SCRIPT_UTXO_AFTER_GENESIS));
+
+constexpr bool IsUtxoAfterChronicle(uint32_t flags)
+{
+    return (flags & SCRIPT_UTXO_AFTER_CHRONICLE) != 0;
+}
+static_assert(!IsUtxoAfterChronicle(0));
+static_assert(IsUtxoAfterChronicle(SCRIPT_UTXO_AFTER_CHRONICLE));
+
 
 #endif // BITCOIN_SCRIPT_SCRIPTFLAGS_H

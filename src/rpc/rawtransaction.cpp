@@ -9,35 +9,35 @@
 #include "chain.h"
 #include "coins.h"
 #include "config.h"
-#include "transaction_specific_config.h"
+#include "consensus/merkle.h"
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "dstencode.h"
 #include "keystore.h"
 #include "merkleblock.h"
+#include "merkletreestore.h"
 #include "net/net.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
 #include "protocol_era.h"
+#include "rawtxvalidator.h"
+#include "rpc/blockchain.h"
 #include "rpc/http_protocol.h"
+#include "rpc/misc.h"
 #include "rpc/server.h"
 #include "rpc/tojson.h"
+#include "script/interpreter.h"
 #include "script/script_error.h"
+#include "script/script_flags.h"
 #include "script/sign.h"
 #include "script/standard.h"
 #include "taskcancellation.h"
+#include "transaction_specific_config.h"
 #include "txdb.h"
 #include "txmempool.h"
-#include "txn_validator.h"
 #include "uint256.h"
 #include "utilstrencodings.h"
-#include "merkletreestore.h"
-#include "rpc/blockchain.h"
-#include "rpc/misc.h"
-#include "consensus/merkle.h"
-#include "util.h"
-#include "rawtxvalidator.h"
-#include <variant>
+
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
 #include "wallet/wallet.h"
@@ -1169,13 +1169,16 @@ static UniValue signrawtransaction(const Config &config,
                           sigdata);
         }
 
+        constexpr bool consensus{true};
+        const auto flags{MandatoryScriptVerifyFlags(era)};
+        const script_params params{make_script_params(config, flags, consensus)};
+
         // ... and merge in other signatures:
         for(const CMutableTransaction& txv : txVariants)
         {
             if(txv.vin.size() > i)
             {
-               sigdata = CombineSignatures(config,
-                                           true,
+               sigdata = CombineSignatures(params,
                                            prevPubKey,
                                            TransactionSignatureChecker(&txConst,
                                                                        i,

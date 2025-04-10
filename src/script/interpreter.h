@@ -124,6 +124,37 @@ public:
     }
 };
 
+class script_params
+{
+    uint64_t maxOpsPerScript;
+    uint64_t maxScriptNumLength;
+    uint64_t maxScriptSize;
+    uint64_t maxPubKeysPerMultiSig;
+
+public:
+    constexpr script_params(uint64_t maxOpsPerScript,
+                            uint64_t maxScriptNumLength,
+                            uint64_t maxScriptSize,
+                            uint64_t maxPubKeysPerMultiSig)
+        : maxOpsPerScript{maxOpsPerScript},
+          maxScriptNumLength{maxScriptNumLength},
+          maxScriptSize{maxScriptSize},
+          maxPubKeysPerMultiSig{maxPubKeysPerMultiSig}
+    {
+    }
+
+    constexpr uint64_t MaxOpsPerScript() const { return maxOpsPerScript; }
+    constexpr uint64_t MaxScriptNumLength() const { return maxScriptNumLength; }
+    constexpr uint64_t MaxScriptSize() const { return maxScriptSize; }
+    constexpr uint64_t MaxPubKeysPerMultiSig() const { return maxPubKeysPerMultiSig; }
+};
+static_assert(script_params(1, 2, 3, 4).MaxOpsPerScript() == 1);
+static_assert(script_params(1, 2, 3, 4).MaxScriptNumLength() == 2);
+static_assert(script_params(1, 2, 3, 4).MaxScriptSize() == 3);
+static_assert(script_params(1, 2, 3, 4).MaxPubKeysPerMultiSig() == 4);
+
+script_params make_script_params(const CScriptConfig&, uint32_t flags, bool consensus);
+
 /**
 * EvalScript function evaluates scripts against predefined limits that are
 * set by either policy rules or consensus rules. Consensus parameter determines if
@@ -132,8 +163,7 @@ public:
 * and it should be false when validating scripts of transactions that are validated for acceptance to mempool
 */
 std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
-    const CScriptConfig& config,
-    bool consensus,
+    const script_params&,
     const task::CCancellationToken& token,
     LimitedStack& stack,
     const CScript& script,
@@ -145,7 +175,30 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     std::vector<bool>& vfElse);
 
 std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
-    const CScriptConfig& config,
+    const script_params&,
+    const task::CCancellationToken& token,
+    LimitedStack& stack,
+    const CScript& script,
+    uint32_t flags,
+    const BaseSignatureChecker& checker);
+
+// Only for unit testing
+std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
+    const CScriptConfig&,
+    bool consensus,
+    const task::CCancellationToken& token,
+    LimitedStack& stack,
+    const CScript& script,
+    uint32_t flags,
+    const BaseSignatureChecker& checker,
+    LimitedStack& altstack,
+    long& ipc,
+    std::vector<bool>& vfExec,
+    std::vector<bool>& vfElse);
+
+// Only for unit testing
+std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
+    const CScriptConfig&,
     bool consensus,
     const task::CCancellationToken& token,
     LimitedStack& stack,

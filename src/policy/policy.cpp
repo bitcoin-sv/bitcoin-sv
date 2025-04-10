@@ -10,9 +10,13 @@
 
 #include "config.h"
 #include "protocol_era.h"
+#include "script/interpreter.h"
 #include "script/malleability_status.h"
+#include "script/script_flags.h"
 #include "script/script_num.h"
 #include "taskcancellation.h"
+
+#include <cstdint>
 
 /**
  * Check transaction inputs to mitigate two potential denial-of-service attacks:
@@ -274,6 +278,10 @@ std::optional<bool> AreInputsStandard(
         return true;
     }
 
+    constexpr bool consensus{};
+    constexpr uint32_t flags{SCRIPT_VERIFY_NONE};
+    const script_params params{make_script_params(config, flags, consensus)};
+
     for (size_t i = 0; i < tx.vin.size(); i++) {
         auto prev = mapInputs.GetCoinWithScript( tx.vin[i].prevout );
         assert(prev.has_value());
@@ -293,13 +301,12 @@ std::optional<bool> AreInputsStandard(
             LimitedStack stack(UINT32_MAX);
             // convert the scriptSig into a stack, so we can inspect the
             // redeemScript
-            if(const auto o = EvalScript(config,
-                                        false,
-                                        token,
-                                        stack,
-                                        tx.vin[i].scriptSig,
-                                        SCRIPT_VERIFY_NONE,
-                                        BaseSignatureChecker());
+            if(const auto o = EvalScript(params,
+                                         token,
+                                         stack,
+                                         tx.vin[i].scriptSig,
+                                         flags,
+                                         BaseSignatureChecker());
                 !o.has_value())
                 return {};
             else

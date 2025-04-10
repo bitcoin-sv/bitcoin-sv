@@ -49,7 +49,6 @@
 
 #include <univalue.h>
 
-
 // Uncomment if you want to output updated JSON tests.
 //#define UPDATE_JSON_TESTS
 
@@ -2412,8 +2411,11 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
 
     const int32_t tx_version{42};
     SignatureData empty;
-    SignatureData combined = CombineSignatures(config,
-                                               true,
+
+    constexpr bool consensus{true};
+    const uint32_t flags{MandatoryScriptVerifyFlags(era)};
+    const script_params params{make_script_params(config, flags, consensus)};
+    SignatureData combined = CombineSignatures(params,
                                                scriptPubKey,
                                                MutableTransactionSignatureChecker(&txTo,
                                                                                   0,
@@ -2429,8 +2431,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
     // Single signature case:
     SignSignature(config, keystore, era, utxoEra, CTransaction(txFrom), txTo, 0,
                   SigHashType()); // changes scriptSig
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(scriptSig),
@@ -2440,8 +2441,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == scriptSig);
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  empty,
@@ -2455,8 +2455,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
     // Signing again will give a different, valid signature:
     SignSignature(config, keystore, era, utxoEra, CTransaction(txFrom), txTo, 0,
                   SigHashType());
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(scriptSigCopy),
@@ -2475,8 +2474,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
     scriptPubKey = GetScriptForDestination(CScriptID(pkSingle));
     SignSignature(config, keystore, era, utxoEra, CTransaction(txFrom), txTo, 0,
                   SigHashType());
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(scriptSig),
@@ -2486,8 +2484,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == scriptSig);
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  empty,
@@ -2500,8 +2497,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
     scriptSigCopy = scriptSig;
     SignSignature(config, keystore, era, utxoEra, CTransaction(txFrom), txTo, 0,
                   SigHashType());
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(scriptSigCopy),
@@ -2517,8 +2513,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
     scriptSigCopy = CScript()
                     << OP_0
                     << std::vector<uint8_t>(pkSingle.begin(), pkSingle.end());
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(scriptSigCopy),
@@ -2534,8 +2529,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
         // 
         BOOST_CHECK(combined.scriptSig == scriptSig);
     }
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(scriptSig),
@@ -2556,8 +2550,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
     keystore.AddCScript(scriptPubKey);
     SignSignature(config, keystore, era, utxoEra, CTransaction(txFrom), txTo, 0,
                   SigHashType());
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(scriptSig),
@@ -2567,8 +2560,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == scriptSig);
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  empty,
@@ -2610,8 +2602,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
     CScript complete13 = CScript() << OP_0 << sig1 << sig3;
     CScript complete23 = CScript() << OP_0 << sig2 << sig3;
 
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(partial1a),
@@ -2621,8 +2612,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == partial1a);
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(partial1a),
@@ -2632,8 +2622,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == complete12);
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(partial2a),
@@ -2643,8 +2632,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == complete12);
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(partial1b),
@@ -2654,8 +2642,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == complete12);
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(partial3b),
@@ -2665,8 +2652,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == complete13);
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(partial2a),
@@ -2676,8 +2662,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == complete23);
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(partial3b),
@@ -2687,8 +2672,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == complete23);
-    combined = CombineSignatures(config,
-                                 true,
+    combined = CombineSignatures(params,
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(partial3b),

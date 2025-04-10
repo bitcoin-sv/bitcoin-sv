@@ -327,8 +327,7 @@ struct Stacks {
     explicit Stacks(const std::vector<valtype> &scriptSigStack_)
         : script(scriptSigStack_) {}
 
-    Stacks(const Config& config,
-           bool consensus,
+    Stacks(const script_params& params,
            const SignatureData& data,
            int32_t tx_version,
            ProtocolEra era)
@@ -336,8 +335,7 @@ struct Stacks {
         // Pre-genesis limitations are stricter than post-genesis, so LimitedStack can use UINT32_MAX as max size.
         LimitedStack stack(UINT32_MAX);
         auto source = task::CCancellationSource::Make();
-        EvalScript(config,
-                   consensus,
+        EvalScript(params,
                    source->GetToken(),
                    stack,
                    data.scriptSig,
@@ -408,8 +406,7 @@ static Stacks CombineSignatures(const CScript &scriptPubKey,
     }
 }
 
-SignatureData CombineSignatures(const Config& config,
-                                bool consensus,
+SignatureData CombineSignatures(const script_params& params,
                                 const CScript& scriptPubKey,
                                 const BaseSignatureChecker& checker,
                                 const SignatureData& scriptSig1,
@@ -424,8 +421,8 @@ SignatureData CombineSignatures(const Config& config,
     Solver(scriptPubKey, utxoEra, txType, vSolutions);
 
     return CombineSignatures(scriptPubKey, checker, txType, vSolutions,
-                             Stacks(config, consensus, scriptSig1, tx_version1, era),
-                             Stacks(config, consensus, scriptSig2, tx_version2, era))
+                             Stacks(params, scriptSig1, tx_version1, era),
+                             Stacks(params, scriptSig2, tx_version2, era))
         .Output();
 }
 

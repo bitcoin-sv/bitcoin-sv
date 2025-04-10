@@ -19,6 +19,7 @@
 #include "script/malleability_status.h"
 #include "script/script.h"
 #include "script/script_error.h"
+#include "script/script_flags.h"
 #include "script/sign.h"
 #include "script/standard.h"
 #include "taskcancellation.h"
@@ -804,10 +805,12 @@ BOOST_AUTO_TEST_CASE(test_witness) {
                                       { flagsPostChronicle, false } } });
 
     BOOST_CHECK(*output1 == *output2);
+    constexpr bool consensus{true};
+    const uint32_t flags{MandatoryScriptVerifyFlags(ProtocolEra::PreGenesis)};
+    const script_params params{make_script_params(testConfig, flags, consensus)};
     UpdateTransaction(input1,
                       0,
-                      CombineSignatures(testConfig,
-                                        true,
+                      CombineSignatures(params,
                                         output1->vout[0].scriptPubKey,
                                         MutableTransactionSignatureChecker(&input1,
                                                                            0,
@@ -854,8 +857,7 @@ BOOST_AUTO_TEST_CASE(test_witness) {
     BOOST_CHECK(*output1 == *output2);
     UpdateTransaction(input1,
                       0,
-                      CombineSignatures(testConfig,
-                                        true,
+                      CombineSignatures(params,
                                         output1->vout[0].scriptPubKey,
                                         MutableTransactionSignatureChecker(&input1,
                                                                            0,

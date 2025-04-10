@@ -8,7 +8,6 @@
 #include "protocol_era.h"
 #include "script/malleability_status.h"
 #include "script_flags.h"
-#include "compat/endian.h"
 #include "crypto/ripemd160.h"
 #include "crypto/sha1.h"
 #include "crypto/sha256.h"
@@ -372,11 +371,9 @@ static bool IsOpcodeDisabled(const opcodetype opcode,
     return false;
 }
 
-inline bool IsValidMaxOpsPerScript(uint64_t nOpCount,
-                                   const CScriptConfig &config,
-                                   bool isGenesisEnabled, bool consensus)
+inline bool IsValidMaxOpsPerScript(const uint64_t nOpCount, const script_params& params)
 {
-    return (nOpCount <= config.GetMaxOpsPerScript(isGenesisEnabled, consensus));
+    return nOpCount <= params.MaxOpsPerScript();
 }
 
 static void to_le(const int32_t n, uint8_t* o)
@@ -386,8 +383,7 @@ static void to_le(const int32_t n, uint8_t* o)
 }
 
 std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
-    const CScriptConfig& config,
-    bool consensus,
+    const script_params& params,
     const task::CCancellationToken& token,
     LimitedStack& stack,
     const CScript& script,
@@ -409,8 +405,8 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     opcodetype opcode;
     valtype vchPushValue;
 
-    const bool utxo_after_genesis { (flags & SCRIPT_UTXO_AFTER_GENESIS) != 0 };
-    const bool utxo_after_chronicle { (flags & SCRIPT_UTXO_AFTER_CHRONICLE) != 0 };
+    const bool utxo_after_genesis{IsUtxoAfterGenesis(flags)};
+    const bool utxo_after_chronicle{IsUtxoAfterChronicle(flags)};
     if(utxo_after_chronicle && !utxo_after_genesis)
         return SCRIPT_ERR_INVALID_FLAGS;
 
@@ -426,9 +422,8 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
             utxoEra = ProtocolEra::PreGenesis;
         }
     }
-    const uint64_t maxScriptNumLength { config.GetMaxScriptNumLength(utxoEra, consensus) };
 
-    if(script.size() > config.GetMaxScriptSize(utxo_after_genesis, consensus))
+    if(script.size() > params.MaxScriptSize())
         return SCRIPT_ERR_SCRIPT_SIZE;
 
     uint64_t nOpCount = 0;
@@ -468,7 +463,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
             //
             // Push values are not taken into consideration.
             // Note how OP_RESERVED does not count towards the opcode limit.
-            if ((opcode > OP_16) && !IsValidMaxOpsPerScript(++nOpCount, config, utxo_after_genesis, consensus))
+            if((opcode > OP_16) && !IsValidMaxOpsPerScript(++nOpCount, params))
                 return SCRIPT_ERR_OP_COUNT;
 
             // Some opcodes are disabled.
@@ -638,13 +633,13 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         const CScriptNum bn_len{stack.stacktop(-1).GetElement(),
                                                 min_encode_check,
                                                 ms,
-                                                maxScriptNumLength};
+                                                params.MaxScriptNumLength()};
                         const auto len{bn_len.getint()};
 
                         const CScriptNum bn_begin{stack.stacktop(-2).GetElement(),
                                                   min_encode_check,
                                                   ms,
-                                                  maxScriptNumLength};
+                                                  params.MaxScriptNumLength()};
                         const auto offset{bn_begin.getint()};
                         
                         auto& data{stack.stacktop(-3)};
@@ -678,7 +673,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         const CScriptNum bn_len{stack.stacktop(-1).GetElement(),
                                                 min_encode_check,
                                                 ms,
-                                                maxScriptNumLength};
+                                                params.MaxScriptNumLength()};
                         const auto len{bn_len.getint()};
 
                         auto& data{stack.stacktop(-2)};
@@ -706,7 +701,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         const CScriptNum bn_len{stack.stacktop(-1).GetElement(),
                                                 min_encode_check,
                                                 ms,
-                                                maxScriptNumLength};
+                                                params.MaxScriptNumLength()};
                         const auto len{bn_len.getint()};
 
                         auto& data{stack.stacktop(-2)};
@@ -976,7 +971,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         const CScriptNum sn{top,
                                             min_encode_check,
                                             ms,
-                                            maxScriptNumLength,
+                                            params.MaxScriptNumLength(),
                                             utxo_after_genesis};
                         stack.pop_back();
                         if(sn < 0 || sn >= stack.size())
@@ -1096,7 +1091,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         CScriptNum n{top,
                                      min_encode_check,
                                      ms,
-                                     maxScriptNumLength,
+                                     params.MaxScriptNumLength(),
                                      utxo_after_genesis};
                         if(n < 0)
                             return SCRIPT_ERR_INVALID_NUMBER_RANGE;
@@ -1134,7 +1129,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         CScriptNum n{top,
                                      min_encode_check,
                                      ms,
-                                     maxScriptNumLength,
+                                     params.MaxScriptNumLength(),
                                      utxo_after_genesis};
                         if(n < 0)
                             return SCRIPT_ERR_INVALID_NUMBER_RANGE;
@@ -1211,7 +1206,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         CScriptNum bn{top,
                                       min_encode_check,
                                       ms,
-                                      maxScriptNumLength,
+                                      params.MaxScriptNumLength(),
                                       utxo_after_genesis};
                         switch (opcode) {
                             case OP_1ADD:
@@ -1280,12 +1275,12 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         const CScriptNum bn1(arg_2.GetElement(),
                                              min_encode_check,
                                              ms,
-                                             maxScriptNumLength,
+                                             params.MaxScriptNumLength(),
                                              utxo_after_genesis);
                         const CScriptNum bn2(arg_1.GetElement(),
                                              min_encode_check,
                                              ms,
-                                             maxScriptNumLength,
+                                             params.MaxScriptNumLength(),
                                              utxo_after_genesis);
                         CScriptNum bn;
                         switch (opcode) {
@@ -1377,19 +1372,19 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         const CScriptNum bn1{top_3,
                                              min_encode_check,
                                              ms,
-                                             maxScriptNumLength,
+                                             params.MaxScriptNumLength(),
                                              utxo_after_genesis};
                         const auto& top_2{stack.stacktop(-2).GetElement()};
                         const CScriptNum bn2{top_2,
                                              min_encode_check,
                                              ms,
-                                             maxScriptNumLength,
+                                             params.MaxScriptNumLength(),
                                              utxo_after_genesis};
                         const auto& top_1{stack.stacktop(-1).GetElement()};
                         const CScriptNum bn3{top_1,
                                              min_encode_check,
                                              ms,
-                                             maxScriptNumLength,
+                                             params.MaxScriptNumLength(),
                                              utxo_after_genesis};
                         const bool fValue = (bn2 <= bn1 && bn1 < bn3);
                         stack.pop_back();
@@ -1518,11 +1513,11 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                             return SCRIPT_ERR_PUBKEY_COUNT;
 
                         uint64_t nKeysCount = static_cast<uint64_t>(nKeysCountSigned);
-                        if (nKeysCount > config.GetMaxPubKeysPerMultiSig(utxo_after_genesis, consensus))
+                        if(nKeysCount > params.MaxPubKeysPerMultiSig())
                             return SCRIPT_ERR_PUBKEY_COUNT;
 
                         nOpCount += nKeysCount;
-                        if (!IsValidMaxOpsPerScript(nOpCount, config, utxo_after_genesis, consensus))
+                        if(!IsValidMaxOpsPerScript(nOpCount, params))
                             return SCRIPT_ERR_OP_COUNT;
  
                         uint64_t ikey = ++i;
@@ -1687,7 +1682,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         const CScriptNum n{top,
                                            min_encode_check,
                                            ms,
-                                           maxScriptNumLength,
+                                           params.MaxScriptNumLength(),
                                            utxo_after_genesis};
                         if(n < 0 || n > data.size())
                             return SCRIPT_ERR_INVALID_SPLIT_RANGE;
@@ -1719,7 +1714,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         const CScriptNum n{arg_1,
                                            min_encode_check,
                                            ms,
-                                           maxScriptNumLength,
+                                           params.MaxScriptNumLength(),
                                            utxo_after_genesis};
                         if(n < 0 || n > std::numeric_limits<int32_t>::max())
                             return SCRIPT_ERR_PUSH_SIZE;
@@ -1762,7 +1757,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         n.MinimallyEncode();
 
                         // The resulting number must be a valid number.
-                        if (!n.IsMinimallyEncoded(maxScriptNumLength))
+                        if(!n.IsMinimallyEncoded(params.MaxScriptNumLength()))
                             return SCRIPT_ERR_INVALID_NUMBER_RANGE;
 
                     } break;
@@ -1809,8 +1804,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 }
 
 std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
-    const CScriptConfig& config,
-    bool consensus,
+    const script_params& params,
     const task::CCancellationToken& token,
     LimitedStack& stack,
     const CScript& script,
@@ -1820,8 +1814,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     LimitedStack altstack {stack.makeChildStack()};
     long ipc{0};
     std::vector<bool> vfExec, vfElse;
-    return EvalScript(config,
-                      consensus,
+    return EvalScript(params,
                       token,
                       stack,
                       script,
@@ -1832,6 +1825,53 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                       vfExec,
                       vfElse);
 }
+
+// Only for unit testing
+std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
+    const CScriptConfig& config,
+    bool consensus,
+    const task::CCancellationToken& token,
+    LimitedStack& stack,
+    const CScript& script,
+    uint32_t flags,
+    const BaseSignatureChecker& checker)
+{
+    const script_params params{make_script_params(config, flags, consensus)};
+    return EvalScript(params,
+                      token,
+                      stack,
+                      script,
+                      flags,
+                      checker);
+}
+
+// Only for unit testing
+std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
+    const CScriptConfig& config,
+    bool consensus,
+    const task::CCancellationToken& token,
+    LimitedStack& stack,
+    const CScript& script,
+    uint32_t flags,
+    const BaseSignatureChecker& checker,
+    LimitedStack& altstack,
+    long& ipc,
+    std::vector<bool>& vfExec,
+    std::vector<bool>& vfElse)
+{
+    const script_params params{make_script_params(config, flags, consensus)};
+    return EvalScript(params,
+                      token,
+                      stack,
+                      script,
+                      flags,
+                      checker,
+                      altstack,
+                      ipc,
+                      vfExec,
+                      vfElse);
+}
+
 
 namespace {
 
@@ -2182,6 +2222,41 @@ int32_t TransactionSignatureChecker::Version() const
     return txTo->nVersion;
 }
 
+static constexpr bool valid_flags(const uint32_t flags)
+{
+    return !(IsUtxoAfterChronicle(flags) && !IsUtxoAfterGenesis(flags));
+}
+static_assert(valid_flags(0));
+static_assert(valid_flags(SCRIPT_UTXO_AFTER_GENESIS));
+static_assert(valid_flags(SCRIPT_UTXO_AFTER_GENESIS & SCRIPT_UTXO_AFTER_CHRONICLE));
+static_assert(!valid_flags(SCRIPT_UTXO_AFTER_CHRONICLE));
+
+// Pre-condition: valid_flags (see above)
+static constexpr ProtocolEra utxo_era(const uint32_t flags)
+{
+    return IsUtxoAfterChronicle(flags) ? ProtocolEra::PostChronicle
+           : IsUtxoAfterGenesis(flags) ? ProtocolEra::PostGenesis
+                                       : ProtocolEra::PreGenesis;
+}
+static_assert(ProtocolEra::PreGenesis == utxo_era(0));
+static_assert(ProtocolEra::PostGenesis == utxo_era(SCRIPT_UTXO_AFTER_GENESIS));
+static_assert(ProtocolEra::PostChronicle == utxo_era(SCRIPT_UTXO_AFTER_CHRONICLE
+                                                     | SCRIPT_UTXO_AFTER_GENESIS));
+static_assert(ProtocolEra::PostChronicle == utxo_era(SCRIPT_UTXO_AFTER_CHRONICLE));
+
+// Pre-condition: valid_flags (see above)
+script_params make_script_params(const CScriptConfig& config,
+                                 const uint32_t flags,
+                                 const bool consensus)
+{
+    const ProtocolEra era{utxo_era(flags)};
+    const bool utxo_after_genesis{IsUtxoAfterGenesis(flags)};
+    return script_params{config.GetMaxOpsPerScript(utxo_after_genesis, consensus),
+                         config.GetMaxScriptNumLength(era, consensus),
+                         config.GetMaxScriptSize(utxo_after_genesis, consensus),
+                         config.GetMaxPubKeysPerMultiSig(utxo_after_genesis, consensus)};
+}
+
 std::optional<std::pair<bool, ScriptError>> VerifyScript(
     const CScriptConfig& config,
     bool consensus,
@@ -2192,6 +2267,9 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     const BaseSignatureChecker& checker, 
     std::atomic<malleability::status>& malleability)
 {
+    if(!valid_flags(flags))
+        return std::make_pair(false, SCRIPT_ERR_INVALID_FLAGS);
+
     // If FORKID is enabled, we also ensure strict encoding.
     if (flags & SCRIPT_ENABLE_SIGHASH_FORKID) {
         flags |= SCRIPT_VERIFY_STRICTENC;
@@ -2208,8 +2286,8 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     LimitedStack stack(config.GetMaxStackMemoryUsage(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus));
     LimitedStack stackCopy(config.GetMaxStackMemoryUsage(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus));
 
-    if(const auto o = EvalScript(config,
-                                 consensus,
+    const script_params params{make_script_params(config, flags, consensus)};
+    if(const auto o = EvalScript(params,
                                  token,
                                  stack,
                                  scriptSig,
@@ -2232,8 +2310,7 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
         stackCopy = stack.makeRootStackCopy();
     }
 
-    if(const auto o = EvalScript(config,
-                                 consensus,
+    if(const auto o = EvalScript(params,
                                  token,
                                  stack,
                                  scriptPubKey,
@@ -2280,8 +2357,7 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
         CScript pubKey2(pubKeySerialized.begin(), pubKeySerialized.end());
         stack.pop_back();
 
-        if(const auto o = EvalScript(config,
-                                     consensus,
+        if(const auto o = EvalScript(params,
                                      token,
                                      stack,
                                      pubKey2,
