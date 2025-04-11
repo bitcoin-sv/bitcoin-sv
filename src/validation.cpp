@@ -2507,12 +2507,33 @@ void UpdateCoins(const CTransaction& tx, ICoinsViewCache& inputs, int32_t nHeigh
     UpdateCoins(tx, inputs, txundo, nHeight);
 }
 
+CScriptCheck::CScriptCheck(
+    const script_params& params,
+    const CScript& scriptPubKeyIn,
+    const Amount& amountIn,
+    const CTransaction& txToIn,
+    unsigned int nInIn,
+    uint32_t nFlagsIn,
+    bool cacheIn,
+    const PrecomputedTransactionData& txdataIn,
+    const std::shared_ptr<std::atomic<malleability::status>>& malleabilityIn)
+    : scriptPubKey{scriptPubKeyIn},
+      amount{amountIn},
+      ptxTo{&txToIn},
+      nIn{nInIn},
+      nFlags{nFlagsIn},
+      cacheStore{cacheIn},
+      txdata{txdataIn},
+      params_{params},
+      malleability{malleabilityIn}
+{
+}
+
 std::optional<bool> CScriptCheck::operator()(const task::CCancellationToken& token)
 {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
 
-    const auto params{make_script_params(config, nFlags, consensus)};
-    const auto o = VerifyScript(params,
+    const auto o = VerifyScript(params_,
                                 token,
                                 scriptSig,
                                 scriptPubKey,
@@ -2664,7 +2685,7 @@ int32_t GetInputScriptBlockHeight(int32_t coinHeight) {
 std::optional<bool> CheckInputScripts(
     const task::CCancellationToken& token,
     const Config& config,
-    bool consensus,
+    const bool consensus,
     const CScript& scriptPubKey,
     const Amount& amount,
     const CTransaction& tx,
@@ -2687,7 +2708,16 @@ std::optional<bool> CheckInputScripts(
     // ScriptExecutionCache does NOT contain per-input flags. That's why we clear the
     // cache when we are about to cross a protocol era activation line (see function FinalizeEraCrossing).
 
-    CScriptCheck check(config, consensus, scriptPubKey, amount, tx, input, flags | perInputScriptFlags, sigCacheStore, txdata, malleability);
+    const script_params params{make_script_params(config, flags | perInputScriptFlags, consensus)};
+    CScriptCheck check(params,
+                       scriptPubKey,
+                       amount,
+                       tx,
+                       input,
+                       flags | perInputScriptFlags,
+                       sigCacheStore,
+                       txdata,
+                       malleability);
     if (pvChecks) 
     {
         pvChecks->push_back(std::move(check));
@@ -2722,8 +2752,19 @@ std::optional<bool> CheckInputScripts(
             uint32_t flags2Check = (flags | perInputScriptFlags) & ~standardNotMandatoryFlags;
             // Consensus flag is set to true, because we check policy rules in check1. If we would test policy rules 
             // again and fail because the transaction exceeds our policy limits, the node would get banned and this is not ok
-            CScriptCheck check2(config, true, scriptPubKey, amount, tx, input, flags2Check, sigCacheStore, txdata,
-                std::make_shared<std::atomic<malleability::status>>(initialMalleability));
+            
+            constexpr bool consensus{true};
+            const script_params params{make_script_params(config, flags2Check, consensus)};
+            CScriptCheck check2(params,
+                                scriptPubKey,
+                                amount,
+                                tx,
+                                input,
+                                flags2Check,
+                                sigCacheStore,
+                                txdata,
+                                std::make_shared<std::atomic<malleability::status>>(
+                                    initialMalleability));
             if (auto res2 = check2(token); !res2.has_value())
             {
                 return {};
@@ -2747,8 +2788,18 @@ std::optional<bool> CheckInputScripts(
                 uint32_t inverseInputFlags { InputScriptVerifyFlags(era, GetInverseProtocolEra(utxoEra, ProtocolName::Genesis)) };
                 uint32_t flags3Check = (flags | inverseInputFlags) & ~standardNotMandatoryFlags;
 
-                CScriptCheck check3(config, true, scriptPubKey, amount, tx, input, flags3Check, sigCacheStore, txdata,
-                    std::make_shared<std::atomic<malleability::status>>(initialMalleability));
+                constexpr bool consensus{true};
+                const script_params params{make_script_params(config, flags3Check, consensus)};
+                CScriptCheck check3(params,
+                                    scriptPubKey,
+                                    amount,
+                                    tx,
+                                    input,
+                                    flags3Check,
+                                    sigCacheStore,
+                                    txdata,
+                                    std::make_shared<std::atomic<malleability::status>>(
+                                        initialMalleability));
                 if (auto res3 = check3(token); !res3.has_value())
                 {
                     return {};
@@ -2765,8 +2816,18 @@ std::optional<bool> CheckInputScripts(
                 uint32_t inverseInputFlags { InputScriptVerifyFlags(era, GetInverseProtocolEra(utxoEra, ProtocolName::Chronicle)) };
                 uint32_t flags3Check = (flags | inverseInputFlags) & ~standardNotMandatoryFlags;
 
-                CScriptCheck check3(config, true, scriptPubKey, amount, tx, input, flags3Check, sigCacheStore, txdata,
-                    std::make_shared<std::atomic<malleability::status>>(initialMalleability));
+                constexpr bool consensus{true};
+                const script_params params{make_script_params(config, flags3Check, consensus)};
+                CScriptCheck check3(params,
+                                    scriptPubKey,
+                                    amount,
+                                    tx,
+                                    input,
+                                    flags3Check,
+                                    sigCacheStore,
+                                    txdata,
+                                    std::make_shared<std::atomic<malleability::status>>(
+                                        initialMalleability));
                 if (auto res3 = check3(token); !res3.has_value())
                 {
                     return {};

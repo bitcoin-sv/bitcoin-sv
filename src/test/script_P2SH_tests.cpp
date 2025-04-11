@@ -19,6 +19,7 @@
 #include "validation.h"
 #include "taskcancellation.h"
 
+#include <cstdint>
 #include <variant>
 #include <vector>
 
@@ -158,11 +159,23 @@ BOOST_AUTO_TEST_CASE(sign) {
             CScript sigSave = txTo[i].vin[0].scriptSig;
             txTo[i].vin[0].scriptSig = txTo[j].vin[0].scriptSig;
             const CTxOut &output = txFrom.vout[txTo[i].vin[0].prevout.GetN()];
-            auto sigOK = CScriptCheck(testConfig, true,
-                output.scriptPubKey, output.nValue, CTransaction(txTo[i]), 0,
-                SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC |
-                    SCRIPT_ENABLE_SIGHASH_FORKID,
-                false, txdata, std::make_shared<std::atomic<malleability::status>>())(source->GetToken());
+
+            constexpr uint32_t flags{SCRIPT_VERIFY_P2SH
+                                     | SCRIPT_VERIFY_STRICTENC
+                                     | SCRIPT_ENABLE_SIGHASH_FORKID};
+            constexpr bool consensus{true};
+            const script_params params{make_script_params(testConfig, flags, consensus)};
+            const auto sigOK = CScriptCheck(params,
+                                            output.scriptPubKey,
+                                            output.nValue,
+                                            CTransaction(txTo[i]),
+                                            0,
+                                            flags,
+                                            false,
+                                            txdata,
+                                            std::make_shared<
+                                                std::atomic<malleability::status>>())(
+                source->GetToken());
             assert(sigOK);
             if (i == j) {
                 BOOST_CHECK_MESSAGE(sigOK.value(),

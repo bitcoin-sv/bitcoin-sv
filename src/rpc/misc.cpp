@@ -3,7 +3,6 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include "rpc/misc.h"
 #include "base58.h"
 #include "block_index_store.h"
 #include "clientversion.h"
@@ -15,7 +14,9 @@
 #include "policy/policy.h"
 #include "protocol_era.h"
 #include "rpc/blockchain.h"
+#include "rpc/misc.h"
 #include "rpc/server.h"
+#include "script/interpreter.h"
 #include "timedata.h"
 #include "txdb.h"
 #include "util.h"
@@ -857,18 +858,18 @@ Examples:
             continue;
         }
 
-        CScriptCheck script_check{
-            config,
-            false, // consensus = false
-            scr.txo_lock,
-            scr.txo_value,
-            scr.tx,
-            scr.n,
-            scr.flags,
-            false, // no cache
-            PrecomputedTransactionData(scr.tx),
-            std::make_shared<std::atomic<malleability::status>>()
-        };
+        constexpr bool consensus{};
+        const script_params params{make_script_params(config, scr.flags, consensus)};
+
+        CScriptCheck script_check{params,
+                                  scr.txo_lock,
+                                  scr.txo_value,
+                                  scr.tx,
+                                  scr.n,
+                                  scr.flags,
+                                  false, // no cache
+                                  PrecomputedTransactionData(scr.tx),
+                                  std::make_shared<std::atomic<malleability::status>>()};
 
         auto t0 = std::chrono::steady_clock::now();
         auto res = script_check( task::CCancellationToken::JoinToken(

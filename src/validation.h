@@ -16,29 +16,23 @@
 #include "chain.h"
 #include "coins.h"
 #include "consensus/consensus.h"
-#include "fs.h"
 #include "mining/journal_change_set.h"
 #include "protocol.h" // For CMessageHeader::MessageMagic
 #include "protocol_era.h"
+#include "script/interpreter.h"
 #include "script/malleability_status.h"
 #include "script/script_error.h"
 #include "sync.h"
-#include "streams.h"
 #include "task.h"
 #include "txn_double_spend_detector.h"
 #include "txn_validation_result.h"
-#include "versionbits.h"
 
-#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
-#include <exception>
 #include <functional>
-#include <map>
 #include <set>
 #include <string>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -987,8 +981,8 @@ bool CheckSequenceLocks(
  * Closure representing one script verification.
  * Note that this stores references to the spending transaction.
  */
-class CScriptCheck {
-private:
+class CScriptCheck
+{
     CScript scriptPubKey;
     Amount amount;
     const CTransaction *ptxTo = 0;
@@ -997,32 +991,19 @@ private:
     bool cacheStore = false;
     ScriptError error = SCRIPT_ERR_UNKNOWN_ERROR;
     PrecomputedTransactionData txdata;
-    std::reference_wrapper<const Config> config;
-    bool consensus = false;
+    script_params params_;
     std::shared_ptr<std::atomic<malleability::status>> malleability {nullptr};
 
 public:
-    CScriptCheck(const Config& configIn,
-                 bool consensusIn,
-                 const CScript& scriptPubKeyIn,
-                 const Amount& amountIn,
-                 const CTransaction& txToIn,
-                 unsigned int nInIn,
-                 uint32_t nFlagsIn,
-                 bool cacheIn,
-                 const PrecomputedTransactionData& txdataIn,
-                 const std::shared_ptr<std::atomic<malleability::status>>& malleabilityIn)
-        : scriptPubKey(scriptPubKeyIn),
-          amount(amountIn),
-          ptxTo(&txToIn),
-          nIn(nInIn),
-          nFlags(nFlagsIn),
-          cacheStore(cacheIn),
-          txdata(txdataIn),
-          config(configIn),
-          consensus(consensusIn),
-          malleability{malleabilityIn}
-    {}
+    CScriptCheck(const script_params&,
+                 const CScript& scriptPubKey,
+                 const Amount&,
+                 const CTransaction& txTo,
+                 unsigned int nIn,
+                 uint32_t flags,
+                 bool cache,
+                 const PrecomputedTransactionData&,
+                 const std::shared_ptr<std::atomic<malleability::status>>&);
 
     std::optional<bool> operator()(const task::CCancellationToken& token);
 

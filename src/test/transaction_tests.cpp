@@ -16,6 +16,7 @@
 #include "keystore.h"
 #include "policy/policy.h"
 #include "protocol_era.h"
+#include "script/interpreter.h"
 #include "script/malleability_status.h"
 #include "script/script.h"
 #include "script/script_error.h"
@@ -470,11 +471,31 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
     for (size_t i = 0; i < mtx.vin.size(); i++) {
         std::vector<CScriptCheck> vChecks;
         const CTxOut& out = coins[tx.vin[i].prevout.GetN()].GetTxOut();
-        vChecks.emplace_back(testConfig, true, out.scriptPubKey, out.nValue, tx, static_cast<unsigned int>(i),
-                             PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS, false, txdata, malleability);
-        vChecks.emplace_back(testConfig, true, out.scriptPubKey, out.nValue, tx, static_cast<unsigned int>(i),
-                             POST_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS, false, txdata, malleability);
-        
+
+        constexpr bool consensus{true};
+        vChecks.emplace_back(make_script_params(testConfig,
+                                                PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS,
+                                                consensus),
+                             out.scriptPubKey,
+                             out.nValue,
+                             tx,
+                             static_cast<unsigned int>(i),
+                             PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS,
+                             false,
+                             txdata,
+                             malleability);
+        vChecks.emplace_back(make_script_params(testConfig,
+                                                POST_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS,
+                                                consensus),
+                             out.scriptPubKey,
+                             out.nValue,
+                             tx,
+                             static_cast<unsigned int>(i),
+                             POST_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS,
+                             false,
+                             txdata,
+                             malleability);
+
         control.Add(vChecks);
     }
 
@@ -545,8 +566,16 @@ BOOST_AUTO_TEST_CASE(test_combined_malleability_status)
     {
         std::vector<CScriptCheck> vChecks;
         const CTxOut& out = coins[tx.vin[i].prevout.GetN()].GetTxOut();
-        vChecks.emplace_back(testConfig, true, out.scriptPubKey, out.nValue, tx, static_cast<unsigned int>(i),
-                             flags, false, txdata, malleability);
+        constexpr bool consensus{true};
+        vChecks.emplace_back(make_script_params(testConfig, flags, consensus),
+                             out.scriptPubKey,
+                             out.nValue,
+                             tx,
+                             static_cast<unsigned int>(i),
+                             flags,
+                             false,
+                             txdata,
+                             malleability);
         control.Add(vChecks);
     }
 
