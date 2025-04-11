@@ -1195,16 +1195,15 @@ static UniValue signrawtransaction(const Config &config,
         UpdateTransaction(mergedTx, i, sigdata);
 
         auto source = task::CCancellationSource::Make();
-        const auto res =
-            VerifyScript(
-                config,
-                true,
-                source->GetToken(),
-                txin.scriptSig,
-                prevPubKey,
-                StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra),
-                TransactionSignatureChecker(&txConst, i, amount),
-                malleability);
+        const auto std_input_flags{StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra)};
+        const auto std_input_params{make_script_params(config, std_input_flags, consensus)};
+        const auto res = VerifyScript(std_input_params,
+                                      source->GetToken(),
+                                      txin.scriptSig,
+                                      prevPubKey,
+                                      std_input_flags,
+                                      TransactionSignatureChecker(&txConst, i, amount),
+                                      malleability);
         if(!res.has_value())
         {
             TxInErrorToJSON(txin, vErrors, "Validation timeout");

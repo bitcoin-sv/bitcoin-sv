@@ -2254,12 +2254,12 @@ script_params make_script_params(const CScriptConfig& config,
     return script_params{config.GetMaxOpsPerScript(utxo_after_genesis, consensus),
                          config.GetMaxScriptNumLength(era, consensus),
                          config.GetMaxScriptSize(utxo_after_genesis, consensus),
-                         config.GetMaxPubKeysPerMultiSig(utxo_after_genesis, consensus)};
+                         config.GetMaxPubKeysPerMultiSig(utxo_after_genesis, consensus),
+                         config.GetMaxStackMemoryUsage(utxo_after_genesis, consensus)};
 }
 
 std::optional<std::pair<bool, ScriptError>> VerifyScript(
-    const CScriptConfig& config,
-    bool consensus,
+    const script_params& params,
     const task::CCancellationToken& token,
     const CScript& scriptSig,
     const CScript& scriptPubKey,
@@ -2282,11 +2282,9 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     {
         our_malleability |= malleability::non_push_data;
     }
-
-    LimitedStack stack(config.GetMaxStackMemoryUsage(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus));
-    LimitedStack stackCopy(config.GetMaxStackMemoryUsage(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus));
-
-    const script_params params{make_script_params(config, flags, consensus)};
+    
+    LimitedStack stack{params.MaxStackMemoryUsage()};
+    LimitedStack stackCopy{params.MaxStackMemoryUsage()};
     if(const auto o = EvalScript(params,
                                  token,
                                  stack,
@@ -2461,5 +2459,26 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     }
 
     return std::make_pair(true, SCRIPT_ERR_OK);
+}
+
+// Only for unit testing
+std::optional<std::pair<bool, ScriptError>> VerifyScript(
+    const CScriptConfig& config,
+    bool consensus,
+    const task::CCancellationToken& token,
+    const CScript& scriptSig,
+    const CScript& scriptPubKey,
+    uint32_t flags,       
+    const BaseSignatureChecker& checker, 
+    std::atomic<malleability::status>& malleability)
+{
+    const script_params params{make_script_params(config, flags, consensus)};
+    return VerifyScript(params,
+                        token,
+                        scriptSig,
+                        scriptPubKey,
+                        flags,
+                        checker,
+                        malleability);
 }
 

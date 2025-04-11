@@ -5,15 +5,18 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "validation.h"
+
 #include "abort_node.h"
 #include "arith_uint256.h"
-#include "async_file_reader.h"
+#include "block_file_access.h"
 #include "block_file_access.h"
 #include "block_index_store.h"
 #include "block_index_store_loader.h"
+#include "block_read_cache.h"
+#include "blockfileinfostore.h"
 #include "blockfileinfostore.h"
 #include "blockindex_with_descendants.h"
-#include "block_read_cache.h"
+#include "blockindex_with_descendants.h"
 #include "blockstreams.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -26,11 +29,9 @@
 #include "frozentxo.h"
 #include "frozentxo_db.h"
 #include "frozentxo_logging.h"
-#include "fs.h"
-#include "hash.h"
 #include "init.h"
 #include "invalid_txn_publisher.h"
-#include "metrics.h"
+#include "invalid_txn_publisher.h"
 #include "miner_id/miner_id_db.h"
 #include "miner_id/miner_info_tracker.h"
 #include "mining/journal_builder.h"
@@ -42,8 +43,9 @@
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "processing_block_index.h"
-#include "pubkey.h"
 #include "protocol_era.h"
+#include "safe_mode.h"
+#include "script/interpreter.h"
 #include "script/script_error.h"
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
@@ -52,9 +54,8 @@
 #include "timedata.h"
 #include "tinyformat.h"
 #include "txdb.h"
-#include "txn_grouper.h"
 #include "txmempool.h"
-#include "txn_validator.h"
+#include "txn_grouper.h"
 #include "ui_interface.h"
 #include "undo.h"
 #include "util.h"
@@ -62,17 +63,13 @@
 #include "utilstrencodings.h"
 #include "validationinterface.h"
 #include "verify_script_flags.h"
-#include "versionbits.h"
 #include "warnings.h"
-#include "blockfileinfostore.h"
-#include "block_file_access.h"
-#include "invalid_txn_publisher.h"
-#include "blockindex_with_descendants.h"
-#include "metrics.h"
-#include "safe_mode.h"
 
 #include <array>
 #include <atomic>
+#include <cstddef>
+#include <cstdint>
+#include <variant>
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -80,9 +77,6 @@
 #include <boost/math/distributions/poisson.hpp>
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/thread.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <variant>
 
 #if defined(NDEBUG)
 #error "Bitcoin cannot be compiled without assertions."
@@ -2517,8 +2511,8 @@ std::optional<bool> CScriptCheck::operator()(const task::CCancellationToken& tok
 {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
 
-    const auto o = VerifyScript(config,
-                                consensus,
+    const auto params{make_script_params(config, nFlags, consensus)};
+    const auto o = VerifyScript(params,
                                 token,
                                 scriptSig,
                                 scriptPubKey,

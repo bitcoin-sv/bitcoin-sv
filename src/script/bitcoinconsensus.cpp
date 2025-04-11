@@ -92,14 +92,16 @@ static int verify_script(const CScriptConfig& config, const uint8_t* scriptPubKe
         auto source = task::CCancellationSource::Make();
         std::atomic<malleability::status> ms {};
 
-        const auto res =
-          VerifyScript(
-              config, true,
-              source->GetToken(),
-              tx.vin[nIn].scriptSig,
-              CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), flags,
-              TransactionSignatureChecker(&tx, nIn, amount, txdata),
-              ms);
+        constexpr bool consensus{true};
+        const auto params{make_script_params(config, flags, consensus)};
+        const auto
+            res = VerifyScript(params,
+                               source->GetToken(),
+                               tx.vin[nIn].scriptSig,
+                               CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen),
+                               flags,
+                               TransactionSignatureChecker(&tx, nIn, amount, txdata),
+                               ms);
 
         return (res.has_value() && res->first);
     }

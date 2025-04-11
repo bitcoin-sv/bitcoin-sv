@@ -130,16 +130,19 @@ class script_params
     uint64_t maxScriptNumLength;
     uint64_t maxScriptSize;
     uint64_t maxPubKeysPerMultiSig;
+    uint64_t maxStackMemoryUsage;
 
 public:
     constexpr script_params(uint64_t maxOpsPerScript,
                             uint64_t maxScriptNumLength,
                             uint64_t maxScriptSize,
-                            uint64_t maxPubKeysPerMultiSig)
+                            uint64_t maxPubKeysPerMultiSig,
+                            uint64_t maxStackMemoryUsage)
         : maxOpsPerScript{maxOpsPerScript},
           maxScriptNumLength{maxScriptNumLength},
           maxScriptSize{maxScriptSize},
-          maxPubKeysPerMultiSig{maxPubKeysPerMultiSig}
+          maxPubKeysPerMultiSig{maxPubKeysPerMultiSig},
+          maxStackMemoryUsage{maxStackMemoryUsage}
     {
     }
 
@@ -147,11 +150,13 @@ public:
     constexpr uint64_t MaxScriptNumLength() const { return maxScriptNumLength; }
     constexpr uint64_t MaxScriptSize() const { return maxScriptSize; }
     constexpr uint64_t MaxPubKeysPerMultiSig() const { return maxPubKeysPerMultiSig; }
+    constexpr uint64_t MaxStackMemoryUsage() const { return maxStackMemoryUsage; }
 };
-static_assert(script_params(1, 2, 3, 4).MaxOpsPerScript() == 1);
-static_assert(script_params(1, 2, 3, 4).MaxScriptNumLength() == 2);
-static_assert(script_params(1, 2, 3, 4).MaxScriptSize() == 3);
-static_assert(script_params(1, 2, 3, 4).MaxPubKeysPerMultiSig() == 4);
+static_assert(script_params(1, 2, 3, 4, 5).MaxOpsPerScript() == 1);
+static_assert(script_params(1, 2, 3, 4, 5).MaxScriptNumLength() == 2);
+static_assert(script_params(1, 2, 3, 4, 5).MaxScriptSize() == 3);
+static_assert(script_params(1, 2, 3, 4, 5).MaxPubKeysPerMultiSig() == 4);
+static_assert(script_params(1, 2, 3, 4, 5).MaxStackMemoryUsage() == 5);
 
 script_params make_script_params(const CScriptConfig&, uint32_t flags, bool consensus);
 
@@ -182,6 +187,15 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     uint32_t flags,
     const BaseSignatureChecker& checker);
 
+std::optional<std::pair<bool, ScriptError>> VerifyScript(
+    const script_params&,
+    const task::CCancellationToken&,
+    const CScript& scriptSig,
+    const CScript& scriptPubKey,
+    uint32_t flags,
+    const BaseSignatureChecker&,
+    std::atomic<malleability::status>&);
+
 // Only for unit testing
 std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     const CScriptConfig&,
@@ -206,6 +220,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     uint32_t flags,
     const BaseSignatureChecker& checker);
 
+// Only for unit testing
 std::optional<std::pair<bool, ScriptError>> VerifyScript(
     const CScriptConfig& config,
     bool consensus,

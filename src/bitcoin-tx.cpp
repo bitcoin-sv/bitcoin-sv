@@ -715,16 +715,20 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
 
         UpdateTransaction(mergedTx, i, sigdata);
 
+        const auto std_input_flags{StandardScriptVerifyFlags(ActiveEra) |
+                                   InputScriptVerifyFlags(ActiveEra, utxoEra)};
+
+        const auto std_input_params{make_script_params(config, std_input_flags, consensus)};
         auto source = task::CCancellationSource::Make();
-        const auto res =
-            VerifyScript(
-                config, true,
-                source->GetToken(),
-                txin.scriptSig,
-                prevPubKey,
-                StandardScriptVerifyFlags(ActiveEra) | InputScriptVerifyFlags(ActiveEra, utxoEra),
-                MutableTransactionSignatureChecker(&mergedTx, i, amount),
-                ms);
+        const auto res = VerifyScript(std_input_params,
+                                      source->GetToken(),
+                                      txin.scriptSig,
+                                      prevPubKey,
+                                      std_input_flags,
+                                      MutableTransactionSignatureChecker(&mergedTx,
+                                                                         i,
+                                                                         amount),
+                                      ms);
         if(!res.has_value() || !res->first)
         {
             fComplete = false;
