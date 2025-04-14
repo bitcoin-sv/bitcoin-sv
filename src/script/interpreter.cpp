@@ -371,7 +371,7 @@ static bool IsOpcodeDisabled(const opcodetype opcode,
     return false;
 }
 
-inline bool IsValidMaxOpsPerScript(const uint64_t nOpCount, const script_params& params)
+inline bool IsValidMaxOpsPerScript(const uint64_t nOpCount, const eval_script_params& params)
 {
     return nOpCount <= params.MaxOpsPerScript();
 }
@@ -383,7 +383,7 @@ static void to_le(const int32_t n, uint8_t* o)
 }
 
 std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
-    const script_params& params,
+    const eval_script_params& params,
     const task::CCancellationToken& token,
     LimitedStack& stack,
     const CScript& script,
@@ -1804,7 +1804,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 }
 
 std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
-    const script_params& params,
+    const eval_script_params& params,
     const task::CCancellationToken& token,
     LimitedStack& stack,
     const CScript& script,
@@ -1836,7 +1836,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     uint32_t flags,
     const BaseSignatureChecker& checker)
 {
-    const script_params params{make_script_params(config, flags, consensus)};
+    const eval_script_params params{make_eval_script_params(config, flags, consensus)};
     return EvalScript(params,
                       token,
                       stack,
@@ -1859,7 +1859,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     std::vector<bool>& vfExec,
     std::vector<bool>& vfElse)
 {
-    const script_params params{make_script_params(config, flags, consensus)};
+    const eval_script_params params{make_eval_script_params(config, flags, consensus)};
     return EvalScript(params,
                       token,
                       stack,
@@ -2245,21 +2245,30 @@ static_assert(ProtocolEra::PostChronicle == utxo_era(SCRIPT_UTXO_AFTER_CHRONICLE
 static_assert(ProtocolEra::PostChronicle == utxo_era(SCRIPT_UTXO_AFTER_CHRONICLE));
 
 // Pre-condition: valid_flags (see above)
-script_params make_script_params(const CScriptConfig& config,
-                                 const uint32_t flags,
-                                 const bool consensus)
+eval_script_params make_eval_script_params(const CScriptConfig& config,
+                                           const uint32_t flags,
+                                           const bool consensus)
 {
     const ProtocolEra era{utxo_era(flags)};
     const bool utxo_after_genesis{IsUtxoAfterGenesis(flags)};
-    return script_params{config.GetMaxOpsPerScript(utxo_after_genesis, consensus),
-                         config.GetMaxScriptNumLength(era, consensus),
-                         config.GetMaxScriptSize(utxo_after_genesis, consensus),
-                         config.GetMaxPubKeysPerMultiSig(utxo_after_genesis, consensus),
-                         config.GetMaxStackMemoryUsage(utxo_after_genesis, consensus)};
+    return eval_script_params{config.GetMaxOpsPerScript(utxo_after_genesis, consensus),
+                              config.GetMaxScriptNumLength(era, consensus),
+                              config.GetMaxScriptSize(utxo_after_genesis, consensus),
+                              config.GetMaxPubKeysPerMultiSig(utxo_after_genesis, consensus)};
+}
+
+// Pre-condition: valid_flags (see above)
+verify_script_params make_verify_script_params(const CScriptConfig& config,
+                                               const uint32_t flags,
+                                               const bool consensus)
+{
+    const bool utxo_after_genesis{IsUtxoAfterGenesis(flags)};
+    return verify_script_params{make_eval_script_params(config, flags, consensus),
+                                config.GetMaxStackMemoryUsage(utxo_after_genesis, consensus)};
 }
 
 std::optional<std::pair<bool, ScriptError>> VerifyScript(
-    const script_params& params,
+    const verify_script_params& params,
     const task::CCancellationToken& token,
     const CScript& scriptSig,
     const CScript& scriptPubKey,
@@ -2285,7 +2294,7 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     
     LimitedStack stack{params.MaxStackMemoryUsage()};
     LimitedStack stackCopy{params.MaxStackMemoryUsage()};
-    if(const auto o = EvalScript(params,
+    if(const auto o = EvalScript(params.EvalScriptParams(),
                                  token,
                                  stack,
                                  scriptSig,
@@ -2308,7 +2317,7 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
         stackCopy = stack.makeRootStackCopy();
     }
 
-    if(const auto o = EvalScript(params,
+    if(const auto o = EvalScript(params.EvalScriptParams(),
                                  token,
                                  stack,
                                  scriptPubKey,
@@ -2355,7 +2364,7 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
         CScript pubKey2(pubKeySerialized.begin(), pubKeySerialized.end());
         stack.pop_back();
 
-        if(const auto o = EvalScript(params,
+        if(const auto o = EvalScript(params.EvalScriptParams(),
                                      token,
                                      stack,
                                      pubKey2,
@@ -2472,7 +2481,7 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     const BaseSignatureChecker& checker, 
     std::atomic<malleability::status>& malleability)
 {
-    const script_params params{make_script_params(config, flags, consensus)};
+    const verify_script_params params{make_verify_script_params(config, flags, consensus)};
     return VerifyScript(params,
                         token,
                         scriptSig,

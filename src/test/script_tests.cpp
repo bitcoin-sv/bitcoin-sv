@@ -2414,7 +2414,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
 
     constexpr bool consensus{true};
     const uint32_t flags{MandatoryScriptVerifyFlags(era)};
-    const script_params params{make_script_params(config, flags, consensus)};
+    const auto params{make_eval_script_params(config, flags, consensus)};
     SignatureData combined = CombineSignatures(params,
                                                scriptPubKey,
                                                MutableTransactionSignatureChecker(&txTo,

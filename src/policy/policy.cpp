@@ -280,7 +280,7 @@ std::optional<bool> AreInputsStandard(
 
     constexpr bool consensus{};
     constexpr uint32_t flags{SCRIPT_VERIFY_NONE};
-    const script_params params{make_script_params(config, flags, consensus)};
+    const auto params{make_eval_script_params(config, flags, consensus)};
 
     for (size_t i = 0; i < tx.vin.size(); i++) {
         auto prev = mapInputs.GetCoinWithScript( tx.vin[i].prevout );

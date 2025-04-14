@@ -859,7 +859,7 @@ Examples:
         }
 
         constexpr bool consensus{};
-        const script_params params{make_script_params(config, scr.flags, consensus)};
+        const auto params{make_verify_script_params(config, scr.flags, consensus)};
 
         CScriptCheck script_check{params,
                                   scr.txo_lock,

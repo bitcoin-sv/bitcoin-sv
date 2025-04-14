@@ -197,7 +197,7 @@ bool SignAndVerify(const Config& config,
     auto source = task::CCancellationSource::Make();
     uint32_t flags = StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra);
     std::atomic<malleability::status> ms{};
-    const auto params{make_script_params(config, flags, consensus)};
+    const auto params{make_verify_script_params(config, flags, consensus)};
     const auto o = VerifyScript(params,
                                 source->GetToken(),
                                 sigdata.scriptSig,
@@ -327,7 +327,7 @@ struct Stacks {
     explicit Stacks(const std::vector<valtype> &scriptSigStack_)
         : script(scriptSigStack_) {}
 
-    Stacks(const script_params& params,
+    Stacks(const eval_script_params& params,
            const SignatureData& data,
            int32_t tx_version,
            ProtocolEra era)
@@ -406,7 +406,7 @@ static Stacks CombineSignatures(const CScript &scriptPubKey,
     }
 }
 
-SignatureData CombineSignatures(const script_params& params,
+SignatureData CombineSignatures(const eval_script_params& params,
                                 const CScript& scriptPubKey,
                                 const BaseSignatureChecker& checker,
                                 const SignatureData& scriptSig1,

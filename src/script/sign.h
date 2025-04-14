@@ -108,7 +108,7 @@ bool SignSignature(const Config& config, const CKeyStore& keystore,
 
 /** Combine two script signatures using a generic signature checker,
  * intelligently, possibly with OP_0 placeholders. */
-SignatureData CombineSignatures(const script_params&,
+SignatureData CombineSignatures(const eval_script_params&,
                                 const CScript& scriptPubKey,
                                 const BaseSignatureChecker&,
                                 const SignatureData& scriptSig1,

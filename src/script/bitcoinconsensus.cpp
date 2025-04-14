@@ -93,7 +93,7 @@ static int verify_script(const CScriptConfig& config, const uint8_t* scriptPubKe
         std::atomic<malleability::status> ms {};
 
         constexpr bool consensus{true};
-        const auto params{make_script_params(config, flags, consensus)};
+        const auto params{make_verify_script_params(config, flags, consensus)};
         const auto
             res = VerifyScript(params,
                                source->GetToken(),

@@ -1171,7 +1171,7 @@ static UniValue signrawtransaction(const Config &config,
 
         constexpr bool consensus{true};
         const auto flags{MandatoryScriptVerifyFlags(era)};
-        const script_params params{make_script_params(config, flags, consensus)};
+        const auto params{make_eval_script_params(config, flags, consensus)};
 
         // ... and merge in other signatures:
         for(const CMutableTransaction& txv : txVariants)
@@ -1196,7 +1196,7 @@ static UniValue signrawtransaction(const Config &config,
 
         auto source = task::CCancellationSource::Make();
         const auto std_input_flags{StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra)};
-        const auto std_input_params{make_script_params(config, std_input_flags, consensus)};
+        const auto std_input_params{make_verify_script_params(config, std_input_flags, consensus)};
         const auto res = VerifyScript(std_input_params,
                                       source->GetToken(),
                                       txin.scriptSig,

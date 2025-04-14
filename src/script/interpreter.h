@@ -124,41 +124,64 @@ public:
     }
 };
 
-class script_params
+class eval_script_params
 {
-    uint64_t maxOpsPerScript;
-    uint64_t maxScriptNumLength;
-    uint64_t maxScriptSize;
-    uint64_t maxPubKeysPerMultiSig;
-    uint64_t maxStackMemoryUsage;
+    uint64_t maxOpsPerScript_;
+    uint64_t maxScriptNumLength_;
+    uint64_t maxScriptSize_;
+    uint64_t maxPubKeysPerMultiSig_;
 
 public:
-    constexpr script_params(uint64_t maxOpsPerScript,
-                            uint64_t maxScriptNumLength,
-                            uint64_t maxScriptSize,
-                            uint64_t maxPubKeysPerMultiSig,
-                            uint64_t maxStackMemoryUsage)
-        : maxOpsPerScript{maxOpsPerScript},
-          maxScriptNumLength{maxScriptNumLength},
-          maxScriptSize{maxScriptSize},
-          maxPubKeysPerMultiSig{maxPubKeysPerMultiSig},
-          maxStackMemoryUsage{maxStackMemoryUsage}
+    constexpr eval_script_params(uint64_t maxOpsPerScript,
+                                 uint64_t maxScriptNumLength,
+                                 uint64_t maxScriptSize,
+                                 uint64_t maxPubKeysPerMultiSig)
+        : maxOpsPerScript_{maxOpsPerScript},
+          maxScriptNumLength_{maxScriptNumLength},
+          maxScriptSize_{maxScriptSize},
+          maxPubKeysPerMultiSig_{maxPubKeysPerMultiSig}
     {
     }
 
-    constexpr uint64_t MaxOpsPerScript() const { return maxOpsPerScript; }
-    constexpr uint64_t MaxScriptNumLength() const { return maxScriptNumLength; }
-    constexpr uint64_t MaxScriptSize() const { return maxScriptSize; }
-    constexpr uint64_t MaxPubKeysPerMultiSig() const { return maxPubKeysPerMultiSig; }
-    constexpr uint64_t MaxStackMemoryUsage() const { return maxStackMemoryUsage; }
-};
-static_assert(script_params(1, 2, 3, 4, 5).MaxOpsPerScript() == 1);
-static_assert(script_params(1, 2, 3, 4, 5).MaxScriptNumLength() == 2);
-static_assert(script_params(1, 2, 3, 4, 5).MaxScriptSize() == 3);
-static_assert(script_params(1, 2, 3, 4, 5).MaxPubKeysPerMultiSig() == 4);
-static_assert(script_params(1, 2, 3, 4, 5).MaxStackMemoryUsage() == 5);
+    constexpr uint64_t MaxOpsPerScript() const { return maxOpsPerScript_; }
+    constexpr uint64_t MaxScriptNumLength() const { return maxScriptNumLength_; }
+    constexpr uint64_t MaxScriptSize() const { return maxScriptSize_; }
+    constexpr uint64_t MaxPubKeysPerMultiSig() const { return maxPubKeysPerMultiSig_; }
 
-script_params make_script_params(const CScriptConfig&, uint32_t flags, bool consensus);
+    constexpr bool operator==(const eval_script_params& other) const = default;
+};
+static_assert(eval_script_params(1, 2, 3, 4).MaxOpsPerScript() == 1);
+static_assert(eval_script_params(1, 2, 3, 4).MaxScriptNumLength() == 2);
+static_assert(eval_script_params(1, 2, 3, 4).MaxScriptSize() == 3);
+static_assert(eval_script_params(1, 2, 3, 4).MaxPubKeysPerMultiSig() == 4);
+
+eval_script_params make_eval_script_params(const CScriptConfig&,
+                                           uint32_t flags,
+                                           bool consensus);
+
+class verify_script_params
+{
+    eval_script_params eval_script_params_;
+    uint64_t maxStackMemoryUsage_;
+
+public:
+    constexpr verify_script_params(const class eval_script_params& eval_script_params,
+                                   uint64_t maxStackMemoryUsage)
+        : eval_script_params_{eval_script_params},
+          maxStackMemoryUsage_{maxStackMemoryUsage}
+    {
+    }
+
+    constexpr const eval_script_params& EvalScriptParams() const { return eval_script_params_; }
+    constexpr uint64_t MaxStackMemoryUsage() const { return maxStackMemoryUsage_; }
+};
+static_assert(verify_script_params(eval_script_params{1, 2, 3, 4}, 5).EvalScriptParams()
+              == eval_script_params{1, 2, 3, 4});
+static_assert(verify_script_params(eval_script_params{1, 2, 3, 4}, 5).MaxStackMemoryUsage() == 5);
+
+verify_script_params make_verify_script_params(const CScriptConfig&,
+                                               uint32_t flags,
+                                               bool consensus);
 
 /**
 * EvalScript function evaluates scripts against predefined limits that are
@@ -168,7 +191,7 @@ script_params make_script_params(const CScriptConfig&, uint32_t flags, bool cons
 * and it should be false when validating scripts of transactions that are validated for acceptance to mempool
 */
 std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
-    const script_params&,
+    const eval_script_params&,
     const task::CCancellationToken& token,
     LimitedStack& stack,
     const CScript& script,
@@ -180,7 +203,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     std::vector<bool>& vfElse);
 
 std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
-    const script_params&,
+    const eval_script_params&,
     const task::CCancellationToken& token,
     LimitedStack& stack,
     const CScript& script,
@@ -188,7 +211,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     const BaseSignatureChecker& checker);
 
 std::optional<std::pair<bool, ScriptError>> VerifyScript(
-    const script_params&,
+    const verify_script_params&,
     const task::CCancellationToken&,
     const CScript& scriptSig,
     const CScript& scriptPubKey,

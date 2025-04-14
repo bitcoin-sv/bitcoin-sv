@@ -696,7 +696,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
         }
         constexpr bool consensus{true};
         const uint32_t flags{MandatoryScriptVerifyFlags(ActiveEra)};
-        const script_params params{make_script_params(config, flags, consensus)};
+        const auto params{make_eval_script_params(config, flags, consensus)};
         for(const CTransaction& txv : txVariants)
         {
             // ... and merge in other signatures:
@@ -718,7 +718,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
         const auto std_input_flags{StandardScriptVerifyFlags(ActiveEra) |
                                    InputScriptVerifyFlags(ActiveEra, utxoEra)};
 
-        const auto std_input_params{make_script_params(config, std_input_flags, consensus)};
+        const auto std_input_params{make_verify_script_params(config, std_input_flags, consensus)};
         auto source = task::CCancellationSource::Make();
         const auto res = VerifyScript(std_input_params,
                                       source->GetToken(),

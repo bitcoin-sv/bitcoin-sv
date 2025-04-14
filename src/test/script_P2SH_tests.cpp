@@ -164,7 +164,7 @@ BOOST_AUTO_TEST_CASE(sign) {
                                      | SCRIPT_VERIFY_STRICTENC
                                      | SCRIPT_ENABLE_SIGHASH_FORKID};
             constexpr bool consensus{true};
-            const script_params params{make_script_params(testConfig, flags, consensus)};
+            const auto params{make_verify_script_params(testConfig, flags, consensus)};
             const auto sigOK = CScriptCheck(params,
                                             output.scriptPubKey,
                                             output.nValue,

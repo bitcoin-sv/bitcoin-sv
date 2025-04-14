@@ -991,11 +991,11 @@ class CScriptCheck
     bool cacheStore = false;
     ScriptError error = SCRIPT_ERR_UNKNOWN_ERROR;
     PrecomputedTransactionData txdata;
-    script_params params_;
+    verify_script_params params_;
     std::shared_ptr<std::atomic<malleability::status>> malleability {nullptr};
 
 public:
-    CScriptCheck(const script_params&,
+    CScriptCheck(const verify_script_params&,
                  const CScript& scriptPubKey,
                  const Amount&,
                  const CTransaction& txTo,

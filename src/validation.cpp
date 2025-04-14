@@ -2508,7 +2508,7 @@ void UpdateCoins(const CTransaction& tx, ICoinsViewCache& inputs, int32_t nHeigh
 }
 
 CScriptCheck::CScriptCheck(
-    const script_params& params,
+    const verify_script_params& params,
     const CScript& scriptPubKeyIn,
     const Amount& amountIn,
     const CTransaction& txToIn,
@@ -2708,7 +2708,7 @@ std::optional<bool> CheckInputScripts(
     // ScriptExecutionCache does NOT contain per-input flags. That's why we clear the
     // cache when we are about to cross a protocol era activation line (see function FinalizeEraCrossing).
 
-    const script_params params{make_script_params(config, flags | perInputScriptFlags, consensus)};
+    const verify_script_params params{make_verify_script_params(config, flags | perInputScriptFlags, consensus)};
     CScriptCheck check(params,
                        scriptPubKey,
                        amount,
@@ -2754,7 +2754,7 @@ std::optional<bool> CheckInputScripts(
             // again and fail because the transaction exceeds our policy limits, the node would get banned and this is not ok
             
             constexpr bool consensus{true};
-            const script_params params{make_script_params(config, flags2Check, consensus)};
+            const auto params{make_verify_script_params(config, flags2Check, consensus)};
             CScriptCheck check2(params,
                                 scriptPubKey,
                                 amount,
@@ -2789,7 +2789,7 @@ std::optional<bool> CheckInputScripts(
                 uint32_t flags3Check = (flags | inverseInputFlags) & ~standardNotMandatoryFlags;
 
                 constexpr bool consensus{true};
-                const script_params params{make_script_params(config, flags3Check, consensus)};
+                const auto params{make_verify_script_params(config, flags3Check, consensus)};
                 CScriptCheck check3(params,
                                     scriptPubKey,
                                     amount,
@@ -2817,7 +2817,7 @@ std::optional<bool> CheckInputScripts(
                 uint32_t flags3Check = (flags | inverseInputFlags) & ~standardNotMandatoryFlags;
 
                 constexpr bool consensus{true};
-                const script_params params{make_script_params(config, flags3Check, consensus)};
+                const auto params{make_verify_script_params(config, flags3Check, consensus)};
                 CScriptCheck check3(params,
                                     scriptPubKey,
                                     amount,

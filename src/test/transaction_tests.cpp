@@ -473,9 +473,9 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
         const CTxOut& out = coins[tx.vin[i].prevout.GetN()].GetTxOut();
 
         constexpr bool consensus{true};
-        vChecks.emplace_back(make_script_params(testConfig,
-                                                PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS,
-                                                consensus),
+        vChecks.emplace_back(make_verify_script_params(testConfig,
+                                                       PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS,
+                                                       consensus),
                              out.scriptPubKey,
                              out.nValue,
                              tx,
@@ -484,9 +484,9 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
                              false,
                              txdata,
                              malleability);
-        vChecks.emplace_back(make_script_params(testConfig,
-                                                POST_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS,
-                                                consensus),
+        vChecks.emplace_back(make_verify_script_params(testConfig,
+                                                       POST_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS,
+                                                       consensus),
                              out.scriptPubKey,
                              out.nValue,
                              tx,
@@ -567,7 +567,7 @@ BOOST_AUTO_TEST_CASE(test_combined_malleability_status)
         std::vector<CScriptCheck> vChecks;
         const CTxOut& out = coins[tx.vin[i].prevout.GetN()].GetTxOut();
         constexpr bool consensus{true};
-        vChecks.emplace_back(make_script_params(testConfig, flags, consensus),
+        vChecks.emplace_back(make_verify_script_params(testConfig, flags, consensus),
                              out.scriptPubKey,
                              out.nValue,
                              tx,
@@ -836,7 +836,7 @@ BOOST_AUTO_TEST_CASE(test_witness) {
     BOOST_CHECK(*output1 == *output2);
     constexpr bool consensus{true};
     const uint32_t flags{MandatoryScriptVerifyFlags(ProtocolEra::PreGenesis)};
-    const script_params params{make_script_params(testConfig, flags, consensus)};
+    const auto params{make_eval_script_params(testConfig, flags, consensus)};
     UpdateTransaction(input1,
                       0,
                       CombineSignatures(params,
