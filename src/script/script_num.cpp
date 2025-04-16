@@ -13,6 +13,7 @@
 
 #include "int_serialization.h"
 #include "script/malleability_status.h"
+#include "overload.h"
 
 using bsv::bint;
 using namespace std;
@@ -225,21 +226,6 @@ std::ostream& operator<<(std::ostream& os, const CScriptNum& n)
 {
     visit([&os](const auto& n) { os << n; }, n.m_value);
     return os;
-}
-
-namespace
-{
-    // overload is expected to be standardized in C++23
-    // see C++17 The Complete Guide, Chapter 14.1, Nico Josuttis
-    // or  Functional Programming in C++, Chapter 9.3, Ivan Cukic
-    template <typename... Ts>
-    struct overload : Ts... // inherit from variadic template arguments
-    {
-        using Ts::operator()...; // 'use' all base type function call operators
-    };
-    // Deduction guide so base types are deduced from passed arguments
-    template <typename... Ts>
-    overload(Ts...)->overload<Ts...>;
 }
 
 int CScriptNum::getint() const

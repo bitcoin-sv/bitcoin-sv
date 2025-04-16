@@ -581,6 +581,7 @@ libbitcoin_util_a_SOURCES = \
   compat/strnlen.cpp \
   fs.cpp \
   logging.cpp \
+  overload.h \
   random.cpp \
   rpc/protocol.cpp \
   rpc/text_writer.cpp \

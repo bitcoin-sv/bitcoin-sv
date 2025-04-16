@@ -3,12 +3,13 @@
 // LICENSE.
 
 #include "config.h"
-#include "logging.h"
-#include "txmempool.h"
-#include "mempooltxdb.h"
-#include "util.h"
-#include "thread_safe_queue.h"
 #include "consensus/consensus.h"
+#include "logging.h"
+#include "mempooltxdb.h"
+#include "overload.h"
+#include "thread_safe_queue.h"
+#include "txmempool.h"
+#include "util.h"
 
 #include <future>
 #include <limits>
@@ -407,14 +408,6 @@ bool CAsyncMempoolTxDB::RemoveXrefKey()
     return result;
 }
 
-
-// Overload dispatcher for std::visit.
-// See the example at https://en.cppreference.com/w/cpp/utility/variant/visit
-namespace {
-    template<class... T> struct dispatch : T... { using T::operator()...; };
-    template<class... T> dispatch(T...) -> dispatch<T...>;
-}
-
 void CAsyncMempoolTxDB::Work()
 {
     // NOLINTNEXTLINE(bugprone-casting-through-void)
@@ -492,7 +485,7 @@ void CAsyncMempoolTxDB::Work()
         batch.Remove(task.transaction.txid, task.transaction.size);
     };
 
-    const auto dispatcher {dispatch{sync, clear, invoke, add, remove}};
+    const auto dispatcher {overload{sync, clear, invoke, add, remove}};
     for (;;)
     {
         try
