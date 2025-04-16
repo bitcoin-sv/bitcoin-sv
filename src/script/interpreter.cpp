@@ -1478,8 +1478,19 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
                         bool fSuccess = checker.CheckSig(vchSig.GetElement(), vchPubKey.GetElement(), scriptCode);
 
-                        if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) && vchSig.size())
-                            return SCRIPT_ERR_SIG_NULLFAIL;
+                        // If the operation failed and the Chronicle sighash bit is not set,
+                        // we require that the signature must be empty vector.
+                        if(!fSuccess && VerifyNullFail(flags) && !vchSig.empty())
+                        {
+                            if((flags & SCRIPT_CHRONICLE) && GetHashType(vchSig.GetElement()).hasChronicle())
+                            {
+                                ms |= malleability::null_fail;
+                            }
+                            else
+                            {
+                                return SCRIPT_ERR_SIG_NULLFAIL;
+                            }
+                        }
 
                         stack.pop_back();
                         stack.pop_back();
@@ -1609,11 +1620,19 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
                         // Clean up stack of actual arguments
                         while (i-- > 1) {
-                            // If the operation failed, we require that all
-                            // signatures must be empty vector
-                            if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) &&
-                                !ikey2 && stack.stacktop(-1).size()) {
-                                return SCRIPT_ERR_SIG_NULLFAIL;
+                            // If the operation failed and the Chronicle sighash bit is not set,
+                            // we require that all signatures must be empty vector
+                            const auto& vchSig { stack.stacktop(-1) };
+                            if (!fSuccess && VerifyNullFail(flags) && !ikey2 && !vchSig.empty())
+                            {
+                                if((flags & SCRIPT_CHRONICLE) && GetHashType(vchSig.GetElement()).hasChronicle())
+                                {
+                                    ms |= malleability::null_fail;
+                                }
+                                else
+                                {
+                                    return SCRIPT_ERR_SIG_NULLFAIL;
+                                }
                             }
  
                             if (ikey2 > 0) {
@@ -2301,6 +2320,10 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
             our_malleability |= std::get<malleability::status>(v);
     }
 
+    // Combine malleability status (so far) so that if we abort script
+    // evaluation and return FALSE we don't lose malleability information
+    malleability |= our_malleability;
+
     if(stack.empty())
         return std::make_pair(false, SCRIPT_ERR_EVAL_FALSE);
 
@@ -2428,6 +2451,12 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
 
                 if(is_non_minimal_scriptnum(combined_malleability))
                     return std::make_pair(false, SCRIPT_ERR_SCRIPTNUM_MINENCODE);
+            }
+
+            if(flags & SCRIPT_VERIFY_NULLFAIL)
+            {
+                if(is_null_fail(combined_malleability))
+                    return std::make_pair(false, SCRIPT_ERR_SIG_NULLFAIL);
             }
         }
     }

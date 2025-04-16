@@ -128,5 +128,11 @@ constexpr bool IsUtxoAfterChronicle(uint32_t flags)
 static_assert(!IsUtxoAfterChronicle(0));
 static_assert(IsUtxoAfterChronicle(SCRIPT_UTXO_AFTER_CHRONICLE));
 
+constexpr bool VerifyNullFail(uint32_t flags)
+{
+    return (flags & SCRIPT_VERIFY_NULLFAIL) != 0;
+}
+static_assert(!VerifyNullFail(0));
+static_assert(VerifyNullFail(SCRIPT_VERIFY_NULLFAIL));
 
 #endif // BITCOIN_SCRIPT_SCRIPTFLAGS_H
