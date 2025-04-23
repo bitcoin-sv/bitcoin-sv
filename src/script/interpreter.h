@@ -14,7 +14,6 @@
 #include "malleability_status.h"
 
 #include <cstdint>
-#include <memory>
 #include <optional>
 #include <variant>
 #include <vector>
@@ -218,40 +217,5 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     uint32_t flags,
     const BaseSignatureChecker&,
     std::atomic<malleability::status>&);
-
-// Only for unit testing
-std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
-    const CScriptConfig&,
-    bool consensus,
-    const task::CCancellationToken& token,
-    LimitedStack& stack,
-    const CScript& script,
-    uint32_t flags,
-    const BaseSignatureChecker& checker,
-    LimitedStack& altstack,
-    long& ipc,
-    std::vector<bool>& vfExec,
-    std::vector<bool>& vfElse);
-
-// Only for unit testing
-std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
-    const CScriptConfig&,
-    bool consensus,
-    const task::CCancellationToken& token,
-    LimitedStack& stack,
-    const CScript& script,
-    uint32_t flags,
-    const BaseSignatureChecker& checker);
-
-// Only for unit testing
-std::optional<std::pair<bool, ScriptError>> VerifyScript(
-    const CScriptConfig& config,
-    bool consensus,
-    const task::CCancellationToken& token,
-    const CScript& scriptSig,
-    const CScript& scriptPubKey,
-    uint32_t flags,
-    const BaseSignatureChecker& checker,
-    std::atomic<malleability::status>& malleability);
 
 #endif // BITCOIN_SCRIPT_INTERPRETER_H

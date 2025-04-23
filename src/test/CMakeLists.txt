@@ -118,6 +118,8 @@ add_test_to_suite(bitcoin test_bitcoin
 	inv_tests.cpp
     int_serialization_tests.cpp
     instruction_iterator_tests.cpp
+    interpreter_adapter.cpp
+    interpreter_adapter.h
     invalid_txn_publisher_tests.cpp
     jba_selfish_mining_tests.cpp
 	journal_assembler_group_tests.cpp

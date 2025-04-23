@@ -5,19 +5,20 @@
 
 #include "data/script_tests.json.h"
 
+#include "config.h"
 #include "core_io.h"
+#include "interpreter_adapter.h"
 #include "key.h"
 #include "keystore.h"
 #include "protocol_era.h"
 #include "rpc/server.h"
-#include "script/interpreter.h"
 #include "script/malleability_status.h"
 #include "script/opcodes.h"
 #include "script/script.h"
+#include "script/script_error.h"
 #include "script/script_flags.h"
 #include "script/script_num.h"
 #include "script/sigcache.h"
-#include "script/script_error.h"
 #include "script/sighashtype.h"
 #include "script/sign.h"
 #include "taskcancellation.h"
@@ -26,7 +27,6 @@
 #include "test/sigutil.h"
 #include "test/test_bitcoin.h"
 #include "utilstrencodings.h"
-#include "config.h"
 
 
 #if defined(HAVE_CONSENSUS_LIB)
@@ -37,7 +37,6 @@
 #include <bitset>
 #include <chrono>
 #include <cstdint>
-#include <numeric>
 #include <optional>
 #include <string>
 #include <tuple>

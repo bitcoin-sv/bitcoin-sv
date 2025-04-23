@@ -1826,53 +1826,6 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                       vfElse);
 }
 
-// Only for unit testing
-std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
-    const CScriptConfig& config,
-    bool consensus,
-    const task::CCancellationToken& token,
-    LimitedStack& stack,
-    const CScript& script,
-    uint32_t flags,
-    const BaseSignatureChecker& checker)
-{
-    const eval_script_params params{make_eval_script_params(config, flags, consensus)};
-    return EvalScript(params,
-                      token,
-                      stack,
-                      script,
-                      flags,
-                      checker);
-}
-
-// Only for unit testing
-std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
-    const CScriptConfig& config,
-    bool consensus,
-    const task::CCancellationToken& token,
-    LimitedStack& stack,
-    const CScript& script,
-    uint32_t flags,
-    const BaseSignatureChecker& checker,
-    LimitedStack& altstack,
-    long& ipc,
-    std::vector<bool>& vfExec,
-    std::vector<bool>& vfElse)
-{
-    const eval_script_params params{make_eval_script_params(config, flags, consensus)};
-    return EvalScript(params,
-                      token,
-                      stack,
-                      script,
-                      flags,
-                      checker,
-                      altstack,
-                      ipc,
-                      vfExec,
-                      vfElse);
-}
-
-
 namespace {
 
 /**
@@ -2468,26 +2421,5 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     }
 
     return std::make_pair(true, SCRIPT_ERR_OK);
-}
-
-// Only for unit testing
-std::optional<std::pair<bool, ScriptError>> VerifyScript(
-    const CScriptConfig& config,
-    bool consensus,
-    const task::CCancellationToken& token,
-    const CScript& scriptSig,
-    const CScript& scriptPubKey,
-    uint32_t flags,       
-    const BaseSignatureChecker& checker, 
-    std::atomic<malleability::status>& malleability)
-{
-    const verify_script_params params{make_verify_script_params(config, flags, consensus)};
-    return VerifyScript(params,
-                        token,
-                        scriptSig,
-                        scriptPubKey,
-                        flags,
-                        checker,
-                        malleability);
 }
 

@@ -4,7 +4,6 @@
 
 #include "data/tx_invalid.json.h"
 #include "data/tx_valid.json.h"
-#include "test/test_bitcoin.h"
 
 #include "chainparams.h"
 #include "checkqueuepool.h"
@@ -12,6 +11,7 @@
 #include "config.h"
 #include "consensus/validation.h"
 #include "core_io.h"
+#include "interpreter_adapter.h"
 #include "key.h"
 #include "keystore.h"
 #include "policy/policy.h"
@@ -27,6 +27,7 @@
 #include "test/dummy_config.h"
 #include "test/jsonutil.h"
 #include "test/scriptflags.h"
+#include "test/test_bitcoin.h"
 #include "utilstrencodings.h"
 #include "validation.h" // For CheckRegularTransaction
 

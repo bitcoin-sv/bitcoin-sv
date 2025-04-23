@@ -13,9 +13,8 @@
 
 #include "bn_helpers.h"
 #include "config.h"
-#include "script/instruction_iterator.h"
+#include "interpreter_adapter.h"
 #include "script/int_serialization.h"
-#include "script/interpreter.h"
 #include "script/limitedstack.h"
 #include "script/opcodes.h"
 #include "script/script_error.h"

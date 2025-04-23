@@ -6,6 +6,7 @@
 #include "chainparams.h"
 #include "config.h"
 #include "core_io.h"
+#include "interpreter_adapter.h"
 #include "key.h"
 #include "keystore.h"
 #include "policy/policy.h"
@@ -15,12 +16,11 @@
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/sign.h"
+#include "taskcancellation.h"
 #include "test/test_bitcoin.h"
 #include "validation.h"
-#include "taskcancellation.h"
 
 #include <cstdint>
-#include <variant>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>

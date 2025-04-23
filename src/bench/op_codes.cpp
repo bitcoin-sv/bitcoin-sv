@@ -22,12 +22,13 @@ static void op_dup(benchmark::State& state)
                                   OP_2DUP,
                                   OP_3DUP, OP_3DUP, OP_3DUP, OP_3DUP, OP_3DUP,
                                   OP_3DUP, OP_3DUP, OP_3DUP, OP_3DUP, OP_3DUP};
+    const auto eval_script_params{make_eval_script_params(config, flags, false)};
     while(state.KeepRunning())
     {
         auto source = task::CCancellationSource::Make();
         LimitedStack stack{INT64_MAX};
-        const auto status = EvalScript(config,
-                                       false,
+
+        const auto status = EvalScript(eval_script_params,
                                        source->GetToken(),
                                        stack,
                                        CScript{script.begin(), script.end()},
@@ -43,7 +44,6 @@ static void op_2rot(benchmark::State& state)
 {
     using namespace std;
 
-    const Config& config = GlobalConfig::GetConfig();
     const int32_t flags{SCRIPT_UTXO_AFTER_GENESIS};
     const vector<uint8_t> script{ OP_1, 2, 0xff, 0x7f, OP_NUM2BIN,
                                   OP_DUP,
@@ -51,12 +51,12 @@ static void op_2rot(benchmark::State& state)
                                   OP_3DUP,
 								  OP_2ROT, OP_2ROT, OP_2ROT, OP_2ROT, OP_2ROT,
                                   OP_2ROT, OP_2ROT, OP_2ROT, OP_2ROT, OP_2ROT};
+    const auto params{make_eval_script_params(GlobalConfig::GetConfig(), flags, false)};
     while(state.KeepRunning())
     {
         auto source = task::CCancellationSource::Make();
         LimitedStack stack{INT64_MAX};
-        const auto status = EvalScript(config,
-                                       false,
+        const auto status = EvalScript(params,
                                        source->GetToken(),
                                        stack,
                                        CScript{script.begin(), script.end()},
@@ -81,12 +81,12 @@ static void op_split(benchmark::State& state)
                                         3, 0xff, 0xff, 0x07, OP_SPLIT,
                                         3, 0xff, 0xff, 0x03, OP_SPLIT,
                                         3, 0xff, 0xff, 0x01, OP_SPLIT };
+    const auto params{make_eval_script_params(config, flags, false)};
     while(state.KeepRunning())
     {
         auto source = task::CCancellationSource::Make();
         LimitedStack stack{INT64_MAX};
-        const auto status = EvalScript(config,
-                                       false,
+        const auto status = EvalScript(params,
                                        source->GetToken(),
                                        stack,
                                        CScript{script.begin(), script.end()},
@@ -109,12 +109,12 @@ static void op_roll(benchmark::State& state)
                                   OP_DUP,
 								  OP_2, OP_ROLL, 
                                   OP_2, OP_ROLL};
+    const auto params{make_eval_script_params(config, flags, false)};
     while(state.KeepRunning())
     {
         auto source = task::CCancellationSource::Make();
         LimitedStack stack{INT64_MAX};
-        const auto status = EvalScript(config,
-                                       false,
+        const auto status = EvalScript(params,
                                        source->GetToken(),
                                        stack,
                                        CScript{script.begin(), script.end()},
@@ -137,12 +137,12 @@ static void op_pick(benchmark::State& state)
                                   OP_DUP,
 								  OP_2, OP_PICK, 
                                   OP_2, OP_PICK};
+    const auto params{make_eval_script_params(config, flags, false)};
     while(state.KeepRunning())
     {
         auto source = task::CCancellationSource::Make();
         LimitedStack stack{INT64_MAX};
-        const auto status = EvalScript(config,
-                                       false,
+        const auto status = EvalScript(params,
                                        source->GetToken(),
                                        stack,
                                        CScript{script.begin(), script.end()},

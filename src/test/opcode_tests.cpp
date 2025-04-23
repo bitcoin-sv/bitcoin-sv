@@ -2,22 +2,20 @@
 // Copyright (c) 2018-2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include "config.h"
+#include "interpreter_adapter.h"
+#include "policy/policy.h"
+#include "protocol_era.h"
+#include "script/int_serialization.h"
+#include "script/limitedstack.h"
 #include "script/malleability_status.h"
 #include "script/opcodes.h"
 #include "script/script_error.h"
 #include "script/script_flags.h"
-#include "test/test_bitcoin.h"
-
-#include "keystore.h"
-#include "policy/policy.h"
-#include "protocol_era.h"
-#include "script/int_serialization.h"
-#include "script/interpreter.h"
 #include "script/script_num.h"
 #include "script/sign.h"
 #include "taskcancellation.h"
-#include "config.h"
-#include "script/limitedstack.h"
+#include "test/test_bitcoin.h"
 
 #include <boost/test/tools/old/interface.hpp>
 #include <boost/test/unit_test.hpp>

@@ -3,26 +3,25 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "config.h"
+#include "config.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
+#include "interpreter_adapter.h"
 #include "key.h"
-#include "pubkey.h"
 #include "protocol_era.h"
+#include "pubkey.h"
 #include "script/malleability_status.h"
 #include "script/script.h"
 #include "script/script_error.h"
+#include "script/script_num.h"
+#include "script/sign.h"
 #include "script/standard.h"
 #include "taskcancellation.h"
-#include "script/script_num.h"
 #include "test/test_bitcoin.h"
 #include "uint256.h"
-#include "chainparams.h"
-#include "config.h"
-#include "script/sign.h"
 
 #include <limits>
 #include <tuple>
-#include <variant>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>

@@ -8,6 +8,7 @@
 #include "script/interpreter.h"
 #include "script/script.h"
 #include "taskcancellation.h"
+
 #include <cstdint>
 
 using namespace std;
@@ -19,10 +20,10 @@ static void interpreter_lshift_int32_max_minus_1(benchmark::State& state)
     auto source = task::CCancellationSource::Make();
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+    const auto params{make_eval_script_params(GlobalConfig::GetConfig(), flags, false)};
     while(state.KeepRunning())
     {
-        EvalScript(GlobalConfig::GetConfig(),
-                   true,
+        EvalScript(params,
                    source->GetToken(),
                    stack,
                    CScript() << INT32_MAX - 1 << OP_LSHIFT,
@@ -39,10 +40,10 @@ static void interpreter_rshift_int32_max_minus_1(benchmark::State& state)
     auto source = task::CCancellationSource::Make();
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+    const auto params{make_eval_script_params(GlobalConfig::GetConfig(), flags, false)};
     while(state.KeepRunning())
     {
-        EvalScript(GlobalConfig::GetConfig(),
-                   true,
+        EvalScript(params,
                    source->GetToken(),
                    stack,
                    CScript() << INT32_MAX - 1 << OP_RSHIFT,
@@ -60,10 +61,10 @@ static void interpreter_lshift_6m_minus_1(benchmark::State& state)
     auto source = task::CCancellationSource::Make();
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+    const auto params{make_eval_script_params(GlobalConfig::GetConfig(), flags, false)};
     while(state.KeepRunning())
     {
-        EvalScript(GlobalConfig::GetConfig(),
-                   true,
+        EvalScript(params,
                    source->GetToken(),
                    stack,
                    CScript() << (size * 8) - 1 << OP_LSHIFT,
@@ -81,10 +82,10 @@ static void interpreter_rshift_6m_minus_1(benchmark::State& state)
     auto source = task::CCancellationSource::Make();
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+    const auto params{make_eval_script_params(GlobalConfig::GetConfig(), flags, false)};
     while(state.KeepRunning())
     {
-        EvalScript(GlobalConfig::GetConfig(),
-                   true,
+        EvalScript(params,
                    source->GetToken(),
                    stack,
                    CScript() << (size * 8) - 1 << OP_RSHIFT,
