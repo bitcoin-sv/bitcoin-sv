@@ -22,7 +22,6 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 #include "txdb_defaults.h"
 #include "txn_validation_config.h"
 #include "validation.h"
-#include "script_config.h"
 #include "invalid_txn_publisher.h"
 #include "txn_validator.h"
 
@@ -39,8 +38,14 @@ class CChainParams;
 struct DefaultBlockSizeParams;
 
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions, cppcoreguidelines-virtual-class-destructor)
-class Config : public boost::noncopyable, public CScriptConfig {
+class Config : public boost::noncopyable
+{
 public:
+    virtual uint64_t GetMaxOpsPerScript(bool isGenesisEnabled, bool isConsensus) const = 0;
+    virtual uint64_t GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const = 0;
+    virtual uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const = 0;
+    virtual uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool isConsensus) const = 0;
+    virtual uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool isConsensus) const = 0;
     virtual uint64_t GetMaxBlockSize() const = 0;
     virtual bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxGeneratedBlockSize() const = 0;

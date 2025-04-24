@@ -19,7 +19,7 @@
 #include "script/script_num.h"
 #include "taskcancellation.h"
 #include "uint256.h"
-#include "script_config.h"
+#include "config.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -2198,7 +2198,7 @@ static_assert(ProtocolEra::PostChronicle == utxo_era(SCRIPT_UTXO_AFTER_CHRONICLE
 static_assert(ProtocolEra::PostChronicle == utxo_era(SCRIPT_UTXO_AFTER_CHRONICLE));
 
 // Pre-condition: valid_flags (see above)
-eval_script_params make_eval_script_params(const CScriptConfig& config,
+eval_script_params make_eval_script_params(const Config& config,
                                            const uint32_t flags,
                                            const bool consensus)
 {
@@ -2211,7 +2211,7 @@ eval_script_params make_eval_script_params(const CScriptConfig& config,
 }
 
 // Pre-condition: valid_flags (see above)
-verify_script_params make_verify_script_params(const CScriptConfig& config,
+verify_script_params make_verify_script_params(const Config& config,
                                                const uint32_t flags,
                                                const bool consensus)
 {

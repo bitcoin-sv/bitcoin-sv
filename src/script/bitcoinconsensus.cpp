@@ -69,11 +69,16 @@ static bool verify_flags(unsigned int flags) {
     return (flags & ~(bitcoinconsensus_SCRIPT_FLAGS_VERIFY_ALL)) == 0;
 }
 
-static int verify_script(const CScriptConfig& config, const uint8_t* scriptPubKey,
-                         unsigned int scriptPubKeyLen, Amount amount,
-                         const uint8_t* txTo, unsigned int txToLen,
-                         unsigned int nIn, unsigned int flags,
-                         bitcoinconsensus_error* err) {
+static int verify_script(const Config& config,
+                         const uint8_t* scriptPubKey,
+                         unsigned int scriptPubKeyLen,
+                         Amount amount,
+                         const uint8_t* txTo,
+                         unsigned int txToLen,
+                         unsigned int nIn,
+                         unsigned int flags,
+                         bitcoinconsensus_error* err)
+{
     if (!verify_flags(flags)) {
         return bitcoinconsensus_ERR_INVALID_FLAGS;
     }
@@ -111,22 +116,30 @@ static int verify_script(const CScriptConfig& config, const uint8_t* scriptPubKe
     }
 }
 
-int bitcoinconsensus_verify_script_with_amount(
-    const CScriptConfig& config,
-    const uint8_t *scriptPubKey, unsigned int scriptPubKeyLen, int64_t amount,
-    const uint8_t *txTo, unsigned int txToLen, unsigned int nIn,
-    unsigned int flags, bitcoinconsensus_error *err) {
+int bitcoinconsensus_verify_script_with_amount(const Config& config,
+                                               const uint8_t* scriptPubKey,
+                                               unsigned int scriptPubKeyLen,
+                                               int64_t amount,
+                                               const uint8_t* txTo,
+                                               unsigned int txToLen,
+                                               unsigned int nIn,
+                                               unsigned int flags,
+                                               bitcoinconsensus_error* err)
+{
     Amount am(amount);
     return ::verify_script(config, scriptPubKey, scriptPubKeyLen, am, txTo, txToLen,
                            nIn, flags, err);
 }
 
-int bitcoinconsensus_verify_script(const CScriptConfig& config,
-                                   const uint8_t *scriptPubKey,
+int bitcoinconsensus_verify_script(const Config& config,
+                                   const uint8_t* scriptPubKey,
                                    unsigned int scriptPubKeyLen,
-                                   const uint8_t *txTo, unsigned int txToLen,
-                                   unsigned int nIn, unsigned int flags,
-                                   bitcoinconsensus_error *err) {
+                                   const uint8_t* txTo,
+                                   unsigned int txToLen,
+                                   unsigned int nIn,
+                                   unsigned int flags,
+                                   bitcoinconsensus_error* err)
+{
     if (flags & bitcoinconsensus_SCRIPT_ENABLE_SIGHASH_FORKID ||
         flags & bitcoinconsensus_SCRIPT_FLAGS_VERIFY_WITNESS_DEPRECATED) {
         return set_error(err, bitcoinconsensus_ERR_AMOUNT_REQUIRED);

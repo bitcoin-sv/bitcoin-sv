@@ -5,7 +5,7 @@
 #include "interpreter_adapter.h"
 
 std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
-    const CScriptConfig& config,
+    const Config& config,
     const bool consensus,
     const task::CCancellationToken& token,
     LimitedStack& stack,
@@ -23,7 +23,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 }
 
 std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
-    const CScriptConfig& config,
+    const Config& config,
     const bool consensus,
     const task::CCancellationToken& token,
     LimitedStack& stack,
@@ -49,7 +49,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 }
 
 std::optional<std::pair<bool, ScriptError>> VerifyScript(
-    const CScriptConfig& config,
+    const Config& config,
     const bool consensus,
     const task::CCancellationToken& token,
     const CScript& scriptSig,

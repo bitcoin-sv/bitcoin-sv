@@ -238,7 +238,6 @@ BITCOIN_CORE_H = \
   rpc/webhook_client_defaults.h \
   safe_mode.h \
   scheduler.h \
-  script_config.h \
   script/scriptcache.h \
   script/sigcache.h \
   script/sign.h \

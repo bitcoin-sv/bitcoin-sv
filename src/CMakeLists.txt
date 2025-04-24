@@ -372,7 +372,6 @@ add_library(common
 	script/sign.h
 	script/standard.cpp
 	script/standard.h
-	script_config.h
 	streams.h
 	support/allocators/secure.h
 	support/allocators/zeroafterfree.h

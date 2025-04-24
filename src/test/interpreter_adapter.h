@@ -5,10 +5,10 @@
 
 #include "script/interpreter.h"
 
-// Wrapper functions to aid migration away from CScriptConfig
+// Wrapper functions to aid migration away from Config
 
 std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
-    const CScriptConfig&,
+    const Config&,
     bool consensus,
     const task::CCancellationToken&,
     LimitedStack& stack,
@@ -21,7 +21,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     std::vector<bool>& vfElse);
 
 std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
-    const CScriptConfig&,
+    const Config&,
     bool consensus,
     const task::CCancellationToken&,
     LimitedStack&,
@@ -30,7 +30,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
     const BaseSignatureChecker&);
 
 std::optional<std::pair<bool, ScriptError>> VerifyScript(
-    const CScriptConfig&,
+    const Config&,
     bool consensus,
     const task::CCancellationToken&,
     const CScript& scriptSig,

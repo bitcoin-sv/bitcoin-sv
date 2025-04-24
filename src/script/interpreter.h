@@ -20,7 +20,6 @@
 
 class CPubKey;
 class CScript;
-class CScriptConfig;
 class CTransaction;
 class uint256;
 
@@ -154,7 +153,7 @@ static_assert(eval_script_params(1, 2, 3, 4).MaxScriptNumLength() == 2);
 static_assert(eval_script_params(1, 2, 3, 4).MaxScriptSize() == 3);
 static_assert(eval_script_params(1, 2, 3, 4).MaxPubKeysPerMultiSig() == 4);
 
-eval_script_params make_eval_script_params(const CScriptConfig&,
+eval_script_params make_eval_script_params(const Config&,
                                            uint32_t flags,
                                            bool consensus);
 
@@ -178,7 +177,7 @@ static_assert(verify_script_params(eval_script_params{1, 2, 3, 4}, 5).EvalScript
               == eval_script_params{1, 2, 3, 4});
 static_assert(verify_script_params(eval_script_params{1, 2, 3, 4}, 5).MaxStackMemoryUsage() == 5);
 
-verify_script_params make_verify_script_params(const CScriptConfig&,
+verify_script_params make_verify_script_params(const Config&,
                                                uint32_t flags,
                                                bool consensus);
 
