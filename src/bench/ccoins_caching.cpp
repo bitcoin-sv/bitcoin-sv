@@ -3,15 +3,13 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "bench.h"
-#include "chainparams.h"
 #include "coins.h"
 #include "config.h"
-#include "consensus/validation.h"
 #include "primitives/transaction.h"
 #include "test/test_bitcoin.h"
-#include "wallet/crypter.h"
+#include "txdb_defaults.h"
 #include "uint256.h"
-#include "validation.h"
+#include "wallet/crypter.h"
 
 #include <cstdint>
 #include <limits>

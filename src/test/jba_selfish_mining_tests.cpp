@@ -6,6 +6,7 @@
 #include "mining/journaling_block_assembler.h"
 #include "pow.h"
 #include "rpc/mining.h"
+#include "txn_validator.h"
 
 #include "test/test_bitcoin.h"
 

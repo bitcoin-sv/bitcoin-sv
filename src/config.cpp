@@ -2,12 +2,17 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include "config.h"
 #include "chainparams.h"
+#include "config.h"
 #include "consensus/consensus.h"
-#include "validation.h"
-#include "util.h"
+#include "double_spend/dsdetected_defaults.h"
 #include "merkletree.h"
+#include "miner_id/miner_id_db_defaults.h"
+#include "rpc/webhook_client_defaults.h"
+#include "txdb_defaults.h"
+#include "txn_validator.h"
+#include "util.h"
+#include "validation.h"
 
 #include <boost/algorithm/string.hpp>
 #include <limits>

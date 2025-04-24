@@ -3,25 +3,22 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "coins.h"
-#include "consensus/validation.h"
+#include "config.h"
 #include "script/standard.h"
 #include "test/test_bitcoin.h"
 #include "testutil.h"
+#include "txdb_defaults.h"
 #include "uint256.h"
 #include "undo.h"
 #include "utilstrencodings.h"
 #include "validation.h"
-#include "chainparams.h"
 
-#include <chrono>
 #include <cstdint>
-#include <map>
 #include <optional>
 #include <thread>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
-#include <config.h>
 
 namespace{ class coins_tests_uid; } // only used as unique identifier
 

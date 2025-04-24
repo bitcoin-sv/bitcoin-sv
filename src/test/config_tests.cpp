@@ -4,8 +4,13 @@
 
 #include "chainparams.h"
 #include "config.h"
+
 #include "consensus/consensus.h"
+#include "double_spend/dsdetected_defaults.h"
+#include "miner_id/miner_id_db_defaults.h"
+#include "rpc/webhook_client_defaults.h"
 #include "test/test_bitcoin.h"
+#include "txdb_defaults.h"
 
 #include <boost/test/unit_test.hpp>
 #include <string>

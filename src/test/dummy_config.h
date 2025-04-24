@@ -4,6 +4,11 @@
 #pragma once
 
 #include "config.h"
+#include "double_spend/dsdetected_defaults.h"
+#include "miner_id/miner_id_db_defaults.h"
+#include "rpc/webhook_client_defaults.h"
+#include "txdb_defaults.h"
+#include "txn_validator.h"
 
 class DummyConfig : public ConfigInit
 {

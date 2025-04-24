@@ -8,22 +8,15 @@
 static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 
 #include "amount.h"
-#include "consensus/consensus.h"
-#include "miner_id/miner_id_db_defaults.h"
-#include "double_spend/dsdetected_defaults.h"
 #include "mining/factory.h"
-#include "net/mempool_msg.h"
 #include "net/net.h"
 #include "policy/policy.h"
 #include "protocol_era.h"
 #include "rpc/client_config.h"
-#include "rpc/webhook_client_defaults.h"
 #include "script/standard.h"
-#include "txdb_defaults.h"
 #include "txn_validation_config.h"
 #include "validation.h"
 #include "invalid_txn_publisher.h"
-#include "txn_validator.h"
 
 #include <boost/noncopyable.hpp>
 

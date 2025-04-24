@@ -56,6 +56,7 @@
 #include "txdb.h"
 #include "txmempool.h"
 #include "txn_grouper.h"
+#include "txn_handlers.h"
 #include "ui_interface.h"
 #include "undo.h"
 #include "util.h"
