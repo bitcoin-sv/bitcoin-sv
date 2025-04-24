@@ -40,9 +40,9 @@ class ChronicleHeightTestsCase(HeightBasedTestsCase):
 
     # Make a key for signing
     @staticmethod
-    def make_key():
+    def make_key(secret=b"randombytes"):
         key = CECKey()
-        key.set_secretbytes(b"randombytes")
+        key.set_secretbytes(secret)
         return key
 
     # Details about an input for spending
