@@ -25,18 +25,19 @@ Please refer to the Protocol Restoration specification for further details.
 
 #### Sighash Flag Changes
 
-A new optional sighash flag **SIGHASH_RELAX** is introduced (value **0x20**), and the
-existing **SIGHASH_FORKID** flag becomes optional.
+A new optional sighash flag **SIGHASH_CHRONICLE** is introduced (value **0x20**).
 
-If the FORKID flag is omitted, then transactions signed that way will use the
-original Bitcoin transaction digest algorithm and relaxed malleability rules.
-If the FORKID flag is still set _AND_ the RELAX flag is also set, then a
-transaction signed that way will continue to use the new transaction digest
-algorithm but can take advantage of the relaxed malleability rules (as detailed
-below).
+Transactions signed without the CHRONICLE flag will see no changes to their
+consensus rules and will remain largely unaffected by the Chronicle update.
+Transactions signed *with* the CHRONICLE flag will see the changes described
+in the following sections.
 
-Transactions signed with just the FORKID flag, as historically required, will see
-no changes to their consensus rules.
+#### Transaction Digest Algorithm
+
+The BSV blockchain will again support the original Bitcoin transaction digest
+algorithm for transactions signed with the CHRONICLE sighash flag. Transactions
+signed without the CHRONICLE flag will continue to use the BIP143 new transaction
+digest algorithm as before.
 
 #### Transaction Limitations Relaxed
 
@@ -50,20 +51,24 @@ to encode numbers as efficiently as possible. For example, the number two can be
 encoded as 0002 (2 bytes) or 02 (1 byte). Prior to this release only the second
 version is accepted. Minimal encoding places an unnecessary burden on users that
 was not present in the original Satoshi implementation and it is removed from this
-release for transactions signed with the relaxed sighash flags.
-*   **Low S signatures -** If S is a signature, then so is -S. The “low S” signature
+release for transactions signed with the CHRONICLE sighash flag.
+*   **Low S signatures** - If S is a signature, then so is -S. The “low S” signature
 requirement was introduced to decrease transaction malleability but is an unnecessary
 requirement and is removed. Either signature S or -S can now be used in transactions
-signed with the relaxed sighash flags.
+signed with the CHRONICLE sighash flag.
+*   **NULLFAIL checks** - The requirement that if an `OP_CHECKSIG` or
+`OP_CHECKMULTISIG` is trying to return a `FALSE` value to the stack then signatures
+must be an empty array is removed for transactions signed with the CHRONICLE sighash
+flag.
 *   **Clean Stack Policy** – Previous releases required that after the execution
 of the unlocking and locking script, the stack is “clean”. i.e. there is only a
 single item (interpreted as true/false) on the stack that indicates whether the
 transaction has permission to spend the relevant input. The requirement is
 unnecessary and adds complexity to scripts. This release removes the clean stack
-requirement for transactions signed with the relaxed sighash flags.
+requirement for transactions signed with the CHRONICLE sighash flag.
 *   **No opcodes in Unlocking Scripts Policy** - Previous releases do not allow
 unlocking scripts to include non-data opcodes. That restriction is removed in
-this release for transactions signed with the relaxed sighash flags.
+this release for transactions signed with the CHRONICLE sighash flag.
 
 ### Performance Improvements
 
