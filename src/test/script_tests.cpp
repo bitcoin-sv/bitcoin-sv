@@ -10,6 +10,7 @@
 #include "interpreter_adapter.h"
 #include "key.h"
 #include "keystore.h"
+#include "overload.h"
 #include "protocol_era.h"
 #include "rpc/server.h"
 #include "script/malleability_status.h"
@@ -27,7 +28,6 @@
 #include "test/sigutil.h"
 #include "test/test_bitcoin.h"
 #include "utilstrencodings.h"
-
 
 #if defined(HAVE_CONSENSUS_LIB)
 #include "script/bitcoinconsensus.h"
@@ -153,71 +153,79 @@ static const std::vector<uint8_t>& high_s_min()
     return v;
 }
 
-std::vector<uint8_t> make_op_checksig_script(const uint8_t sighash,
-                                             const std::vector<uint8_t>& s)
+static std::vector<uint8_t> make_signature(const std::span<const uint8_t> s,
+                                           const uint8_t sighash)
 {
-    const auto rs_len{32};
-    const auto sig_len{2 * (2 + rs_len)};
-    const auto der_len{sig_len + 2};
-    const auto type_code{2};
+    assert(s.size() < OP_PUSHDATA1);
+
+    constexpr auto rs_len{32};
+    constexpr auto sig_len{2 * (2 + rs_len)};
+    constexpr auto der_len{sig_len + 2};
+    constexpr auto type_code{2};
+    static_assert(der_len == 70);
 
     // signature
-    std::vector<uint8_t> script{der_len + 1,
-                                0x30,
-                                sig_len,
-                                type_code,
-                                rs_len};
-    script.insert(script.end(), rs_len, 42);  // r
-    script.push_back(type_code);
-    script.push_back(s.size());
-    script.insert(script.end(), s.begin(), s.end());
-    script.push_back(static_cast<uint8_t>(sighash));
+    std::vector<uint8_t> sig{0x30,
+                             sig_len,
+                             type_code,
+                             rs_len};
+    sig.insert(sig.end(), rs_len, 42);
+    sig.push_back(type_code);
+    sig.push_back(s.size());
+    sig.insert(sig.end(), s.begin(), s.end());
+    sig.push_back(static_cast<uint8_t>(sighash));
 
-    // pub key
+    return sig;
+}
+
+static std::vector<uint8_t> make_pub_key()
+{
     const auto pk_len{33};
-    script.push_back(pk_len);
-    script.push_back(2);
-    script.insert(script.end(), pk_len - 1, 101);
-    
+    std::vector<uint8_t> v(pk_len, 2);
+    return v;
+}
+
+static std::vector<uint8_t> make_op_checksig_script(const std::span<const uint8_t> sig,
+                                                    const std::span<const uint8_t> pub_key)
+{
+    assert(sig.size() < OP_PUSHDATA1);
+    assert(pub_key.size() < OP_PUSHDATA1);
+
+    std::vector<uint8_t> script;
+    script.push_back(sig.size());
+    script.insert(script.end(), sig.begin(), sig.end());
+
+    script.push_back(pub_key.size());
+    script.insert(script.end(), pub_key.begin(), pub_key.end());
+
     script.push_back(OP_CHECKSIG);
 
     return script;
 }
 
-std::vector<uint8_t> make_op_check_multi_sig_script(const uint8_t sighash,
-                                                    const std::vector<uint8_t>& s)
+static std::vector<uint8_t> make_op_check_multi_sig_script(const std::vector<std::vector<uint8_t>>& sigs,
+                                                           const std::vector<std::vector<uint8_t>>& pks,
+                                                           const uint8_t dummy=OP_0)
 {
-    const auto rs_len{32};
-    const auto sig_len{2 * (2 + rs_len)};
-    const auto der_len{sig_len + 2};
-    const auto type_code{2};
+    std::vector<uint8_t> script{dummy}; // historic bug, start with vestigial unchecked value
 
-    // signature
-    std::vector<uint8_t> script{OP_0,   // historic bug start with OP_0 
-                                der_len + 1,
-                                0x30,
-                                sig_len,
-                                type_code,
-                                rs_len};
-    script.insert(script.end(), rs_len, 42);  // r
-    script.push_back(type_code);
-    script.push_back(s.size());
-    script.insert(script.end(), s.begin(), s.end());
-    script.push_back(static_cast<uint8_t>(sighash));
-    
-    script.push_back(1);
-    const auto n_sigs{1};
-    script.push_back(n_sigs);
+    // Signatures
+    for(const auto& sig : sigs)
+    {
+        assert(sig.size() < OP_PUSHDATA1);
+        script.push_back(sig.size());
+        script.insert(script.end(), sig.begin(), sig.end());
+    }
+    script.push_back(EncodeOP_N(sigs.size())); // number of signatures
 
-    // pub key
-    const auto pk_len{33};
-    script.push_back(pk_len);
-    script.push_back(2);
-    script.insert(script.end(), pk_len - 1, 101);
-    
-    script.push_back(1);
-    const auto n_pub_keys{1};
-    script.push_back(n_pub_keys);
+    // Public keys
+    for(const auto& pk : pks)
+    {
+        assert(pk.size() < OP_PUSHDATA1);
+        script.push_back(pk.size());
+        script.insert(script.end(), pk.begin(), pk.end());
+    }
+    script.push_back(EncodeOP_N(pks.size())); // number of pub keys
     
     script.push_back(OP_CHECKMULTISIG);
 
@@ -4179,10 +4187,11 @@ BOOST_AUTO_TEST_CASE(EvalScript_lows)
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
 
-        const auto script{make_op_checksig_script(SIGHASH_ALL
-                                                  | SIGHASH_FORKID
-                                                  | SIGHASH_CHRONICLE,
-                                                  s)};
+        const auto script{make_op_checksig_script(make_signature(s,
+                                                                 SIGHASH_ALL
+                                                                 | SIGHASH_FORKID
+                                                                 | SIGHASH_CHRONICLE),
+                                                  make_pub_key())};
         const auto status = EvalScript(config,
                                        false,
                                        source->GetToken(),
@@ -4267,7 +4276,8 @@ BOOST_AUTO_TEST_CASE(VerifyScript_lows)
         auto source = task::CCancellationSource::Make();
 
         const vector<uint8_t> scriptSig;
-        const auto scriptPubKey{make_op_checksig_script(sig_hash, s)};
+        const auto scriptPubKey{make_op_checksig_script(make_signature(s, sig_hash),
+                                                        make_pub_key())};
         std::atomic<malleability::status> ms;
         const auto status = VerifyScript(config,
                                          false,
@@ -4401,7 +4411,8 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid_chronicle)
         const Config& config = GlobalConfig::GetConfig();
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const auto script{make_op_checksig_script(sighash, low_s_max())};
+        const auto script{make_op_checksig_script(make_signature(low_s_max(), sighash),
+                                                  make_pub_key())};
         const auto status = EvalScript(config,
                                        false,
                                        source->GetToken(),
@@ -4544,7 +4555,8 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid_chronicle)
         const Config& config = GlobalConfig::GetConfig();
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const auto script{make_op_check_multi_sig_script(sighash, low_s_max())};
+        const auto script{make_op_check_multi_sig_script({make_signature(low_s_max(), sighash)},
+                                                         {make_pub_key()})};
         const auto status = EvalScript(config,
                                        false,
                                        source->GetToken(),
@@ -4601,8 +4613,9 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checksig_forkid_chronicle)
                                 vector<uint8_t>{}, 
                                 [](auto acc, const auto sighash)
                                 {
-                                    const auto s{make_op_checksig_script(sighash,
-                                                                         low_s_max())};
+                                    const auto s{make_op_checksig_script(make_signature(low_s_max(),
+                                                                                        sighash),
+                                                                         make_pub_key())};
                                     acc.insert(acc.end(), s.begin(), s.end());
                                     return acc;
                                 })};
@@ -4652,8 +4665,9 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checkmultisig_forkid_relax)
                                 vector<uint8_t>{}, 
                                 [](auto acc, const auto sighash)
                                 {
-                                    const auto s{make_op_check_multi_sig_script(sighash,
-                                                                                low_s_max())};
+                                    const auto s{make_op_check_multi_sig_script({make_signature(low_s_max(),
+                                                                                                sighash)},
+                                                                                {make_pub_key()})};
                                     acc.insert(acc.end(), s.begin(), s.end());
                                     return acc;
                                 })};
@@ -4769,7 +4783,9 @@ BOOST_AUTO_TEST_CASE(EvalScript_minimal_encoding)
         LimitedStack stack(UINT32_MAX);
       
         vector<uint8_t> script{s};
-        const auto op_checksig_script{make_op_checksig_script(sig_hash, low_s_max())};
+        const auto op_checksig_script{make_op_checksig_script(make_signature(low_s_max(),
+                                                                             sig_hash),
+                                                              make_pub_key())};
         script.insert(script.end(), op_checksig_script.begin(), op_checksig_script.end());
         const auto status = EvalScript(config,
                                        false,
@@ -4846,7 +4862,9 @@ BOOST_AUTO_TEST_CASE(VerifyScript_minimal_encoding)
         auto source = task::CCancellationSource::Make();
       
         const auto scriptPubKey{[&sig_hash]{
-            vector<uint8_t> v{make_op_checksig_script(sig_hash, low_s_max())};
+            vector<uint8_t> v{make_op_checksig_script(make_signature(low_s_max(),
+                                                                     sig_hash),
+                                                      make_pub_key())};
             v.push_back(OP_DROP); // ignore result of OP_CHECKSIG (always false)
             return v;
         }()};
