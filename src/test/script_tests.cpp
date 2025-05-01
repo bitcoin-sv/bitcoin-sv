@@ -4885,5 +4885,103 @@ BOOST_AUTO_TEST_CASE(VerifyScript_minimal_encoding)
     }
 }
 
+BOOST_AUTO_TEST_CASE(eval_script_op_checksig_nullfail)
+{
+    using namespace std;
+
+    const vector<uint8_t> empty_sig{};
+    constexpr uint8_t non_chronicle_sighash{SIGHASH_ALL | SIGHASH_FORKID};
+    const auto non_chronicle_sig{make_signature(low_s_max(), non_chronicle_sighash)};
+    constexpr uint8_t chronicle_sighash{non_chronicle_sighash | SIGHASH_CHRONICLE};
+    const auto chronicle_sig{make_signature(low_s_max(), chronicle_sighash)};
+
+    using test_args = tuple<uint32_t,              // flags
+                            vector<uint8_t>,       // empty signature
+                            std::variant<ScriptError, malleability::status>>;
+    const vector<test_args> test_data
+    {
+        // Pre-Chronicle
+        {{},
+         non_chronicle_sig,
+         malleability::non_malleable},
+        
+        {{},
+         chronicle_sig,
+         malleability::non_malleable},
+        
+        {{},
+         empty_sig,
+         malleability::non_malleable},
+
+        {SCRIPT_VERIFY_NULLFAIL,
+         non_chronicle_sig,
+         SCRIPT_ERR_SIG_NULLFAIL},
+        
+        {SCRIPT_VERIFY_NULLFAIL,
+         chronicle_sig,
+         SCRIPT_ERR_SIG_NULLFAIL},
+
+        {SCRIPT_VERIFY_NULLFAIL,
+         empty_sig,
+         malleability::non_malleable},
+        
+        // Post-Chronicle
+        {SCRIPT_CHRONICLE,
+         non_chronicle_sig,
+         malleability::non_malleable},
+        
+        {SCRIPT_CHRONICLE,
+         chronicle_sig,
+         malleability::non_malleable},
+        
+        {SCRIPT_CHRONICLE,
+         empty_sig,
+         malleability::non_malleable},
+
+        {SCRIPT_VERIFY_NULLFAIL | SCRIPT_CHRONICLE,
+         non_chronicle_sig,
+         SCRIPT_ERR_SIG_NULLFAIL},
+
+        {SCRIPT_VERIFY_NULLFAIL | SCRIPT_CHRONICLE,
+         chronicle_sig,
+         malleability::null_fail},
+        
+        {SCRIPT_VERIFY_NULLFAIL | SCRIPT_CHRONICLE,
+         empty_sig,
+         malleability::non_malleable},
+    };
+    for(const auto& [flags, sig, expected] : test_data)
+    {
+        const auto params{make_eval_script_params(GlobalConfig::GetConfig(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto op_checksig_script{make_op_checksig_script(sig,
+                                                              make_pub_key())};
+        const auto status = EvalScript(params,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{op_checksig_script.begin(),
+                                               op_checksig_script.end()},
+                                       flags,
+                                       BaseSignatureChecker{});
+        assert(status);
+        std::visit(overload([&expected, &stack](const malleability::status ms)
+                            {
+                                BOOST_CHECK_EQUAL(std::get<malleability::status>(expected),
+                                                  ms);
+                                BOOST_CHECK_EQUAL(1, stack.size());
+                                BOOST_CHECK_EQUAL(0, stack.at(0).size());
+                            },
+                            [&expected, &stack](const ScriptError se)
+                            {
+                                BOOST_CHECK_EQUAL(std::get<ScriptError>(expected), se); 
+                                BOOST_CHECK_EQUAL(2, stack.size());
+                                BOOST_CHECK_EQUAL(71, stack.at(0).size());
+                                BOOST_CHECK_EQUAL(33, stack.at(1).size());
+                            }),
+                   *status);
+    }
+}
 
 BOOST_AUTO_TEST_SUITE_END()
+
