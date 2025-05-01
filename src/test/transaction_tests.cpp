@@ -376,7 +376,7 @@ static CScript PushAll(const LimitedStack &values) {
         if (values.at(i).size() == 0) {
             result << OP_0;
         } else if (values.at(i).size() == 1 && values.at(i)[0] >= 1 && values.at(i)[0] <= 16) {
-            result << CScript::EncodeOP_N(values.at(i)[0]);
+            result << EncodeOP_N(values.at(i)[0]);
         } else {
             result << values.at(i).GetElement();
         }

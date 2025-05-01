@@ -182,7 +182,7 @@ bool Solver(
                     vSolutionsRet.push_back(vch1);
                 }
                 else if (opcode1 >= OP_1 && opcode1 <= OP_16) {
-                    char n = (char)CScript::DecodeOP_N(opcode1);
+                    char n = (char)DecodeOP_N(opcode1);
                     vSolutionsRet.push_back(valtype(1, n));
                 } else {
                     break;

@@ -5,15 +5,23 @@
 // LICENSE.
 
 #include "script.h"
+
 #include "consensus/consensus.h"
 #include "instruction_iterator.h"
 #include "int_serialization.h"
 #include "script/malleability_status.h"
 #include "script_num.h"
-#include "utilstrencodings.h"
 
 #include <algorithm>
 #include <sstream>
+
+static_assert(EncodeOP_N(0) == OP_0);
+static_assert(EncodeOP_N(1) == OP_1);
+static_assert(EncodeOP_N(16) == OP_16);
+
+static_assert(DecodeOP_N(OP_0) == 0);
+static_assert(DecodeOP_N(OP_1) == 1);
+static_assert(DecodeOP_N(OP_16) == 16);
 
 uint64_t CScript::GetSigOpCount(bool fAccurate, ProtocolEra era, bool& sigOpCountError) const
 {

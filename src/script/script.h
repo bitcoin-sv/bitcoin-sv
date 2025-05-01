@@ -191,18 +191,6 @@ public:
         return true;
     }
 
-    /** Encode/decode small integers: */
-    static int DecodeOP_N(opcodetype opcode) {
-        if (opcode == OP_0) return 0;
-        assert(opcode >= OP_1 && opcode <= OP_16);
-        return (int)opcode - (int)(OP_1 - 1);
-    }
-    static opcodetype EncodeOP_N(int n) {
-        assert(n >= 0 && n <= 16);
-        if (n == 0) return OP_0;
-        return (opcodetype)(OP_1 + n - 1);
-    }
-
     int FindAndDelete(const CScript &b) {
         int nFound = 0;
         if (b.empty()) return nFound;
@@ -333,5 +321,24 @@ public:
     CReserveScript() {}
     virtual ~CReserveScript() {}
 };
+    
+constexpr uint8_t DecodeOP_N(opcodetype opcode)
+{
+    assert(opcode >= OP_0 && opcode <= OP_16);
+
+    if(opcode == OP_0)
+        return 0;
+
+    return opcode - OP_1 + 1;
+}
+
+constexpr opcodetype EncodeOP_N(uint8_t n)
+{
+    assert(n <= 16);
+    if(n == 0)
+        return OP_0;
+    
+    return static_cast<opcodetype>(OP_1 + n - 1);
+}
 
 #endif // BITCOIN_SCRIPT_SCRIPT_H
