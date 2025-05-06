@@ -95,20 +95,17 @@ public:
             psz += 2;
 
         // hex string to uint
-        const char *pbegin = psz;
-        while (::HexDigit(*psz) != -1)
-            ++psz;
+        size_t digits = 0;
+        while (::HexDigit(psz[digits]) != -1)
+            ++digits;
 
-        --psz;
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         uint8_t *p1 = data;
         uint8_t *pend = p1 + WIDTH;
-        while (psz >= pbegin && p1 < pend) {
-            *p1 = ::HexDigit(*psz);
-            --psz;
-            if (psz >= pbegin) {
-                *p1 |= uint8_t(::HexDigit(*psz) << 4);
-                --psz;
+        while (digits > 0 && p1 < pend) {
+            *p1 = ::HexDigit(psz[--digits]);
+            if(digits > 0) {
+                *p1 |= uint8_t(::HexDigit(psz[--digits]) << 4);
                 ++p1;
             }
         }
