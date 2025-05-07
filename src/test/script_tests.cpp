@@ -4983,6 +4983,79 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checksig_nullfail)
     }
 }
 
+BOOST_AUTO_TEST_CASE(verify_script_op_checksig_nullfail)
+{
+    using namespace std;
+
+    const vector<uint8_t> empty_sig{};
+    constexpr uint8_t non_chronicle_sighash{SIGHASH_ALL | SIGHASH_FORKID};
+    constexpr uint8_t chronicle_sighash{non_chronicle_sighash | SIGHASH_CHRONICLE};
+    const auto chronicle_sig{make_signature(low_s_max(), chronicle_sighash)};
+
+    using test_args = tuple<uint32_t,              // flags
+                            malleability::status,
+                            ScriptError,           // expected error
+                            malleability::status>; // expected malleability_status
+    const vector<test_args> test_data
+    {
+        // Pre-Chronicle
+        {{},
+         {},
+         SCRIPT_ERR_OK, {}},
+
+        {SCRIPT_VERIFY_NULLFAIL,
+         {},
+         SCRIPT_ERR_SIG_NULLFAIL, {}},
+        
+        {{},
+         malleability::disallowed,
+         SCRIPT_ERR_OK, malleability::disallowed},
+
+        {SCRIPT_VERIFY_NULLFAIL,
+         malleability::disallowed,
+         SCRIPT_ERR_SIG_NULLFAIL, malleability::disallowed},
+       
+        // Post-Chronicle
+        {SCRIPT_CHRONICLE,
+         {},
+         SCRIPT_ERR_OK, {}},
+
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLFAIL,
+         {},
+         SCRIPT_ERR_OK, malleability::null_fail},
+
+        {SCRIPT_CHRONICLE,
+         malleability::disallowed,
+         SCRIPT_ERR_OK, malleability::disallowed},
+
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLFAIL,
+         malleability::disallowed,
+         SCRIPT_ERR_SIG_NULLFAIL, malleability::disallowed | malleability::null_fail},
+    };
+    for(const auto& [flags, ms, exp_error, exp_mall] : test_data)
+    {
+        const auto params{make_verify_script_params(GlobalConfig::GetConfig(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        const CScript scriptSig;
+        auto scriptPubKey{make_op_checksig_script(chronicle_sig,
+                                                  make_pub_key())};
+        scriptPubKey.push_back(OP_NOT);
+        std::atomic<malleability::status> ams{ms};
+        const auto status = VerifyScript(params,
+                                         source->GetToken(),
+                                         scriptSig,
+                                         CScript{scriptPubKey.begin(),
+                                                 scriptPubKey.end()},
+                                         flags,
+                                         BaseSignatureChecker{},
+                                         ams);
+        assert(status);
+        BOOST_CHECK_EQUAL(exp_error == SCRIPT_ERR_OK, status->first);
+        BOOST_CHECK_EQUAL(exp_error, status->second);
+        BOOST_CHECK_EQUAL(exp_mall, malleability::status{ams});
+    }
+}
+
 BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nullfail)
 {
     using namespace std;
