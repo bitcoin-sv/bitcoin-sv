@@ -517,6 +517,7 @@ libbitcoin_consensus_a_SOURCES = \
   script/int_serialization.h \
   script/limitedstack.cpp \
   script/limitedstack.h \
+  script/malleability_status.cpp \
   script/malleability_status.h \
   script/opcodes.cpp \
   script/opcodes.h \

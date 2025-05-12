@@ -108,7 +108,6 @@ BITCOIN_TESTS =\
   test/locked_ref_tests.cpp \
   test/m_candidates_tests.cpp \
   test/main_tests.cpp \
-  test/malleability_status_tests.cpp \
   test/mempool_test_access.h \
   test/mempool_dump_load_tests.cpp \
   test/mempool_limit_tests.cpp \

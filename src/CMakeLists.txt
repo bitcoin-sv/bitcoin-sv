@@ -423,6 +423,7 @@ add_library(bitcoinconsensus
 	script/instruction_iterator.h
 	script/interpreter.cpp
 	script/limitedstack.cpp
+    script/malleability_status.cpp
 	script/opcodes.cpp
 	script/script.cpp
 	script/script_error.cpp
