@@ -17,6 +17,7 @@ namespace malleability
     constexpr static status high_s               {0x08};
     constexpr static status non_push_data        {0x10};
     constexpr static status null_fail            {0x20};
+    constexpr static status null_dummy           {0x40};
     constexpr static status disallowed           {0x80};
 }
 
@@ -27,7 +28,8 @@ constexpr bool is_malleable(const malleability::status s)
                 | malleability::non_minimal_scriptnum
                 | malleability::high_s
                 | malleability::non_push_data
-                | malleability::null_fail);
+                | malleability::null_fail
+                | malleability::null_dummy);
 }
 
 constexpr bool is_unclean_stack(const malleability::status s)
@@ -58,6 +60,11 @@ constexpr bool has_non_push_data(const malleability::status s)
 constexpr bool is_null_fail(const malleability::status s)
 {
     return s & malleability::null_fail;
+}
+
+constexpr bool is_null_dummy(const malleability::status s)
+{
+    return s & malleability::null_dummy;
 }
 
 constexpr bool is_disallowed(const malleability::status s)
