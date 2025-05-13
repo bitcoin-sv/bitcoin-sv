@@ -1647,11 +1647,16 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         // Unfortunately this is a potential source of
                         // mutability, so optionally verify it is exactly equal
                         // to zero prior to removing it from the stack.
-                        if (stack.size() < 1)
+                        if(stack.empty())
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
  
-                        if ((flags & SCRIPT_VERIFY_NULLDUMMY) && stack.stacktop(-1).size())
-                            return SCRIPT_ERR_SIG_NULLDUMMY;
+                        if(VerifyNullDummy(flags) && !stack.stacktop(-1).empty())
+                        {
+                            if(IsChronicle(flags))
+                                ms |= malleability::null_dummy;
+                            else
+                                return SCRIPT_ERR_SIG_NULLDUMMY;
+                        }
 
                         stack.pop_back();
 
@@ -2457,6 +2462,12 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
             {
                 if(is_null_fail(combined_malleability))
                     return std::make_pair(false, SCRIPT_ERR_SIG_NULLFAIL);
+            }
+           
+            if(flags & SCRIPT_VERIFY_NULLDUMMY)
+            {
+                if(is_null_dummy(combined_malleability))
+                    return std::make_pair(false, SCRIPT_ERR_SIG_NULLDUMMY);
             }
         }
     }

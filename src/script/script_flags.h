@@ -114,6 +114,13 @@ enum {
     SCRIPT_FLAG_LAST = (1U << 22)
 };
 
+constexpr bool IsChronicle(uint32_t flags)
+{
+    return (flags & SCRIPT_CHRONICLE) != 0;
+}
+static_assert(!IsChronicle(0));
+static_assert(IsChronicle(SCRIPT_CHRONICLE));
+
 constexpr bool IsUtxoAfterGenesis(uint32_t flags)
 {
     return (flags & SCRIPT_UTXO_AFTER_GENESIS) != 0;
@@ -127,6 +134,13 @@ constexpr bool IsUtxoAfterChronicle(uint32_t flags)
 }
 static_assert(!IsUtxoAfterChronicle(0));
 static_assert(IsUtxoAfterChronicle(SCRIPT_UTXO_AFTER_CHRONICLE));
+
+constexpr bool VerifyNullDummy(uint32_t flags)
+{
+    return (flags & SCRIPT_VERIFY_NULLDUMMY) != 0;
+}
+static_assert(!VerifyNullDummy(0));
+static_assert(VerifyNullDummy(SCRIPT_VERIFY_NULLDUMMY));
 
 constexpr bool VerifyNullFail(uint32_t flags)
 {

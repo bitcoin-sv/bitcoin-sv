@@ -5266,6 +5266,34 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nulldummy)
          SCRIPT_ERR_SIG_NULLDUMMY,
          {{1}}},
        
+        // Post-Chronicle
+        {SCRIPT_CHRONICLE,
+         OP_0,
+         {sig},
+         {pub_key},
+         malleability::non_malleable,
+         {script_false}},
+        
+        {SCRIPT_CHRONICLE,
+         OP_1,
+         {sig},
+         {pub_key},
+         malleability::non_malleable,
+         {script_false}},
+       
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLDUMMY,
+         OP_0,
+         {sig},
+         {pub_key},
+         malleability::non_malleable,
+         {script_false}},
+        
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLDUMMY,
+         OP_1,
+         {sig},
+         {pub_key},
+         malleability::null_dummy,
+         {script_false}},
     };
     for(const auto& [flags,
                      dummy,
@@ -5319,6 +5347,132 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nulldummy)
                                 }
                             }),
                    *status);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(verify_script_op_checksig_nulldummy)
+{
+    using namespace std;
+
+    const vector<uint8_t> empty_sig{};
+    constexpr uint8_t sighash{SIGHASH_ALL | SIGHASH_FORKID};
+    const auto sig{make_signature(low_s_max(), sighash)};
+
+    using test_args = tuple<uint32_t,              // flags
+                            uint8_t,               // dummy
+                            malleability::status,
+                            ScriptError,           // expected error
+                            malleability::status>; // expected malleability_status
+    const vector<test_args> test_data
+    {
+        // Pre-Chronicle
+        // malleability allowed
+        {{},
+         OP_0,
+         {},
+         SCRIPT_ERR_OK, malleability::non_malleable},
+
+        {{},
+         OP_1,
+         {},
+         SCRIPT_ERR_OK, malleability::non_malleable},
+
+        {SCRIPT_VERIFY_NULLDUMMY,
+         OP_0,
+         {},
+         SCRIPT_ERR_OK, malleability::non_malleable},
+
+        {SCRIPT_VERIFY_NULLDUMMY,
+         OP_1,
+         {},
+         SCRIPT_ERR_SIG_NULLDUMMY, malleability::non_malleable},
+
+        // malleability disallowed
+        {{},
+         OP_0,
+         malleability::disallowed,
+         SCRIPT_ERR_OK, malleability::disallowed},
+
+        {{},
+         OP_1,
+         malleability::disallowed,
+         SCRIPT_ERR_OK, malleability::disallowed},
+
+        {SCRIPT_VERIFY_NULLDUMMY,
+         OP_0,
+         malleability::disallowed,
+         SCRIPT_ERR_OK, malleability::disallowed},
+
+        {SCRIPT_VERIFY_NULLDUMMY,
+         OP_1,
+         malleability::disallowed,
+         SCRIPT_ERR_SIG_NULLDUMMY, malleability::disallowed},
+
+        // Post-Chronicle
+        // malleability allowed
+        {SCRIPT_CHRONICLE,
+         OP_0,
+         {},
+         SCRIPT_ERR_OK, malleability::non_malleable},
+
+        {SCRIPT_CHRONICLE,
+         OP_1,
+         {},
+         SCRIPT_ERR_OK, malleability::non_malleable},
+
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLDUMMY,
+         OP_0,
+         {},
+         SCRIPT_ERR_OK, malleability::non_malleable},
+
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLDUMMY,
+         OP_1,
+         {},
+         SCRIPT_ERR_OK, malleability::null_dummy},
+
+        // malleability disallowed
+        {SCRIPT_CHRONICLE,
+         OP_0,
+         malleability::disallowed,
+         SCRIPT_ERR_OK, malleability::disallowed},
+
+        {SCRIPT_CHRONICLE,
+         OP_1,
+         malleability::disallowed,
+         SCRIPT_ERR_OK, malleability::disallowed},
+
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLDUMMY,
+         OP_0,
+         malleability::disallowed,
+         SCRIPT_ERR_OK, malleability::disallowed},
+
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLDUMMY,
+         OP_1,
+         malleability::disallowed,
+         SCRIPT_ERR_SIG_NULLDUMMY, malleability::disallowed | malleability::null_dummy},
+    };
+    for(const auto& [flags, dummy, ms, exp_error, exp_mall] : test_data)
+    {
+        const auto params{make_verify_script_params(GlobalConfig::GetConfig(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        const CScript scriptSig;
+        auto scriptPubKey{make_op_check_multi_sig_script({sig},
+                                                         {make_pub_key()},
+                                                         dummy)};
+        scriptPubKey.push_back(OP_NOT);
+        std::atomic<malleability::status> ams{ms};
+        const auto status = VerifyScript(params,
+                                         source->GetToken(),
+                                         scriptSig,
+                                         CScript{scriptPubKey.begin(),
+                                                 scriptPubKey.end()},
+                                         flags,
+                                         BaseSignatureChecker{},
+                                         ams);
+        assert(status);
+        BOOST_CHECK_EQUAL(exp_error == SCRIPT_ERR_OK, status->first);
+        BOOST_CHECK_EQUAL(exp_error, status->second);
+        BOOST_CHECK_EQUAL(exp_mall, malleability::status{ams});
     }
 }
 
