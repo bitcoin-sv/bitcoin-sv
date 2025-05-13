@@ -5218,5 +5218,109 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nullfail)
     }
 }
 
+BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nulldummy)
+{
+    using namespace std;
+   
+    const vector<uint8_t> null_sig;
+    constexpr uint8_t sighash{SIGHASH_ALL | SIGHASH_FORKID};
+    const auto sig{make_signature(low_s_max(), sighash)};
+    const auto pub_key{make_pub_key()};
+    
+    const vector<uint8_t> script_false{};
+
+    using test_args = tuple<uint32_t,                                   // flags
+                            uint8_t,                                    // dummy
+                            vector<vector<uint8_t>>,                    // signatures
+                            vector<vector<uint8_t>>,                    // public keys
+                            variant<ScriptError, malleability::status>, // expected result
+                            vector<vector<uint8_t>>>;                   // expected stack
+    const vector<test_args> test_data
+    {
+        // Pre-Chronicle
+        {{},
+         OP_0,
+         {sig},
+         {pub_key},
+         malleability::non_malleable,
+         {script_false}},
+        
+        {{},
+         OP_1,
+         {sig},
+         {pub_key},
+         malleability::non_malleable,
+         {script_false}},
+       
+        {SCRIPT_VERIFY_NULLDUMMY,
+         OP_0,
+         {sig},
+         {pub_key},
+         malleability::non_malleable,
+         {script_false}},
+        
+        {SCRIPT_VERIFY_NULLDUMMY,
+         OP_1,
+         {sig},
+         {pub_key},
+         SCRIPT_ERR_SIG_NULLDUMMY,
+         {{1}}},
+       
+    };
+    for(const auto& [flags,
+                     dummy,
+                     sigs,
+                     pks,
+                     expected,
+                     exp_stack] : test_data)
+    {
+        const auto params{make_eval_script_params(GlobalConfig::GetConfig(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+
+        const auto op_checksig_script{make_op_check_multi_sig_script(sigs, pks, dummy)};
+        const auto status = EvalScript(params,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{op_checksig_script.begin(),
+                                               op_checksig_script.end()},
+                                       flags,
+                                       BaseSignatureChecker{});
+        assert(status);
+        std::visit(overload([&expected,
+                             &stack,
+                             &exp_stack](const malleability::status ms)
+                            {
+                                BOOST_CHECK_EQUAL(std::get<malleability::status>(expected),
+                                                  ms);
+                                BOOST_CHECK_EQUAL(exp_stack.size(), stack.size());
+                                for(int i{}; const auto& elem : exp_stack)
+                                {
+                                    BOOST_CHECK_EQUAL_COLLECTIONS(elem.begin(),
+                                                                  elem.end(),
+                                                                  stack.at(i).begin(),
+                                                                  stack.at(i).end());
+                                    ++i;
+                                }
+                            },
+                            [&expected,
+                             &stack,
+                             &exp_stack](const ScriptError se)
+                            {
+                                BOOST_CHECK_EQUAL(std::get<ScriptError>(expected), se); 
+                                BOOST_CHECK_EQUAL(exp_stack.size(), stack.size());
+                                for(int i{}; const auto& elem : exp_stack)
+                                {
+                                    BOOST_CHECK_EQUAL_COLLECTIONS(elem.begin(),
+                                                                  elem.end(),
+                                                                  stack.at(i).begin(),
+                                                                  stack.at(i).end());
+                                    ++i;
+                                }
+                            }),
+                   *status);
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
