@@ -5476,5 +5476,146 @@ BOOST_AUTO_TEST_CASE(verify_script_op_checksig_nulldummy)
     }
 }
 
+BOOST_AUTO_TEST_CASE(eval_script_op_if_minimal_if)
+{
+    using namespace std;
+   
+    using test_args = tuple<uint32_t,                                   // flags
+                            vector<uint8_t>,                            // script
+                            variant<ScriptError, malleability::status>, // expected result
+                            vector<vector<uint8_t>>>;                   // expected stack
+    const vector<test_args> test_data
+    {
+        // Pre-Chronicle
+        {{},
+         {OP_0, OP_IF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{16}}},
+
+        {{},
+         {OP_1, OP_IF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{15}}},
+        
+        {{},
+         {2, 0, 1, OP_IF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{15}}},
+
+        {{},
+         {OP_2, OP_IF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{15}}},
+
+        {{},
+         {OP_0, OP_NOTIF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{15}}},
+
+        {{},
+         {OP_1, OP_NOTIF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{16}}},
+        
+        {{},
+         {2, 0, 1, OP_NOTIF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{16}}},
+
+        {{},
+         {OP_2, OP_NOTIF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{16}}},
+
+        {SCRIPT_VERIFY_MINIMALIF,
+         {OP_0, OP_IF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{16}}},
+
+        {SCRIPT_VERIFY_MINIMALIF,
+         {OP_1, OP_IF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{15}}},
+        
+        {SCRIPT_VERIFY_MINIMALIF,
+         {2, 0, 1, OP_IF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         SCRIPT_ERR_MINIMALIF,
+         {{0, 1}}},
+
+        {SCRIPT_VERIFY_MINIMALIF,
+         {OP_2, OP_IF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         SCRIPT_ERR_MINIMALIF,
+         {{2}}},
+
+        {SCRIPT_VERIFY_MINIMALIF,
+         {OP_0, OP_NOTIF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{15}}},
+
+        {SCRIPT_VERIFY_MINIMALIF,
+         {OP_1, OP_NOTIF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{16}}},
+        
+        {SCRIPT_VERIFY_MINIMALIF,
+         {2, 0, 1, OP_NOTIF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         SCRIPT_ERR_MINIMALIF,
+         {{0, 1}}},
+
+        {SCRIPT_VERIFY_MINIMALIF,
+         {OP_2, OP_NOTIF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         SCRIPT_ERR_MINIMALIF,
+         {{2}}},
+    };
+    for(const auto& [flags,
+                     script,
+                     expected,
+                     exp_stack] : test_data)
+    {
+        const auto params{make_eval_script_params(GlobalConfig::GetConfig(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto status = EvalScript(params,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{});
+        assert(status);
+        std::visit(overload([&expected,
+                             &stack,
+                             &exp_stack](const malleability::status ms)
+                            {
+                                BOOST_CHECK_EQUAL(std::get<malleability::status>(expected),
+                                                  ms);
+                                BOOST_CHECK_EQUAL(exp_stack.size(), stack.size());
+                                for(int i{}; const auto& elem : exp_stack)
+                                {
+                                    BOOST_CHECK_EQUAL_COLLECTIONS(elem.begin(),
+                                                                  elem.end(),
+                                                                  stack.at(i).begin(),
+                                                                  stack.at(i).end());
+                                    ++i;
+                                }
+                            },
+                            [&expected,
+                             &stack,
+                             &exp_stack](const ScriptError se)
+                            {
+                                BOOST_CHECK_EQUAL(std::get<ScriptError>(expected), se); 
+                                BOOST_CHECK_EQUAL(exp_stack.size(), stack.size());
+                                for(int i{}; const auto& elem : exp_stack)
+                                {
+                                    BOOST_CHECK_EQUAL_COLLECTIONS(elem.begin(),
+                                                                  elem.end(),
+                                                                  stack.at(i).begin(),
+                                                                  stack.at(i).end());
+                                    ++i;
+                                }
+                            }),
+                   *status);
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
