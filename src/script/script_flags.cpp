@@ -13,6 +13,9 @@ static_assert(IsUtxoAfterGenesis(SCRIPT_UTXO_AFTER_GENESIS));
 static_assert(!IsUtxoAfterChronicle(0));
 static_assert(IsUtxoAfterChronicle(SCRIPT_UTXO_AFTER_CHRONICLE));
 
+static_assert(!VerifyMinimalIf(0));
+static_assert(VerifyMinimalIf(SCRIPT_VERIFY_MINIMALIF));
+
 static_assert(!VerifyNullDummy(0));
 static_assert(VerifyNullDummy(SCRIPT_VERIFY_NULLDUMMY));
 

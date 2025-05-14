@@ -16,6 +16,7 @@ static_assert(!is_high_s(ms));
 static_assert(!has_non_push_data(ms));
 static_assert(!is_null_fail(ms));
 static_assert(!is_null_dummy(ms));
+static_assert(!is_minimal_if(ms));
 static_assert(!is_disallowed(ms));
     
 constexpr malleability::status ms_unclean_stack{malleability::unclean_stack};
@@ -28,6 +29,7 @@ static_assert(!is_high_s(ms_unclean_stack));
 static_assert(!has_non_push_data(ms_unclean_stack));
 static_assert(!is_null_fail(ms_unclean_stack));
 static_assert(!is_null_dummy(ms_unclean_stack));
+static_assert(!is_minimal_if(ms_unclean_stack));
 static_assert(!is_disallowed(ms_unclean_stack));
 
 constexpr malleability::status ms_min_push{malleability::non_minimal_push};
@@ -40,6 +42,7 @@ static_assert(!is_high_s(ms_min_push));
 static_assert(!has_non_push_data(ms_min_push));
 static_assert(!is_null_fail(ms_min_push));
 static_assert(!is_null_dummy(ms_min_push));
+static_assert(!is_minimal_if(ms_min_push));
 static_assert(!is_disallowed(ms_min_push));
 
 constexpr malleability::status ms_min_scriptnum{malleability::non_minimal_scriptnum};
@@ -52,6 +55,7 @@ static_assert(!is_high_s(ms_min_scriptnum));
 static_assert(!has_non_push_data(ms_min_scriptnum));
 static_assert(!is_null_fail(ms_min_scriptnum));
 static_assert(!is_null_dummy(ms_min_scriptnum));
+static_assert(!is_minimal_if(ms_min_scriptnum));
 static_assert(!is_disallowed(ms_min_scriptnum));
 
 constexpr malleability::status ms_high_s{malleability::high_s};
@@ -64,6 +68,7 @@ static_assert(is_high_s(ms_high_s));
 static_assert(!has_non_push_data(ms_high_s));
 static_assert(!is_null_fail(ms_high_s));
 static_assert(!is_null_dummy(ms_high_s));
+static_assert(!is_minimal_if(ms_high_s));
 static_assert(!is_disallowed(ms_high_s));
 
 constexpr malleability::status ms_non_push_data{malleability::non_push_data};
@@ -76,6 +81,7 @@ static_assert(!is_high_s(ms_non_push_data));
 static_assert(has_non_push_data(ms_non_push_data));
 static_assert(!is_null_fail(ms_non_push_data));
 static_assert(!is_null_dummy(ms_non_push_data));
+static_assert(!is_minimal_if(ms_non_push_data));
 static_assert(!is_disallowed(ms_non_push_data));
 
 constexpr malleability::status ms_null_fail{malleability::null_fail};
@@ -88,6 +94,7 @@ static_assert(!is_high_s(ms_null_fail));
 static_assert(!has_non_push_data(ms_null_fail));
 static_assert(is_null_fail(ms_null_fail));
 static_assert(!is_null_dummy(ms_null_fail));
+static_assert(!is_minimal_if(ms_null_fail));
 static_assert(!is_disallowed(ms_null_fail));
 
 constexpr malleability::status ms_null_dummy{malleability::null_dummy};
@@ -100,7 +107,21 @@ static_assert(!is_high_s(ms_null_dummy));
 static_assert(!has_non_push_data(ms_null_dummy));
 static_assert(!is_null_fail(ms_null_dummy));
 static_assert(is_null_dummy(ms_null_dummy));
+static_assert(!is_minimal_if(ms_null_dummy));
 static_assert(!is_disallowed(ms_null_dummy));
+
+constexpr malleability::status ms_minimal_if{malleability::minimal_if};
+static_assert(malleability::minimal_if == ms_minimal_if);
+static_assert(!is_malleable(ms_minimal_if));
+static_assert(!is_unclean_stack(ms_minimal_if));
+static_assert(!is_non_minimal_push(ms_minimal_if));
+static_assert(!is_non_minimal_scriptnum(ms_minimal_if));
+static_assert(!is_high_s(ms_minimal_if));
+static_assert(!has_non_push_data(ms_minimal_if));
+static_assert(!is_null_fail(ms_minimal_if));
+static_assert(!is_null_dummy(ms_minimal_if));
+static_assert(is_minimal_if(ms_minimal_if));
+static_assert(!is_disallowed(ms_minimal_if));
 
 constexpr malleability::status ms_disallowed{malleability::disallowed};
 static_assert(malleability::disallowed == ms_disallowed);
@@ -112,6 +133,7 @@ static_assert(!is_high_s(ms_disallowed));
 static_assert(!has_non_push_data(ms_disallowed));
 static_assert(!is_null_fail(ms_disallowed));
 static_assert(!is_null_dummy(ms_disallowed));
+static_assert(!is_minimal_if(ms_disallowed));
 static_assert(is_disallowed(ms_disallowed));
 
 constexpr malleability::status ms_all{malleability::unclean_stack |
@@ -140,7 +162,7 @@ static_assert(is_null_fail(ms_all));
 static_assert(is_null_dummy(ms_all));
 static_assert(is_disallowed(ms_all));
 
-static_assert(malleability::status{0x88} == []() constexpr
+static_assert(malleability::status{0x8008} == []() constexpr
               {
                   malleability::status a{malleability::high_s};
                   malleability::status b{malleability::disallowed}; 

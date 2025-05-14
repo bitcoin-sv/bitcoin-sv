@@ -749,13 +749,16 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
                             const LimitedVector& vch = stack.stacktop(-1);
                             if((opcode == OP_IF || opcode == OP_NOTIF)
-                                && flags & SCRIPT_VERIFY_MINIMALIF)
+                                && VerifyMinimalIf(flags))
                             {
-                                if(vch.size() > 1)
-                                    return SCRIPT_ERR_MINIMALIF;
-
-                                if(vch.size() == 1 && vch[0] != 1)
-                                    return SCRIPT_ERR_MINIMALIF;
+                                if(vch.size() > 1
+                                   || (vch.size() == 1 && vch[0] != 1))
+                                {   
+                                    if(IsChronicle(flags))
+                                        ms |= malleability::minimal_if;
+                                    else
+                                        return SCRIPT_ERR_MINIMALIF;
+                                }
                             }
                            
                             if(opcode == OP_VERIF || opcode == OP_VERNOTIF)
@@ -2468,6 +2471,12 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
             {
                 if(is_null_dummy(combined_malleability))
                     return std::make_pair(false, SCRIPT_ERR_SIG_NULLDUMMY);
+            }
+            
+            if(flags & SCRIPT_VERIFY_MINIMALIF)
+            {
+                if(is_minimal_if(combined_malleability))
+                    return std::make_pair(false, SCRIPT_ERR_MINIMALIF);
             }
         }
     }

@@ -129,6 +129,11 @@ constexpr bool IsUtxoAfterChronicle(uint32_t flags)
     return (flags & SCRIPT_UTXO_AFTER_CHRONICLE) != 0;
 }
 
+constexpr bool VerifyMinimalIf(uint32_t flags)
+{
+    return (flags & SCRIPT_VERIFY_MINIMALIF) != 0;
+}
+
 constexpr bool VerifyNullDummy(uint32_t flags)
 {
     return (flags & SCRIPT_VERIFY_NULLDUMMY) != 0;
@@ -138,6 +143,5 @@ constexpr bool VerifyNullFail(uint32_t flags)
 {
     return (flags & SCRIPT_VERIFY_NULLFAIL) != 0;
 }
-
 
 #endif // BITCOIN_SCRIPT_SCRIPTFLAGS_H

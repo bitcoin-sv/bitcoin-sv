@@ -8,7 +8,7 @@
 
 namespace malleability
 {
-    using status = std::uint8_t;
+    using status = std::uint16_t;
 
     constexpr static status non_malleable        {0x00};
     constexpr static status unclean_stack        {0x01};
@@ -18,7 +18,8 @@ namespace malleability
     constexpr static status non_push_data        {0x10};
     constexpr static status null_fail            {0x20};
     constexpr static status null_dummy           {0x40};
-    constexpr static status disallowed           {0x80};
+    constexpr static status minimal_if           {0x80};
+    constexpr static status disallowed           {0x8000};
 }
 
 constexpr bool is_malleable(const malleability::status s)
@@ -55,6 +56,11 @@ constexpr bool is_high_s(const malleability::status s)
 constexpr bool has_non_push_data(const malleability::status s)
 {
     return s & malleability::non_push_data;
+}
+
+constexpr bool is_minimal_if(const malleability::status s)
+{
+    return s & malleability::minimal_if;
 }
 
 constexpr bool is_null_fail(const malleability::status s)

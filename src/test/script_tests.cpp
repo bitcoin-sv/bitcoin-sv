@@ -5698,5 +5698,87 @@ BOOST_AUTO_TEST_CASE(eval_script_op_if_minimal_if)
     }
 }
 
+BOOST_AUTO_TEST_CASE(verify_script_minimal_if)
+{
+    using namespace std;
+
+    const vector<uint8_t> empty_sig{};
+    constexpr uint8_t sighash{SIGHASH_ALL | SIGHASH_FORKID};
+    const auto sig{make_signature(low_s_max(), sighash)};
+
+    using test_args = tuple<uint32_t,              // flags
+                            vector<uint8_t>,       // script
+                            malleability::status,
+                            ScriptError,           // expected error
+                            malleability::status>; // expected malleability_status
+    const vector<test_args> test_data
+    {
+        // Pre-Chronicle
+        // malleability allowed
+        {{},
+         {OP_2, OP_IF, OP_1, OP_ENDIF},
+         {},
+         SCRIPT_ERR_OK, malleability::non_malleable},
+
+        {SCRIPT_VERIFY_MINIMALIF,
+         {OP_2, OP_IF, OP_1, OP_ENDIF},
+         {},
+         SCRIPT_ERR_MINIMALIF, malleability::non_malleable},
+
+        // malleability disallowed
+        {{},
+         {OP_2, OP_IF, OP_1, OP_ENDIF},
+         malleability::disallowed,
+         SCRIPT_ERR_OK, malleability::disallowed},
+
+        {SCRIPT_VERIFY_MINIMALIF,
+         {OP_2, OP_IF, OP_1, OP_ENDIF},
+         malleability::disallowed,
+         SCRIPT_ERR_MINIMALIF, malleability::disallowed},
+
+        // Post-Chronicle
+        // malleability allowed
+        {SCRIPT_CHRONICLE,
+         {OP_2, OP_IF, OP_1, OP_ENDIF},
+         {},
+         SCRIPT_ERR_OK, malleability::non_malleable},
+
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_MINIMALIF,
+         {OP_2, OP_IF, OP_1, OP_ENDIF},
+         {},
+         SCRIPT_ERR_OK, malleability::minimal_if},
+
+        // malleability disallowed
+        {SCRIPT_CHRONICLE,
+         {OP_2, OP_IF, OP_1, OP_ENDIF},
+         malleability::disallowed,
+         SCRIPT_ERR_OK, malleability::disallowed},
+
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_MINIMALIF,
+         {OP_2, OP_IF, OP_1, OP_ENDIF},
+         malleability::disallowed,
+         SCRIPT_ERR_MINIMALIF, malleability::disallowed | malleability::minimal_if},
+    };
+    for(const auto& [flags, script, ms, exp_error, exp_mall] : test_data)
+    {
+        const auto params{make_verify_script_params(GlobalConfig::GetConfig(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        const CScript scriptSig;
+        std::atomic<malleability::status> ams{ms};
+        const auto status = VerifyScript(params,
+                                         source->GetToken(),
+                                         scriptSig,
+                                         CScript{script.begin(),
+                                                 script.end()},
+                                         flags,
+                                         BaseSignatureChecker{},
+                                         ams);
+        assert(status);
+        BOOST_CHECK_EQUAL(exp_error == SCRIPT_ERR_OK, status->first);
+        BOOST_CHECK_EQUAL(exp_error, status->second);
+        BOOST_CHECK_EQUAL(exp_mall, malleability::status{ams});
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
