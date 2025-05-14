@@ -5566,6 +5566,87 @@ BOOST_AUTO_TEST_CASE(eval_script_op_if_minimal_if)
          {OP_2, OP_NOTIF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
          SCRIPT_ERR_MINIMALIF,
          {{2}}},
+
+        // Post-Chronicle
+        {SCRIPT_CHRONICLE,
+         {OP_0, OP_IF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{16}}},
+
+        {SCRIPT_CHRONICLE,
+         {OP_1, OP_IF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{15}}},
+        
+        {SCRIPT_CHRONICLE,
+         {2, 0, 1, OP_IF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{15}}},
+
+        {SCRIPT_CHRONICLE,
+         {OP_2, OP_IF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{15}}},
+
+        {SCRIPT_CHRONICLE,
+         {OP_0, OP_NOTIF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{15}}},
+
+        {SCRIPT_CHRONICLE,
+         {OP_1, OP_NOTIF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{16}}},
+        
+        {SCRIPT_CHRONICLE,
+         {2, 0, 1, OP_NOTIF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{16}}},
+
+        {SCRIPT_CHRONICLE,
+         {OP_2, OP_NOTIF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{16}}},
+
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_MINIMALIF,
+         {OP_0, OP_IF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{16}}},
+
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_MINIMALIF,
+         {OP_1, OP_IF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{15}}},
+        
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_MINIMALIF,
+         {2, 0, 1, OP_IF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::minimal_if,
+         {{15}}},
+
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_MINIMALIF,
+         {OP_2, OP_IF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::minimal_if,
+         {{15}}},
+
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_MINIMALIF,
+         {OP_0, OP_NOTIF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{15}}},
+
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_MINIMALIF,
+         {OP_1, OP_NOTIF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::non_malleable,
+         {{16}}},
+        
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_MINIMALIF,
+         {2, 0, 1, OP_NOTIF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::minimal_if,
+         {{16}}},
+
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_MINIMALIF,
+         {OP_2, OP_NOTIF, OP_15, OP_ELSE, OP_16, OP_ENDIF},
+         malleability::minimal_if,
+         {{16}}},
     };
     for(const auto& [flags,
                      script,
