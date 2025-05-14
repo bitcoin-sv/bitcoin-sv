@@ -365,6 +365,7 @@ add_library(common
 	script/opcodes.h
 	script/script.h
 	script/script_error.h
+	script/script_flags.cpp
 	script/script_flags.h
 	script/script_num.h
 	script/sighashtype.h

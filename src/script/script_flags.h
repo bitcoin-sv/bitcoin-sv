@@ -118,35 +118,26 @@ constexpr bool IsChronicle(uint32_t flags)
 {
     return (flags & SCRIPT_CHRONICLE) != 0;
 }
-static_assert(!IsChronicle(0));
-static_assert(IsChronicle(SCRIPT_CHRONICLE));
 
 constexpr bool IsUtxoAfterGenesis(uint32_t flags)
 {
     return (flags & SCRIPT_UTXO_AFTER_GENESIS) != 0;
 }
-static_assert(!IsUtxoAfterGenesis(0));
-static_assert(IsUtxoAfterGenesis(SCRIPT_UTXO_AFTER_GENESIS));
 
 constexpr bool IsUtxoAfterChronicle(uint32_t flags)
 {
     return (flags & SCRIPT_UTXO_AFTER_CHRONICLE) != 0;
 }
-static_assert(!IsUtxoAfterChronicle(0));
-static_assert(IsUtxoAfterChronicle(SCRIPT_UTXO_AFTER_CHRONICLE));
 
 constexpr bool VerifyNullDummy(uint32_t flags)
 {
     return (flags & SCRIPT_VERIFY_NULLDUMMY) != 0;
 }
-static_assert(!VerifyNullDummy(0));
-static_assert(VerifyNullDummy(SCRIPT_VERIFY_NULLDUMMY));
 
 constexpr bool VerifyNullFail(uint32_t flags)
 {
     return (flags & SCRIPT_VERIFY_NULLFAIL) != 0;
 }
-static_assert(!VerifyNullFail(0));
-static_assert(VerifyNullFail(SCRIPT_VERIFY_NULLFAIL));
+
 
 #endif // BITCOIN_SCRIPT_SCRIPTFLAGS_H

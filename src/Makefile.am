@@ -521,6 +521,7 @@ libbitcoin_consensus_a_SOURCES = \
   script/malleability_status.h \
   script/opcodes.cpp \
   script/opcodes.h \
+  script/script_flags.cpp \
   script/script_flags.h \
   script/script.cpp \
   script/script.h \
