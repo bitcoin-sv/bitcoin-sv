@@ -2317,49 +2317,47 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
     static const std::array<uint8_t, 4> pushdata2 = {OP_PUSHDATA2, 1, 0, 0x5a};
     static const std::array<uint8_t, 6> pushdata4 = {OP_PUSHDATA4, 1, 0, 0, 0, 0x5a};
 
-    LimitedStack directStack(UINT32_MAX);
+    const uint32_t flags{SCRIPT_VERIFY_P2SH};
+    const auto params{make_eval_script_params(testConfig, flags, true)};
     auto source = task::CCancellationSource::Make();
-    auto res = EvalScript(testConfig,
-                          true,
+    LimitedStack directStack(UINT32_MAX);
+    auto res = EvalScript(params,
                           source->GetToken(),
                           directStack,
                           CScript(direct.begin(), direct.end()),
-                          SCRIPT_VERIFY_P2SH,
+                          flags,
                           BaseSignatureChecker());
     assert(res);
     BOOST_CHECK(std::holds_alternative<malleability::status>(*res));
 
     LimitedStack pushdata1Stack(UINT32_MAX);
-    res = EvalScript(testConfig,
-                     true,
+    res = EvalScript(params,
                      source->GetToken(),
                      pushdata1Stack,
                      CScript(pushdata1.begin(), pushdata1.end()),
-                     SCRIPT_VERIFY_P2SH,
+                     flags,
                      BaseSignatureChecker());
     assert(res);
     BOOST_CHECK(std::holds_alternative<malleability::status>(*res));
     BOOST_CHECK(pushdata1Stack == directStack);
 
     LimitedStack pushdata2Stack(UINT32_MAX);
-    res = EvalScript(testConfig,
-                     true,
+    res = EvalScript(params,
                      source->GetToken(),
                      pushdata2Stack,
                      CScript(pushdata2.begin(), pushdata2.end()),
-                     SCRIPT_VERIFY_P2SH,
+                     flags,
                      BaseSignatureChecker());
     assert(res);
     BOOST_CHECK(std::holds_alternative<malleability::status>(*res));
     BOOST_CHECK(pushdata2Stack == directStack);
 
     LimitedStack pushdata4Stack(UINT32_MAX);
-    res = EvalScript(testConfig,
-                     true,
+    res = EvalScript(params,
                      source->GetToken(),
                      pushdata4Stack,
                      CScript(pushdata4.begin(), pushdata4.end()),
-                     SCRIPT_VERIFY_P2SH,
+                     flags,
                      BaseSignatureChecker());
     assert(res);
     BOOST_CHECK(std::holds_alternative<malleability::status>(*res));
@@ -2383,10 +2381,10 @@ BOOST_AUTO_TEST_CASE(op_pushdata1_op_size)
 
     CScript script(args.begin(), args.end());
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+    const auto params{make_eval_script_params(config, flags, false)};
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
-    const auto status = EvalScript(config,
-                                   false,
+    const auto status = EvalScript(params,
                                    source->GetToken(),
                                    stack,
                                    script,
@@ -2414,10 +2412,10 @@ BOOST_AUTO_TEST_CASE(op_pushdata2_op_size)
 
     CScript script(args.begin(), args.end());
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+    const auto params{make_eval_script_params(config, flags, false)};
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
-    const auto status = EvalScript(config,
-                                   false,
+    const auto status = EvalScript(params,
                                    source->GetToken(),
                                    stack,
                                    script,
@@ -2449,10 +2447,10 @@ BOOST_AUTO_TEST_CASE(op_pushdata4_op_size)
 
     CScript script(args.begin(), args.end());
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+    const auto params{make_eval_script_params(config, flags, false)};
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
-    const auto status = EvalScript(config,
-                                   false,
+    const auto status = EvalScript(params,
                                    source->GetToken(),
                                    stack,
                                    script,
@@ -3795,10 +3793,10 @@ BOOST_AUTO_TEST_CASE(mt_2_plus_2)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+        const auto params{make_eval_script_params(config, flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
-        const auto status = EvalScript(config,
-                                       false,
+        const auto status = EvalScript(params,
                                        source->GetToken(),
                                        stack,
                                        script,
@@ -3911,6 +3909,7 @@ BOOST_AUTO_TEST_CASE(mt_p2pkh)
         CScript script(args.begin(), args.end());
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+        const auto params{make_eval_script_params(config, flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const string serialized_tx{
@@ -3921,8 +3920,7 @@ BOOST_AUTO_TEST_CASE(mt_p2pkh)
         CTransaction tx{mtx};
         Amount amount{10};
         const TransactionSignatureChecker sig_checker{&tx, 0, amount};
-        const auto status = EvalScript(config,
-                                       false,
+        const auto status = EvalScript(params,
                                        source->GetToken(),
                                        stack,
                                        script,
@@ -4184,6 +4182,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_lows)
     for(const auto& [flags, s, exp_error, exp_mall] : test_data)
     {
         const Config& config = GlobalConfig::GetConfig();
+        const auto params{make_eval_script_params(config, flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
 
@@ -4192,8 +4191,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_lows)
                                                                  | SIGHASH_FORKID
                                                                  | SIGHASH_CHRONICLE),
                                                   make_pub_key())};
-        const auto status = EvalScript(config,
-                                       false,
+        const auto status = EvalScript(params,
                                        source->GetToken(),
                                        stack,
                                        CScript{script.begin(), script.end()},
@@ -4409,12 +4407,12 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid_chronicle)
     for(const auto& [flags, sighash, exp_error, exp_mall] : test_data)
     {
         const Config& config = GlobalConfig::GetConfig();
+        const auto params{make_eval_script_params(config, flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto script{make_op_checksig_script(make_signature(low_s_max(), sighash),
                                                   make_pub_key())};
-        const auto status = EvalScript(config,
-                                       false,
+        const auto status = EvalScript(params,
                                        source->GetToken(),
                                        stack,
                                        CScript{script.begin(), script.end()},
@@ -4553,12 +4551,12 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid_chronicle)
     for(const auto& [flags, sighash, exp_error, exp_mall] : test_data)
     {
         const Config& config = GlobalConfig::GetConfig();
+        const auto params{make_eval_script_params(config, flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto script{make_op_check_multi_sig_script({make_signature(low_s_max(), sighash)},
                                                          {make_pub_key()})};
-        const auto status = EvalScript(config,
-                                       false,
+        const auto status = EvalScript(params,
                                        source->GetToken(),
                                        stack,
                                        CScript{script.begin(), script.end()},
@@ -4589,6 +4587,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checksig_forkid_chronicle)
     using namespace std;
         
     const Config& config = GlobalConfig::GetConfig();
+    const auto params{make_eval_script_params(config, flags, false)};
     auto source = task::CCancellationSource::Make();
     
     using test_args = tuple<vector<uint8_t>,   // sighashes
@@ -4623,13 +4622,12 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checksig_forkid_chronicle)
                             | SCRIPT_VERIFY_STRICTENC
                             | SCRIPT_CHRONICLE
                             };
-        const auto status = EvalScript(config,
-                                        false,
-                                        source->GetToken(),
-                                        stack,
-                                        CScript{s.begin(), s.end()},
-                                        flags,
-                                        BaseSignatureChecker{});
+        const auto status = EvalScript(params,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{s.begin(), s.end()},
+                                       flags,
+                                       BaseSignatureChecker{});
         assert(status);
         BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
         BOOST_CHECK_EQUAL(exp_mall, std::get<malleability::status>(*status));
@@ -4641,6 +4639,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checkmultisig_forkid_relax)
     using namespace std;
 
     const Config& config = GlobalConfig::GetConfig();
+    const auto params{make_eval_script_params(config, flags, false)};
     auto source = task::CCancellationSource::Make();
     
     using test_args = tuple<vector<uint8_t>,   // sighashes
@@ -4676,13 +4675,12 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checkmultisig_forkid_relax)
                             | SCRIPT_VERIFY_STRICTENC
                             | SCRIPT_CHRONICLE
                             };
-        const auto status = EvalScript(config,
-                                        false,
-                                        source->GetToken(),
-                                        stack,
-                                        CScript{s.begin(), s.end()},
-                                        flags,
-                                        BaseSignatureChecker{});
+        const auto status = EvalScript(params,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{s.begin(), s.end()},
+                                       flags,
+                                       BaseSignatureChecker{});
         assert(status);
         BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
         BOOST_CHECK_EQUAL(exp_mall, std::get<malleability::status>(*status));
@@ -4779,6 +4777,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_minimal_encoding)
     for(const auto& [flags, s, sig_hash, exp_error, exp_mall] : test_data)
     {
         const Config& config = GlobalConfig::GetConfig();
+        const auto params{make_eval_script_params(config, flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
       
@@ -4787,8 +4786,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_minimal_encoding)
                                                                              sig_hash),
                                                               make_pub_key())};
         script.insert(script.end(), op_checksig_script.begin(), op_checksig_script.end());
-        const auto status = EvalScript(config,
-                                       false,
+        const auto status = EvalScript(params,
                                        source->GetToken(),
                                        stack,
                                        CScript{script.begin(), script.end()},

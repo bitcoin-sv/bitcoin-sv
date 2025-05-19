@@ -387,13 +387,14 @@ static CScript PushAll(const LimitedStack &values) {
 void ReplaceRedeemScript(CScript &script, const CScript &redeemScript) {
     const Config& config = GlobalConfig::GetConfig();
 
+    constexpr uint32_t flags{SCRIPT_VERIFY_STRICTENC};
+    const auto params{make_eval_script_params(config, flags, true)};
     LimitedStack stack(UINT32_MAX);
-    EvalScript(config,
-               true,
+    EvalScript(params,
                task::CCancellationSource::Make()->GetToken(),
                stack,
                script,
-               SCRIPT_VERIFY_STRICTENC,
+               flags,
                BaseSignatureChecker());
     BOOST_CHECK(stack.size() > 0);
     stack.pop_back();
