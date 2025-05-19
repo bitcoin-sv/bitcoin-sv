@@ -214,20 +214,21 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount) {
  * Verifies script execution of the zeroth scriptPubKey of tx output and zeroth
  * scriptSig and witness of tx input.
  */
-ScriptError VerifyWithFlag(const CTransaction &output,
-                           const CMutableTransaction &input, int flags) {
-    const Config& config = GlobalConfig::GetConfig();
+ScriptError VerifyWithFlag(const CTransaction& output,
+                           const CMutableTransaction& input,
+                           const int flags)
+{
+    const auto params{make_verify_script_params(GlobalConfig::GetConfig(), flags, true)};
     CTransaction inputi(input);
     std::atomic<malleability::status> ms {};
     const auto ret =
-        VerifyScript(
-            config, true,
-            task::CCancellationSource::Make(),
-            inputi.vin[0].scriptSig,
-            output.vout[0].scriptPubKey,
-            flags,
-            TransactionSignatureChecker(&inputi, 0, output.vout[0].nValue),
-            ms);
+        VerifyScript(params,
+                     task::CCancellationSource::Make(),
+                     inputi.vin[0].scriptSig,
+                     output.vout[0].scriptPubKey,
+                     flags,
+                     TransactionSignatureChecker(&inputi, 0, output.vout[0].nValue),
+                     ms);
     assert(ret.has_value());
     BOOST_CHECK(!ret->first);
     return ret->second;

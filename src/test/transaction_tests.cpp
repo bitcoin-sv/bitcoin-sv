@@ -128,6 +128,8 @@ void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
 
             for (auto verify_flags: flags_to_check)
             {
+                const auto params{make_verify_script_params(globalConfig, verify_flags, true)};
+
                 bool is_valid = true;
                 PrecomputedTransactionData txdata(tx);
                 size_t i = 0;
@@ -146,14 +148,13 @@ void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
                     }
 
                     const auto o =
-                        VerifyScript(
-                            globalConfig, true,
-                            task::CCancellationSource::Make()->GetToken(),
-                            tx.vin[i].scriptSig,
-                            mapprevOutScriptPubKeys[tx.vin[i].prevout],
-                            verify_flags,
-                            TransactionSignatureChecker(&tx, i, amount, txdata),
-                            malleability);
+                        VerifyScript(params,
+                                     task::CCancellationSource::Make()->GetToken(),
+                                     tx.vin[i].scriptSig,
+                                     mapprevOutScriptPubKeys[tx.vin[i].prevout],
+                                     verify_flags,
+                                     TransactionSignatureChecker(&tx, i, amount, txdata),
+                                     malleability);
                     assert(o);
                     if(o->first)
                     {
@@ -617,22 +618,22 @@ void CheckWithFlag(const CheckFlagParams& params)
     //auto s1 = ScriptToAsmStr(inputi.vin[0].scriptSig);
     //auto s2 = ScriptToAsmStr(output->vout[0].scriptPubKey);
 
-    for(const auto& flags : flagList)
+    for(const auto& flag_item : flagList)
     {
+        const auto flags{flag_item.first | SCRIPT_ENABLE_SIGHASH_FORKID};
+        const auto params{make_verify_script_params(config, flags, true)};
         std::atomic<malleability::status> ms {};
         const auto o =
-            VerifyScript(
-                config,
-                true,
-                task::CCancellationSource::Make()->GetToken(),
-                inputi.vin[0].scriptSig,
-                output->vout[0].scriptPubKey,
-                flags.first | SCRIPT_ENABLE_SIGHASH_FORKID,
-                TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue),
-                ms);
+            VerifyScript(params,
+                         task::CCancellationSource::Make()->GetToken(),
+                         inputi.vin[0].scriptSig,
+                         output->vout[0].scriptPubKey,
+                         flags,
+                         TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue),
+                         ms);
         assert(o);
         const bool ret = o->first;
-        BOOST_CHECK_MESSAGE(ret == flags.second, std::string("failed result: ") + (ret? "true":"false"));
+        BOOST_CHECK_MESSAGE(ret == flag_item.second, std::string("failed result: ") + (ret? "true":"false"));
     }
 }
 

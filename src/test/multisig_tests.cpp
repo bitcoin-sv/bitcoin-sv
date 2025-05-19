@@ -44,8 +44,10 @@ CScript sign_multisig(const CScript& scriptPubKey,
     return result;
 }
 
-BOOST_AUTO_TEST_CASE(multisig_verify) {
-    uint32_t flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC;
+BOOST_AUTO_TEST_CASE(multisig_verify)
+{
+    constexpr uint32_t flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC;
+    const auto params{make_verify_script_params(testConfig, flags, true)};
 
     ScriptError err{};
     std::array<CKey, 4> key;
@@ -93,28 +95,26 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
     s = sign_multisig(a_and_b, keys, txTo[0], 0);
     auto source = task::CCancellationSource::Make();
     auto res =
-        VerifyScript(
-            testConfig, true,
-            source->GetToken(),
-            s,
-            a_and_b,
-            flags,
-            MutableTransactionSignatureChecker(&txTo[0], 0, amount),
-            ms);
+        VerifyScript(params,
+                     source->GetToken(),
+                     s,
+                     a_and_b,
+                     flags,
+                     MutableTransactionSignatureChecker(&txTo[0], 0, amount),
+                     ms);
     BOOST_CHECK(res.has_value() && res->first);
 
     for (int i = 0; i < 4; i++) {
         keys.assign(1, key[i]);
         s = sign_multisig(a_and_b, keys, txTo[0], 0);
         res =
-            VerifyScript(
-                testConfig, true,
-                source->GetToken(),
-                s,
-                a_and_b,
-                flags,
-                MutableTransactionSignatureChecker(&txTo[0], 0, amount),
-                ms);
+            VerifyScript(params,
+                         source->GetToken(),
+                         s,
+                         a_and_b,
+                         flags,
+                         MutableTransactionSignatureChecker(&txTo[0], 0, amount),
+                         ms);
         BOOST_CHECK(res.has_value());
         BOOST_CHECK_MESSAGE(!res->first, strprintf("a&b 1: %d", i));
         err = res->second;
@@ -125,14 +125,13 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
         keys.push_back(key[i]);
         s = sign_multisig(a_and_b, keys, txTo[0], 0);
         res =
-            VerifyScript(
-                testConfig, true,
-                source->GetToken(),
-                s,
-                a_and_b,
-                flags,
-                MutableTransactionSignatureChecker(&txTo[0], 0, amount),
-                ms);
+            VerifyScript(params,
+                         source->GetToken(),
+                         s,
+                         a_and_b,
+                         flags,
+                         MutableTransactionSignatureChecker(&txTo[0], 0, amount),
+                         ms);
         BOOST_CHECK(res.has_value());
         BOOST_CHECK_MESSAGE(!res->first, strprintf("a&b 2: %d", i));
         err = res->second;
@@ -146,26 +145,24 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
         s = sign_multisig(a_or_b, keys, txTo[1], 0);
         if (i == 0 || i == 1) {
             res =
-                VerifyScript(
-                    testConfig, true,
-                    source->GetToken(),
-                    s,
-                    a_or_b,
-                    flags,
-                    MutableTransactionSignatureChecker(&txTo[1], 0, amount),
-                    ms);
+                VerifyScript(params,
+                             source->GetToken(),
+                             s,
+                             a_or_b,
+                             flags,
+                             MutableTransactionSignatureChecker(&txTo[1], 0, amount),
+                             ms);
             BOOST_CHECK(res.has_value());
             BOOST_CHECK_MESSAGE(res->first, strprintf("a|b: %d", i));
         } else {
             res =
-                VerifyScript(
-                    testConfig, true,
-                    source->GetToken(),
-                    s,
-                    a_or_b,
-                    flags,
-                    MutableTransactionSignatureChecker(&txTo[1], 0, amount),
-                    ms);
+                VerifyScript(params,
+                             source->GetToken(),
+                             s,
+                             a_or_b,
+                             flags,
+                             MutableTransactionSignatureChecker(&txTo[1], 0, amount),
+                             ms);
             BOOST_CHECK(res.has_value());
             BOOST_CHECK_MESSAGE(!res->first, strprintf("a|b: %d", i));
             err = res->second;
@@ -176,14 +173,13 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
     s.clear();
     s << OP_0 << OP_1;
     res =
-        VerifyScript(
-            testConfig, true,
-            source->GetToken(),
-            s,
-            a_or_b,
-            flags,
-            MutableTransactionSignatureChecker(&txTo[1], 0, amount),
-            ms);
+        VerifyScript(params,
+                     source->GetToken(),
+                     s,
+                     a_or_b,
+                     flags,
+                     MutableTransactionSignatureChecker(&txTo[1], 0, amount),
+                     ms);
     BOOST_CHECK(res.has_value());
     BOOST_CHECK(!res->first);
     err = res->second;
@@ -196,26 +192,24 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
             s = sign_multisig(escrow, keys, txTo[2], 0);
             if (i < j && i < 3 && j < 3) {
                 res =
-                    VerifyScript(
-                        testConfig, true,
-                        source->GetToken(),
-                        s,
-                        escrow,
-                        flags,
-                        MutableTransactionSignatureChecker(&txTo[2], 0, amount),
-                        ms);
+                    VerifyScript(params,
+                                 source->GetToken(),
+                                 s,
+                                 escrow,
+                                 flags,
+                                 MutableTransactionSignatureChecker(&txTo[2], 0, amount),
+                                 ms);
                 BOOST_CHECK(res.has_value());
                 BOOST_CHECK_MESSAGE(res->first, strprintf("escrow 1: %d %d", i, j));
             } else {
                 res =
-                    VerifyScript(
-                        testConfig, true,
-                        source->GetToken(),
-                        s,
-                        escrow,
-                        flags,
-                        MutableTransactionSignatureChecker(&txTo[2], 0, amount),
-                        ms);
+                    VerifyScript(params,
+                                 source->GetToken(),
+                                 s,
+                                 escrow,
+                                 flags,
+                                 MutableTransactionSignatureChecker(&txTo[2], 0, amount),
+                                 ms);
                 BOOST_CHECK(res.has_value());
                 BOOST_CHECK_MESSAGE(!res->first, strprintf("escrow 2: %d %d", i, j));
                 err = res->second;

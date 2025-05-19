@@ -31,9 +31,15 @@ static std::vector<uint8_t> Serialize(const CScript &s) {
     return sSerialized;
 }
 
-static bool Verify(const CScript &scriptSig, const CScript &scriptPubKey,
-                   bool fStrict, ScriptError &err) {
-    const Config& config = GlobalConfig::GetConfig();
+static bool Verify(const CScript& scriptSig,
+                   const CScript& scriptPubKey,
+                   bool fStrict,
+                   ScriptError& err)
+{
+    const uint32_t flags = (fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE)
+                           | SCRIPT_ENABLE_SIGHASH_FORKID;
+    const auto params{make_verify_script_params(GlobalConfig::GetConfig(), flags, true)};
+
     // Create dummy to/from transactions:
     CMutableTransaction txFrom;
     txFrom.vout.resize(1);
@@ -47,16 +53,16 @@ static bool Verify(const CScript &scriptSig, const CScript &scriptPubKey,
     txTo.vout[0].nValue = Amount(1);
 
     std::atomic<malleability::status> ms {};
-    const auto res =
-        VerifyScript(
-            config, true,
-            task::CCancellationSource::Make()->GetToken(),
-            scriptSig,
-            scriptPubKey,
-            (fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE) |
-                SCRIPT_ENABLE_SIGHASH_FORKID,
-            MutableTransactionSignatureChecker(&txTo, 0, txFrom.vout[0].nValue),
-            ms);
+    const auto res = VerifyScript(params,
+                                  task::CCancellationSource::Make()->GetToken(),
+                                  scriptSig,
+                                  scriptPubKey,
+                                  flags,
+                                  MutableTransactionSignatureChecker(&txTo,
+                                                                     0,
+                                                                     txFrom.vout[0]
+                                                                         .nValue),
+                                  ms);
     assert(res);
     err = res->second;
     return res->first;
