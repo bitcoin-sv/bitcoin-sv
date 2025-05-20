@@ -13,7 +13,6 @@
 
 #include "bn_helpers.h"
 #include "config.h"
-#include "interpreter_adapter.h"
 #include "script/int_serialization.h"
 #include "script/limitedstack.h"
 #include "script/opcodes.h"

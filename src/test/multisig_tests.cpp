@@ -2,7 +2,6 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include "interpreter_adapter.h"
 #include "key.h"
 #include "keystore.h"
 #include "policy/policy.h"

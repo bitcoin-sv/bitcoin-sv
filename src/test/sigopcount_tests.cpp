@@ -6,7 +6,6 @@
 #include "config.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
-#include "interpreter_adapter.h"
 #include "key.h"
 #include "protocol_era.h"
 #include "pubkey.h"

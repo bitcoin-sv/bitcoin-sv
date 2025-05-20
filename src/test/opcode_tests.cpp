@@ -3,7 +3,6 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "config.h"
-#include "interpreter_adapter.h"
 #include "policy/policy.h"
 #include "protocol_era.h"
 #include "script/int_serialization.h"

@@ -7,7 +7,6 @@
 
 #include "config.h"
 #include "core_io.h"
-#include "interpreter_adapter.h"
 #include "key.h"
 #include "keystore.h"
 #include "overload.h"

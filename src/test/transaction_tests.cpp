@@ -11,7 +11,6 @@
 #include "config.h"
 #include "consensus/validation.h"
 #include "core_io.h"
-#include "interpreter_adapter.h"
 #include "key.h"
 #include "keystore.h"
 #include "policy/policy.h"
