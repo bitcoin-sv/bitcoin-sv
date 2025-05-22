@@ -22,7 +22,7 @@ option(BUILD_BITCOIN_MINER "Build bitcoin-miner" ON)
 option(BUILD_BITCOIN_BENCH "Build benchmarks" ON)
 
 option(ENABLE_TCMALLOC "Use TCMAlloc" ON)
-option(ENABLE_CLANG_TIDY "Use ClangTidy" ON)
+option(ENABLE_CLANG_TIDY "Use ClangTidy" OFF)
 
 # Ensure that WINDRES_PREPROC is enabled when using windres.
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
