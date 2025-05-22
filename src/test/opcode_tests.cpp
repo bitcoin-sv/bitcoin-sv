@@ -44,7 +44,7 @@ static void CheckStackSize(const std::vector<valtype> &original_stack_elements, 
 
     LimitedStack stack = LimitedStack(original_stack_elements, maxStackSize);
                               
-    constexpr uint32_t flags{flagset[0] | 0};
+    constexpr uint32_t flags{flagset[0]};
     const auto params{make_eval_script_params(config, flags, true)};
     const auto r = EvalScript(params,
                               source->GetToken(),
