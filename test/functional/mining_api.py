@@ -129,9 +129,10 @@ class MiningTest(BitcoinTestFramework):
 
         # Submit with wrong ID
         self.log.info("Submitting to wrong node with unknown ID")
-        assert_raises_rpc_error(-22, "Block candidate ID not found",
-                                otherNode.submitminingsolution,
-                                {'id': candidate['id'], 'nonce': block.nNonce})
+
+        submitResult = otherNode.submitminingsolution({'id': candidate['id'],
+                                                       'nonce': block.nNonce})
+        assert submitResult == 'unknown-id'
 
         # Omit nonce
         self.log.info("Submitting without nonce")

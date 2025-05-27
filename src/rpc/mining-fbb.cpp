@@ -9,6 +9,7 @@
 #include "consensus/params.h"
 #include "core_io.h"
 #include "hash.h"
+#include "logging.h"
 #include "mining/candidates.h"
 #include "mining/factory.h"
 #include "net/net.h"
@@ -269,7 +270,8 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
     CMiningCandidateRef result { mining::CMiningFactory::GetCandidateManager().Get(id) };
     if (!result)
     {
-        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block candidate ID not found");
+        LogPrint(BCLog::RPC, "Submit mining solution, block candidate id %s not found\n", idstr);
+        return "unknown-id";
     }
 
     // Make a copy of the block we're trying to submit so that we can safely update the fields
