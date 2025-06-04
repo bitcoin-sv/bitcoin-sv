@@ -2,9 +2,9 @@
 
 This release is a hard fork which includes changes to the BSV protocol.   
 
-The scheduled TestNet activation height is 1,621,670 (Target is 12:00 midday 31-Oct-2024)
+The scheduled TestNet activation height is 1,686,611 (Target is 12:00 midday 05-Aug-2025)
 
-The scheduled MainNet activation height is 882,687 (Target is 12:00 midday 4-Feb-2025)
+The scheduled MainNet activation height is 921,788 (Target is 12:00 midday 04-Nov-2025)
 
 ## What’s Changed  
 
@@ -60,6 +60,9 @@ signed with the CHRONICLE sighash flag.
 `OP_CHECKMULTISIG` is trying to return a `FALSE` value to the stack then signatures
 must be an empty array is removed for transactions signed with the CHRONICLE sighash
 flag.
+*   **NULLDUMMY checks** - The requirement that the dummy value in the unlocking
+script for a multisig transaction must be an empty array is removed for transactions
+signed with the CHRONICLE sighash flag.
 *   **Clean Stack Policy** – Previous releases required that after the execution
 of the unlocking and locking script, the stack is “clean”. i.e. there is only a
 single item (interpreted as true/false) on the stack that indicates whether the
