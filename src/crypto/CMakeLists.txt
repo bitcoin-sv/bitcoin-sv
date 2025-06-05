@@ -18,6 +18,7 @@ add_library(crypto
 	$<$<BOOL:${CRYPTO_USE_ASM}>:sha256_sse4.cpp>
 	sha512.cpp
 )
+enable_coverage(crypto)
 
 target_include_directories(crypto
 	PRIVATE

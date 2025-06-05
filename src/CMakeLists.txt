@@ -65,6 +65,30 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
 	endif()
 endif()
 
+function(enable_coverage target)
+    if(NOT ENABLE_COVERAGE)
+        return()
+    endif()
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES Clang)
+        target_compile_options(${target}
+            PRIVATE
+            -fprofile-instr-generate
+            -fcoverage-mapping
+        )
+
+        target_link_options(${target}
+            PRIVATE
+            -fprofile-instr-generate
+            -fcoverage-mapping
+        )
+    endif()
+
+endfunction()
+
+# Enable coverage
+option(ENABLE_COVERAGE "Enable code coverage" OFF)
+
 # Enable hardening
 option(USE_HARDENING "Enable extra hardening" ON)
 if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
@@ -188,6 +212,7 @@ add_library(util
 	utiltime.cpp
 	utiltime.h
 )
+enable_coverage(util)
 
 if(ENABLE_PROD_BUILD)
     target_compile_definitions(util PUBLIC IS_PRODUCTION_BUILD)
@@ -404,6 +429,7 @@ add_library(common
 	write_preferring_upgradable_mutex.cpp
 	write_preferring_upgradable_mutex.h
 )
+enable_coverage(common)
 
 target_include_directories(common SYSTEM PUBLIC secp256k1/include)
 target_link_libraries(common util secp256k1)
@@ -431,6 +457,7 @@ add_library(bitcoinconsensus
     verify_script_flags.h
     verify_script_flags.cpp
 )
+enable_coverage(bitcoinconsensus)
 
 target_link_libraries(bitcoinconsensus common)
 
@@ -627,6 +654,7 @@ add_library(server
 	vmtouch.cpp
 	vmtouch.h
 )
+enable_coverage(server)
 
 # This require libevent
 find_package(Event REQUIRED)
@@ -701,6 +729,7 @@ add_library(rpcclient
 	rpc/http_response.h
 	support/events.h
 )
+enable_coverage(rpcclient)
 target_link_libraries(rpcclient util)
 
 # bitcoin-cli
@@ -751,6 +780,9 @@ endif()
 # bitcoind
 add_executable(bitcoind bitcoind.cpp
 )
+
+enable_coverage(bitcoind)
+
 target_link_libraries(
 	bitcoind
 	server

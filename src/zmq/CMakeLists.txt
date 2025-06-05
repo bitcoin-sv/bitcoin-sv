@@ -10,6 +10,7 @@ add_library(zmq
 	zmqpublishnotifier.cpp
 	zmq_publisher.cpp
 )
+enable_coverage(zmq)
 
 find_package(ZeroMQ REQUIRED)
 target_include_directories(zmq PRIVATE ${ZMQ_INCLUDE_DIR})

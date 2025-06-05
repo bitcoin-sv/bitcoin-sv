@@ -12,8 +12,8 @@ inputs:
     description: Targets (bitcoind/bitcoin-cli/etc)
     required: false
     default: ''
-  sanitizers:
-    description: Sanitizers (asan/tsan/usan/etc)
+  options:
+    description: Options (asan/tsan/usan/etc)
     required: false
 runs:
   using: "composite"
@@ -21,7 +21,7 @@ runs:
     - run: |
         readarray -t args < <(.github/actions/build_bitcoin_cmake/build.sh \
             ${{ inputs.build_type }} \
-            ${{ inputs.sanitizers }})
+            ${{ inputs.options }})
         echo "${args[@]}"
         cmake -G Ninja . "${args[@]}"
         cmake --build . --target ${{ inputs.targets }}
@@ -30,7 +30,7 @@ runs:
     - run: |
         readarray -t args < <(.github/actions/build_bitcoin_cmake/build.sh \
             ${{ inputs.build_type }} \
-            ${{ inputs.sanitizers }})
+            ${{ inputs.options }})
         echo "${args[@]}"
         cmake -G Ninja . "${args[@]}"
         cmake --build . -v --target test_bitcoin

@@ -14,10 +14,11 @@ then
     args+=(-Denable_debug=ON)
 fi
 
-for sanitizer in ${@:2}
+for option in ${@:2}
 do
-    case ${sanitizer,,} in
+    case ${option,,} in
         asan) args+=(-Denable_asan=ON); args+=(-DCRYPTO_USE_ASM=OFF) ;;
+        cov)  args+=(-D ENABLE_COVERAGE=ON) ;;
         tsan) args+=(-Denable_tsan=ON) ;;
         usan) args+=(-Denable_ubsan=ON) ;;
     esac

@@ -220,6 +220,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	# Tests generated from JSON
 	${JSON_HEADERS}
 )
+enable_coverage(test_bitcoin)
 
 target_include_directories(test_bitcoin
 	PUBLIC
