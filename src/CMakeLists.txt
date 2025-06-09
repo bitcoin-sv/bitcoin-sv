@@ -82,6 +82,16 @@ function(enable_coverage target)
             -fprofile-instr-generate
             -fcoverage-mapping
         )
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES GNU)
+        target_compile_options(${target}
+            PRIVATE
+            --coverage
+        )
+
+        target_link_options(${target}
+            PRIVATE
+            --coverage
+        )
     endif()
 
 endfunction()
@@ -734,8 +744,9 @@ target_link_libraries(rpcclient util)
 
 # bitcoin-cli
 if(BUILD_BITCOIN_CLI)
-	add_executable(bitcoin-cli bitcoin-cli.cpp
-)
+	add_executable(bitcoin-cli bitcoin-cli.cpp)
+    enable_coverage(bitcoin-cli)
+
 	if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 		target_sources(bitcoin-cli PRIVATE bitcoin-cli-res.rc)
 	endif()
@@ -750,8 +761,9 @@ endif()
 
 # bitcoin-tx
 if(BUILD_BITCOIN_TX)
-	add_executable(bitcoin-tx bitcoin-tx.cpp
-)
+	add_executable(bitcoin-tx bitcoin-tx.cpp)
+    enable_coverage(bitcoin-tx)
+
 	if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 		target_sources(bitcoin-tx PRIVATE bitcoin-tx-res.rc)
 	endif()
@@ -765,8 +777,9 @@ endif()
 
 # bitcoin-miner
 if(BUILD_BITCOIN_MINER)
-	add_executable(bitcoin-miner bitcoin-miner.cpp
-)
+	add_executable(bitcoin-miner bitcoin-miner.cpp)
+    enable_coverage(bitcoin-miner)
+
 	target_include_directories(bitcoin-miner PRIVATE ${EVENT_INCLUDE_DIR})
 
 	target_link_libraries(bitcoin-miner common rpcclient bitcoinconsensus ${EVENT_LIBRARY})

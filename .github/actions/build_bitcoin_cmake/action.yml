@@ -4,6 +4,10 @@
 name: 'Build Bitcoin with CMake'
 description:  'Build Bitcoin with CMake'
 inputs:
+  toolset:
+    description: Toolset (clang/gcc)
+    required: false
+    default: 'clang'
   build_type:
     description: Build type (Release/Debug/etc)
     required: false
@@ -20,6 +24,7 @@ runs:
   steps:
     - run: |
         readarray -t args < <(.github/actions/build_bitcoin_cmake/build.sh \
+            ${{ inputs.toolset }} \
             ${{ inputs.build_type }} \
             ${{ inputs.options }})
         echo "${args[@]}"
@@ -29,6 +34,7 @@ runs:
       shell: bash
     - run: |
         readarray -t args < <(.github/actions/build_bitcoin_cmake/build.sh \
+            ${{ inputs.toolset }} \
             ${{ inputs.build_type }} \
             ${{ inputs.options }})
         echo "${args[@]}"

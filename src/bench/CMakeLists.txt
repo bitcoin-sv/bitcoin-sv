@@ -32,6 +32,8 @@ add_executable(bench_bitcoin
         thread_safe_queue.cpp
         data/block413567.raw.h)
 
+enable_coverage(bench_bitcoin)
+
 target_link_libraries(bench_bitcoin
         server
         rpcclient

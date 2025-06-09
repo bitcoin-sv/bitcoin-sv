@@ -83,11 +83,9 @@ jobs:
         version: [ 19 ]
         build_type: [ Release, Debug ]
         include:
-          - version: 19
-            build_type: Debug
+          - build_type: Debug
             options: cov
-          - version: 19
-            build_type: Release
+          - build_type: Release
             options: asan usan
     runs-on: [ self-hosted, docker, large ]
     container:
@@ -108,15 +106,16 @@ jobs:
       - name: Build Bitcoin
         uses: ./.github/actions/build_bitcoin_cmake
         with: 
+          toolset: ${{ matrix.toolset }}
           build_type: ${{ matrix.build_type }}
           options: ${{ matrix.options }}
       - name: Unit test secp256k1
         uses: ./.github/actions/unit_test_secp256k1_cmake
       - name: Unit test Bitcoin
         uses: ./.github/actions/unit_test_bitcoin_cmake
-      - name: Generate coverage
+      - name: Generate unit test coverage
         if: ${{ matrix.build_type == 'Debug' && matrix.options == 'cov' }}
-        run: ./contrib/generate_coverage.sh src/test/test_bitcoin
+        run: contrib/generate_coverage.sh -t ${{ matrix.toolset }} src/test/test_bitcoin
       - name: Set now environment variable
         if: ${{ matrix.build_type == 'Debug' && matrix.options == 'cov' }}
         run: |
@@ -126,8 +125,8 @@ jobs:
         if: ${{ matrix.build_type == 'Debug' && matrix.options == 'cov' }}
         uses: actions/upload-artifact@v4
         with:
-          name: test_bitcoin_coverage-${{ env.now }}
-          path: ./src/test/test_bitcoin_*.txt
+          name: test_bitcoin_cov-${{ env.now }}
+          path: ./src/test/test_bitcoin_cov
       - name: Bench test Bitcoin
         uses: ./.github/actions/bench_test_bitcoin_cmake
       - name: Functional test
