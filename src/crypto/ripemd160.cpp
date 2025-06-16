@@ -43,7 +43,7 @@ namespace ripemd160 {
         return (x << i) | (x >> (32 - i));
     }
 
-    inline void Round(uint32_t &a, uint32_t b, uint32_t &c, uint32_t d,
+    inline void Round(uint32_t& a, uint32_t /*b*/, uint32_t& c, uint32_t /*d*/,
                       uint32_t e, uint32_t f, uint32_t x, uint32_t k, int r) {
         a = rol(a + f + x + k, r) + e;
         c = rol(c, 10);
