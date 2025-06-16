@@ -4,11 +4,10 @@
 
 #include "bench.h"
 #include "crypto/sha256.h"
-#include "key.h"
 #include "random.h"
 #include "util.h"
 
-int main(int argc, char** argv)
+int main(int /*argc*/, char** /*argv*/)
 {
     SHA256AutoDetect();
     RandomInit();
