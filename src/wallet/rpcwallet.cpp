@@ -144,8 +144,8 @@ std::string AccountFromValue(const UniValue &value) {
     return strAccount;
 }
 
-static UniValue getnewaddress(const Config &config,
-                              const JSONRPCRequest &request) {
+static UniValue getnewaddress(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -211,8 +211,8 @@ CTxDestination GetAccountAddress(CWallet *const pwallet, std::string strAccount,
     return pubKey.GetID();
 }
 
-static UniValue getaccountaddress(const Config &config,
-                                  const JSONRPCRequest &request) {
+static UniValue getaccountaddress(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -249,8 +249,8 @@ static UniValue getaccountaddress(const Config &config,
     return ret;
 }
 
-static UniValue getrawchangeaddress(const Config &config,
-                                    const JSONRPCRequest &request) {
+static UniValue getrawchangeaddress(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -392,8 +392,8 @@ static UniValue getaccount(const Config &config,
     return strAccount;
 }
 
-static UniValue getaddressesbyaccount(const Config &config,
-                                      const JSONRPCRequest &request) {
+static UniValue getaddressesbyaccount(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -572,8 +572,8 @@ static UniValue sendtoaddress(const Config &config,
     return wtx.GetId().GetHex();
 }
 
-static UniValue listaddressgroupings(const Config &config,
-                                     const JSONRPCRequest &request) {
+static UniValue listaddressgroupings(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -864,8 +864,8 @@ static UniValue getreceivedbyaccount(const Config &config,
     return ValueFromAmount(nAmount);
 }
 
-static UniValue getbalance(const Config &config,
-                           const JSONRPCRequest &request) {
+static UniValue getbalance(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -944,8 +944,8 @@ static UniValue getbalance(const Config &config,
         pwallet->GetLegacyBalance(filter, nMinDepth, account));
 }
 
-static UniValue getunconfirmedbalance(const Config &config,
-                                      const JSONRPCRequest &request) {
+static UniValue getunconfirmedbalance(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -962,7 +962,8 @@ static UniValue getunconfirmedbalance(const Config &config,
     return ValueFromAmount(pwallet->GetUnconfirmedBalance());
 }
 
-static UniValue movecmd(const Config &config, const JSONRPCRequest &request) {
+static UniValue movecmd(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -1313,8 +1314,8 @@ static UniValue sendmany(const Config &config, const JSONRPCRequest &request) {
     return wtx.GetId().GetHex();
 }
 
-static UniValue addmultisigaddress(const Config &config,
-                                   const JSONRPCRequest &request) {
+static UniValue addmultisigaddress(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -1741,8 +1742,8 @@ void AcentryToJSON(const CAccountingEntry &acentry,
     }
 }
 
-static UniValue listtransactions(const Config &config,
-                                 const JSONRPCRequest &request) {
+static UniValue listtransactions(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -1930,8 +1931,8 @@ static UniValue listtransactions(const Config &config,
     return ret;
 }
 
-static UniValue listaccounts(const Config &config,
-                             const JSONRPCRequest &request) {
+static UniValue listaccounts(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2025,8 +2026,8 @@ static UniValue listaccounts(const Config &config,
     return ret;
 }
 
-static UniValue listsinceblock(const Config &config,
-                               const JSONRPCRequest &request) {
+static UniValue listsinceblock(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2169,8 +2170,8 @@ static UniValue listsinceblock(const Config &config,
     return ret;
 }
 
-static UniValue gettransaction(const Config &config,
-                               const JSONRPCRequest &request) {
+static UniValue gettransaction(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2297,8 +2298,8 @@ static UniValue gettransaction(const Config &config,
     return entry;
 }
 
-static UniValue abandontransaction(const Config &config,
-                                   const JSONRPCRequest &request) {
+static UniValue abandontransaction(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2346,8 +2347,8 @@ static UniValue abandontransaction(const Config &config,
     return NullUniValue;
 }
 
-static UniValue backupwallet(const Config &config,
-                             const JSONRPCRequest &request) {
+static UniValue backupwallet(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2375,8 +2376,8 @@ static UniValue backupwallet(const Config &config,
     return NullUniValue;
 }
 
-static UniValue keypoolrefill(const Config &config,
-                              const JSONRPCRequest &request) {
+static UniValue keypoolrefill(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2425,8 +2426,8 @@ static void LockWallet(CWallet *pWallet) {
     pWallet->Lock();
 }
 
-static UniValue walletpassphrase(const Config &config,
-                                 const JSONRPCRequest &request) {
+static UniValue walletpassphrase(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2506,8 +2507,9 @@ static UniValue walletpassphrase(const Config &config,
     return NullUniValue;
 }
 
-static UniValue walletpassphrasechange(const Config &config,
-                                       const JSONRPCRequest &request) {
+static UniValue walletpassphrasechange(const Config&,
+                                       const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2567,8 +2569,8 @@ static UniValue walletpassphrasechange(const Config &config,
     return NullUniValue;
 }
 
-static UniValue walletlock(const Config &config,
-                           const JSONRPCRequest &request) {
+static UniValue walletlock(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2612,8 +2614,8 @@ static UniValue walletlock(const Config &config,
     return NullUniValue;
 }
 
-static UniValue encryptwallet(const Config &config,
-                              const JSONRPCRequest &request) {
+static UniValue encryptwallet(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2690,8 +2692,8 @@ static UniValue encryptwallet(const Config &config,
            "backup.";
 }
 
-static UniValue lockunspent(const Config &config,
-                            const JSONRPCRequest &request) {
+static UniValue lockunspent(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2811,8 +2813,8 @@ static UniValue lockunspent(const Config &config,
     return true;
 }
 
-static UniValue listlockunspent(const Config &config,
-                                const JSONRPCRequest &request) {
+static UniValue listlockunspent(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2871,7 +2873,8 @@ static UniValue listlockunspent(const Config &config,
     return ret;
 }
 
-static UniValue settxfee(const Config &config, const JSONRPCRequest &request) {
+static UniValue settxfee(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2904,8 +2907,8 @@ static UniValue settxfee(const Config &config, const JSONRPCRequest &request) {
     return true;
 }
 
-static UniValue getwalletinfo(const Config &config,
-                              const JSONRPCRequest &request) {
+static UniValue getwalletinfo(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2986,8 +2989,8 @@ static UniValue getwalletinfo(const Config &config,
     return obj;
 }
 
-static UniValue listwallets(const Config &config,
-                            const JSONRPCRequest &request) {
+static UniValue listwallets(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp || request.params.size() != 0) {
         throw std::runtime_error(
             "listwallets\n"
@@ -3018,8 +3021,9 @@ static UniValue listwallets(const Config &config,
     return obj;
 }
 
-static UniValue resendwallettransactions(const Config &config,
-                                         const JSONRPCRequest &request) {
+static UniValue resendwallettransactions(const Config&,
+                                         const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;

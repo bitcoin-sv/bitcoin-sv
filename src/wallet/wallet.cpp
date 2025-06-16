@@ -132,7 +132,7 @@ public:
         }
     }
 
-    void operator()(const CNoDestination &none) {}
+    void operator()(const CNoDestination&) {}
 };
 
 const CWalletTx *CWallet::GetWalletTx(const uint256 &hash) const {
