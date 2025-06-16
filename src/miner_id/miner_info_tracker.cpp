@@ -193,11 +193,11 @@ static std::optional<int> parsestorefile (std::string n)  {
     return res;
 };
 
-std::optional<std::pair<COutPoint, std::optional<CoinWithScript>>>
-mining::BlockDatarefTracker::find_fund(
-        int32_t height,
-        std::function<std::optional<CoinWithScript>(const COutPoint&)>
-            get_spendable_coin) const
+std::optional<std::pair<COutPoint, std::optional<CoinWithScript>>> mining::
+    BlockDatarefTracker::find_fund(
+        int32_t /*height*/, // cjg Fix? server
+        std::function<std::optional<CoinWithScript>(const COutPoint&)> get_spendable_coin)
+        const
 {
     std::lock_guard lock(mtx_);
     for(auto i = funds_.crbegin(); i != funds_.crend(); ++i)

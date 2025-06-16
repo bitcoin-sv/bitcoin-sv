@@ -416,8 +416,12 @@ protected:
 class CCoinsViewEmpty : public ICoinsView
 {
 protected:
-    void CacheAllCoins(const std::vector<CTransactionRef>& txns) const override {}
-    std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const override { return {}; }
+    void CacheAllCoins(const std::vector<CTransactionRef>&) const override {}
+    std::optional<CoinImpl> GetCoin(const COutPoint&,
+                                    uint64_t /*maxScriptSize*/) const override
+    {
+        return {};
+    }
     uint256 GetBestBlock() const override { return {}; }
 
     void ReleaseLock() override {}

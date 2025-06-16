@@ -339,7 +339,7 @@ static void FindNextBlocksToDownload(
     unsigned int count,
     std::vector<const CBlockIndex*>& vBlocks,
     NodeId& nodeStaller,
-    const Consensus::Params& consensusParams,
+    const Consensus::Params&, // cjg server?
     const CNodeStatePtr& state,
     CConnman& connman)
 {
@@ -662,8 +662,10 @@ void PeerLogicValidation::UnregisterValidationInterface()
 }
 
 void PeerLogicValidation::BlockConnected(
-    const std::shared_ptr<const CBlock> &pblock, const CBlockIndex *pindex,
-    const std::vector<CTransactionRef> &vtxConflicted) {
+    const std::shared_ptr<const CBlock>& pblock,
+    const CBlockIndex*,
+    const std::vector<CTransactionRef>&)
+{
     LOCK(cs_main);
     std::vector<uint256> vOrphanErase {};
     for (const CTransactionRef &ptx : pblock->vtx) {
@@ -3092,7 +3094,9 @@ public:
      * @param config Needed by CMerkleTreeFactory.
      * @param chainActiveHeight Current height of active chain. Needed by CMerkleTreeFactory.
      */
-    void SetCoinBaseInfo(int serializationVersion, const Config& config, int32_t chainActiveHeight)
+    void SetCoinBaseInfo(int /*serializationVersion*/,
+                         const Config& config,
+                         int32_t chainActiveHeight)
     {
         coinbaseAndProof.reset();
         try
@@ -3301,8 +3305,8 @@ static void ProcessGetHeadersEnrichedMessage(const CNodePtr& pfrom,
 */
 static void ProcessTxMessage(const Config& config,
                              const CNodePtr& pfrom,
-                             const CNetMsgMaker& msgMaker,
-                             const std::string& strCommand,
+                             const CNetMsgMaker&, // cjg server?
+                             const std::string& /*strCommand*/,
                              msg_buffer& vRecv,
                              CConnman& connman)
 {
@@ -3694,10 +3698,10 @@ static bool ProcessCompactBlockMessage(
     const Config& config,
     const CNodePtr& pfrom,
     const CNetMsgMaker& msgMaker,
-    const std::string& strCommand,
+    const std::string& /*strCommand*/, // cjg server?
     const CChainParams& chainparams,
-    const std::atomic<bool>& interruptMsgProc,
-    int64_t nTimeReceived,
+    const std::atomic<bool>& /*interruptMsgProc*/, // cjg server?
+    int64_t /*nTimeReceived*/, // cjg server?
     msg_buffer& vRecv,
     CConnman& connman)
 {
@@ -3984,7 +3988,7 @@ static bool ProcessCompactBlockMessage(
 static void ProcessBlockMessage(const Config& config,
                                 const CNodePtr& pfrom,
                                 msg_buffer& vRecv,
-                                CConnman& connman)
+                                CConnman&) // cjg server?
 {
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
     vRecv >> *pblock;
@@ -4054,7 +4058,7 @@ static void ProcessBlockMessage(const Config& config,
 * Process getaddr message.
 */
 static void ProcessGetAddrMessage(const CNodePtr& pfrom,
-                                  msg_buffer& vRecv,
+                                  msg_buffer& /*vRecv*/, // cjg server?
                                   CConnman& connman)
 {
     // This asymmetric behavior for inbound and outbound connections was
@@ -4288,7 +4292,7 @@ static void ProcessFilterAddMessage(const CNodePtr& pfrom, msg_buffer& vRecv)
 /**
 * Process filter clear message.
 */
-static void ProcessFilterClearMessage(const CNodePtr& pfrom, msg_buffer& vRecv)
+static void ProcessFilterClearMessage(const CNodePtr& pfrom, msg_buffer& /*vRecv*/)
 {
     LOCK(pfrom->cs_filter);
     if(pfrom->GetLocalServices() & NODE_BLOOM) {
@@ -5766,8 +5770,10 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
     }
 }
 
-bool SendMessages(const Config &config, const CNodePtr& pto, CConnman &connman,
-                  const std::atomic<bool> &interruptMsgProc)
+bool SendMessages(const Config& config,
+                  const CNodePtr& pto,
+                  CConnman& connman,
+                  const std::atomic<bool>& /*interruptMsgProc*/)
 {
     // Don't send anything until the version handshake is complete
     if (!pto->fSuccessfullyConnected || pto->fDisconnect) {

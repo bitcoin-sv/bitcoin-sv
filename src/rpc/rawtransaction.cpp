@@ -432,8 +432,8 @@ static UniValue gettxoutproof(const Config &config,
     return strHex;
 }
 
-static UniValue verifytxoutproof(const Config &config,
-                                 const JSONRPCRequest &request) {
+static UniValue verifytxoutproof(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp || request.params.size() != 1) {
         throw std::runtime_error(
             "verifytxoutproof \"proof\"\n"
@@ -717,7 +717,7 @@ void decoderawtransaction(const Config& config,
     }
 }
 
-void decoderawtransaction(const Config& config,
+void decoderawtransaction(const Config&,
                           const JSONRPCRequest& request,
                           CTextWriter& textWriter, 
                           bool processedInBatch,
@@ -751,8 +751,8 @@ void decoderawtransaction(const Config& config,
     textWriter.Write(", \"error\": " + NullUniValue.write() + ", \"id\": " + request.id.write() + "}");
 }
 
-static UniValue decodescript(const Config &config,
-                             const JSONRPCRequest &request) {
+static UniValue decodescript(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp || request.params.size() != 1) {
         throw std::runtime_error(
             "decodescript \"hexstring\"\n"
@@ -1495,8 +1495,8 @@ namespace
     }
 }
 
-static UniValue sendrawtransaction(const Config &config,
-                                   const JSONRPCRequest &request) {
+static UniValue sendrawtransaction(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp || request.params.size() < 1 ||
         request.params.size() > 3) {
         throw std::runtime_error(
@@ -2490,8 +2490,7 @@ static UniValue getmerkleproof2(const Config& config, const JSONRPCRequest& requ
     return callbackDataObject;
 }
 
-static UniValue verifymerkleproof(const Config& config,
-    const JSONRPCRequest& request)
+static UniValue verifymerkleproof(const Config&, const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 1)
     {

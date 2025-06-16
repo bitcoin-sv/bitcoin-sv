@@ -363,9 +363,15 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
     auto blockHeight = chainActive.Height() + 1;
     auto prevBlockHash = chainActive.Tip()->GetBlockHash();
 
-    auto GetOrRemoveCachedMinerInfoTx = [](int32_t blockHeight, uint256 const & prevBlockHash, bool overridetx, CScript const & scriptPubKey) -> CTransactionRef {
-        try {
-            if (currentMinerInfoTx && currentMinerInfoTx->height == blockHeight) {
+    auto GetOrRemoveCachedMinerInfoTx = [](int32_t blockHeight,
+                                           uint256 const& /*prevBlockHash*/,
+                                           bool overridetx,
+                                           CScript const& scriptPubKey) -> CTransactionRef
+    {
+        try
+        {
+            if (currentMinerInfoTx && currentMinerInfoTx->height == blockHeight)
+            {
                 CTransactionRef tx = mempool.Get(currentMinerInfoTx->txid);
                 if (!tx)
                     return nullptr;
@@ -389,14 +395,18 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
                 g_MempoolDatarefTracker->funds_pop_back();
                 return nullptr;
             }
-        } catch (std::exception const & e) {
+        }
+        catch(std::exception const& e)
+        {
             throw std::runtime_error(strprintf("rpc CreateReplaceMinerinfotx - minerinfo tx tracking error: %s", e.what()));
-        } catch (...) {
+        }
+        catch(...)
+        {
             throw std::runtime_error("rpc CreateReplaceMinerinfotx - unknown minerinfo tx tracking error");
         }
         return nullptr;
     };
-    
+
     // If such a transaction already exists in the mempool, then it is the one we need and return
     // unless we want to override
     CTransactionRef trackedTransaction = GetOrRemoveCachedMinerInfoTx (blockHeight, prevBlockHash, overridetx, scriptPubKey);
@@ -561,7 +571,7 @@ static UniValue createdatareftx(const Config &config, const JSONRPCRequest &requ
 }
 
 
-static UniValue getminerinfotxid(const Config &config, const JSONRPCRequest &request)
+static UniValue getminerinfotxid(const Config&, const JSONRPCRequest &request)
 {
     if (request.fHelp || !request.params.empty()) {
         throw std::runtime_error(
@@ -645,7 +655,7 @@ static UniValue makeminerinfotxsigningkey(const Config &config, const JSONRPCReq
     return {};
 }
 
-static UniValue getminerinfotxfundingaddress(const Config &config, const JSONRPCRequest &request)
+static UniValue getminerinfotxfundingaddress(const Config&, const JSONRPCRequest &request)
 {
     if (request.fHelp || !request.params.empty()) {
         throw std::runtime_error(
@@ -674,7 +684,7 @@ static UniValue getminerinfotxfundingaddress(const Config &config, const JSONRPC
     return destination["fundingDestination"]["addressBase58"].get_str();
 }
 
-static UniValue setminerinfotxfundingoutpoint(const Config &config, const JSONRPCRequest &request)
+static UniValue setminerinfotxfundingoutpoint(const Config&, const JSONRPCRequest &request)
 {
     if (request.fHelp || request.params.size() != 2) {
         throw std::runtime_error(
@@ -709,7 +719,7 @@ static UniValue setminerinfotxfundingoutpoint(const Config &config, const JSONRP
     return {};
 }
 
-UniValue rebuildminerids(const Config& config, const JSONRPCRequest& request)
+UniValue rebuildminerids(const Config&, const JSONRPCRequest& request)
 {
     if(request.fHelp || request.params.size() > 1)
     {
@@ -745,7 +755,7 @@ UniValue rebuildminerids(const Config& config, const JSONRPCRequest& request)
     return true;
 }
 
-UniValue revokeminerid(const Config& config, const JSONRPCRequest& request)
+UniValue revokeminerid(const Config&, const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() < 1 || request.params.size() > 1) {
         throw std::runtime_error(
@@ -840,8 +850,10 @@ UniValue revokeminerid(const Config& config, const JSONRPCRequest& request)
     return NullUniValue;
 }
 
-static UniValue getmineridinfo(const Config &config, const JSONRPCRequest &request) {
-    if (request.fHelp || request.params.size() < 1 || request.params.size() > 1) {
+static UniValue getmineridinfo(const Config&, const JSONRPCRequest& request)
+{
+    if(request.fHelp || request.params.size() < 1 || request.params.size() > 1)
+    {
         throw std::runtime_error(
                 "getmineridinfo \"minerId\"\n"
                 "\nReturn miner ID information.\n"
@@ -884,7 +896,7 @@ static UniValue getmineridinfo(const Config &config, const JSONRPCRequest &reque
     return ret;
 }
 
-UniValue dumpminerids(const Config& config, const JSONRPCRequest& request)
+UniValue dumpminerids(const Config&, const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 0)
     {
@@ -928,7 +940,7 @@ UniValue dumpminerids(const Config& config, const JSONRPCRequest& request)
     }
 }
 
-UniValue datarefindexdump(const Config& config, const JSONRPCRequest& request)
+UniValue datarefindexdump(const Config&, const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 0)
     {
@@ -960,7 +972,7 @@ UniValue datarefindexdump(const Config& config, const JSONRPCRequest& request)
     }
 }
 
-UniValue datareftxndelete(const Config& config, const JSONRPCRequest& request)
+UniValue datareftxndelete(const Config&, const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 1)
     {
@@ -991,7 +1003,7 @@ UniValue datareftxndelete(const Config& config, const JSONRPCRequest& request)
     return NullUniValue;
 }
 
-static UniValue getdatareftxid(const Config &config, const JSONRPCRequest &request)
+static UniValue getdatareftxid(const Config&, const JSONRPCRequest &request)
 {
     if (request.fHelp || !request.params.empty()) {
         throw std::runtime_error(

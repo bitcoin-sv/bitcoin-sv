@@ -204,7 +204,8 @@ static void http_reject_request_cb(struct evhttp_request *req, void *) {
 }
 
 /** Event dispatcher thread */
-static bool ThreadHTTP(struct event_base *base, struct evhttp *http) {
+static bool ThreadHTTP(struct event_base* base, struct evhttp*)
+{
     RenameThread("http");
     LogPrint(BCLog::HTTP, "Entering http event loop\n");
     event_base_dispatch(base);

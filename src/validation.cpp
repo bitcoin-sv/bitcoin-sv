@@ -580,7 +580,7 @@ bool CheckCoinbase(const CTransaction& tx,
                    uint64_t maxTxSigOpsCountConsensusBeforeGenesis,
                    uint64_t maxTxSizeConsensus,
                    ProtocolEra era,
-                   int32_t height)
+                   int32_t /*height*/) // cjg server?
 {
     if (!tx.IsCoinBase()) {
         return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing",
@@ -6630,7 +6630,8 @@ bool CheckDiskSpace(uint64_t nAdditionalBytes) {
     return true;
 }
 
-static bool LoadBlockIndexDB(const CChainParams &chainparams) {
+static bool LoadBlockIndexDB(const CChainParams&) // cjg server?
+{
     if (!BlockIndexStoreLoader(mapBlockIndex).ForceLoad(
             GlobalConfig::GetConfig(),
             pblocktree->GetIterator()))

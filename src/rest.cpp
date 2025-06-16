@@ -480,8 +480,10 @@ static bool rest_mempool_info(Config &config, HTTPRequest *req,
     return true;
 }
 
-static bool rest_mempool_contents(Config &config, HTTPRequest *req,
-                                  const std::string &strURIPart) {
+static bool rest_mempool_contents(Config&,
+                                  HTTPRequest* req,
+                                  const std::string& strURIPart)
+{
     if (!CheckWarmup(req)) {
         return false;
     }

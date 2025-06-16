@@ -161,7 +161,7 @@ public:
 
     DescribeAddressVisitor(CWallet *_pwallet) : pwallet(_pwallet) {}
 
-    UniValue operator()(const CNoDestination &dest) const {
+    UniValue operator()(const CNoDestination&) const {
         return UniValue(UniValue::VOBJ);
     }
 
@@ -378,8 +378,8 @@ CScript createmultisig_redeemScript(CWallet *const pwallet,
     return result;
 }
 
-static UniValue createmultisig(const Config &config,
-                               const JSONRPCRequest &request) {
+static UniValue createmultisig(const Config&, const JSONRPCRequest& request)
+{
 #ifdef ENABLE_WALLET
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
 #else
@@ -921,8 +921,8 @@ Examples:
     return result_json;
 }
 
-static UniValue signmessagewithprivkey(const Config &config,
-                                       const JSONRPCRequest &request) {
+static UniValue signmessagewithprivkey(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp || request.params.size() != 2) {
         throw std::runtime_error(
             "signmessagewithprivkey \"privkey\" \"message\"\n"
@@ -973,8 +973,8 @@ static UniValue signmessagewithprivkey(const Config &config,
     return EncodeBase64(&vchSig[0], vchSig.size());
 }
 
-static UniValue clearinvalidtransactions(const Config &config,
-                                         const JSONRPCRequest &request) {
+static UniValue clearinvalidtransactions(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp || request.params.size() != 0) {
         throw std::runtime_error(
             "clearinvalidtransactions\n\n"
@@ -1043,8 +1043,8 @@ static UniValue TouchedPagesInfo() {
     return obj;
 }
 
-static UniValue getmemoryinfo(const Config &config,
-                              const JSONRPCRequest &request) {
+static UniValue getmemoryinfo(const Config&, const JSONRPCRequest& request)
+{
     /* Please, avoid using the word "pool" here in the RPC interface or help,
      * as users will undoubtedly confuse it with the other "memory pool"
      */
@@ -1080,7 +1080,8 @@ static UniValue getmemoryinfo(const Config &config,
     return obj;
 }
 
-static UniValue echo(const Config &config, const JSONRPCRequest &request) {
+static UniValue echo(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp) {
         throw std::runtime_error(
             "echo|echojson \"message\" ...\n"
@@ -1094,7 +1095,7 @@ static UniValue echo(const Config &config, const JSONRPCRequest &request) {
     return request.params;
 }
 
-static UniValue activezmqnotifications(const Config &config, const JSONRPCRequest &request)
+static UniValue activezmqnotifications(const Config&, const JSONRPCRequest &request)
 {
     if (request.fHelp || request.params.size() != 0)
     {
@@ -1252,7 +1253,7 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
     return obj;
 }
 
-static UniValue dumpparameters(const Config &config, const JSONRPCRequest &request)
+static UniValue dumpparameters(const Config&, const JSONRPCRequest &request)
 {
 
     if (request.fHelp || request.params.size() != 0)

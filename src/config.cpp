@@ -297,7 +297,7 @@ uint64_t GlobalConfig::GetMaxSendQueuesBytes() const {
     return data->factorMaxSendQueuesBytes * maxBlockSize;
 }
 
-bool GlobalConfig::SetMaxGeneratedBlockSize(uint64_t maxSize, std::string* err) {
+bool GlobalConfig::SetMaxGeneratedBlockSize(uint64_t maxSize, std::string* /*err*/) {
     std::scoped_lock<std::shared_mutex> lock{data->configMtx};
     data->maxGeneratedBlockSizeAfter = maxSize;
     data->maxGeneratedBlockSizeOverridden = true;
@@ -327,7 +327,7 @@ bool GlobalConfig::MaxGeneratedBlockSizeOverridden() const {
     return data->maxGeneratedBlockSizeOverridden;
 }
 
-bool GlobalConfig::SetBlockSizeActivationTime(int64_t activationTime, std::string* err) {
+bool GlobalConfig::SetBlockSizeActivationTime(int64_t activationTime, std::string* /*err*/) {
     data->blockSizeActivationTime = activationTime;
     return true;
 }
@@ -444,7 +444,7 @@ uint64_t GlobalConfig::GetMinConfConsolidationInput() const
     return data->minConfConsolidationInput;
 }
 
-bool GlobalConfig::SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err)
+bool GlobalConfig::SetAcceptNonStdConsolidationInput(bool flagValue, std::string* /*err*/)
 {
     data->acceptNonStdConsolidationInput = flagValue;
     return true;
@@ -1632,7 +1632,7 @@ bool GlobalConfig::SetP2PHandshakeTimeout(int64_t timeout, std::string* err)
     return true;
 }
 
-bool GlobalConfig::SetStreamSendRateLimit(int64_t limit, std::string* err)
+bool GlobalConfig::SetStreamSendRateLimit(int64_t limit, std::string* /*err*/)
 {
     data->streamSendRateLimit = limit;
     return true;
@@ -1681,7 +1681,7 @@ unsigned int GlobalConfig::GetBlockTxnMaxPercent() const
     return data->blockTxnMaxPercent;
 }
 
-bool GlobalConfig::SetMultistreamsEnabled(bool enabled, std::string* err)
+bool GlobalConfig::SetMultistreamsEnabled(bool enabled, std::string* /*err*/)
 {
     data->multistreamsEnabled = enabled;
     return true;
@@ -1691,7 +1691,7 @@ bool GlobalConfig::GetMultistreamsEnabled() const
     return data->multistreamsEnabled;
 }
 
-bool GlobalConfig::SetWhitelistRelay(bool relay, std::string* err)
+bool GlobalConfig::SetWhitelistRelay(bool relay, std::string* /*err*/)
 {
     data->whitelistRelay = relay;
     return true;

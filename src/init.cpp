@@ -1857,7 +1857,8 @@ bool InitSanityCheck(void) {
     return true;
 }
 
-static bool AppInitServers(Config &config, boost::thread_group &threadGroup) {
+static bool AppInitServers(Config &config, boost::thread_group&) // cjg Fix server?
+{
     RPCServer::OnStarted(&OnRPCStarted);
     RPCServer::OnStopped(&OnRPCStopped);
     RPCServer::OnPreCommand(&OnRPCPreCommand);

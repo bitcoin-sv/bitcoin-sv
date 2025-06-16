@@ -2342,7 +2342,8 @@ bool CConnman::BindListenPort(const CService &addrBind, std::string &strError,
     return true;
 }
 
-void Discover(boost::thread_group &threadGroup) {
+void Discover(boost::thread_group&) // cjg Fix server?
+{
     if (!fDiscover) {
         return;
     }
@@ -2489,8 +2490,10 @@ NodeId CConnman::GetNewNodeId() {
     return nLastNodeId.fetch_add(1, std::memory_order_relaxed);
 }
 
-bool CConnman::Start(CScheduler &scheduler, std::string &strNodeError,
-                     Options connOptions) {
+bool CConnman::Start(CScheduler& scheduler,
+                     std::string& /*strNodeError*/,
+                     Options connOptions)
+{
     nTotalBytesRecv = 0;
     nTotalBytesSent = 0;
     nMaxOutboundTotalBytesSentInCycle = 0;

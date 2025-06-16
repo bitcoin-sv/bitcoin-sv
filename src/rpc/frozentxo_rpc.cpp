@@ -317,7 +317,7 @@ std::string GenerateHelpStringForFunds(const std::string& fund_str, const std::s
 
 
 
-UniValue addToPolicyBlacklist(const Config& config, const JSONRPCRequest& request)
+UniValue addToPolicyBlacklist(const Config&, const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 1)
     {
@@ -343,7 +343,7 @@ Examples:
     return PrepareResult(notImportedFunds);
 }
 
-UniValue addToConsensusBlacklist(const Config& config, const JSONRPCRequest& request)
+UniValue addToConsensusBlacklist(const Config&, const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 1)
     {
@@ -377,7 +377,7 @@ Examples:
     return PrepareResult(notImportedFundsConsensus);
 }
 
-UniValue removeFromPolicyBlacklist(const Config& config, const JSONRPCRequest& request)
+UniValue removeFromPolicyBlacklist(const Config&, const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 1)
     {
@@ -401,7 +401,7 @@ Examples:
     return PrepareResult(notRemovedFunds);
 }
 
-void queryBlacklist(const Config& config, const JSONRPCRequest& jsonRPCReq, HTTPRequest* httpReq, bool processedInBatch)
+void queryBlacklist(const Config&, const JSONRPCRequest& jsonRPCReq, HTTPRequest* httpReq, bool processedInBatch)
 {
     if(jsonRPCReq.fHelp || jsonRPCReq.params.size()>0)
     {
@@ -498,7 +498,7 @@ Examples:
     }
 }
 
-UniValue clearBlacklists(const Config& config, const JSONRPCRequest& jsonRPCReq)
+UniValue clearBlacklists(const Config&, const JSONRPCRequest& jsonRPCReq)
 {
     if(jsonRPCReq.fHelp || jsonRPCReq.params.size()!=1)
     {
@@ -629,7 +629,7 @@ std::string GenerateHelpStringForConfiscationTxids(const std::string& txs_str, b
 })";
 }
 
-UniValue addToConfiscationTxidWhitelist(const Config& config, const JSONRPCRequest& request)
+UniValue addToConfiscationTxidWhitelist(const Config&, const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 1)
     {
@@ -763,7 +763,7 @@ Examples:
     return result_json;
 }
 
-UniValue clearConfiscationWhitelist(const Config& config, const JSONRPCRequest& jsonRPCReq)
+UniValue clearConfiscationWhitelist(const Config&, const JSONRPCRequest& jsonRPCReq)
 {
     if(jsonRPCReq.fHelp || jsonRPCReq.params.size()>0)
     {
@@ -796,7 +796,7 @@ Examples:
     return result;
 }
 
-void queryConfiscationTxidWhitelist(const Config& config, const JSONRPCRequest& jsonRPCReq, HTTPRequest* httpReq, bool processedInBatch)
+void queryConfiscationTxidWhitelist(const Config&, const JSONRPCRequest& jsonRPCReq, HTTPRequest* httpReq, bool processedInBatch)
 {
     if(jsonRPCReq.fHelp || jsonRPCReq.params.size()>1)
     {

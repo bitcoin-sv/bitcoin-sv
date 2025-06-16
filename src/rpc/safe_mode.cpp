@@ -94,10 +94,10 @@ UniValue reconsidersafemodeforblock(const Config &config, const JSONRPCRequest &
     return NullUniValue;
 }
 
-void  getsafemodeinfo(const Config& config,
-                   const JSONRPCRequest& request,
-                   HTTPRequest* httpReq,
-                   bool processedInBatch) 
+void getsafemodeinfo(const Config&,
+                     const JSONRPCRequest& request,
+                     HTTPRequest* httpReq,
+                     bool processedInBatch)
 {
     if (request.fHelp || request.params.size() > 0) {
         throw std::runtime_error(

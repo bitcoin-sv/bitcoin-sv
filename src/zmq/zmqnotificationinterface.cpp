@@ -290,10 +290,12 @@ void CZMQNotificationInterface::TransactionAdded(const CTransactionRef& ptx)
 }
 
 void CZMQNotificationInterface::BlockConnected(
-    const std::shared_ptr<const CBlock> &pblock,
-    const CBlockIndex *pindexConnected,
-    const std::vector<CTransactionRef> &vtxConflicted) {
-    for (const CTransactionRef &ptx : pblock->vtx) {
+    const std::shared_ptr<const CBlock>& pblock,
+    const CBlockIndex*,
+    const std::vector<CTransactionRef>&)
+{
+    for(const CTransactionRef& ptx : pblock->vtx)
+    {
         // Do a normal notify for each transaction added in the block
         TransactionAddedToMempool(ptx);
     }

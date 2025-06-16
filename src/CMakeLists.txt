@@ -128,6 +128,8 @@ add_subdirectory(config)
 # libraries
 add_subdirectory(crypto)
 add_subdirectory(leveldb)
+target_compile_options(leveldb PRIVATE -Wno-unused-parameter)
+
 add_subdirectory(secp256k1)
 add_subdirectory(univalue)
 

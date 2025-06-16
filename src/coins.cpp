@@ -385,7 +385,7 @@ void CoinsStore::AddCoin(
     const COutPoint& outpoint,
     CoinWithScript&& coin,
     bool possible_overwrite,
-    uint64_t genesisActivationHeight)
+    uint64_t /*genesisActivationHeight*/) // cjg Fix? server
 {
     auto [it, inserted] =
         cacheCoins.emplace(std::piecewise_construct,

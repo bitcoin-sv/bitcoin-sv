@@ -947,7 +947,7 @@ void CTxMemPool::removeRecursiveNL(
 
 void CTxMemPool::RemoveForReorgNL(
     const Config &config,
-    const CoinsDB& coinsTip,
+    const CoinsDB& /*coinsTip*/, // cjg  server?
     const CJournalChangeSetPtr& changeSet,
     const CBlockIndex& tip,
     int flags) {

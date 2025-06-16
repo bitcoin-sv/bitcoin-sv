@@ -111,8 +111,8 @@ static UniValue GetNetworkHashPS(int lookup, int32_t height) {
     return workDiff.getdouble() / timeDiff;
 }
 
-static UniValue getnetworkhashps(const Config &config,
-                                 const JSONRPCRequest &request) {
+static UniValue getnetworkhashps(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp || request.params.size() > 2) {
         throw std::runtime_error(
             "getnetworkhashps ( nblocks height )\n"
@@ -305,8 +305,8 @@ static UniValue getmininginfo(const Config &config,
 
 // NOTE: Unlike wallet RPC (which use BSV values), mining RPCs follow GBT (BIP
 // 22) in using satoshi amounts
-static UniValue prioritisetransaction(const Config &config,
-                                      const JSONRPCRequest &request) {
+static UniValue prioritisetransaction(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp || request.params.size() != 3) {
         throw std::runtime_error(
             "prioritisetransaction <txid> <priority delta> <fee delta>\n"
@@ -341,8 +341,8 @@ static UniValue prioritisetransaction(const Config &config,
 
 // NOTE: Assumes a conclusive result; if result is inconclusive, it must be
 // handled by caller
-static UniValue BIP22ValidationResult(const Config &config,
-                                      const CValidationState &state) {
+static UniValue BIP22ValidationResult(const Config&, const CValidationState& state)
+{
     if (state.IsValid()) {
         return NullUniValue;
     }
