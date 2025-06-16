@@ -204,7 +204,7 @@ public:
     }
 };
 
-void EncodeHexTx(const CTransaction& tx, CTextWriter& writer, const int serialFlags)
+void EncodeHexTx(const CTransaction& tx, CTextWriter& writer, const int /*serialFlags*/)
 {
     CHexWriter ssTx(writer);
     ssTx << tx;

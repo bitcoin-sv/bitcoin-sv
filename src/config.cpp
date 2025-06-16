@@ -1701,7 +1701,7 @@ bool GlobalConfig::GetWhitelistRelay() const
     return data->whitelistRelay;
 }
 
-bool GlobalConfig::SetWhitelistForceRelay(bool relay, std::string* err)
+bool GlobalConfig::SetWhitelistForceRelay(bool relay, std::string* /*err*/)
 {
     data->whitelistForceRelay = relay;
     return true;
@@ -1711,7 +1711,7 @@ bool GlobalConfig::GetWhitelistForceRelay() const
     return data->whitelistForceRelay;
 }
 
-bool GlobalConfig::SetRejectMempoolRequest(bool reject, std::string* err)
+bool GlobalConfig::SetRejectMempoolRequest(bool reject, std::string* /*err*/)
 {
     data->rejectMempoolRequest = reject;
     return true;
@@ -1783,7 +1783,7 @@ unsigned int GlobalConfig::GetInvalidChecksumFreq() const
     return data->invalidChecksumFreq;
 }
 
-bool GlobalConfig::SetFeeFilter(bool feefilter, std::string* err)
+bool GlobalConfig::SetFeeFilter(bool feefilter, std::string* /*err*/)
 {
     data->feeFilter = feefilter;
     return true;
@@ -1970,7 +1970,7 @@ uint64_t GlobalConfig::GetDoubleSpendEndpointBlacklistSize() const
     return data->dsEndpointBlacklistSize;
 }
 
-bool GlobalConfig::SetDoubleSpendEndpointSkipList(const std::string& skip, std::string* err)
+bool GlobalConfig::SetDoubleSpendEndpointSkipList(const std::string& skip, std::string* /*err*/)
 {
     // Split comma separated list of IPs and trim whitespace
     std::vector<std::string> ips {};
@@ -2111,7 +2111,8 @@ int64_t GlobalConfig::GetSafeModeMinForkHeightDifference() const
     return data->safeModeMinHeightDifference;
 }
 
-bool GlobalConfig::SetSafeModeMinForkHeightDifference(int64_t heightDifference, std::string* err)
+bool GlobalConfig::SetSafeModeMinForkHeightDifference(int64_t heightDifference,
+                                                      std::string* /*err*/)
 {
     data->safeModeMinHeightDifference = heightDifference;
     return true;
@@ -2203,11 +2204,12 @@ bool GlobalConfig::GetDisableBIP30Checks() const
 }
 
 // MinerID
-bool GlobalConfig::SetMinerIdEnabled(bool enabled, std::string* err)
+bool GlobalConfig::SetMinerIdEnabled(bool enabled, std::string* /*err*/)
 {
     data->minerIdEnabled = enabled;
     return true;
 }
+
 bool GlobalConfig::GetMinerIdEnabled() const
 {
     return data->minerIdEnabled;
@@ -2371,11 +2373,13 @@ std::string GlobalConfig::GetMinerIdGeneratorPath() const
     return data->minerIdGeneratorPath;
 }
 
-bool GlobalConfig::SetMinerIdGeneratorAlias(const std::string& alias, std::string* err)
+bool GlobalConfig::SetMinerIdGeneratorAlias(const std::string& alias,
+                                            std::string* /*err*/)
 {
     data->minerIdGeneratorAlias = alias;
     return true;
 }
+
 std::string GlobalConfig::GetMinerIdGeneratorAlias() const
 {
     return data->minerIdGeneratorAlias;

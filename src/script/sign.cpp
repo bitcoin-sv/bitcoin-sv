@@ -143,10 +143,10 @@ static CScript PushAll(const std::vector<valtype> &values) {
     return result;
 }
 
-static bool ProduceSignature(const Config& config,
-                             const bool consensus,
+static bool ProduceSignature(const Config&,
+                             const bool /*consensus*/,
                              const BaseSignatureCreator& creator,
-                             ProtocolEra era,
+                             ProtocolEra /*era*/, // cjg Fix common?
                              ProtocolEra utxoEra,
                              const CScript& fromPubKey,
                              SignatureData& sigdata)
@@ -329,7 +329,7 @@ struct Stacks {
 
     Stacks(const eval_script_params& params,
            const SignatureData& data,
-           int32_t tx_version,
+           int32_t /*tx_version*/, // cjg Fix common?
            ProtocolEra era)
     {
         // Pre-genesis limitations are stricter than post-genesis, so LimitedStack can use UINT32_MAX as max size.
@@ -432,9 +432,9 @@ class DummySignatureChecker : public BaseSignatureChecker {
 public:
     DummySignatureChecker() {}
 
-    bool CheckSig(const std::vector<uint8_t> &scriptSig,
-                  const std::vector<uint8_t> &vchPubKey,
-                  const CScript &scriptCode) const override
+    bool CheckSig(const std::vector<uint8_t>& /*scriptSig*/,
+                  const std::vector<uint8_t>& /*vchPubKey*/,
+                  const CScript& /*scriptCode*/) const override
     {
         return true;
     }
@@ -446,9 +446,10 @@ const BaseSignatureChecker &DummySignatureCreator::Checker() const {
     return dummyChecker;
 }
 
-bool DummySignatureCreator::CreateSig(std::vector<uint8_t> &vchSig,
-                                      const CKeyID &keyid,
-                                      const CScript &scriptCode) const {
+bool DummySignatureCreator::CreateSig(std::vector<uint8_t>& vchSig,
+                                      const CKeyID&,
+                                      const CScript&) const
+{
     // Create a dummy signature that is a valid DER-encoding
     vchSig.assign(72, '\000');
     vchSig[0] = 0x30;

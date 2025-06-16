@@ -229,7 +229,7 @@ public:
         return EncodeBase58Check(data);
     }
 
-    std::string operator()(const CNoDestination &no) const { return ""; }
+    std::string operator()(const CNoDestination&) const { return ""; }
 };
 
 CTxDestination DecodeDestination(const std::string &str,

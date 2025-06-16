@@ -272,7 +272,7 @@ uint64_t TransactionSpecificConfig::GetMinConfConsolidationInput() const
     return mMinConsolidationInput.has_value() ? *mMinConsolidationInput : GlobalConfig::GetMinConfConsolidationInput();
 };
 
-bool TransactionSpecificConfig::SetTransactionSpecificAcceptNonStdConsolidationInput(bool flagValue, std::string* err)
+bool TransactionSpecificConfig::SetTransactionSpecificAcceptNonStdConsolidationInput(bool flagValue, std::string* /*err*/)
 {
     mAcceptNonStdConsoldationInput = flagValue;
     return true;
