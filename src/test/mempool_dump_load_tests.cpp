@@ -45,7 +45,7 @@ namespace {
 
         CValidationState operator()(const TxInputDataSPtr& txInputData,
                                     const mining::CJournalChangeSetPtr& changeSet,
-                                    bool limitMempoolSize)
+                                    bool /*limitMempoolSize*/)
         {
             auto entry = std::make_shared<CTxMemPoolEntry>(
                 helper.Time(txInputData->GetAcceptTime())

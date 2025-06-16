@@ -1184,9 +1184,7 @@ static UniValue signrawtransaction(const Config &config,
                                                                        i,
                                                                        amount),
                                            sigdata,
-                                           txConst.nVersion,
                                            DataFromTransaction(txv, i),
-                                           txv.nVersion,
                                            era,
                                            utxoEra);
             }

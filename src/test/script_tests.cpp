@@ -2771,9 +2771,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
     // CTransaction creates a copy of CMutableTransaction and is not modified
     // when scriptPubKey is assigned to.
 
-    const int32_t tx_version{42};
     SignatureData empty;
-
     constexpr bool consensus{true};
     const uint32_t flags{MandatoryScriptVerifyFlags(era)};
     const auto params{make_eval_script_params(config, flags, consensus)};
@@ -2783,9 +2781,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                                                                   0,
                                                                                   amount),
                                                empty,
-                                               tx_version,
                                                empty,
-                                               tx_version,
                                                era,
                                                utxoEra);
     BOOST_CHECK(combined.scriptSig.empty());
@@ -2797,9 +2793,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(scriptSig),
-                                 tx_version,
                                  empty,
-                                 tx_version,
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == scriptSig);
@@ -2807,9 +2801,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  empty,
-                                 tx_version,
                                  SignatureData(scriptSig),
-                                 tx_version,
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == scriptSig);
@@ -2821,9 +2813,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(scriptSigCopy),
-                                 tx_version,
                                  SignatureData(scriptSig),
-                                 tx_version,
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == scriptSigCopy ||
@@ -2840,9 +2830,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(scriptSig),
-                                 tx_version,
                                  empty,
-                                 tx_version,
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == scriptSig);
@@ -2850,9 +2838,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  empty,
-                                 tx_version,
                                  SignatureData(scriptSig),
-                                 tx_version,
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == scriptSig);
@@ -2863,9 +2849,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(scriptSigCopy),
-                                 tx_version,
                                  SignatureData(scriptSig),
-                                 tx_version,
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == scriptSigCopy ||
@@ -2879,9 +2863,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(scriptSigCopy),
-                                 tx_version,
                                  SignatureData(scriptSig),
-                                 tx_version,
                                  era,
                                  utxoEra);
     if (IsProtocolActive(utxoEra, ProtocolName::Genesis)) {
@@ -2895,9 +2877,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(scriptSig),
-                                 tx_version,
                                  SignatureData(scriptSigCopy),
-                                 tx_version,
                                  era,
                                  utxoEra);
     if (IsProtocolActive(utxoEra, ProtocolName::Genesis)) {
@@ -2916,9 +2896,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(scriptSig),
-                                 tx_version,
                                  empty,
-                                 tx_version,
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == scriptSig);
@@ -2926,9 +2904,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  empty,
-                                 tx_version,
                                  SignatureData(scriptSig),
-                                 tx_version,
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == scriptSig);
@@ -2968,9 +2944,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(partial1a),
-                                 tx_version,
                                  SignatureData(partial1b),
-                                 tx_version,
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == partial1a);
@@ -2978,9 +2952,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(partial1a),
-                                 tx_version,
                                  SignatureData(partial2a),
-                                 tx_version,
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == complete12);
@@ -2988,9 +2960,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(partial2a),
-                                 tx_version,
                                  SignatureData(partial1a),
-                                 tx_version,
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == complete12);
@@ -2998,9 +2968,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(partial1b),
-                                 tx_version,
                                  SignatureData(partial2b),
-                                 tx_version,
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == complete12);
@@ -3008,9 +2976,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(partial3b),
-                                 tx_version,
                                  SignatureData(partial1b),
-                                 tx_version,
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == complete13);
@@ -3018,9 +2984,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(partial2a),
-                                 tx_version,
                                  SignatureData(partial3a),
-                                 tx_version,
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == complete23);
@@ -3028,9 +2992,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(partial3b),
-                                 tx_version,
                                  SignatureData(partial2b),
-                                 tx_version,
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == complete23);
@@ -3038,9 +3000,7 @@ void TestCombineSigs(ProtocolEra era, ProtocolEra utxoEra) {
                                  scriptPubKey,
                                  MutableTransactionSignatureChecker(&txTo, 0, amount),
                                  SignatureData(partial3b),
-                                 tx_version,
                                  SignatureData(partial3a),
-                                 tx_version,
                                  era,
                                  utxoEra);
     BOOST_CHECK(combined.scriptSig == partial3c);

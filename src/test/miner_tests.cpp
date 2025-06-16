@@ -764,7 +764,7 @@ void Test_BlockAssembler_construction_activate_new_blocksize(TestingSetup& testi
 }
 
 
-void Test_JournalingBlockAssembler_Construction(TestingSetup& testingSetup)
+void Test_JournalingBlockAssembler_Construction(TestingSetup&)
 {
     CScript scriptPubKey =
         CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909"

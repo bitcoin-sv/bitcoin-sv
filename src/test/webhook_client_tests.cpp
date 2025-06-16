@@ -31,7 +31,7 @@ namespace
         {
             auto self { shared_from_this() };
             mSocket.async_read_some(boost::asio::buffer(mData, mData.size()),
-                [this, self](boost::system::error_code ec, size_t length)
+                [this, self](boost::system::error_code ec, size_t /*length*/)
                 {
                     if(!ec)
                     {

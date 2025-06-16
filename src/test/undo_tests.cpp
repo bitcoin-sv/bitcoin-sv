@@ -23,7 +23,7 @@ struct ProcessingBlockIndex::UnitTestAccess<undo_tests_uid>
                             const CBlock &block,
                             CBlockIndex* index,
                             CCoinsViewCache &view,
-                            const task::CCancellationToken& shutdownToken)
+                            const task::CCancellationToken&)
     {
         ProcessingBlockIndex idx{ *index };
         idx.ApplyBlockUndo(
@@ -54,7 +54,7 @@ BOOST_FIXTURE_TEST_SUITE(undo_tests, BasicTestingSetup)
 static void UpdateUTXOSet(const CBlock& block,
                           CCoinsViewCache& view,
                           CBlockUndo& blockundo,
-                          const CChainParams& chainparams,
+                          const CChainParams&,
                           int32_t nHeight)
 {
     auto &coinbaseTx = *block.vtx[0];
@@ -73,7 +73,7 @@ static void UpdateUTXOSet(const CBlock& block,
 static void UndoBlock(const CBlock& block,
                       CCoinsViewCache& view,
                       const CBlockUndo& blockUndo,
-                      const CChainParams& chainparams,
+                      const CChainParams&,
                       int32_t nHeight)
 {
     CBlockIndex::TemporaryBlockIndex index{ {} };

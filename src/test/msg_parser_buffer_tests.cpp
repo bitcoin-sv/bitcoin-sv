@@ -28,7 +28,7 @@ struct always_0_parser
         return std::make_pair(0, 0);
     }
 
-    size_t read(size_t read_pos, std::span<uint8_t>)
+    size_t read(size_t /*read_pos*/, std::span<uint8_t>)
     {
         assert(false);
         return 0;
@@ -213,7 +213,7 @@ struct always_req_more_parser
         return make_pair(0, s.size() + 1);
     }
 
-    size_t read(size_t read_pos, std::span<uint8_t>)
+    size_t read(size_t /*read_pos*/, std::span<uint8_t>)
     {
         assert(false);
         return 0;

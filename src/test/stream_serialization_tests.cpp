@@ -53,7 +53,7 @@ BOOST_AUTO_TEST_CASE(exception)
 {
     struct CTestExceptionReader
     {
-        size_t Read(char* pch, size_t maxSize)
+        size_t Read(char* /*pch*/, size_t /*maxSize*/)
         {
             throw std::exception{};
         }

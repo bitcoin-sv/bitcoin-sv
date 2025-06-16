@@ -13,7 +13,7 @@
 namespace {
 struct WalletDBTestingSetup : public TestingSetup { // NOLINT(cppcoreguidelines-special-member-functions)
     WalletDBTestingSetup(
-        const std::string &chainName = CBaseChainParams::MAIN) {
+        const std::string& /*chainName*/ = CBaseChainParams::MAIN) {
         bitdb.MakeMock();
     }
 

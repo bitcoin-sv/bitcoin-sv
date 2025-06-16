@@ -292,7 +292,7 @@ BOOST_AUTO_TEST_CASE(callback_throw_exception)
 
     auto check =
         [&callbackTriggered]
-        (const InvalidTxnPublisher::InvalidTxnInfoWithTxn& info)
+        (const InvalidTxnPublisher::InvalidTxnInfoWithTxn& /*info*/)
         {
             callbackTriggered = true;
 
@@ -309,7 +309,7 @@ BOOST_AUTO_TEST_CASE(callback_throw_exception)
             , mTriggered{ triggered }
         {}
 
-        void Publish(const InvalidTxnInfo& invalidTxInfo) override
+        void Publish(const InvalidTxnInfo& /*invalidTxInfo*/) override
         {
             mTriggered = true;
             mProcessPublish.notify_one();

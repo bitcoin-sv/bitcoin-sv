@@ -38,7 +38,7 @@ public:
         return buffer_.size(); 
     }
 
-    size_t read(size_t read_pos, std::span<uint8_t>)
+    size_t read(size_t /*read_pos*/, std::span<uint8_t>)
     {
         assert(false);
         return 0;

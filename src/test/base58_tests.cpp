@@ -88,15 +88,9 @@ private:
 public:
     TestAddrTypeVisitor(const std::string &_exp_addrType)
         : exp_addrType(_exp_addrType) {}
-    bool operator()(const CKeyID &id) const {
-        return (exp_addrType == "pubkey");
-    }
-    bool operator()(const CScriptID &id) const {
-        return (exp_addrType == "script");
-    }
-    bool operator()(const CNoDestination &no) const {
-        return (exp_addrType == "none");
-    }
+    bool operator()(const CKeyID&) const { return (exp_addrType == "pubkey"); }
+    bool operator()(const CScriptID&) const { return (exp_addrType == "script"); }
+    bool operator()(const CNoDestination&) const { return (exp_addrType == "none"); }
 };
 
 // Visitor to check address payload
@@ -115,7 +109,7 @@ public:
         uint160 exp_key(exp_payload);
         return exp_key == id;
     }
-    bool operator()(const CNoDestination &no) const {
+    bool operator()(const CNoDestination&) const {
         return exp_payload.size() == 0;
     }
 };

@@ -16,29 +16,29 @@ public:
     DummyConfig();
     DummyConfig(const std::string& net);
 
-    void SetDefaultBlockSizeParams(const DefaultBlockSizeParams& params) override {}
+    void SetDefaultBlockSizeParams(const DefaultBlockSizeParams&) override {}
 
-    bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) override
+    bool SetMaxBlockSize(uint64_t /*maxBlockSize*/, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
         return false;
     }
     uint64_t GetMaxBlockSize() const override { return 0; }
 
-    bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize,
+    bool SetMaxGeneratedBlockSize(uint64_t /*maxGeneratedBlockSize*/,
                                   std::string* err = nullptr) override
     {
         SetErrorMsg(err);
         return false;
     }
     uint64_t GetMaxGeneratedBlockSize() const override { return 0; };
-    uint64_t GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const override
+    uint64_t GetMaxGeneratedBlockSize(int64_t /*nMedianTimePast*/) const override
     {
         return 0;
     }
     bool MaxGeneratedBlockSizeOverridden() const override { return false; }
 
-    bool SetBlockSizeActivationTime(int64_t activationTime,
+    bool SetBlockSizeActivationTime(int64_t /*activationTime*/,
                                     std::string* err = nullptr) override
     {
         SetErrorMsg(err);
@@ -52,7 +52,7 @@ public:
         maxTxSizePolicy = static_cast<uint64_t>(value);
         return false;
     }
-    uint64_t GetMaxTxSize(ProtocolEra era, bool isConsensus) const override
+    uint64_t GetMaxTxSize(ProtocolEra, bool /*isConsensus*/) const override
     {
         return maxTxSizePolicy;
     }
@@ -103,10 +103,10 @@ public:
     void SetChainParams(const std::string& net);
     const CChainParams& GetChainParams() const override { return *chainParams; }
 
-    void SetMinFeePerKB(CFeeRate amt) override {};
+    void SetMinFeePerKB(CFeeRate) override {};
     CFeeRate GetMinFeePerKB() const override { return CFeeRate(Amount(0)); }
 
-    bool SetDustRelayFee(Amount amt, std::string* err = nullptr) override
+    bool SetDustRelayFee(Amount, std::string* /*err*/ = nullptr) override
     {
         return true;
     };
@@ -115,13 +115,13 @@ public:
         return CFeeRate(Amount(DUST_RELAY_TX_FEE));
     };
 
-    bool SetDustLimitFactor(int64_t factor, std::string* err = nullptr) override
+    bool SetDustLimitFactor(int64_t /*factor*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     };
     int64_t GetDustLimitFactor() const override { return 0; }
 
-    void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) override {}
+    void SetPreferredBlockFileSize(uint64_t /*preferredBlockFileSize*/) override {}
     uint64_t GetPreferredBlockFileSize() const override { return 0; }
 
     uint64_t GetDataCarrierSize() const override { return dataCarrierSize; }
@@ -133,30 +133,30 @@ public:
     bool GetDataCarrier() const override { return dataCarrier; }
     void SetDataCarrier(bool dataCarrierIn) override { dataCarrier = dataCarrierIn; }
 
-    bool SetLimitAncestorCount(int64_t limitAncestorCount,
-                               std::string* err = nullptr) override
+    bool SetLimitAncestorCount(int64_t /*limitAncestorCount*/,
+                               std::string* /*err*/ = nullptr) override
     {
         return true;
     }
     uint64_t GetLimitAncestorCount() const override { return 0; }
 
     bool SetLimitSecondaryMempoolAncestorCount(
-        int64_t limitSecondaryMempoolAncestorCountIn,
-        std::string* err = nullptr) override
+        int64_t /*limitSecondaryMempoolAncestorCountIn*/,
+        std::string* /*err*/ = nullptr) override
     {
         return true;
     }
     uint64_t GetLimitSecondaryMempoolAncestorCount() const override { return 0; }
 
-    void SetTestBlockCandidateValidity(bool skip) override {}
+    void SetTestBlockCandidateValidity(bool /*skip*/) override {}
     bool GetTestBlockCandidateValidity() const override { return false; }
 
-    void SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytes) override {}
+    void SetFactorMaxSendQueuesBytes(uint64_t /*factorMaxSendQueuesBytes*/) override {}
     uint64_t GetFactorMaxSendQueuesBytes() const override { return 0; }
     uint64_t GetMaxSendQueuesBytes() const override { return 0; }
 
     void SetMiningCandidateBuilder(
-        mining::CMiningFactory::BlockAssemblerType type) override
+        mining::CMiningFactory::BlockAssemblerType /*type*/) override
     {
     }
     mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const override
@@ -165,7 +165,7 @@ public:
     }
 
     bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn,
-                                    std::string* err = nullptr) override
+                                    std::string* /*err*/ = nullptr) override
     {
         genesisActivationHeight = genesisActivationHeightIn;
         return true;
@@ -175,7 +175,7 @@ public:
         return genesisActivationHeight;
     }
     bool SetChronicleActivationHeight(int32_t chronicleActivationHeightIn,
-                                      std::string* err = nullptr) override
+                                      std::string* /*err*/ = nullptr) override
     {
         chronicleActivationHeight = chronicleActivationHeightIn;
         return true;
@@ -185,7 +185,7 @@ public:
         return chronicleActivationHeight;
     }
 
-    bool SetMaxConcurrentAsyncTasksPerNode(int maxConcurrentAsyncTasksPerNode,
+    bool SetMaxConcurrentAsyncTasksPerNode(int /*maxConcurrentAsyncTasksPerNode*/,
                                            std::string* error = nullptr) override
     {
         SetErrorMsg(error);
@@ -194,10 +194,10 @@ public:
     }
     int GetMaxConcurrentAsyncTasksPerNode() const override;
 
-    bool SetBlockScriptValidatorsParams(int maxParallelBlocks,
-                                        int perValidatorScriptThreadsCount,
-                                        int perValidatorTxnThreadsCount,
-                                        int perValidatorThreadMaxBatchSize,
+    bool SetBlockScriptValidatorsParams(int /*maxParallelBlocks*/,
+                                        int /*perValidatorScriptThreadsCount*/,
+                                        int /*perValidatorTxnThreadsCount*/,
+                                        int /*perValidatorThreadMaxBatchSize*/,
                                         std::string* error = nullptr) override
     {
         SetErrorMsg(error);
@@ -208,23 +208,23 @@ public:
     int GetPerBlockTxnValidatorThreadsCount() const override;
     int GetPerBlockScriptValidatorThreadsCount() const override;
     int GetPerBlockScriptValidationMaxBatchSize() const override;
-    bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn,
-                                int64_t maxStackMemoryUsagePolicyIn,
-                                std::string* err = nullptr) override
+    bool SetMaxStackMemoryUsage(int64_t /*maxStackMemoryUsageConsensusIn*/,
+                                int64_t /*maxStackMemoryUsagePolicyIn*/,
+                                std::string* /*err*/ = nullptr) override
     {
         return true;
     }
-    uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const override
+    uint64_t GetMaxStackMemoryUsage(bool /*isGenesisEnabled*/, bool /*consensus*/) const override
     {
         return UINT32_MAX;
     }
 
-    bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn,
-                                  std::string* error) override
+    bool SetMaxOpsPerScriptPolicy(int64_t /*maxOpsPerScriptPolicyIn*/,
+                                  std::string* /*error*/) override
     {
         return true;
     }
-    uint64_t GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const override
+    uint64_t GetMaxOpsPerScript(bool isGenesisEnabled, bool /*consensus*/) const override
     {
         if(isGenesisEnabled)
         {
@@ -235,8 +235,8 @@ public:
             return MAX_OPS_PER_SCRIPT_BEFORE_GENESIS;
         }
     }
-    bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn,
-                                   std::string* err = nullptr) override
+    bool SetMaxTxSigOpsCountPolicy(int64_t /*maxTxSigOpsCountIn*/,
+                                   std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -244,18 +244,18 @@ public:
     {
         return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS;
     }
-    uint64_t GetMaxTxSigOpsCountPolicy(ProtocolEra era) const override
+    uint64_t GetMaxTxSigOpsCountPolicy(ProtocolEra) const override
     {
         return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS;
     }
 
-    uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const override
+    uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t /*blockSize*/) const override
     {
         throw std::runtime_error("DummyCofig::GetMaxBlockSigOps not implemented");
     }
 
-    bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn,
-                                  std::string* err = nullptr) override
+    bool SetGenesisGracefulPeriod(int64_t /*genesisGracefulPeriodIn*/,
+                                  std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -263,8 +263,8 @@ public:
     {
         return DEFAULT_GENESIS_GRACEFUL_ACTIVATION_PERIOD;
     }
-    bool SetChronicleGracefulPeriod(int64_t chronicleGracefulPeriodIn,
-                                    std::string* err = nullptr) override
+    bool SetChronicleGracefulPeriod(int64_t /*chronicleGracefulPeriodIn*/,
+                                    std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -273,13 +273,13 @@ public:
         return DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD;
     }
 
-    bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn,
-                                        std::string* err = nullptr) override
+    bool SetMaxPubKeysPerMultiSigPolicy(int64_t /*maxPubKeysPerMultiSigIn*/,
+                                        std::string* /*err*/ = nullptr) override
     {
         return true;
     }
     uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled,
-                                      bool consensus) const override
+                                      bool /*consensus*/) const override
     {
         if(isGenesisEnabled)
         {
@@ -291,7 +291,7 @@ public:
         }
     }
 
-    bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) override
+    bool SetMaxStdTxnValidationDuration(int /*ms*/, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
 
@@ -302,7 +302,7 @@ public:
         return DEFAULT_MAX_STD_TXN_VALIDATION_DURATION;
     }
 
-    bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) override
+    bool SetMaxNonStdTxnValidationDuration(int /*ms*/, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
 
@@ -313,7 +313,7 @@ public:
         return DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION;
     }
 
-    bool SetMaxTxnValidatorAsyncTasksRunDuration(int ms,
+    bool SetMaxTxnValidatorAsyncTasksRunDuration(int /*ms*/,
                                                  std::string* err = nullptr) override
     {
         SetErrorMsg(err);
@@ -326,7 +326,7 @@ public:
         return CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION;
     }
 
-    bool SetMaxTxnChainValidationBudget(int ms, std::string* err = nullptr) override
+    bool SetMaxTxnChainValidationBudget(int /*ms*/, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
 
@@ -337,11 +337,11 @@ public:
         return DEFAULT_MAX_TXN_CHAIN_VALIDATION_BUDGET;
     }
 
-    void SetValidationClockCPU(bool enable) override {}
+    void SetValidationClockCPU(bool /*enable*/) override {}
     bool GetValidationClockCPU() const override { return DEFAULT_VALIDATION_CLOCK_CPU; }
 
-    bool SetPTVTaskScheduleStrategy(PTVTaskScheduleStrategy strategy,
-                                    std::string* err = nullptr) override
+    bool SetPTVTaskScheduleStrategy(PTVTaskScheduleStrategy,
+                                    std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -357,17 +357,17 @@ public:
         maxScriptSizePolicy = static_cast<uint64_t>(maxScriptSizePolicyIn);
         return true;
     };
-    uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const override
+    uint64_t GetMaxScriptSize(bool /*isGenesisEnabled*/, bool /*isConsensus*/) const override
     {
         return maxScriptSizePolicy;
     };
 
-    bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn,
-                                     std::string* err = nullptr) override
+    bool SetMaxScriptNumLengthPolicy(int64_t /*maxScriptNumLengthIn*/,
+                                     std::string* /*err*/ = nullptr) override
     {
         return true;
     }
-    uint64_t GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const override
+    uint64_t GetMaxScriptNumLength(ProtocolEra era, bool /*isConsensus*/) const override
     {
         if(!IsProtocolActive(era, ProtocolName::Genesis))
         {
@@ -386,7 +386,7 @@ public:
         return IsProtocolActive(era, ProtocolName::Genesis) ? true : !fRequireStandard;
     }
 
-    bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) override
+    bool SetMaxCoinsViewCacheSize(int64_t /*max*/, std::string* err) override
     {
         SetErrorMsg(err);
 
@@ -394,7 +394,7 @@ public:
     }
     uint64_t GetMaxCoinsViewCacheSize() const override { return 0; /* unlimited */ }
 
-    bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) override
+    bool SetMaxCoinsProviderCacheSize(int64_t /*max*/, std::string* err) override
     {
         SetErrorMsg(err);
 
@@ -402,7 +402,7 @@ public:
     }
     uint64_t GetMaxCoinsProviderCacheSize() const override { return 0; /* unlimited */ }
 
-    bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) override
+    bool SetMaxCoinsDbOpenFiles(int64_t /*max*/, std::string* err) override
     {
         SetErrorMsg(err);
 
@@ -410,13 +410,13 @@ public:
     }
     uint64_t GetMaxCoinsDbOpenFiles() const override { return 64; /* old default */ }
 
-    bool SetCoinsDBMaxFileSize(int64_t max, std::string* err) override { return true; }
+    bool SetCoinsDBMaxFileSize(int64_t /*max*/, std::string* /*err*/) override { return true; }
     uint64_t GetCoinsDBMaxFileSize() const override
     {
         return CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE;
     }
 
-    bool SetMaxMempool(int64_t maxMempool, std::string* err) override
+    bool SetMaxMempool(int64_t /*maxMempool*/, std::string* err) override
     {
         SetErrorMsg(err);
 
@@ -427,7 +427,7 @@ public:
         return DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE;
     }
 
-    bool SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) override
+    bool SetMaxMempoolSizeDisk(int64_t /*maxMempoolSizeDisk*/, std::string* err) override
     {
         SetErrorMsg(err);
 
@@ -439,7 +439,7 @@ public:
                ONE_MEGABYTE;
     }
 
-    bool SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP,
+    bool SetMempoolMaxPercentCPFP(int64_t /*mempoolMaxPercentCPFP*/,
                                   std::string* err) override
     {
         SetErrorMsg(err);
@@ -451,7 +451,7 @@ public:
         return DEFAULT_MEMPOOL_MAX_PERCENT_CPFP;
     }
 
-    bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) override
+    bool SetMemPoolExpiry(int64_t /*memPoolExpiry*/, std::string* err) override
     {
         SetErrorMsg(err);
 
@@ -462,7 +462,7 @@ public:
         return DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
     }
 
-    bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) override
+    bool SetMaxOrphanTxSize(int64_t /*maxOrphanTxSize*/, std::string* err) override
     {
         SetErrorMsg(err);
 
@@ -473,7 +473,7 @@ public:
         return COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE;
     }
 
-    bool SetMaxOrphansInBatchPercentage(uint64_t percent, std::string* err) override
+    bool SetMaxOrphansInBatchPercentage(uint64_t /*percent*/, std::string* err) override
     {
         SetErrorMsg(err);
 
@@ -485,7 +485,7 @@ public:
         return COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH;
     };
 
-    bool SetMaxInputsForSecondLayerOrphan(uint64_t maxInputs, std::string* err) override
+    bool SetMaxInputsForSecondLayerOrphan(uint64_t /*maxInputs*/, std::string* err) override
     {
         SetErrorMsg(err);
 
@@ -496,7 +496,7 @@ public:
         return COrphanTxns::DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION;
     };
 
-    bool SetStopAtHeight(int32_t stopAtHeight, std::string* err) override
+    bool SetStopAtHeight(int32_t /*stopAtHeight*/, std::string* err) override
     {
         SetErrorMsg(err);
 
@@ -504,7 +504,7 @@ public:
     }
     int32_t GetStopAtHeight() const override { return DEFAULT_STOPATHEIGHT; }
 
-    bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags,
+    bool SetPromiscuousMempoolFlags(int64_t /*promiscuousMempoolFlags*/,
                                     std::string* err) override
     {
         SetErrorMsg(err);
@@ -541,11 +541,11 @@ public:
         return mBannedUAClients.find(uaClient) != mBannedUAClients.end();
     }
 
-    bool SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err) override
+    bool SetMaxProtocolRecvPayloadLength(uint64_t /*value*/, std::string* /*err*/) override
     {
         return true;
     }
-    bool SetRecvInvQueueFactor(uint64_t value, std::string* err) override { return true; }
+    bool SetRecvInvQueueFactor(uint64_t /*value*/, std::string* /*err*/) override { return true; }
     unsigned int GetMaxProtocolRecvPayloadLength() const override
     {
         return DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
@@ -560,7 +560,7 @@ public:
         return DEFAULT_RECV_INV_QUEUE_FACTOR;
     }
 
-    bool AddInvalidTxSink(const std::string& sink, std::string* err = nullptr) override
+    bool AddInvalidTxSink(const std::string& /*sink*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     };
@@ -570,8 +570,8 @@ public:
         return {"NONE"};
     };
 
-    bool SetInvalidTxFileSinkMaxDiskUsage(int64_t max,
-                                          std::string* err = nullptr) override
+    bool SetInvalidTxFileSinkMaxDiskUsage(int64_t /*max*/,
+                                          std::string* /*err*/ = nullptr) override
     {
         return true;
     };
@@ -580,8 +580,8 @@ public:
         return 300 * ONE_MEGABYTE;
     };
 
-    bool SetInvalidTxFileSinkEvictionPolicy(std::string policy,
-                                            std::string* err = nullptr) override
+    bool SetInvalidTxFileSinkEvictionPolicy(std::string /*policy*/,
+                                            std::string* /*err*/ = nullptr) override
     {
         return true;
     };
@@ -590,13 +590,13 @@ public:
         return InvalidTxEvictionPolicy::IGNORE_NEW;
     };
 
-    void SetEnableAssumeWhitelistedBlockDepth(bool enabled) override {}
+    void SetEnableAssumeWhitelistedBlockDepth(bool /*enabled*/) override {}
     bool GetEnableAssumeWhitelistedBlockDepth() const override
     {
         return DEFAULT_ENABLE_ASSUME_WHITELISTED_BLOCK_DEPTH;
     }
-    bool SetAssumeWhitelistedBlockDepth(int64_t depth,
-                                        std::string* err = nullptr) override
+    bool SetAssumeWhitelistedBlockDepth(int64_t /*depth*/,
+                                        std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -605,12 +605,12 @@ public:
         return DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH;
     }
 
-    bool SetMinBlocksToKeep(int32_t minblocks, std::string* err = nullptr) override
+    bool SetMinBlocksToKeep(int32_t /*minblocks*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
     int32_t GetMinBlocksToKeep() const override { return DEFAULT_MIN_BLOCKS_TO_KEEP; }
-    bool SetBlockValidationTxBatchSize(int64_t size, std::string* err = nullptr) override
+    bool SetBlockValidationTxBatchSize(int64_t /*size*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -620,8 +620,8 @@ public:
     }
 
     // Block download
-    bool SetBlockStallingMinDownloadSpeed(int64_t min,
-                                          std::string* err = nullptr) override
+    bool SetBlockStallingMinDownloadSpeed(int64_t /*min*/,
+                                          std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -629,7 +629,7 @@ public:
     {
         return DEFAULT_MIN_BLOCK_STALLING_RATE;
     }
-    bool SetBlockStallingTimeout(int64_t timeout, std::string* err = nullptr) override
+    bool SetBlockStallingTimeout(int64_t /*timeout*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -637,7 +637,7 @@ public:
     {
         return DEFAULT_BLOCK_STALLING_TIMEOUT;
     }
-    bool SetBlockDownloadWindow(int64_t window, std::string* err = nullptr) override
+    bool SetBlockDownloadWindow(int64_t /*window*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -645,7 +645,7 @@ public:
     {
         return DEFAULT_BLOCK_DOWNLOAD_WINDOW;
     }
-    bool SetBlockDownloadLowerWindow(int64_t window, std::string* err = nullptr) override
+    bool SetBlockDownloadLowerWindow(int64_t /*window*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -653,8 +653,8 @@ public:
     {
         return DEFAULT_BLOCK_DOWNLOAD_LOWER_WINDOW;
     }
-    bool SetBlockDownloadSlowFetchTimeout(int64_t timeout,
-                                          std::string* err = nullptr) override
+    bool SetBlockDownloadSlowFetchTimeout(int64_t /*timeout*/,
+                                          std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -662,8 +662,8 @@ public:
     {
         return DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT;
     }
-    bool SetBlockDownloadMaxParallelFetch(int64_t max,
-                                          std::string* err = nullptr) override
+    bool SetBlockDownloadMaxParallelFetch(int64_t /*max*/,
+                                          std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -671,7 +671,7 @@ public:
     {
         return DEFAULT_MAX_BLOCK_PARALLEL_FETCH;
     }
-    bool SetBlockDownloadTimeoutBase(int64_t max, std::string* err = nullptr) override
+    bool SetBlockDownloadTimeoutBase(int64_t /*max*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -679,7 +679,7 @@ public:
     {
         return DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE;
     }
-    bool SetBlockDownloadTimeoutBaseIBD(int64_t max, std::string* err = nullptr) override
+    bool SetBlockDownloadTimeoutBaseIBD(int64_t /*max*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -687,7 +687,7 @@ public:
     {
         return DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD;
     }
-    bool SetBlockDownloadTimeoutPerPeer(int64_t max, std::string* err = nullptr) override
+    bool SetBlockDownloadTimeoutPerPeer(int64_t /*max*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -697,7 +697,7 @@ public:
     }
 
     // P2P parameters
-    bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override
+    bool SetP2PHandshakeTimeout(int64_t /*timeout*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -705,7 +705,7 @@ public:
     {
         return DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL;
     }
-    bool SetStreamSendRateLimit(int64_t limit, std::string* err = nullptr) override
+    bool SetStreamSendRateLimit(int64_t /*limit*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -713,7 +713,7 @@ public:
     {
         return Stream::DEFAULT_SEND_RATE_LIMIT;
     }
-    bool SetBanScoreThreshold(int64_t threshold, std::string* err = nullptr) override
+    bool SetBanScoreThreshold(int64_t /*threshold*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -721,7 +721,7 @@ public:
     {
         return DEFAULT_BANSCORE_THRESHOLD;
     }
-    bool SetBlockTxnMaxPercent(unsigned int percent, std::string* err = nullptr) override
+    bool SetBlockTxnMaxPercent(unsigned int /*percent*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -729,33 +729,33 @@ public:
     {
         return DEFAULT_BLOCK_TXN_MAX_PERCENT;
     }
-    bool SetMultistreamsEnabled(bool enabled, std::string* err = nullptr) override
+    bool SetMultistreamsEnabled(bool /*enabled*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
     bool GetMultistreamsEnabled() const override { return DEFAULT_STREAMS_ENABLED; }
-    bool SetWhitelistRelay(bool relay, std::string* err = nullptr) override
+    bool SetWhitelistRelay(bool /*relay*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
     bool GetWhitelistRelay() const override { return DEFAULT_WHITELISTRELAY; }
-    bool SetWhitelistForceRelay(bool relay, std::string* err = nullptr) override
+    bool SetWhitelistForceRelay(bool /*relay*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
     bool GetWhitelistForceRelay() const override { return DEFAULT_WHITELISTFORCERELAY; }
-    bool SetRejectMempoolRequest(bool reject, std::string* err = nullptr) override
+    bool SetRejectMempoolRequest(bool /*reject*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
     bool GetRejectMempoolRequest() const override { return DEFAULT_REJECTMEMPOOLREQUEST; }
-    bool SetDropMessageTest(int64_t val, std::string* err = nullptr) override
+    bool SetDropMessageTest(int64_t /*val*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
     bool DoDropMessageTest() const override { return false; }
     uint64_t GetDropMessageTest() const override { return 0; }
-    bool SetInvalidChecksumInterval(int64_t val, std::string* err = nullptr) override
+    bool SetInvalidChecksumInterval(int64_t /*val*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -763,7 +763,7 @@ public:
     {
         return DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS;
     }
-    bool SetInvalidChecksumFreq(int64_t val, std::string* err = nullptr) override
+    bool SetInvalidChecksumFreq(int64_t /*val*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -771,12 +771,12 @@ public:
     {
         return DEFAULT_INVALID_CHECKSUM_FREQUENCY;
     }
-    bool SetFeeFilter(bool feefilter, std::string* err = nullptr) override
+    bool SetFeeFilter(bool /*feefilter*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
     bool GetFeeFilter() const override { return DEFAULT_FEEFILTER; }
-    bool SetMaxAddNodeConnections(int16_t max, std::string* err = nullptr) override
+    bool SetMaxAddNodeConnections(int16_t /*max*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -786,7 +786,7 @@ public:
     }
 
     // RPC parameters
-    bool SetWebhookClientNumThreads(int64_t num, std::string* err) override
+    bool SetWebhookClientNumThreads(int64_t /*num*/, std::string* /*err*/) override
     {
         return true;
     }
@@ -796,7 +796,7 @@ public:
     }
 
     // Double-Spend processing parameters
-    bool SetDoubleSpendNotificationLevel(int level, std::string* err) override
+    bool SetDoubleSpendNotificationLevel(int /*level*/, std::string* /*err*/) override
     {
         return true;
     }
@@ -804,7 +804,7 @@ public:
     {
         return DSAttemptHandler::DEFAULT_NOTIFY_LEVEL;
     }
-    bool SetDoubleSpendEndpointFastTimeout(int timeout, std::string* err) override
+    bool SetDoubleSpendEndpointFastTimeout(int /*timeout*/, std::string* /*err*/) override
     {
         return true;
     }
@@ -812,7 +812,7 @@ public:
     {
         return rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT;
     }
-    bool SetDoubleSpendEndpointSlowTimeout(int timeout, std::string* err) override
+    bool SetDoubleSpendEndpointSlowTimeout(int /*timeout*/, std::string* /*err*/) override
     {
         return true;
     }
@@ -820,7 +820,7 @@ public:
     {
         return rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT;
     }
-    bool SetDoubleSpendEndpointSlowRatePerHour(int64_t rate, std::string* err) override
+    bool SetDoubleSpendEndpointSlowRatePerHour(int64_t /*rate*/, std::string* /*err*/) override
     {
         return true;
     }
@@ -828,12 +828,12 @@ public:
     {
         return DSAttemptHandler::DEFAULT_DS_ENDPOINT_SLOW_RATE_PER_HOUR;
     }
-    bool SetDoubleSpendEndpointPort(int port, std::string* err) override { return true; }
+    bool SetDoubleSpendEndpointPort(int /*port*/, std::string* /*err*/) override { return true; }
     int GetDoubleSpendEndpointPort() const override
     {
         return rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT;
     }
-    bool SetDoubleSpendTxnRemember(int64_t size, std::string* err) override
+    bool SetDoubleSpendTxnRemember(int64_t /*size*/, std::string* /*err*/) override
     {
         return true;
     }
@@ -841,7 +841,7 @@ public:
     {
         return DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT;
     }
-    bool SetDoubleSpendEndpointBlacklistSize(int64_t size, std::string* err) override
+    bool SetDoubleSpendEndpointBlacklistSize(int64_t /*size*/, std::string* /*err*/) override
     {
         return true;
     }
@@ -849,13 +849,13 @@ public:
     {
         return DSAttemptHandler::DEFAULT_DS_ENDPOINT_BLACKLIST_SIZE;
     }
-    bool SetDoubleSpendEndpointSkipList(const std::string& skip,
-                                        std::string* err) override
+    bool SetDoubleSpendEndpointSkipList(const std::string& /*skip*/,
+                                        std::string* /*err*/) override
     {
         return true;
     }
     std::set<std::string> GetDoubleSpendEndpointSkipList() const override { return {}; }
-    bool SetDoubleSpendEndpointMaxCount(int64_t max, std::string* err) override
+    bool SetDoubleSpendEndpointMaxCount(int64_t /*max*/, std::string* /*err*/) override
     {
         return true;
     }
@@ -863,7 +863,7 @@ public:
     {
         return DSAttemptHandler::DEFAULT_DS_ENDPOINT_MAX_COUNT;
     }
-    bool SetDoubleSpendNumFastThreads(int64_t num, std::string* err) override
+    bool SetDoubleSpendNumFastThreads(int64_t /*num*/, std::string* /*err*/) override
     {
         return true;
     }
@@ -871,7 +871,7 @@ public:
     {
         return DSAttemptHandler::DEFAULT_NUM_FAST_THREADS;
     }
-    bool SetDoubleSpendNumSlowThreads(int64_t num, std::string* err) override
+    bool SetDoubleSpendNumSlowThreads(int64_t /*num*/, std::string* /*err*/) override
     {
         return true;
     }
@@ -879,7 +879,7 @@ public:
     {
         return DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS;
     }
-    bool SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err) override
+    bool SetDoubleSpendQueueMaxMemory(int64_t /*max*/, std::string* /*err*/) override
     {
         return true;
     }
@@ -887,8 +887,8 @@ public:
     {
         return DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY * ONE_MEGABYTE;
     }
-    bool SetDoubleSpendDetectedWebhookURL(const std::string& url,
-                                          std::string* err) override
+    bool SetDoubleSpendDetectedWebhookURL(const std::string& /*url*/,
+                                          std::string* /*err*/) override
     {
         return true;
     }
@@ -898,7 +898,7 @@ public:
         return rpc::client::WebhookClientDefaults::DEFAULT_WEBHOOK_PORT;
     }
     std::string GetDoubleSpendDetectedWebhookPath() const override { return ""; }
-    bool SetDoubleSpendDetectedWebhookMaxTxnSize(int64_t max, std::string* err) override
+    bool SetDoubleSpendDetectedWebhookMaxTxnSize(int64_t /*max*/, std::string* /*err*/) override
     {
         return true;
     }
@@ -908,32 +908,32 @@ public:
     }
 
     // MinerID
-    bool SetMinerIdEnabled(bool enabled, std::string* err) override { return true; }
+    bool SetMinerIdEnabled(bool /*enabled*/, std::string* /*err*/) override { return true; }
     bool GetMinerIdEnabled() const override
     {
         return MinerIdDatabaseDefaults::DEFAULT_MINER_ID_ENABLED;
     }
-    bool SetMinerIdCacheSize(int64_t size, std::string* err) override { return true; }
+    bool SetMinerIdCacheSize(int64_t /*size*/, std::string* /*err*/) override { return true; }
     uint64_t GetMinerIdCacheSize() const override
     {
         return MinerIdDatabaseDefaults::DEFAULT_CACHE_SIZE;
     }
-    bool SetMinerIdsNumToKeep(int64_t num, std::string* err) override { return true; }
+    bool SetMinerIdsNumToKeep(int64_t /*num*/, std::string* /*err*/) override { return true; }
     uint64_t GetMinerIdsNumToKeep() const override
     {
         return MinerIdDatabaseDefaults::DEFAULT_MINER_IDS_TO_KEEP;
     }
-    bool SetMinerIdReputationM(int64_t num, std::string* err) override { return true; }
+    bool SetMinerIdReputationM(int64_t /*num*/, std::string* /*err*/) override { return true; }
     uint32_t GetMinerIdReputationM() const override
     {
         return MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_M;
     }
-    bool SetMinerIdReputationN(int64_t num, std::string* err) override { return true; }
+    bool SetMinerIdReputationN(int64_t /*num*/, std::string* /*err*/) override { return true; }
     uint32_t GetMinerIdReputationN() const override
     {
         return MinerIdDatabaseDefaults::DEFAULT_MINER_REPUTATION_N;
     }
-    bool SetMinerIdReputationMScale(double num, std::string* err) override
+    bool SetMinerIdReputationMScale(double /*num*/, std::string* /*err*/) override
     {
         return true;
     }
@@ -948,55 +948,55 @@ public:
     }
     std::string GetMinerIdGeneratorPath() const override { return ""; }
     std::string GetMinerIdGeneratorAlias() const override { return ""; }
-    bool SetMinerIdGeneratorURL(const std::string& url, std::string* err) override
+    bool SetMinerIdGeneratorURL(const std::string& /*url*/, std::string* /*err*/) override
     {
         return true;
     }
-    bool SetMinerIdGeneratorAlias(const std::string& alias, std::string* err) override
+    bool SetMinerIdGeneratorAlias(const std::string& /*alias*/, std::string* /*err*/) override
     {
         return true;
     }
 
 #if ENABLE_ZMQ
-    bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override
+    bool SetInvalidTxZMQMaxMessageSize(int64_t /*max*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     };
     int64_t GetInvalidTxZMQMaxMessageSize() const override { return 10 * ONE_MEGABYTE; };
 #endif
 
-    bool SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace,
-                                   std::string* err = nullptr) override
+    bool SetMaxMerkleTreeDiskSpace(int64_t /*maxDiskSpace*/,
+                                   std::string* /*err*/ = nullptr) override
     {
         return true;
     }
 
     uint64_t GetMaxMerkleTreeDiskSpace() const override { return 0; }
 
-    bool SetPreferredMerkleTreeFileSize(int64_t preferredFileSize,
-                                        std::string* err = nullptr) override
+    bool SetPreferredMerkleTreeFileSize(int64_t /*preferredFileSize*/,
+                                        std::string* /*err*/ = nullptr) override
     {
         return true;
     }
 
     uint64_t GetPreferredMerkleTreeFileSize() const override { return 0; }
 
-    bool SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize,
-                                         std::string* err = nullptr) override
+    bool SetMaxMerkleTreeMemoryCacheSize(int64_t /*maxMemoryCacheSize*/,
+                                         std::string* /*err*/ = nullptr) override
     {
         return true;
     }
 
     uint64_t GetMaxMerkleTreeMemoryCacheSize() const override { return 0; }
 
-    bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) override
+    bool SetDisableBIP30Checks(bool /*disable*/, std::string* /*err*/ = nullptr) override
     {
         return true;
     }
 
     bool GetDisableBIP30Checks() const override { return true; }
 
-    bool SetSoftConsensusFreezeDuration(std::int64_t duration, std::string* err) override
+    bool SetSoftConsensusFreezeDuration(std::int64_t /*duration*/, std::string* /*err*/) override
     {
         return true;
     }
@@ -1007,8 +1007,8 @@ public:
     }
 
     // Safe mode params
-    bool SetSafeModeWebhookURL(const std::string& url,
-                               std::string* err = nullptr) override
+    bool SetSafeModeWebhookURL(const std::string& /*url*/,
+                               std::string* /*err*/ = nullptr) override
     {
         return true;
     }
@@ -1019,33 +1019,33 @@ public:
     }
     std::string GetSafeModeWebhookPath() const override { return ""; }
     int64_t GetSafeModeMaxForkDistance() const override { return 100; };
-    bool SetSafeModeMaxForkDistance(int64_t distance, std::string* err) override
+    bool SetSafeModeMaxForkDistance(int64_t /*distance*/, std::string* /*err*/) override
     {
         return true;
     };
     int64_t GetSafeModeMinForkLength() const override { return 3; };
-    bool SetSafeModeMinForkLength(int64_t length, std::string* err) override
+    bool SetSafeModeMinForkLength(int64_t /*length*/, std::string* /*err*/) override
     {
         return true;
     };
     int64_t GetSafeModeMinForkHeightDifference() const override { return 5; };
-    bool SetSafeModeMinForkHeightDifference(int64_t heightDifference,
-                                            std::string* err) override
+    bool SetSafeModeMinForkHeightDifference(int64_t /*heightDifference*/,
+                                            std::string* /*err*/) override
     {
         return true;
     };
 
     bool GetDetectSelfishMining() const override { return true; };
 
-    void SetDetectSelfishMining(bool detectSelfishMining) override {}
+    void SetDetectSelfishMining(bool /*detectSelfishMining*/) override {}
 
     int64_t GetMinBlockMempoolTimeDifferenceSelfish() const override
     {
         return DEFAULT_MIN_BLOCK_MEMPOOL_TIME_DIFFERENCE_SELFISH;
     };
 
-    bool SetMinBlockMempoolTimeDifferenceSelfish(int64_t minBlockMempoolTimeDiffIn,
-                                                 std::string* err) override
+    bool SetMinBlockMempoolTimeDifferenceSelfish(int64_t /*minBlockMempoolTimeDiffIn*/,
+                                                 std::string* /*err*/) override
     {
         return true;
     }
@@ -1055,17 +1055,17 @@ public:
         return DEFAULT_SELFISH_TX_THRESHOLD_IN_PERCENT;
     }
 
-    bool SetSelfishTxThreshold(uint64_t selfishTxPercentThreshold,
-                               std::string* err) override
+    bool SetSelfishTxThreshold(uint64_t /*selfishTxPercentThreshold*/,
+                               std::string* /*err*/) override
     {
         return true;
     }
 
     // Mempool syncing
     int64_t GetMempoolSyncAge() const override { return MempoolMsg::DEFAULT_AGE; }
-    bool SetMempoolSyncAge(int64_t age, std::string* err) override { return true; }
+    bool SetMempoolSyncAge(int64_t /*age*/, std::string* /*err*/) override { return true; }
     int64_t GetMempoolSyncPeriod() const override { return MempoolMsg::DEFAULT_PERIOD; }
-    bool SetMempoolSyncPeriod(int64_t period, std::string* err) override { return true; }
+    bool SetMempoolSyncPeriod(int64_t /*period*/, std::string* /*err*/) override { return true; }
 
     void Reset() override;
 

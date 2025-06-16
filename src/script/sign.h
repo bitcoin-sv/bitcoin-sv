@@ -112,9 +112,7 @@ SignatureData CombineSignatures(const eval_script_params&,
                                 const CScript& scriptPubKey,
                                 const BaseSignatureChecker&,
                                 const SignatureData& scriptSig1,
-                                int32_t tx_version1,
                                 const SignatureData& scriptSig2,
-                                int32_t tx_version2,
                                 ProtocolEra era,
                                 ProtocolEra utxoEra);
 

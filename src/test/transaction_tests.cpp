@@ -861,9 +861,7 @@ BOOST_AUTO_TEST_CASE(test_witness) {
                                                                                ->vout[0]
                                                                                .nValue),
                                         DataFromTransaction(input1, 0),
-                                        input1.nVersion,
                                         DataFromTransaction(input2, 0),
-                                        input2.nVersion,
                                         ProtocolEra::PreGenesis,
                                         ProtocolEra::PreGenesis));
 
@@ -908,9 +906,7 @@ BOOST_AUTO_TEST_CASE(test_witness) {
                                                                                ->vout[0]
                                                                                .nValue),
                                         DataFromTransaction(input1, 0),
-                                        input1.nVersion,
                                         DataFromTransaction(input2, 0),
-                                        input2.nVersion,
                                         ProtocolEra::PreGenesis,
                                         ProtocolEra::PreGenesis));
 

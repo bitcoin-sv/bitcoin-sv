@@ -706,9 +706,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                                                                            i,
                                                                            amount),
                                         sigdata,
-                                        mergedTx.nVersion,
                                         DataFromTransaction(txv, i),
-                                        txv.nVersion,
                                         ActiveEra,
                                         utxoEra);
         }

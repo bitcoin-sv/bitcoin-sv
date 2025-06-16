@@ -140,19 +140,14 @@ BOOST_AUTO_TEST_CASE(key_construction)
 // Serialisation/deserialisation
 BOOST_AUTO_TEST_CASE(serialisation)
 {
-    auto Check = [](bool makeWithSig) {
-        // Create revokemid msg
-        RevokeMid msg { MakeRevokeMid() };
+    // Create revokemid msg
+    RevokeMid msg { MakeRevokeMid() };
 
-        CDataStream ss { SER_NETWORK, 0 };
-        ss << msg;
-        RevokeMid deserialised {};
-        ss >> deserialised;
-        BOOST_CHECK_EQUAL(msg, deserialised);
-    };
-
-    Check(false);
-    Check(true);
+    CDataStream ss { SER_NETWORK, 0 };
+    ss << msg;
+    RevokeMid deserialised {};
+    ss >> deserialised;
+    BOOST_CHECK_EQUAL(msg, deserialised);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

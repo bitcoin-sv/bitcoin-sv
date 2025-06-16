@@ -422,7 +422,7 @@ BOOST_AUTO_TEST_CASE(test_sigops_limits) {
     BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(std::numeric_limits<uint32_t>::max()), 4295 * expected_res);
 }
 
-void TestMaxSigOps(const Config& globalConfig, uint64_t maxTxSigOpsCount, uint64_t maxTxSize)
+void TestMaxSigOps(uint64_t maxTxSigOpsCount, uint64_t maxTxSize)
 {
     CMutableTransaction tx;
     tx.nVersion = 1;
@@ -466,7 +466,7 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx)
     /* Case 1: Genesis is not enabled, consensus - MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS */
     uint64_t maxTxSigOpsCountConsensusBeforeGenesis = testConfig.GetMaxTxSigOpsCountConsensusBeforeGenesis();
     BOOST_CHECK_EQUAL(maxTxSigOpsCountConsensusBeforeGenesis, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS);
-    TestMaxSigOps(testConfig, maxTxSigOpsCountConsensusBeforeGenesis, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS);
+    TestMaxSigOps(maxTxSigOpsCountConsensusBeforeGenesis, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS);
 
     /* Case 2: Genesis is not enabled, policy - MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS */
     uint64_t maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(ProtocolEra::PreGenesis);

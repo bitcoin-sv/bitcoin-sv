@@ -325,7 +325,6 @@ struct Stacks {
 
     Stacks(const eval_script_params& params,
            const SignatureData& data,
-           int32_t /*tx_version*/, // cjg Fix common?
            ProtocolEra era)
     {
         // Pre-genesis limitations are stricter than post-genesis, so LimitedStack can use UINT32_MAX as max size.
@@ -406,9 +405,7 @@ SignatureData CombineSignatures(const eval_script_params& params,
                                 const CScript& scriptPubKey,
                                 const BaseSignatureChecker& checker,
                                 const SignatureData& scriptSig1,
-                                const int32_t tx_version1,
                                 const SignatureData& scriptSig2,
-                                const int32_t tx_version2,
                                 ProtocolEra era,
                                 ProtocolEra utxoEra)
 {
@@ -417,8 +414,8 @@ SignatureData CombineSignatures(const eval_script_params& params,
     Solver(scriptPubKey, utxoEra, txType, vSolutions);
 
     return CombineSignatures(scriptPubKey, checker, txType, vSolutions,
-                             Stacks(params, scriptSig1, tx_version1, era),
-                             Stacks(params, scriptSig2, tx_version2, era))
+                             Stacks(params, scriptSig1, era),
+                             Stacks(params, scriptSig2, era))
         .Output();
 }
 
