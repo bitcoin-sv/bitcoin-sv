@@ -47,17 +47,17 @@ uint256 SignatureHash(const CScript &scriptCode, const CTransaction &txTo,
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class BaseSignatureChecker {
 public:
-    virtual bool CheckSig(const std::vector<uint8_t> &scriptSig,
-                          const std::vector<uint8_t> &vchPubKey,
-                          const CScript &scriptCode) const {
+    virtual bool CheckSig(const std::vector<uint8_t>& /*scriptSig*/,
+                          const std::vector<uint8_t>& /*vchPubKey*/,
+                          const CScript& /*scriptCode*/) const {
         return false;
     }
 
-    virtual bool CheckLockTime(const CScriptNum &nLockTime) const {
+    virtual bool CheckLockTime(const CScriptNum& /*nLockTime*/) const {
         return false;
     }
 
-    virtual bool CheckSequence(const CScriptNum &nSequence) const {
+    virtual bool CheckSequence(const CScriptNum& /*nSequence*/) const {
         return false;
     }
     
