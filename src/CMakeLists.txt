@@ -39,7 +39,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
 		-Wvla
 		-Wformat-security
 		-Wcast-align
-		-Wunused-parameter
 		$<$<COMPILE_LANGUAGE:C>:-Wnested-externs>
 		$<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
 	)
@@ -54,10 +53,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
 		add_compile_options(
 			-Wshadow
 			$<$<COMPILE_LANGUAGE:CXX>:-Wsuggest-override>
-		)
-	else()
-		add_compile_options(
-			-Wno-unused-parameter
 		)
 	endif()
 elseif(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
