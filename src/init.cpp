@@ -1008,7 +1008,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                                _("Shrink bitcoind.log file on client startup "
                                  "(default: 1 when no -debug)"));
 
-    AppendParamsHelpMessages(strUsage, showDebug);
+    AppendParamsHelpMessages(strUsage);
 
     strUsage += HelpMessageGroup(_("Node relay options:"));
     strUsage +=

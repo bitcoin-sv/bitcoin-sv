@@ -15,7 +15,8 @@ const std::string CBaseChainParams::TESTNET = "test";
 const std::string CBaseChainParams::REGTEST = "regtest";
 const std::string CBaseChainParams::STN = "stn";
 
-void AppendParamsHelpMessages(std::string &strUsage, bool debugHelp) {
+void AppendParamsHelpMessages(std::string& strUsage)
+{
     strUsage += HelpMessageGroup(_("Chain selection options:"));
     strUsage += HelpMessageOpt("-testnet", _("Use the test chain"));
     strUsage += HelpMessageOpt(
