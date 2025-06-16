@@ -11,26 +11,31 @@ CZMQAbstractNotifier::~CZMQAbstractNotifier() {
     assert(!psocket);
 }
 
-bool CZMQAbstractNotifier::NotifyBlock(const CBlockIndex * /*CBlockIndex*/) {
-    return true;
-}
-
-bool CZMQAbstractNotifier::NotifyTransaction(
-    const CTransaction & /*transaction*/) {
-    return true;
-}
-
-bool CZMQAbstractNotifier::NotifyTextMessage(const std::string& topic, std::string_view message)
-{
-    return true;
-}
-bool CZMQAbstractNotifier::NotifyRemovedFromMempool(const uint256& txid, MemPoolRemovalReason reason,
-                                                    const CTransactionConflict& conflictedWith)
+bool CZMQAbstractNotifier::NotifyBlock(const CBlockIndex*)
 {
     return true;
 }
 
-bool CZMQAbstractNotifier::NotifyRemovedFromMempoolBlock(const uint256& txid, MemPoolRemovalReason reason)
+bool CZMQAbstractNotifier::NotifyTransaction(const CTransaction&)
+{
+    return true;
+}
+
+bool CZMQAbstractNotifier::NotifyTextMessage(const std::string& /*topic*/,
+                                             std::string_view /*message*/)
+{
+    return true;
+}
+
+bool CZMQAbstractNotifier::NotifyRemovedFromMempool(const uint256& /*txid*/,
+                                                    MemPoolRemovalReason,
+                                                    const CTransactionConflict&)
+{
+    return true;
+}
+
+bool CZMQAbstractNotifier::NotifyRemovedFromMempoolBlock(const uint256& /*txid*/,
+                                                         MemPoolRemovalReason)
 {
     return true;
 }
@@ -44,3 +49,4 @@ bool CZMQAbstractNotifier::NotifyTransaction2(const CTransaction&)
 {
     return true;
 }
+
