@@ -144,9 +144,7 @@ static CScript PushAll(const std::vector<valtype> &values) {
 }
 
 static bool ProduceSignature(const Config&,
-                             const bool /*consensus*/,
                              const BaseSignatureCreator& creator,
-                             ProtocolEra /*era*/, // cjg Fix common?
                              ProtocolEra utxoEra,
                              const CScript& fromPubKey,
                              SignatureData& sigdata)
@@ -183,9 +181,7 @@ bool SignAndVerify(const Config& config,
                    SignatureData& sigdata)
 {
     const bool solved = ProduceSignature(config,
-                                         consensus,
                                          creator,
-                                         era,
                                          utxoEra,
                                          fromPubKey,
                                          sigdata);
