@@ -579,8 +579,7 @@ bool CheckCoinbase(const CTransaction& tx,
                    CValidationState& state,
                    uint64_t maxTxSigOpsCountConsensusBeforeGenesis,
                    uint64_t maxTxSizeConsensus,
-                   ProtocolEra era,
-                   int32_t /*height*/) // cjg server?
+                   ProtocolEra era)
 {
     if (!tx.IsCoinBase()) {
         return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing",
@@ -5805,7 +5804,7 @@ bool CheckBlock(const Config &config, const CBlock &block,
     uint64_t maxTxSizeConsensus = config.GetMaxTxSize(era, true);
 
     // And a valid coinbase.
-    if (!CheckCoinbase(*block.vtx[0], state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, era, blockHeight)) {
+    if (!CheckCoinbase(*block.vtx[0], state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, era)) {
         auto result = state.Invalid(false, state.GetRejectCode(),
                                     state.GetRejectReason(),
                                     strprintf("Coinbase check failed (txid %s) %s",

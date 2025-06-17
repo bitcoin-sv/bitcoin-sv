@@ -923,8 +923,7 @@ bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state,
                              uint64_t maxTxSizeConsensus, ProtocolEra era);
 bool CheckCoinbase(const CTransaction &tx, CValidationState &state,
                    uint64_t maxTxSigOpsCountConsensusBeforeGenesis,
-                   uint64_t maxTxSizeConsensus, ProtocolEra era,
-                   int32_t blockHeight = -1);
+                   uint64_t maxTxSizeConsensus, ProtocolEra era);
 
 namespace Consensus {
 
