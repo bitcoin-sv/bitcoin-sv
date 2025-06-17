@@ -3304,7 +3304,6 @@ static void ProcessGetHeadersEnrichedMessage(const CNodePtr& pfrom,
 */
 static void ProcessTxMessage(const Config& config,
                              const CNodePtr& pfrom,
-                             const CNetMsgMaker&, // cjg server?
                              const std::string& /*strCommand*/,
                              msg_buffer& vRecv,
                              CConnman& connman)
@@ -4736,7 +4735,7 @@ bool ProcessMessage(const Config& config,
     }
 
     else if (strCommand == NetMsgType::TX) {
-        ProcessTxMessage(config, pfrom, msgMaker, strCommand, vRecv, connman);
+        ProcessTxMessage(config, pfrom, strCommand, vRecv, connman);
     }
 
     // Ignore blocks received while importing
