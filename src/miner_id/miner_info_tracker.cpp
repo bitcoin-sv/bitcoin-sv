@@ -195,7 +195,6 @@ static std::optional<int> parsestorefile (std::string n)  {
 
 std::optional<std::pair<COutPoint, std::optional<CoinWithScript>>> mining::
     BlockDatarefTracker::find_fund(
-        int32_t /*height*/, // cjg Fix? server
         std::function<std::optional<CoinWithScript>(const COutPoint&)> get_spendable_coin)
         const
 {

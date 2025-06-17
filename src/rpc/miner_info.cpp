@@ -149,7 +149,8 @@ public:
     {
     }
 
-    std::pair<COutPoint, COutPoint> FundAndSignMinerInfoTx (const Config &config, CMutableTransaction & mtx, int32_t blockheight)
+    std::pair<COutPoint, COutPoint> FundAndSignMinerInfoTx(const Config& config,
+                                                           CMutableTransaction& mtx)
     {
         try {
             // A potential new funding seed has preceedence.
@@ -178,7 +179,7 @@ public:
 
                     // find our minerinfo/dataref funding tx if exists.
                     std::optional<std::pair<COutPoint, std::optional<CoinWithScript>>> output =
-                            g_BlockDatarefTracker->find_fund(blockheight, hasSpendableFunds);
+                            g_BlockDatarefTracker->find_fund(hasSpendableFunds);
                     if (output && output->second.has_value() ) {
                         fundingOutPoint = output->first;
                         coin = std::move(output->second);
@@ -312,7 +313,7 @@ std::string CreateDatarefTx(const Config& config, const std::vector<CScript>& sc
     }        
 
     auto funding = CreateDatarefFundingFromFile(config, fundingPath, fundingKeyFile, fundingSeedFile);
-    auto newfund_and_previous = funding.FundAndSignMinerInfoTx (config, mtx, blockHeight);
+    auto newfund_and_previous = funding.FundAndSignMinerInfoTx (config, mtx);
 
     std::string const mtxhex {EncodeHexTx(CTransaction(mtx))};
     UniValue minerinfotx_args(UniValue::VARR);
@@ -443,7 +444,7 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
     mtx.vout.push_back(CTxOut{Amount{0}, scriptPubKey});
 
     auto funding = CreateDatarefFundingFromFile(config, fundingPath, fundingKeyFile, fundingSeedFile);
-    auto newfund_and_previous = funding.FundAndSignMinerInfoTx (config, mtx, blockHeight);
+    auto newfund_and_previous = funding.FundAndSignMinerInfoTx (config, mtx);
 
     std::string const mtxhex {EncodeHexTx(CTransaction(mtx))};
     UniValue minerinfotx_args(UniValue::VARR);
