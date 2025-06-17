@@ -6629,7 +6629,7 @@ bool CheckDiskSpace(uint64_t nAdditionalBytes) {
     return true;
 }
 
-static bool LoadBlockIndexDB(const CChainParams&) // cjg server?
+static bool LoadBlockIndexDB()
 {
     if (!BlockIndexStoreLoader(mapBlockIndex).ForceLoad(
             GlobalConfig::GetConfig(),
@@ -7136,9 +7136,10 @@ void UnloadBlockIndex() {
     fHavePruned = false;
 }
 
-bool LoadBlockIndex(const CChainParams &chainparams) {
+bool LoadBlockIndex()
+{
     // Load block index from databases
-    if (!fReindex && !LoadBlockIndexDB(chainparams)) {
+    if (!fReindex && !LoadBlockIndexDB()) {
         return false;
     }
     return true;

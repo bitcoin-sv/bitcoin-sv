@@ -3664,7 +3664,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
                 }
                 if (shutdownToken.IsCanceled()) break;
 
-                if (!LoadBlockIndex(chainparams)) {
+                if (!LoadBlockIndex()) {
                     strLoadError = _("Error loading block database");
                     break;
                 }
