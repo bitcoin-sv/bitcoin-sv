@@ -3906,7 +3906,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     LogPrintf("mapBlockIndex.size() = %u\n", mapBlockIndex.Count());
     LogPrintf("nBestHeight = %d\n", chainActive.Height());
 
-    Discover(threadGroup);
+    Discover();
 
     // Map ports with UPnP
     MapPort(gArgs.GetBoolArg("-upnp", DEFAULT_UPNP));

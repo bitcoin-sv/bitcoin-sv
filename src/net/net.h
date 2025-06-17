@@ -807,7 +807,7 @@ private:
 };
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern std::unique_ptr<CConnman> g_connman;
-void Discover(boost::thread_group &threadGroup);
+void Discover();
 void MapPort(bool fUseUPnP);
 unsigned short GetListenPort();
 
