@@ -4052,7 +4052,6 @@ static void ProcessBlockMessage(const Config& config,
 * Process getaddr message.
 */
 static void ProcessGetAddrMessage(const CNodePtr& pfrom,
-                                  msg_buffer& /*vRecv*/, // cjg server?
                                   CConnman& connman)
 {
     // This asymmetric behavior for inbound and outbound connections was
@@ -4761,7 +4760,7 @@ bool ProcessMessage(const Config& config,
     }
 
     else if (strCommand == NetMsgType::GETADDR) {
-        ProcessGetAddrMessage(pfrom, vRecv, connman);
+        ProcessGetAddrMessage(pfrom, connman);
     }
 
     else if (strCommand == NetMsgType::MEMPOOL) {
