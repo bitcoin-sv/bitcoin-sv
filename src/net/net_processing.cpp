@@ -3982,8 +3982,7 @@ static bool ProcessCompactBlockMessage(
 */
 static void ProcessBlockMessage(const Config& config,
                                 const CNodePtr& pfrom,
-                                msg_buffer& vRecv,
-                                CConnman&) // cjg server?
+                                msg_buffer& vRecv)
 {
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
     vRecv >> *pblock;
@@ -4753,7 +4752,7 @@ bool ProcessMessage(const Config& config,
 
     // Ignore blocks received while importing
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) {
-        ProcessBlockMessage(config, pfrom, vRecv, connman);
+        ProcessBlockMessage(config, pfrom, vRecv);
     }
 
     // Ignore double-spend detected notifications while importing
