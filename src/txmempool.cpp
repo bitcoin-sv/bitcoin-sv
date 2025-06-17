@@ -945,12 +945,11 @@ void CTxMemPool::removeRecursiveNL(
     removeStagedNL(setAllRemoves, nonNullChangeSet.Get(), conflictedWith, reason);
 }
 
-void CTxMemPool::RemoveForReorgNL(
-    const Config &config,
-    const CoinsDB& /*coinsTip*/, // cjg  server?
-    const CJournalChangeSetPtr& changeSet,
-    const CBlockIndex& tip,
-    int flags) {
+void CTxMemPool::RemoveForReorgNL(const Config& config,
+                                  const CJournalChangeSetPtr& changeSet,
+                                  const CBlockIndex& tip,
+                                  int flags)
+{
 
     const int32_t nMemPoolHeight = tip.GetHeight() + 1;
     // NOLINTNEXTLINE(*-narrowing-conversions)
@@ -2393,7 +2392,6 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
         const CBlockIndex& tip = *chainActive.Tip();
         RemoveForReorgNL(
                 config,
-                *pcoinsTip,
                 changeSet,
                 tip,
                 // NOLINTNEXTLINE(*-narrowing-conversions)
@@ -2460,7 +2458,6 @@ void CTxMemPool::RemoveFromMempoolForReorg(const Config &config,
         const CBlockIndex& tip = *chainActive.Tip();
         RemoveForReorgNL(
             config,
-            *pcoinsTip,
             changeSet,
             tip,
             // NOLINTNEXTLINE(*-narrowing-conversions)

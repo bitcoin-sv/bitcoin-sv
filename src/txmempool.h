@@ -1232,13 +1232,10 @@ private:
     // A non-locking version of IsSpent
     bool IsSpentNL(const COutPoint &outpoint) const;
 
-    void RemoveForReorgNL(
-        const Config &config,
-        const CoinsDB& coinsTip,
-        const mining::CJournalChangeSetPtr& changeSet,
-        const CBlockIndex& tip,
-        int flags);
-
+    void RemoveForReorgNL(const Config&,
+                          const mining::CJournalChangeSetPtr&,
+                          const CBlockIndex& tip,
+                          int flags);
 
     // A non-locking version of AddUnchecked
     // A signal NotifyEntryAdded is decoupled from AddUncheckedNL.
