@@ -1857,7 +1857,7 @@ bool InitSanityCheck(void) {
     return true;
 }
 
-static bool AppInitServers(Config &config, boost::thread_group&) // cjg Fix server?
+static bool AppInitServers(Config& config)
 {
     RPCServer::OnStarted(&OnRPCStarted);
     RPCServer::OnStopped(&OnRPCStopped);
@@ -3363,7 +3363,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
      */
     if (gArgs.GetBoolArg("-server", false)) {
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);
-        if (!AppInitServers(config, threadGroup)) {
+        if (!AppInitServers(config)) {
             return InitError(
                 _("Unable to start HTTP server. See debug log for details."));
         }
