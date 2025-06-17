@@ -454,11 +454,9 @@ public:
     }
 
     const CoinImpl& AddCoin(const COutPoint& outpoint, CoinImpl&& coin);
-    void AddCoin(
-        const COutPoint& outpoint,
-        CoinWithScript&& coin,
-        bool possible_overwrite,
-        uint64_t genesisActivationHeight);
+    void AddCoin(const COutPoint& outpoint,
+                 CoinWithScript&& coin,
+                 bool possible_overwrite);
     bool SpendCoin(const COutPoint& outpoint);
     void Uncache(const std::vector<COutPoint>& vOutpoints);
     void BatchWrite(CCoinsMap& mapCoins);

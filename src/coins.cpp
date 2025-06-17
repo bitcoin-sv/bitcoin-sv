@@ -75,7 +75,7 @@ void CCoinsViewCache::Shard::AddCoin(
     }
 #endif
 
-    mCache.AddCoin(outpoint, std::move(coin), possible_overwrite, genesisActivationHeight);
+    mCache.AddCoin(outpoint, std::move(coin), possible_overwrite);
 }
 
 bool CCoinsViewCache::Shard::SpendCoin(const COutPoint& outpoint, CoinWithScript* moveout)
@@ -381,11 +381,9 @@ const CoinImpl& CoinsStore::AddCoin(const COutPoint& outpoint, CoinImpl&& coin)
     return it->second.GetCoinImpl();
 }
 
-void CoinsStore::AddCoin(
-    const COutPoint& outpoint,
-    CoinWithScript&& coin,
-    bool possible_overwrite,
-    uint64_t /*genesisActivationHeight*/) // cjg Fix? server
+void CoinsStore::AddCoin(const COutPoint& outpoint,
+                         CoinWithScript&& coin,
+                         bool possible_overwrite)
 {
     auto [it, inserted] =
         cacheCoins.emplace(std::piecewise_construct,
