@@ -339,7 +339,6 @@ static void FindNextBlocksToDownload(
     unsigned int count,
     std::vector<const CBlockIndex*>& vBlocks,
     NodeId& nodeStaller,
-    const Consensus::Params&, // cjg server?
     const CNodeStatePtr& state,
     CConnman& connman)
 {
@@ -5612,7 +5611,6 @@ void SendGetDataBlocks(const Config &config, const CNodePtr& pto, CConnman& conn
     const CNetMsgMaker& msgMaker, const CNodeStatePtr& state)
 {
     assert(state);
-    const Consensus::Params& consensusParams { config.GetChainParams().GetConsensus() };
     //
     // Message: getdata (blocks)
     //
@@ -5623,9 +5621,13 @@ void SendGetDataBlocks(const Config &config, const CNodePtr& pto, CConnman& conn
         state->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
         std::vector<const CBlockIndex *> vToDownload;
         NodeId staller = -1;
-        FindNextBlocksToDownload(config, pto->GetId(),
+        FindNextBlocksToDownload(config,
+                                 pto->GetId(),
                                  MAX_BLOCKS_IN_TRANSIT_PER_PEER - state->nBlocksInFlight,
-                                 vToDownload, staller, consensusParams, state, connman);
+                                 vToDownload,
+                                 staller,
+                                 state,
+                                 connman);
         for (const CBlockIndex *pindex : vToDownload) {
             vGetData.push_back(CInv(MSG_BLOCK, pindex->GetBlockHash()));
             blockDownloadTracker.MarkBlockAsInFlight(config, {pindex->GetBlockHash(), pto->id}, state, *pindex);
