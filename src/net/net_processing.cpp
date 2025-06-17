@@ -3696,10 +3696,7 @@ static bool ProcessCompactBlockMessage(
     const Config& config,
     const CNodePtr& pfrom,
     const CNetMsgMaker& msgMaker,
-    const std::string& /*strCommand*/, // cjg server?
     const CChainParams& chainparams,
-    const std::atomic<bool>& /*interruptMsgProc*/, // cjg server?
-    int64_t /*nTimeReceived*/, // cjg server?
     msg_buffer& vRecv,
     CConnman& connman)
 {
@@ -4740,7 +4737,7 @@ bool ProcessMessage(const Config& config,
 
     // Ignore blocks received while importing
     else if (strCommand == NetMsgType::CMPCTBLOCK && !fImporting && !fReindex) {
-        return ProcessCompactBlockMessage(config, pfrom, msgMaker, strCommand, chainparams, interruptMsgProc, nTimeReceived, vRecv, connman);
+        return ProcessCompactBlockMessage(config, pfrom, msgMaker, chainparams, vRecv, connman);
     }
 
     // Ignore blocks received while importing
