@@ -2,26 +2,28 @@
 # Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
 # software license, see the accompanying file LICENSE
 
-build_type=${1,,}
+BUILD_TYPE=${1,,}
 
-args="-D CMAKE_BUILD_TYPE=$build_type"
-args+=' -D CMAKE_CXX_FLAGS=-Werror'
-args+=' -D CMAKE_CXX_FLAGS=-fno-omit-frame-pointer'
-args+=' -D ENABLE_CLANG_TIDY=ON'
-    
-if [[ $build_type == debug ]];
+args=()
+args+=(-DCMAKE_BUILD_TYPE="${BUILD_TYPE}")
+args+=(-DCMAKE_CXX_FLAGS=-Werror\ -fno-omit-frame-pointer)
+args+=(-DENABLE_CLANG_TIDY=ON)
+
+if [[ $BUILD_TYPE == debug ]];
 then
-    args+=' -D enable_debug=ON'
+    args+=(-Denable_debug=ON)
 fi
 
 for sanitizer in ${@:2}
 do
     case ${sanitizer,,} in
-        asan) args+=' -D enable_asan=ON -D CRYPTO_USE_ASM=OFF' ;;
-        tsan) args+=' -D enable_tsan=ON' ;;
-        usan) args+=' -D enable_ubsan=ON' ;;
+        asan) args+=(-Denable_asan=ON); args+=(-DCRYPTO_USE_ASM=OFF) ;;
+        tsan) args+=(-Denable_tsan=ON) ;;
+        usan) args+=(-Denable_ubsan=ON) ;;
     esac
 done
 
-echo "$args"
+for arg in "${args[@]}"; do
+    echo "$arg"
+done
 

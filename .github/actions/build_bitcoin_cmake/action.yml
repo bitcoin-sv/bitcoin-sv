@@ -19,19 +19,21 @@ runs:
   using: "composite"
   steps:
     - run: |
-        args=$(.github/actions/build_bitcoin_cmake/build.sh \
-             ${{ inputs.build_type }} \
-             ${{ inputs.sanitizers }})
-        cmake -G Ninja . ${args}
+        readarray -t args < <(.github/actions/build_bitcoin_cmake/build.sh \
+            ${{ inputs.build_type }} \
+            ${{ inputs.sanitizers }})
+        echo "${args[@]}"
+        cmake -G Ninja . "${args[@]}"
         cmake --build . --target ${{ inputs.targets }}
       if: inputs.targets
       shell: bash
     - run: |
-        args=$(.github/actions/build_bitcoin_cmake/build.sh \
-             ${{ inputs.build_type }} \
-             ${{ inputs.sanitizers }})
-        cmake -G Ninja . ${args}
-        cmake --build . --target test_bitcoin
+        readarray -t args < <(.github/actions/build_bitcoin_cmake/build.sh \
+            ${{ inputs.build_type }} \
+            ${{ inputs.sanitizers }})
+        echo "${args[@]}"
+        cmake -G Ninja . "${args[@]}"
+        cmake --build . -v --target test_bitcoin
         cmake --build .
       if: ${{ ! inputs.targets }}
       shell: bash
