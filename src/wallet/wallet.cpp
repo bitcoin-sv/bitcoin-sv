@@ -868,26 +868,26 @@ DBErrors CWallet::ReorderTransactions() {
 
     // First: get all CWalletTx and CAccountingEntry into a sorted-by-time
     // multimap.
-    typedef std::pair<CWalletTx *, CAccountingEntry *> TxPair;
-    typedef std::multimap<int64_t, TxPair> TxItems;
-    TxItems txByTime;
+    using tx_pair = std::pair<CWalletTx *, CAccountingEntry *>;
+    using tx_items = std::multimap<int64_t, tx_pair>;
+    tx_items txByTime;
 
     for (std::map<uint256, CWalletTx>::iterator it = mapWallet.begin();
          it != mapWallet.end(); ++it) {
         CWalletTx *wtx = &((*it).second);
         txByTime.insert(
-            std::make_pair(wtx->nTimeReceived, TxPair(wtx, nullptr)));
+            std::make_pair(wtx->nTimeReceived, tx_pair(wtx, nullptr)));
     }
 
     std::list<CAccountingEntry> acentries;
     walletdb.ListAccountCreditDebit("", acentries);
     for (CAccountingEntry &entry : acentries) {
-        txByTime.insert(std::make_pair(entry.nTime, TxPair(nullptr, &entry)));
+        txByTime.insert(std::make_pair(entry.nTime, tx_pair(nullptr, &entry)));
     }
 
     nOrderPosNext = 0;
     std::vector<int64_t> nOrderPosOffsets;
-    for (TxItems::iterator it = txByTime.begin(); it != txByTime.end(); ++it) {
+    for(tx_items::iterator it = txByTime.begin(); it != txByTime.end(); ++it) {
         CWalletTx *const pwtx = (*it).second.first;
         CAccountingEntry *const pacentry = (*it).second.second;
         int64_t &nOrderPos =
