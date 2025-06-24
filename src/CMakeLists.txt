@@ -31,6 +31,7 @@ endif()
 
 # Enable warning
 option(EXTRA_WARNINGS "Enable extra warnings" OFF)
+
 if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
 	add_compile_options(
 		-Wall
@@ -41,6 +42,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
 		-Wcast-align
 		$<$<COMPILE_LANGUAGE:C>:-Wnested-externs>
 		$<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
+		$<$<COMPILE_LANGUAGE:CXX>:-Wsuggest-override>
 	)
 
     if(CMAKE_CXX_COMPILER_ID MATCHES Clang)
@@ -52,7 +54,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
 	if(EXTRA_WARNINGS)
 		add_compile_options(
 			-Wshadow
-			$<$<COMPILE_LANGUAGE:CXX>:-Wsuggest-override>
 		)
 	endif()
 elseif(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
@@ -162,7 +163,11 @@ add_subdirectory(config)
 # libraries
 add_subdirectory(crypto)
 add_subdirectory(leveldb)
-target_compile_options(leveldb PRIVATE -Wno-unused-parameter)
+
+target_compile_options(leveldb
+                       PRIVATE
+                       -Wno-unused-parameter
+                       -Wno-suggest-override)
 
 add_subdirectory(secp256k1)
 add_subdirectory(univalue)
