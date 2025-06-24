@@ -161,14 +161,14 @@ LimitedStack::LimitedStack(std::vector<valtype> stackElements,
 
 bool LimitedStack::operator==(const LimitedStack& other) const
 {
-    if (stack.size() != other.size())
+    if(stack_.size() != other.size())
     {
         return false;
     }
 
-    for (size_t i = 0; i < stack.size(); i++)
+    for(size_t i = 0; i < stack_.size(); i++)
     {
-        if (stack.at(i).GetElement() != other.at(i).GetElement())
+        if(stack_.at(i).GetElement() != other.at(i).GetElement())
         {
             return false;
         }
@@ -208,12 +208,12 @@ void LimitedStack::increaseCombinedStackSize(uint64_t additionalSize)
 
 void LimitedStack::pop_back()
 {
-    if (stack.empty())
+    if(stack_.empty())
     {
         throw std::runtime_error("popstack(): stack empty");
     }
     decreaseCombinedStackSize(stacktop(-1).size() + LimitedVector::ELEMENT_OVERHEAD);
-    stack.pop_back();
+    stack_.pop_back();
 }
 
 void LimitedStack::push_back(const std::initializer_list<unsigned char>& v)
@@ -223,11 +223,11 @@ void LimitedStack::push_back(const std::initializer_list<unsigned char>& v)
 
 LimitedVector& LimitedStack::stacktop(int index)
 {
-    if (index >= 0)
+    if(index >= 0)
     {
         throw std::invalid_argument("Invalid argument - index should be < 0.");
     };
-    return stack.at(stack.size() + (index));
+    return stack_.at(stack_.size() + (index));
 }
 
 uint64_t LimitedStack::getCombinedStackSize() const
@@ -242,16 +242,17 @@ uint64_t LimitedStack::getCombinedStackSize() const
 
 void LimitedStack::erase(int first, int last)
 {
-    if (last >= 0 || last <= first)
+    if(last >= 0 || last <= first)
     {
         throw std::invalid_argument("Invalid argument - first and last should be negative, also last should be larger than first.");
     }
-    for (std::vector<LimitedVector>::iterator it = stack.end() + first; it != stack.end() + last; it++)
+
+    for(std::vector<LimitedVector>::iterator it = stack_.end() + first; it != stack_.end() + last; it++)
     {
         decreaseCombinedStackSize(it->size() + LimitedVector::ELEMENT_OVERHEAD);
     }
 
-    stack.erase(stack.end() + first, stack.end() + last);
+    stack_.erase(stack_.end() + first, stack_.end() + last);
 }
 
 void LimitedStack::erase(int index)
@@ -260,8 +261,8 @@ void LimitedStack::erase(int index)
     {
         throw std::invalid_argument("Invalid argument - index should be < 0.");
     };
-    decreaseCombinedStackSize(stack.at(stack.size() + index).size() + LimitedVector::ELEMENT_OVERHEAD);
-    stack.erase(stack.end() + index); 
+    decreaseCombinedStackSize(stack_.at(stack_.size() + index).size() + LimitedVector::ELEMENT_OVERHEAD);
+    stack_.erase(stack_.end() + index); 
 }
 
 void LimitedStack::insert(int position, const LimitedVector& element)
@@ -276,12 +277,12 @@ void LimitedStack::insert(int position, const LimitedVector& element)
         throw std::invalid_argument("Invalid argument - position should be < 0.");
     };
     increaseCombinedStackSize(element.size() + LimitedVector::ELEMENT_OVERHEAD);
-    stack.insert(stack.end() + position, element);
+    stack_.insert(stack_.end() + position, element);
 }
 
 void LimitedStack::swapElements(size_t index1, size_t index2)
 {
-    std::swap(stack.at(index1), stack.at(index2));
+    std::swap(stack_.at(index1), stack_.at(index2));
 }
 
 // this method does not change combinedSize
@@ -292,8 +293,8 @@ void LimitedStack::moveTopToStack(LimitedStack& otherStack)
     {
         // Moving element to other stack does not change the total size of stack.
         // Just use internal functions to move the element.
-        stack.push_back(std::move(otherStack.stacktop(-1)));
-        otherStack.stack.pop_back();
+        stack_.push_back(std::move(otherStack.stacktop(-1)));
+        otherStack.stack_.pop_back();
     }
     else
     {
@@ -303,38 +304,38 @@ void LimitedStack::moveTopToStack(LimitedStack& otherStack)
 
 size_t LimitedStack::size() const
 {
-    return stack.size();
+    return stack_.size();
 }
 
 const LimitedVector& LimitedStack::front() const
 {
-    return stack.front();
+    return stack_.front();
 }
 
 const LimitedVector& LimitedStack::back() const
 {
-    return stack.back();
+    return stack_.back();
 }
 
 const LimitedVector& LimitedStack::at(uint64_t i) const
 {
-    return stack.at(i);
+    return stack_.at(i);
 }
 
 bool LimitedStack::empty() const
 {
-    return stack.empty();
+    return stack_.empty();
 }
 
 void  LimitedStack::MoveToValtypes(std::vector<valtype>& valtypes)
 {
-    for (LimitedVector& it : stack)
+    for(LimitedVector& it : stack_)
     {
         decreaseCombinedStackSize(it.size() + LimitedVector::ELEMENT_OVERHEAD);
         valtypes.push_back(std::move(it.GetElementNonConst()));
     }
 
-    stack.clear();
+    stack_.clear();
 }
 
 LimitedStack LimitedStack::makeChildStack()

@@ -85,7 +85,7 @@ public:
 private:
     uint64_t combinedStackSize = 0;
     uint64_t maxStackSize = 0;
-    stack_type stack;
+    stack_type stack_;
     LimitedStack* parentStack { nullptr };
     void decreaseCombinedStackSize(uint64_t additionalSize);
     void increaseCombinedStackSize(uint64_t additionalSize);
@@ -161,7 +161,7 @@ void LimitedStack::push_back(T&& element)
             "parent stack as the one we are adding to.");
     }
     increaseCombinedStackSize(element.size() + LimitedVector::ELEMENT_OVERHEAD);
-    stack.push_back(std::forward<T>(element));
+    stack_.push_back(std::forward<T>(element));
 }
 
 template<typename T>
@@ -169,7 +169,7 @@ template<typename T>
 void LimitedStack::push_back(T&& element)
 {
     increaseCombinedStackSize(element.size() + LimitedVector::ELEMENT_OVERHEAD);
-    stack.push_back(LimitedVector{std::forward<T>(element), *this});
+    stack_.push_back(LimitedVector{std::forward<T>(element), *this});
 }
 
 #endif
