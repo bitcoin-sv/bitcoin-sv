@@ -696,7 +696,7 @@ private:
     // Mempool syncing
     void SyncMempool();
 
-    const Config *config;
+    const Config* config_;
 
     // Network usage totals
     CCriticalSection cs_totalBytesRecv;

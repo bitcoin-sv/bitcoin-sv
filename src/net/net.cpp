@@ -370,7 +370,7 @@ CNodePtr CConnman::ConnectNode(NodeConnectInfo& connect)
     SOCKET hSocket;
     bool proxyConnectionFailed = false;
     if (connect.pszDest ? ConnectSocketByName(connect.addrConnect, hSocket, connect.pszDest,
-                                      config->GetChainParams().GetDefaultPort(),
+                                      config_->GetChainParams().GetDefaultPort(),
                                       nConnectTimeout, &proxyConnectionFailed)
                 : ConnectSocket(connect.addrConnect, hSocket, nConnectTimeout,
                                 &proxyConnectionFailed)) {
@@ -441,7 +441,7 @@ void CConnman::DumpBanlist() {
 
     int64_t nStart = GetTimeMillis();
 
-    CBanDB bandb(config->GetChainParams());
+    CBanDB bandb(config_->GetChainParams());
     banmap_t banmap;
     GetBanned(banmap);
     if (bandb.Write(banmap)) {
@@ -1531,7 +1531,7 @@ void CConnman::ThreadSocketHandler() {
 
             uint64_t bytesRecv {0};
             uint64_t bytesSent {0};
-            pnode->ServiceSockets(fdsetRecv, fdsetSend, fdsetError, *this, *config, bytesRecv, bytesSent);
+            pnode->ServiceSockets(fdsetRecv, fdsetSend, fdsetError, *this, *config_, bytesRecv, bytesSent);
 
             if(bytesRecv > 0) {
                 RecordBytesRecv(bytesRecv);
@@ -1709,7 +1709,7 @@ void CConnman::ThreadDNSAddressSeed() {
     }
 
     const std::vector<CDNSSeedData> &vSeeds =
-        config->GetChainParams().DNSSeeds();
+        config_->GetChainParams().DNSSeeds();
     int found = 0;
 
     LogPrintf("Loading addresses from DNS seeds (could take a while)\n");
@@ -1726,7 +1726,7 @@ void CConnman::ThreadDNSAddressSeed() {
                 for (const CNetAddr &ip : vIPs) {
                     int nOneDay = 24 * 3600;
                     CAddress addr = CAddress(
-                        CService(ip, config->GetChainParams().GetDefaultPort()),
+                        CService(ip, config_->GetChainParams().GetDefaultPort()),
                         requiredServiceBits);
                     // Use a random age between 3 and 7 days old.
                     addr.nTime = GetTime() - 3 * nOneDay - GetRand(4 * nOneDay);
@@ -1753,7 +1753,7 @@ void CConnman::ThreadDNSAddressSeed() {
 void CConnman::DumpAddresses() {
     int64_t nStart = GetTimeMillis();
 
-    CAddrDB adb(config->GetChainParams());
+    CAddrDB adb(config_->GetChainParams());
     adb.Write(addrman);
 
     LogPrint(BCLog::NETCONN, "Flushed %d addresses to peers.dat  %dms\n",
@@ -1833,7 +1833,7 @@ void CConnman::ThreadOpenConnections() {
                           "available.\n");
                 CNetAddr local;
                 LookupHost("127.0.0.1", local, false);
-                addrman.Add(convertSeed6(config->GetChainParams().FixedSeeds()),
+                addrman.Add(convertSeed6(config_->GetChainParams().FixedSeeds()),
                             local);
                 done = true;
             }
@@ -1934,7 +1934,7 @@ void CConnman::ThreadOpenConnections() {
 
             // do not allow non-default ports, unless after 50 invalid addresses
             // selected already.
-            if (addr.GetPort() != config->GetChainParams().GetDefaultPort() &&
+            if (addr.GetPort() != config_->GetChainParams().GetDefaultPort() &&
                 nTries < 50) {
                 continue;
             }
@@ -1997,7 +1997,7 @@ std::vector<AddedNodeInfo> CConnman::GetAddedNodeInfo() {
 
     for (const std::string &strAddNode : lAddresses) {
         CService service(LookupNumeric(
-            strAddNode.c_str(), config->GetChainParams().GetDefaultPort()));
+            strAddNode.c_str(), config_->GetChainParams().GetDefaultPort()));
         if (service.IsValid()) {
             // strAddNode is an IP:port
             auto it = mapConnected.find(service);
@@ -2052,7 +2052,7 @@ void CConnman::ThreadOpenAddedConnections() {
                 tried = true;
                 CService service(
                     LookupNumeric(info.strAddedNode.c_str(),
-                                  config->GetChainParams().GetDefaultPort()));
+                                  config_->GetChainParams().GetDefaultPort()));
                 NodeConnectInfo connectInfo { CAddress(service, NODE_NONE), info.strAddedNode.c_str() };
                 OpenNetworkConnection(connectInfo, &grant, false, false, true);
                 if (!interruptNet.sleep_for(std::chrono::milliseconds(500))) {
@@ -2194,7 +2194,7 @@ void CConnman::ThreadMessageHandler()
 
             // Receive messages
             bool fMoreNodeWork = GetNodeSignals().ProcessMessages(
-                *config, pnode, *this, flagInterruptMsgProc,
+                *config_, pnode, *this, flagInterruptMsgProc,
                 mDebugP2PTheadStallsThreshold);
             fMoreWork |= (fMoreNodeWork && !pnode->GetPausedForSending());
 
@@ -2205,7 +2205,7 @@ void CConnman::ThreadMessageHandler()
             // Send messages
             {
                 LOCK(pnode->cs_sendProcessing);
-                GetNodeSignals().SendMessages(*config, pnode, *this,
+                GetNodeSignals().SendMessages(*config_, pnode, *this,
                                               flagInterruptMsgProc);
             }
 
@@ -2418,7 +2418,7 @@ CConnman::CConnman(
     uint64_t nSeed0In,
     uint64_t nSeed1In,
     std::chrono::milliseconds debugP2PTheadStallsThreshold)
-    : config(&configIn)
+    : config_(&configIn)
     , nSeed0(nSeed0In)
     , nSeed1(nSeed1In)
     , mValidatorThreadPool{true, "TxnValidatorPool",
@@ -2483,7 +2483,7 @@ CConnman::CConnman(
             std::make_shared<CTxnDoubleSpendDetector>(),
             mTxIdTracker);
 
-    mRawTxnValidator = std::make_shared<RawTxValidator>(*config);
+    mRawTxnValidator = std::make_shared<RawTxValidator>(*config_);
 }
 
 NodeId CConnman::GetNewNodeId() {
@@ -2522,7 +2522,7 @@ bool CConnman::Start(CScheduler& scheduler,
     // Load addresses from peers.dat
     int64_t nStart = GetTimeMillis();
     {
-        CAddrDB adb(config->GetChainParams());
+        CAddrDB adb(config_->GetChainParams());
         if (adb.Read(addrman)) {
             LogPrintf("Loaded %i addresses from peers.dat  %dms\n",
                       addrman.size(), GetTimeMillis() - nStart);
@@ -2538,7 +2538,7 @@ bool CConnman::Start(CScheduler& scheduler,
     }
     // Load addresses from banlist.dat
     nStart = GetTimeMillis();
-    CBanDB bandb(config->GetChainParams());
+    CBanDB bandb(config_->GetChainParams());
     banmap_t banmap;
     if (bandb.Read(banmap)) {
         // thread save setter
@@ -2643,7 +2643,7 @@ bool CConnman::Start(CScheduler& scheduler,
         if(! vMempoolSyncPeers.empty())
         {
             scheduler.scheduleEvery([this]{ SyncMempool(); },
-                config->GetMempoolSyncPeriod() * 1000);
+                config_->GetMempoolSyncPeriod() * 1000);
         }
     }
 
@@ -2985,7 +2985,7 @@ void CConnman::PeerAvgBandwithCalc()
 // Send message to all whitelisted peers to sync our mempools
 void CConnman::SyncMempool()
 {
-    const int64_t age { config->GetMempoolSyncAge() };
+    const int64_t age { config_->GetMempoolSyncAge() };
 
     ForEachNode(
         [this, age](const CNodePtr& node)
@@ -3130,7 +3130,7 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg&& msg, Strea
     LogPrint(BCLog::NETMSGVERB, "sending %s (%d bytes) peer=%d\n",
              SanitizeString(msg.Command().c_str()), nPayloadLength, pnode->id);
 
-    CMessageHeader hdr { *config, msg };
+    CMessageHeader hdr { *config_, msg };
     std::vector<uint8_t> serializedHeader {};
     serializedHeader.reserve(hdr.GetLength());
     CVectorWriter { SER_NETWORK, INIT_PROTO_VERSION, serializedHeader, 0, hdr };

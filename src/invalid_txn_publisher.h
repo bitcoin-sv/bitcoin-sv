@@ -138,10 +138,10 @@ public:
 
         for(const auto& item : mCollidedWithTransaction)
         {
-            auto tx = std::get_if<CTransactionRef>(&item.mTransaction);
-            if (tx)
+            const auto cw_tx = std::get_if<CTransactionRef>(&item.mTransaction);
+            if(cw_tx)
             {
-                totalSize += (*tx)->GetTotalSize();
+                totalSize += (*cw_tx)->GetTotalSize();
             }
         }
 
