@@ -35,11 +35,12 @@ option(EXTRA_WARNINGS "Enable extra warnings" OFF)
 if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
 	add_compile_options(
 		-Wall
+		-Wcast-align
 		-Wextra
 		-Wformat
-		-Wvla
 		-Wformat-security
-		-Wcast-align
+		-Wshadow
+		-Wvla
 		$<$<COMPILE_LANGUAGE:C>:-Wnested-externs>
 		$<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
 		$<$<COMPILE_LANGUAGE:CXX>:-Wsuggest-override>
@@ -51,11 +52,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
         endif()
     endif()
 
-	if(EXTRA_WARNINGS)
-		add_compile_options(
-			-Wshadow
-		)
-	endif()
 elseif(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
     if(NOT EXTRA_WARNINGS)
 		add_compile_options(
