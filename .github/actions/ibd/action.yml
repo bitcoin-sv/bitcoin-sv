@@ -56,7 +56,7 @@ runs:
       shell: bash
     - name: Run bitcoind
       run: |
-        ./src/bitcoind&
+        ./src/bitcoind -assumevalid=0 &
       shell: bash
     - name: Run Perf
       run: |
