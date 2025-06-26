@@ -4284,7 +4284,7 @@ static void ProcessFilterAddMessage(const CNodePtr& pfrom, msg_buffer& vRecv)
 /**
 * Process filter clear message.
 */
-static void ProcessFilterClearMessage(const CNodePtr& pfrom, msg_buffer& /*vRecv*/)
+static void ProcessFilterClearMessage(const CNodePtr& pfrom)
 {
     LOCK(pfrom->cs_filter);
     if(pfrom->GetLocalServices() & NODE_BLOOM) {
@@ -4783,7 +4783,7 @@ bool ProcessMessage(const Config& config,
     }
 
     else if (strCommand == NetMsgType::FILTERCLEAR) {
-        ProcessFilterClearMessage(pfrom, vRecv);
+        ProcessFilterClearMessage(pfrom);
     }
 
     else if (strCommand == NetMsgType::FEEFILTER) {
