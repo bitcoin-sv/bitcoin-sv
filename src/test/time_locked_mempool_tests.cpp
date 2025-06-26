@@ -233,8 +233,8 @@ BOOST_AUTO_TEST_CASE(UpdateTest)
             GetTime()
         )
     };
-    CValidationState state { NonFinalState() };
-    tlMempool.addOrUpdateTransaction({txnRef}, pTxInputData, state);
+    CValidationState vs{ NonFinalState() };
+    tlMempool.addOrUpdateTransaction({txnRef}, pTxInputData, vs);
 
     CTransactionRef lastUpdate {nullptr};
 

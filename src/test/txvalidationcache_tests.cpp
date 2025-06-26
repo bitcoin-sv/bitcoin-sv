@@ -159,21 +159,21 @@ namespace {
             {
                 // Check that we get a cache hit if the tx was valid
                 std::vector<CScriptCheck> scriptchecks;
-                const auto o{CheckInputs(source->GetToken(),
-                                         config,
-                                         true,
-                                         tx,
-                                         state,
-                                         tipView,
-                                         true,
-                                         test_flags,
-                                         true,
-                                         add_to_cache,
-                                         txdata,
-                                         frozenTXOCheckTransaction,
-                                         &scriptchecks)};
-                assert(o);
-                BOOST_CHECK(o.value());
+                const auto opt{CheckInputs(source->GetToken(),
+                                           config,
+                                           true,
+                                           tx,
+                                           state,
+                                           tipView,
+                                           true,
+                                           test_flags,
+                                           true,
+                                           add_to_cache,
+                                           txdata,
+                                           frozenTXOCheckTransaction,
+                                           &scriptchecks)};
+                assert(opt);
+                BOOST_CHECK(opt.value());
                 BOOST_CHECK(scriptchecks.empty());
             }
             else
@@ -181,21 +181,21 @@ namespace {
                 // Check that we get script executions to check, if the transaction
                 // was invalid, or we didn't add to cache.
                 std::vector<CScriptCheck> scriptchecks;
-                const auto o{CheckInputs(source->GetToken(),
-                                         config,
-                                         true,
-                                         tx,
-                                         state,
-                                         tipView,
-                                         true,
-                                         test_flags,
-                                         true,
-                                         add_to_cache,
-                                         txdata,
-                                         frozenTXOCheckTransaction,
-                                         &scriptchecks)};
-                assert(o);
-                BOOST_CHECK(o.value());
+                const auto opt{CheckInputs(source->GetToken(),
+                                           config,
+                                           true,
+                                           tx,
+                                           state,
+                                           tipView,
+                                           true,
+                                           test_flags,
+                                           true,
+                                           add_to_cache,
+                                           txdata,
+                                           frozenTXOCheckTransaction,
+                                           &scriptchecks)};
+                assert(opt);
+                BOOST_CHECK(opt.value());
                 BOOST_CHECK_EQUAL(scriptchecks.size(), tx.vin.size());
             }
         }
@@ -331,7 +331,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
     // Test that invalidity under a set of flags doesn't preclude validity under
     // other (eg consensus) flags.
     // spend_tx is invalid according to DERSIG
-    CValidationState state;
+    CValidationState validation_state;
     auto source = task::CCancellationSource::Make();
     {
         PrecomputedTransactionData ptd_spend_tx(spend_tx);
@@ -342,7 +342,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                                      config,
                                      true,
                                      spend_tx,
-                                     state,
+                                     validation_state,
                                      cache,
                                      true,
                                      PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
@@ -363,7 +363,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                                      config,
                                      true,
                                      spend_tx,
-                                     state,
+                                     validation_state,
                                      cache,
                                      true,
                                      PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |
@@ -447,7 +447,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
         
         // Make it valid, and check again
         invalid_with_cltv_tx.vin[0].scriptSig = CScript() << vchSig << 100;
-        CValidationState state;
+        CValidationState val_state;
 
         CTransaction transaction(invalid_with_cltv_tx);
         PrecomputedTransactionData txdata(transaction);
@@ -456,7 +456,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                                  config,
                                  true,
                                  transaction,
-                                 state,
+                                 val_state,
                                  cache,
                                  true,
                                  PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS |

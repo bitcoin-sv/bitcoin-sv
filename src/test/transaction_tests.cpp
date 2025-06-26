@@ -67,13 +67,18 @@ void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
                 auto flags = ParseScriptFlags(test[2].get_str());
                 flags_to_check.push_back(flags); 
                 flags_to_string[flags] = test[2].get_str();
-            }else if(test[2].isArray() && test[2].size()){
-                for (size_t idx = 0; idx < test[2].size(); idx++){
-                    auto flags = ParseScriptFlags(test[2][idx].get_str());
-                    flags_to_check.push_back(flags); 
-                    flags_to_string[flags] = test[2][idx].get_str();
+            }
+            else if(test[2].isArray() && test[2].size())
+            {
+                for(size_t i = 0; i < test[2].size(); i++)
+                {
+                    auto flags = ParseScriptFlags(test[2][i].get_str());
+                    flags_to_check.push_back(flags);
+                    flags_to_string[flags] = test[2][i].get_str();
                 }
-            } else {
+            }
+            else
+            {
                 BOOST_ERROR("Bad test (third element should be string or an non-empty array of strings): " << strTest);
                 continue;
             }
@@ -620,10 +625,10 @@ void CheckWithFlag(const CheckFlagParams& params)
     for(const auto& flag_item : flagList)
     {
         const auto flags{flag_item.first | SCRIPT_ENABLE_SIGHASH_FORKID};
-        const auto params{make_verify_script_params(config, flags, true)};
+        const auto verify_params{make_verify_script_params(config, flags, true)};
         std::atomic<malleability::status> ms {};
         const auto o =
-            VerifyScript(params,
+            VerifyScript(verify_params,
                          task::CCancellationSource::Make()->GetToken(),
                          inputi.vin[0].scriptSig,
                          output->vout[0].scriptPubKey,

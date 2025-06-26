@@ -457,10 +457,10 @@ BOOST_AUTO_TEST_CASE(SaveOnFullMempool)
     // Check that all transactions have been saved to disk:
     uint64_t sizeTxsAdded = 0;
     uint64_t countTxsAdded = 0;
-    for (const auto& entry : testPoolAccess.mapTx().get<entry_time>())
+    for (const auto& e : testPoolAccess.mapTx().get<entry_time>())
     {
-        BOOST_CHECK(!entry.IsInMemory());
-        sizeTxsAdded += entry.GetTxSize();
+        BOOST_CHECK(!e.IsInMemory());
+        sizeTxsAdded += e.GetTxSize();
         ++countTxsAdded;
     }
     BOOST_CHECK_EQUAL(diskUsage, sizeTxsAdded);

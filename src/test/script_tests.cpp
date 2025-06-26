@@ -404,7 +404,7 @@ struct KeyData {
 class TestBuilder {
 private:
     //! Actually executed script
-    CScript script;
+    CScript script_;
     //! The P2SH redeemscript
     CScript redeemscript;
     CTransactionRef creditTx;
@@ -471,12 +471,12 @@ private:
     }
 
 public:
-    TestBuilder(const CScript& script_,
+    TestBuilder(const CScript& script,
                 const std::string& comment_,
                 uint32_t flags_,
                 bool P2SH = false,
                 const Amount& nValue_ = Amount(0))
-        : script(script_),
+        : script_(script),
           comment(comment_),
           flags(flags_),
           nValue(nValue_)
@@ -532,7 +532,7 @@ public:
         const Amount& amount = Amount(0),
         const std::optional<TxDigestAlgorithm>& forceTDA = std::nullopt)
     {
-        DoPush(MakeSig(script, key, sigHashType, lenR, lenS, amount, forceTDA));
+        DoPush(MakeSig(script_, key, sigHashType, lenR, lenS, amount, forceTDA));
         return *this;
     }
 
@@ -561,12 +561,12 @@ public:
         std::vector<CScript> separatedScripts;
         separatedScripts.emplace_back();
         
-        CScript::const_iterator pc = script.begin();
+        CScript::const_iterator pc = script_.begin();
         std::vector<uint8_t> data;
         
-        while (pc < script.end()) {
+        while (pc < script_.end()) {
             opcodetype opcode; // NOLINT(cppcoreguidelines-init-variables)
-            if (!script.GetOp(pc, opcode, data)){
+            if (!script_.GetOp(pc, opcode, data)){
                 break;
             }
             for(auto& sc : separatedScripts) {

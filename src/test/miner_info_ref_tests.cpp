@@ -130,7 +130,6 @@ BOOST_AUTO_TEST_CASE(parse_miner_id_ref_failure_cases)
     constexpr uint8_t txid_len{32};
     constexpr uint8_t mmr_pbh_hash_len{32};
     constexpr uint8_t sig_len{70};
-    vector<uint8_t> script{0x0, 0x6a, 0x4, 0x60, 0x1d, 0xfa, 0xce, 0x1, 0x0};
 
     // version, txid_len_offset, mmr_pbh_hash_len_offset, sig_len_offset, expected
     // result

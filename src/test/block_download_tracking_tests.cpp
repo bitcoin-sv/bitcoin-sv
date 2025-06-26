@@ -179,16 +179,16 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
         BOOST_CHECK_THROW(blockTracker.GetBlockDetails({blockID, pDummyNode3->id}), std::runtime_error);
         // But we will from node2
         BOOST_CHECK_NO_THROW(
-            auto blockDetails { blockTracker.GetBlockDetails({blockID, pDummyNode2->id}) };
-            BOOST_CHECK_EQUAL(blockDetails.block.GetNode(), pDummyNode2->id);
-            BOOST_CHECK(blockDetails.queuedBlockIt->partialBlock != nullptr);
+            auto block_details { blockTracker.GetBlockDetails({blockID, pDummyNode2->id}) };
+            BOOST_CHECK_EQUAL(block_details.block.GetNode(), pDummyNode2->id);
+            BOOST_CHECK(block_details.queuedBlockIt->partialBlock != nullptr);
         );
         // Will also find it from node1
         BOOST_CHECK_NO_THROW(
-            auto blockDetails = blockTracker.GetBlockDetails({blockID, pDummyNode1->id});
-            BOOST_CHECK_EQUAL(blockDetails.block.GetNode(), pDummyNode1->id);
+            auto block_details = blockTracker.GetBlockDetails({blockID, pDummyNode1->id});
+            BOOST_CHECK_EQUAL(block_details.block.GetNode(), pDummyNode1->id);
             // Node1 has null partial block however
-            BOOST_CHECK(blockDetails.queuedBlockIt->partialBlock == nullptr);
+            BOOST_CHECK(block_details.queuedBlockIt->partialBlock == nullptr);
         );
     }
 

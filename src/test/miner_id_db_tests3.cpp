@@ -700,12 +700,12 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests3_id>
 
     static MinerId GetLatestMinerIdByName(
         const MinerIdDatabase& db,
-        BlockIndexStore& mapBlockIndex,
+        BlockIndexStore& block_index_store,
         const std::string& name)
     {
         // Fetch from latest block from named miner
-        const auto& entry { GetMinerUUIdEntryByName(db, mapBlockIndex, name) };
-        CBlockIndex* blockindex { mapBlockIndex.Get(entry.second.mLastBlock) };
+        const auto& entry { GetMinerUUIdEntryByName(db, block_index_store, name) };
+        CBlockIndex* blockindex { block_index_store.Get(entry.second.mLastBlock) };
         BOOST_REQUIRE(blockindex);
         CBlock block {};
         BOOST_REQUIRE(blockindex->ReadBlockFromDisk(block, GlobalConfig::GetConfig()));
@@ -721,13 +721,13 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests3_id>
 
     static const MinerIdDatabase::MinerUUIdMap::value_type GetMinerUUIdEntryByName(
         const MinerIdDatabase& db,
-        BlockIndexStore& mapBlockIndex,
+        BlockIndexStore& block_index_store,
         const std::string& name)
     {
         for(const auto& entry : db.GetAllMinerUUIdsNL())
         {
             // Lookup last block we saw from this miner and extract the miner ID
-            CBlockIndex* blockindex { mapBlockIndex.Get(entry.second.mLastBlock) };
+            CBlockIndex* blockindex { block_index_store.Get(entry.second.mLastBlock) };
             BOOST_REQUIRE(blockindex);
             CBlock block {};
             BOOST_REQUIRE(blockindex->ReadBlockFromDisk(block, GlobalConfig::GetConfig()));
@@ -752,11 +752,11 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests3_id>
 
     static const std::vector<MinerIdDatabase::MinerIdEntry> GetMinerIdsForMinerByName(
         const MinerIdDatabase& db,
-        BlockIndexStore& mapBlockIndex,
+        BlockIndexStore& block_index_store,
         const std::string& name)
     {
         // Get UUID for named miner
-        const MinerIdDatabase::MinerUUId& miner { GetMinerUUIdEntryByName(db, mapBlockIndex, name).first };
+        const MinerIdDatabase::MinerUUId& miner { GetMinerUUIdEntryByName(db, block_index_store, name).first };
 
         // Get all miner IDs for this miner
         return db.GetMinerIdsForMinerNL(miner);
@@ -764,11 +764,11 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests3_id>
 
     static size_t GetNumRecentBlocksForMinerByName(
         const MinerIdDatabase& db,
-        BlockIndexStore& mapBlockIndex,
+        BlockIndexStore& block_index_store,
         const std::string& name)
     {
         // Get UUID for named miner
-        const MinerIdDatabase::MinerUUId& miner { GetMinerUUIdEntryByName(db, mapBlockIndex, name).first };
+        const MinerIdDatabase::MinerUUId& miner { GetMinerUUIdEntryByName(db, block_index_store, name).first };
 
         // Get number of recent blocks from this miner
         return db.GetNumRecentBlocksForMinerNL(miner);
@@ -2104,9 +2104,9 @@ BOOST_FIXTURE_TEST_CASE(RecoverReputation, SetupMinerIDChain)
     // Mine enough blocks to take them up to M/N
     for(int i = 0; i < 4; ++i)
     {
-        UniValue baseDocument { CreateValidCoinbaseDocument(
+        UniValue base_document { CreateValidCoinbaseDocument(
             key3, chainActive.Height() + 1, HexStr(key3.GetPubKey()), HexStr(key3.GetPubKey()), "Miner1", {}, miner1V3Fields) };
-        CreateAndProcessBlock({}, baseDocument, key3);
+        CreateAndProcessBlock({}, base_document, key3);
     }
     BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 7U);
 

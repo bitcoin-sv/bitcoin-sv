@@ -326,12 +326,14 @@ BOOST_AUTO_TEST_CASE(univalue_readwrite) {
     BOOST_CHECK(!v.read("{}[]"));
     BOOST_CHECK(!v.read("{} 42"));
 
-    UniValue val;
-    std::string strJson2(json2);
-    BOOST_CHECK(val.read(strJson2));
+    {
+        UniValue val;
+        std::string strJson2(json2);
+        BOOST_CHECK(val.read(strJson2));
 
-    BOOST_CHECK(val.isArray());
-    BOOST_CHECK_EQUAL(val.size(), 2U);
+        BOOST_CHECK(val.isArray());
+        BOOST_CHECK_EQUAL(val.size(), 2U);
+    }
 
     {
         // set the max JSON object nesting to two levels
