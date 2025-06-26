@@ -90,8 +90,8 @@ using namespace mining;
 /**
  * class CTxPrioritizer
  */
-CTxPrioritizer::CTxPrioritizer(CTxMemPool& mempool, const TxId& txnToPrioritise)
-    : mMempool(mempool)
+CTxPrioritizer::CTxPrioritizer(CTxMemPool& mem_pool, const TxId& txnToPrioritise)
+    : mMempool(mem_pool)
 {
     // A nulness detection.
     if (!txnToPrioritise.IsNull()) {
@@ -100,8 +100,8 @@ CTxPrioritizer::CTxPrioritizer(CTxMemPool& mempool, const TxId& txnToPrioritise)
     }
 }
 
-CTxPrioritizer::CTxPrioritizer(CTxMemPool& mempool, std::vector<TxId> txnsToPrioritise)
-    : mMempool(mempool), mTxnsToPrioritise(std::move(txnsToPrioritise))
+CTxPrioritizer::CTxPrioritizer(CTxMemPool& mem_pool, std::vector<TxId> txnsToPrioritise)
+    : mMempool(mem_pool), mTxnsToPrioritise(std::move(txnsToPrioritise))
 {
     // An early emptiness check.
     if (!mTxnsToPrioritise.empty()) {
@@ -3222,10 +3222,10 @@ bool CTxMemPool::LoadMempool(const Config &config,
             }
         }
 
-        std::map<uint256, Amount> mapDeltas;
-        file >> mapDeltas;
+        std::map<uint256, Amount> deltas;
+        file >> deltas;
 
-        for (const auto &i : mapDeltas) {
+        for (const auto &i : deltas) {
             PrioritiseTransaction(i.first, i.first.ToString(), i.second);
         }
 
@@ -3258,9 +3258,9 @@ void CTxMemPool::DumpMempool() {
 void CTxMemPool::DumpMempool(uint64_t version) {
     int64_t start = GetTimeMicros();
 
-    std::map<uint256, Amount> mapDeltas;
+    std::map<uint256, Amount> deltas;
     std::vector<TxMempoolInfo> vinfo;
-    GetDeltasAndInfo(mapDeltas, vinfo);
+    GetDeltasAndInfo(deltas, vinfo);
 
     int64_t mid = GetTimeMicros();
 
@@ -3300,11 +3300,11 @@ void CTxMemPool::DumpMempool(uint64_t version) {
             }
             file << static_cast<int64_t>(i.nTime);
             file << static_cast<int64_t>(i.nFeeDelta.GetSatoshis());
-            mapDeltas.erase(i.GetTxId());
+            deltas.erase(i.GetTxId());
             ++count;
         }
 
-        file << mapDeltas;
+        file << deltas;
         FileCommit(file.Get());
         file.reset();
         RenameOver(GetDataDir() / "mempool.dat.new",

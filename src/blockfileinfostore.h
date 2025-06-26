@@ -8,7 +8,6 @@
 
 #include "sync.h"
 #include "block_file_info.h"
-#include "chain.h"
 #include "validation.h"
 
 /** Stores a collection of CBlockFileInfo-s in memory */
@@ -16,7 +15,7 @@ class CBlockFileInfoStore
 {
     CCriticalSection cs_LastBlockFile;
     std::vector<CBlockFileInfo> vinfoBlockFile;
-    int nLastBlockFile = 0;
+    int nLastBlockFile_ = 0;
 
     /** Dirty block file entries. */
     std::set<int> setDirtyFileInfo;
@@ -59,7 +58,7 @@ public:
 
     // Return number of block files
     int GetnLastBlockFile() {
-        return nLastBlockFile;
+        return nLastBlockFile_;
     }
     CCriticalSection& GetLock()
     {

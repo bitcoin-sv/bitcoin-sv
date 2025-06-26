@@ -112,8 +112,8 @@ static const CRPCCommand commands[] = {
 };
 // clang-format on
 
-void RegisterABCRPCCommands(CRPCTable &tableRPC) {
+void RegisterABCRPCCommands(CRPCTable& table_rpc) {
     for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++) {
-        tableRPC.appendCommand(commands[vcidx].name, &commands[vcidx]);
+        table_rpc.appendCommand(commands[vcidx].name, &commands[vcidx]);
     }
 }

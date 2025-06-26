@@ -2694,7 +2694,7 @@ void SendBlockTransactions(const Config& config,
                            const std::atomic<bool>& interruptMsgProc,
                            const BlockTransactionsRequest& req,
                            BlockTransactionReader& reader,
-                           bool mostRecentBlock,
+                           bool most_recent_block,
                            CConnman& connman)
 {
     // If the peer wants more than the configured % of txns in the original block, just stream them the whole thing
@@ -2733,7 +2733,7 @@ void SendBlockTransactions(const Config& config,
 
     const CNetMsgMaker msgMaker { pfrom->GetSendVersion() };
     CSerializedNetMsg msg { msgMaker.Make(NetMsgType::BLOCKTXN, resp) };
-    if(! rejectIfMaxDownloadExceeded(config, msg, mostRecentBlock, pfrom, connman))
+    if(!rejectIfMaxDownloadExceeded(config, msg, most_recent_block, pfrom, connman))
     {
         connman.PushMessage(pfrom, std::move(msg));
     }

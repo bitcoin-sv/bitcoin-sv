@@ -95,7 +95,7 @@ private:
      * Make mutable so that we can "fill the cache" even from Get-methods
      * declared as "const".
      */
-    mutable uint256 hashBlock;
+    mutable uint256 hashBlock_;
     mutable CoinsStore mCache;
 
 public:

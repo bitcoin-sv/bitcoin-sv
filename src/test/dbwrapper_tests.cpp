@@ -328,8 +328,8 @@ BOOST_AUTO_TEST_CASE(iterator_string_ordering)
         for (unsigned x = seek_start; x < 10; ++x) {
             for (unsigned y = 0; y < 10; y++) {
                 // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
-                const auto n = sprintf(buf.data(), "%d", x);
-                assert(n >= 0);
+                const auto m = sprintf(buf.data(), "%d", x);
+                assert(m >= 0);
                 std::string exp_key(buf.data());
                 for (unsigned z = 0; z < y; z++)
                     exp_key += exp_key;

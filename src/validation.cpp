@@ -9,13 +9,10 @@
 #include "abort_node.h"
 #include "arith_uint256.h"
 #include "block_file_access.h"
-#include "block_file_access.h"
 #include "block_index_store.h"
 #include "block_index_store_loader.h"
 #include "block_read_cache.h"
 #include "blockfileinfostore.h"
-#include "blockfileinfostore.h"
-#include "blockindex_with_descendants.h"
 #include "blockindex_with_descendants.h"
 #include "blockstreams.h"
 #include "chainparams.h"
@@ -30,7 +27,6 @@
 #include "frozentxo_db.h"
 #include "frozentxo_logging.h"
 #include "init.h"
-#include "invalid_txn_publisher.h"
 #include "invalid_txn_publisher.h"
 #include "miner_id/miner_id_db.h"
 #include "miner_id/miner_info_tracker.h"
@@ -1371,7 +1367,7 @@ CTxnValResult TxnValidation(
             uint32_t inverseScriptFlags { GetScriptVerifyFlags(config, GetInverseProtocolEra(era, ProtocolName::Chronicle)) };
             inverseScriptFlags &= ~pTxInputData->GetSkipScriptFlags();
             CValidationState graceState {};
-            auto res =
+            const auto status =
                 CheckInputs(
                     source->GetToken(),
                     config,
@@ -1385,12 +1381,12 @@ CTxnValResult TxnValidation(
                     false,
                     txdata,
                     frozenTXOCheck);
-            if(res.has_value())
+            if(status.has_value())
             {
                 // If inverse flags allow checks to pass, or if they change the failure cause
                 // to a less serious one, give the sender some benefit of the doubt during
                 // the grace period.
-                if(res.value() || graceState.GetNDoS() < state.GetNDoS())
+                if(status.value() || graceState.GetNDoS() < state.GetNDoS())
                 {
                     graceState.Invalid(false, REJECT_NONSTANDARD, "flexible-" + state.GetRejectReason());
                     state = graceState;
@@ -2753,9 +2749,7 @@ std::optional<bool> CheckInputScripts(
             // Consensus flag is set to true, because we check policy rules in check1. If we would test policy rules 
             // again and fail because the transaction exceeds our policy limits, the node would get banned and this is not ok
             
-            constexpr bool consensus{true};
-            const auto params{make_verify_script_params(config, flags2Check, consensus)};
-            CScriptCheck check2(params,
+            CScriptCheck check2(make_verify_script_params(config, flags2Check, true),
                                 scriptPubKey,
                                 amount,
                                 tx,
@@ -2788,9 +2782,7 @@ std::optional<bool> CheckInputScripts(
                 uint32_t inverseInputFlags { InputScriptVerifyFlags(era, GetInverseProtocolEra(utxoEra, ProtocolName::Genesis)) };
                 uint32_t flags3Check = (flags | inverseInputFlags) & ~standardNotMandatoryFlags;
 
-                constexpr bool consensus{true};
-                const auto params{make_verify_script_params(config, flags3Check, consensus)};
-                CScriptCheck check3(params,
+                CScriptCheck check3(make_verify_script_params(config, flags3Check, true),
                                     scriptPubKey,
                                     amount,
                                     tx,
@@ -2816,9 +2808,7 @@ std::optional<bool> CheckInputScripts(
                 uint32_t inverseInputFlags { InputScriptVerifyFlags(era, GetInverseProtocolEra(utxoEra, ProtocolName::Chronicle)) };
                 uint32_t flags3Check = (flags | inverseInputFlags) & ~standardNotMandatoryFlags;
 
-                constexpr bool consensus{true};
-                const auto params{make_verify_script_params(config, flags3Check, consensus)};
-                CScriptCheck check3(params,
+                CScriptCheck check3(make_verify_script_params(config, flags3Check, true),
                                     scriptPubKey,
                                     amount,
                                     tx,
@@ -3025,26 +3015,26 @@ class BlockConnector
 {
 public:
     BlockConnector(
-        bool parallelBlockValidation_,
-        bool parallelTxnValidation_,
-        const Config& config_,
-        const CBlock& block_,
-        CValidationState& state_,
-        CBlockIndex* pindex_,
-        CCoinsViewCache& view_,
-        std::int32_t mostWorkBlockHeight_,
-        const arith_uint256& mostWorkOnChain_,
-        bool fJustCheck_ )
-    : config{ config_ }
-    , block{ block_ }
-    , state{ state_ }
-    , pindex{ pindex_ }
-    , view{ view_ }
-    , mostWorkBlockHeight{ mostWorkBlockHeight_ }
-    , mostWorkOnChain{ mostWorkOnChain_ }
-    , fJustCheck{ fJustCheck_ }
-    , parallelBlockValidation{ parallelBlockValidation_ }
-    , parallelTxnValidation{ parallelTxnValidation_ }
+        bool parallelBlockValidation,
+        bool parallelTxnValidation,
+        const Config& config,
+        const CBlock& block,
+        CValidationState& state,
+        CBlockIndex* pindex,
+        CCoinsViewCache& view,
+        std::int32_t mostWorkBlockHeight,
+        const arith_uint256& mostWorkOnChain,
+        bool fJustCheck)
+    : config_{config}
+    , block_{block}
+    , state_{state}
+    , pindex_{pindex}
+    , view_{view}
+    , mostWorkBlockHeight_{ mostWorkBlockHeight }
+    , mostWorkOnChain_{mostWorkOnChain}
+    , fJustCheck_{fJustCheck}
+    , parallelBlockValidation_{parallelBlockValidation}
+    , parallelTxnValidation_{parallelTxnValidation}
     {}
 
     bool Connect( const task::CCancellationToken& token )
@@ -3055,25 +3045,25 @@ public:
 
         // Check it again in case a previous version let a bad block in
         BlockValidationOptions validationOptions = BlockValidationOptions()
-            .withCheckPoW(!fJustCheck)
-            .withCheckMerkleRoot(!fJustCheck);
-        if (!CheckBlock(config, block, state, pindex->GetHeight(), validationOptions)) {
+            .withCheckPoW(!fJustCheck_)
+            .withCheckMerkleRoot(!fJustCheck_);
+        if (!CheckBlock(config_, block_, state_, pindex_->GetHeight(), validationOptions)) {
             return error("%s: Consensus::CheckBlock: %s", __func__,
-                         FormatStateMessage(state));
+                         FormatStateMessage(state_));
         }
 
         // Verify that the view's current state corresponds to the previous block
         uint256 hashPrevBlock =
-            pindex->IsGenesis() ? uint256() : pindex->GetPrev()->GetBlockHash();
-        assert(hashPrevBlock == view.GetBestBlock());
+            pindex_->IsGenesis() ? uint256() : pindex_->GetPrev()->GetBlockHash();
+        assert(hashPrevBlock == view_.GetBestBlock());
 
         // Special case for the genesis block, skipping connection of its
         // transactions (its coinbase is unspendable)
         const Consensus::Params &consensusParams =
-            config.GetChainParams().GetConsensus();
-        if (block.GetHash() == consensusParams.hashGenesisBlock) {
-            if (!fJustCheck) {
-                view.SetBestBlock(pindex->GetBlockHash());
+            config_.GetChainParams().GetConsensus();
+        if (block_.GetHash() == consensusParams.hashGenesisBlock) {
+            if (!fJustCheck_) {
+                view_.SetBestBlock(pindex_->GetBlockHash());
             }
 
             return true;
@@ -3097,12 +3087,12 @@ public:
         // applied to all blocks except the two in the chain that violate it. This
         // prevents exploiting the issue against nodes during their initial block
         // download.
-        bool fEnforceBIP30 = !((pindex->GetHeight() == 91842 &&
-                                pindex->GetBlockHash() ==
+        bool fEnforceBIP30 = !((pindex_->GetHeight() == 91842 &&
+                                pindex_->GetBlockHash() ==
                                     uint256S("0x00000000000a4d0a398161ffc163c503763"
                                              "b1f4360639393e0e4c8e300e0caec")) ||
-                               (pindex->GetHeight() == 91880 &&
-                                pindex->GetBlockHash() ==
+                               (pindex_->GetHeight() == 91880 &&
+                                pindex_->GetBlockHash() ==
                                     uint256S("0x00000000000743f190a18c5577a3c2d2a1f"
                                              "610ae9601ac046a38084ccb7cd721")));
 
@@ -3116,7 +3106,7 @@ public:
         // we're on the known chain at height greater than where BIP34 activated, we
         // can save the db accesses needed for the BIP30 check.
         const CBlockIndex* pindexBIP34height =
-            pindex->GetPrev()->GetAncestor(consensusParams.BIP34Height);
+            pindex_->GetPrev()->GetAncestor(consensusParams.BIP34Height);
         // Only continue to enforce if we're below BIP34 activation height or the
         // block hash at that height doesn't correspond.
         fEnforceBIP30 =
@@ -3124,22 +3114,22 @@ public:
             (!pindexBIP34height ||
              !(pindexBIP34height->GetBlockHash() == consensusParams.BIP34Hash));
 
-        if(config.GetDisableBIP30Checks())
+        if(config_.GetDisableBIP30Checks())
         {
             fEnforceBIP30 = false;
         }
 
         if (fEnforceBIP30) {
-            for (const auto &tx : block.vtx) {
+            for (const auto &tx : block_.vtx) {
                 for (size_t o = 0; o < tx->vout.size(); o++) {
-                    if (view.HaveCoin(COutPoint(tx->GetId(), o))) {
-                        auto result = state.DoS(
+                    if (view_.HaveCoin(COutPoint(tx->GetId(), o))) {
+                        auto result = state_.DoS(
                             100,
                             error("ConnectBlock(): tried to overwrite transaction"),
                             REJECT_INVALID, "bad-txns-BIP30");
-                        if(!state.IsValid() && g_connman)
+                        if(!state_.IsValid() && g_connman)
                         {
-                            g_connman->getInvalidTxnPublisher().Publish( { tx, pindex, state } );
+                            g_connman->getInvalidTxnPublisher().Publish( { tx, pindex_, state_ } );
                         }
                         return result;
                     }
@@ -3158,7 +3148,7 @@ public:
 
         int64_t nTime4{}; // This is set inside scope below
 
-        if (parallelBlockValidation)
+        if (parallelBlockValidation_)
         {
             /* Script validation is the most expensive part and is also not cs_main
             dependent so in case of parallel block validation we release it for
@@ -3190,9 +3180,9 @@ public:
 
             private:
                 CCoinsViewCache* mView;
-            } csGuard{ view };
+            } csGuard{ view_ };
 
-            if (!checkScripts( token, nTime2, nInputs, blockundo, mostWorkBlockHeight ))
+            if (!checkScripts( token, nTime2, nInputs, blockundo, mostWorkBlockHeight_ ))
             {
                 return false;
             }
@@ -3204,7 +3194,7 @@ public:
         }
         else
         {
-            if (!checkScripts( token, nTime2, nInputs, blockundo, mostWorkBlockHeight ))
+            if (!checkScripts( token, nTime2, nInputs, blockundo, mostWorkBlockHeight_ ))
             {
                 return false;
             }
@@ -3227,7 +3217,7 @@ public:
         LogPrint(BCLog::BENCH, "    - Time to reobtain the lock: %.2fms [%.2fs]\n",
                  0.001 * lockReObtainTime, nTimeObtainLock * 0.000001);
 
-        if (fJustCheck) {
+        if (fJustCheck_) {
             return true;
         }
 
@@ -3235,17 +3225,17 @@ public:
         {
             // since we are changing validation time we need to update
             // setBlockIndexCandidates as well - it sorts by that time
-            setBlockIndexCandidates.erase(pindex);
+            setBlockIndexCandidates.erase(pindex_);
 
             bool res =
-                 pindex->writeUndoToDisk(
-                    state,
+                 pindex_->writeUndoToDisk(
+                    state_,
                     blockundo,
                     fCheckForPruning,
-                    config,
+                    config_,
                     mapBlockIndex);
 
-            setBlockIndexCandidates.insert(pindex);
+            setBlockIndexCandidates.insert(pindex_);
 
             if (!res)
             {
@@ -3258,10 +3248,10 @@ public:
         {
             // Calculate transaction indexing information
             std::vector<std::pair<uint256, CDiskTxPos>> vPos {};
-            vPos.reserve(block.vtx.size());
+            vPos.reserve(block_.vtx.size());
 
-            CDiskTxPos pos { pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()) };
-            for(const auto& txn : block.vtx)
+            CDiskTxPos pos { pindex_->GetBlockPos(), GetSizeOfCompactSize(block_.vtx.size()) };
+            for(const auto& txn : block_.vtx)
             {
                 vPos.push_back(std::make_pair(txn->GetId(), pos));
                 pos = { pos, pos.TxOffset() + ::GetSerializeSize(*txn, SER_DISK, CLIENT_VERSION) };
@@ -3270,15 +3260,15 @@ public:
             // Write it out
             if(!pblocktree->WriteTxIndex(vPos))
             {
-                return AbortNode(state, "Failed to write transaction index");
+                return AbortNode(state_, "Failed to write transaction index");
             }
         }
 
-        if (parallelBlockValidation)
+        if (parallelBlockValidation_)
         {
             // TryReattach() will succeed if best block in active chain hasn't
             // changed since ForceDetach().
-            if (!view.TryReattach())
+            if (!view_.TryReattach())
             {
                 // a different block managed to become best block before this one
                 // so we should terminate connecting process
@@ -3287,7 +3277,7 @@ public:
         }
 
         // add this block to the view's block chain
-        view.SetBestBlock(pindex->GetBlockHash());
+        view_.SetBestBlock(pindex_->GetBlockHash());
 
         int64_t nTime5 = GetTimeMicros();
         nTimeIndex += nTime5 - nTime4;
@@ -3384,7 +3374,7 @@ private:
                 // * legacy (always)
                 // * p2sh (when P2SH enabled)
                 bool sigOpCountError{};
-                uint64_t txSigOpsCount = GetTransactionSigOpCount(config, tx, shard, flags & SCRIPT_VERIFY_P2SH, era, sigOpCountError);
+                uint64_t txSigOpsCount = GetTransactionSigOpCount(config_, tx, shard, flags & SCRIPT_VERIFY_P2SH, era, sigOpCountError);
                 if (sigOpCountError || txSigOpsCount > maxTxSigOpsCountConsensusBeforeGenesis) {
                     return state.DoS(100, false, REJECT_INVALID, "bad-txn-sigops");
                 }
@@ -3402,14 +3392,14 @@ private:
 
                 // Don't cache results if we're actually connecting blocks (still
                 // consult the cache, though).
-                bool fCacheResults = fJustCheck;
+                bool fCacheResults = fJustCheck_;
 
                 std::vector<CScriptCheck> vChecks;
 
                 auto res =
                     CheckInputs(
                         token,
-                        config,
+                        config_,
                         true,
                         tx,
                         state,
@@ -3433,7 +3423,7 @@ private:
                     {
                         softConsensusFreeze(
                             *pindex,
-                            config.GetSoftConsensusFreezeDuration() );
+                            config_.GetSoftConsensusFreezeDuration() );
                     }
 
                     return error("ConnectBlock(): CheckInputs on %s failed with %s",
@@ -3484,30 +3474,30 @@ private:
         CBlockUndo& blockundo,
         std::int32_t mostWorkBlockHeight )
     {
-        blockundo.vtxundo.reserve(block.vtx.size() - 1);
+        blockundo.vtxundo.reserve(block_.vtx.size() - 1);
 
         const Consensus::Params& consensusParams =
-            config.GetChainParams().GetConsensus();
-        ProtocolEra era { GetProtocolEra(config, pindex->GetHeight()) };
+            config_.GetChainParams().GetConsensus();
+        ProtocolEra era { GetProtocolEra(config_, pindex_->GetHeight()) };
 
         // Start enforcing BIP68 (sequence locks).
         int nLockTimeFlags = 0;
-        if (pindex->GetHeight() >= consensusParams.CSVHeight) {
+        if (pindex_->GetHeight() >= consensusParams.CSVHeight) {
             // NOLINTNEXTLINE(*-narrowing-conversions)
             nLockTimeFlags |= StandardNonFinalVerifyFlags(era);
         }
 
-        uint64_t maxTxSigOpsCountConsensusBeforeGenesis = config.GetMaxTxSigOpsCountConsensusBeforeGenesis();
+        uint64_t maxTxSigOpsCountConsensusBeforeGenesis = config_.GetMaxTxSigOpsCountConsensusBeforeGenesis();
         std::vector<int32_t> prevheights;
-        const uint32_t flags = GetBlockScriptFlags(config, pindex->GetPrev());
+        const uint32_t flags = GetBlockScriptFlags(config_, pindex_->GetPrev());
         std::atomic_uint64_t nSigOpsCount = 0;
         Amount nFees(0);
 
         // Sigops counting. We need to do it again because of P2SH.
         const uint64_t currentBlockSize =
-            ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+            ::GetSerializeSize(block_, SER_NETWORK, PROTOCOL_VERSION);
         // Sigops are not counted after Genesis anymore
-        const uint64_t nMaxSigOpsCountConsensusBeforeGenesis = config.GetMaxBlockSigOpsConsensusBeforeGenesis(currentBlockSize);
+        const uint64_t nMaxSigOpsCountConsensusBeforeGenesis = config_.GetMaxBlockSigOpsConsensusBeforeGenesis(currentBlockSize);
 
         bool fScriptChecks = true;
         if (!hashAssumeValid.IsNull()) {
@@ -3521,8 +3511,8 @@ private:
             if (auto index = mapBlockIndex.Get(hashAssumeValid); index)
             {
                 const auto& bestHeader = mapBlockIndex.GetBestHeader();
-                if (index->GetAncestor(pindex->GetHeight()) == pindex &&
-                    bestHeader.GetAncestor(pindex->GetHeight()) == pindex &&
+                if (index->GetAncestor(pindex_->GetHeight()) == pindex_ &&
+                    bestHeader.GetAncestor(pindex_->GetHeight()) == pindex_ &&
                     bestHeader.GetChainWork() >= nMinimumChainWork)
                 {
                     // This block is a member of the assumed verified chain and an
@@ -3540,7 +3530,7 @@ private:
                     // the expected chain.
                     fScriptChecks =
                         (GetBlockProofEquivalentTime(
-                             bestHeader, *pindex, bestHeader,
+                             bestHeader, *pindex_, bestHeader,
                              consensusParams) <= 60 * 60 * 24 * 7 * 2);
                 }
             }
@@ -3553,13 +3543,13 @@ private:
         using NullScriptChecker = ScriptChecker;
         ScriptChecker control =
             fScriptChecks
-            ? scriptCheckQueuePool->GetChecker(mostWorkOnChain, token, &checkPoolToken)
+            ? scriptCheckQueuePool->GetChecker(mostWorkOnChain_, token, &checkPoolToken)
             : NullScriptChecker{};
 
-        CFrozenTXOCheck frozenTXOCheck{ *pindex };
-        if( config.GetEnableAssumeWhitelistedBlockDepth() )
+        CFrozenTXOCheck frozenTXOCheck{ *pindex_ };
+        if( config_.GetEnableAssumeWhitelistedBlockDepth() )
         {
-            if( (mostWorkBlockHeight - pindex->GetHeight()) >= config.GetAssumeWhitelistedBlockDepth() )
+            if( (mostWorkBlockHeight - pindex_->GetHeight()) >= config_.GetAssumeWhitelistedBlockDepth() )
             {   // NOLINT(bugprone-branch-clone)
 
                 // This block is deep enough under the block with most work to assume that a confiscation transaction is whitelisted
@@ -3572,8 +3562,8 @@ private:
                 frozenTXOCheck.DisableEnforcingConfiscationTransactionChecks();
             }
             else if( const auto& bestHeader = mapBlockIndex.GetBestHeader();
-                     (bestHeader.GetHeight() - pindex->GetHeight()) >= config.GetAssumeWhitelistedBlockDepth() &&
-                     bestHeader.GetAncestor(pindex->GetHeight()) == pindex )
+                     (bestHeader.GetHeight() - pindex_->GetHeight()) >= config_.GetAssumeWhitelistedBlockDepth() &&
+                     bestHeader.GetAncestor(pindex_->GetHeight()) == pindex_ )
             {
                 // This block is deep enough under the block with best known header to assume that a confiscation transaction is whitelisted
                 // even if its TxId is not present in our frozen TXO database.
@@ -3592,14 +3582,14 @@ private:
         }
 
         // Setup for parallel txn validation if required
-        size_t maxThreads { parallelTxnValidation? static_cast<size_t>(config.GetPerBlockTxnValidatorThreadsCount()) : 1UL };
-        uint64_t batchSize { config.GetBlockValidationTxBatchSize() };
-        size_t numThreads { block.vtx.size() / batchSize };
+        size_t maxThreads { parallelTxnValidation_ ? static_cast<size_t>(config_.GetPerBlockTxnValidatorThreadsCount()) : 1UL };
+        uint64_t batchSize { config_.GetBlockValidationTxBatchSize() };
+        size_t numThreads { block_.vtx.size() / batchSize };
         numThreads = std::clamp(numThreads, size_t(1), maxThreads);
 
         int64_t startGroupTime { GetTimeMicros() };
         TxnGrouper grouper {};
-        const std::vector<TxnGrouper::UPtrTxnGroup> txnGroups { grouper.GetNumGroups(block.vtx, numThreads, batchSize) };
+        const std::vector<TxnGrouper::UPtrTxnGroup> txnGroups { grouper.GetNumGroups(block_.vtx, numThreads, batchSize) };
         int64_t groupTime { GetTimeMicros() - startGroupTime };
         size_t numGroups { txnGroups.size() };
         std::stringstream groupSizesStr {};
@@ -3612,29 +3602,29 @@ private:
             groupSizesStr << txnGroups[i]->size();
         }
         LogPrint(BCLog::BENCH, "        - Group %ld transactions into %d groups of sizes [%s]: %.2fms\n",
-            block.vtx.size(), numGroups, groupSizesStr.str(), 0.001 * groupTime);
+            block_.vtx.size(), numGroups, groupSizesStr.str(), 0.001 * groupTime);
 
         std::vector<CValidationState> states(numGroups);
         std::vector<Amount> allFees(numGroups);
 
         // Make space for all but the coinbase
-        blockundo.vtxundo.resize(block.vtx.size() - 1);
+        blockundo.vtxundo.resize(block_.vtx.size() - 1);
 
         // Cache all inputs
         int64_t startCacheTime { GetTimeMicros() };
-        view.CacheInputs(block.vtx);
+        view_.CacheInputs(block_.vtx);
         int64_t cacheTime { GetTimeMicros() - startCacheTime };
         LogPrint(BCLog::BENCH, "        - Cache: %.2fms\n", 0.001 * cacheTime);
 
         // Validate
         int64_t validateStartTime { GetTimeMicros() };
-        std::vector<bool> results { view.RunSharded(numGroups,
+        std::vector<bool> results { view_.RunSharded(numGroups,
             std::bind(&BlockConnector::BlockValidateTxns, this, std::placeholders::_1, std::placeholders::_2,
-                std::cref(block.vtx),
+                std::cref(block_.vtx),
                 std::cref(txnGroups),
                 std::cref(token),
                 std::ref(control),
-                pindex,
+                pindex_,
                 std::ref(frozenTXOCheck),
                 std::ref(blockundo),
                 std::ref(states),
@@ -3656,7 +3646,7 @@ private:
             if(!s.IsValid())
             {
                 // Just return details of first failure
-                state = s;
+                state_ = s;
                 return false;
             }
         }
@@ -3665,11 +3655,11 @@ private:
         nFees = std::accumulate(allFees.begin(), allFees.end(), Amount{0});
 
         int64_t validateTime { GetTimeMicros() - validateStartTime };
-        LogPrint(BCLog::BENCH, "        - Validate %ld transactions: %.2fms\n", block.vtx.size(), 0.001 * validateTime);
+        LogPrint(BCLog::BENCH, "        - Validate %ld transactions: %.2fms\n", block_.vtx.size(), 0.001 * validateTime);
 
-        if (parallelBlockValidation)
+        if (parallelBlockValidation_)
         {
-            view.ForceDetach();
+            view_.ForceDetach();
         }
 
         int64_t nTime3 = GetTimeMicros();
@@ -3677,21 +3667,21 @@ private:
         LogPrint(BCLog::BENCH,
                  "      - Connect %u transactions: %.2fms (%.3fms/tx, "
                  "%.3fms/txin) [%.2fs]\n",
-                 (unsigned)block.vtx.size(), 0.001 * (nTime3 - nTime2),
-                 0.001 * (nTime3 - nTime2) / block.vtx.size(),
+                 (unsigned)block_.vtx.size(), 0.001 * (nTime3 - nTime2),
+                 0.001 * (nTime3 - nTime2) / block_.vtx.size(),
                  nInputs <= 1 ? 0 : 0.001 * (nTime3 - nTime2) / (nInputs - 1),
                  nTimeConnect * 0.000001);
 
         Amount blockReward =
-            nFees + GetBlockSubsidy(pindex->GetHeight(), consensusParams);
-        if (block.vtx[0]->GetValueOut() > blockReward) {
-            auto result = state.DoS(100, error("ConnectBlock(): coinbase pays too much "
+            nFees + GetBlockSubsidy(pindex_->GetHeight(), consensusParams);
+        if (block_.vtx[0]->GetValueOut() > blockReward) {
+            auto result = state_.DoS(100, error("ConnectBlock(): coinbase pays too much "
                                                "(actual=%d vs limit=%d)",
-                                               block.vtx[0]->GetValueOut(), blockReward),
+                                               block_.vtx[0]->GetValueOut(), blockReward),
                                     REJECT_INVALID, "bad-cb-amount");
-            if(!state.IsValid() && g_connman)
+            if(!state_.IsValid() && g_connman)
             {
-                g_connman->getInvalidTxnPublisher().Publish( { block.vtx[0], pindex, state } );
+                g_connman->getInvalidTxnPublisher().Publish( { block_.vtx[0], pindex_, state_ } );
             }
             return result;
         }
@@ -3701,7 +3691,7 @@ private:
             // We only wait during tests and even then only if validation would
             // be performed.
             blockValidationStatus.waitIfRequired(
-                pindex->GetBlockHash(),
+                pindex_->GetBlockHash(),
                 task::CCancellationToken::JoinToken(checkPoolToken.value(), token));
         }
 
@@ -3719,12 +3709,12 @@ private:
         {
             for(const auto& check : failedChecks)
             {
-                auto it = std::find_if(block.vtx.begin(), block.vtx.end(),
+                auto it = std::find_if(block_.vtx.begin(), block_.vtx.end(),
                                 [&check](const CTransactionRef& tx)
                                 {
                                     return tx.get() == check.GetTransaction();
                                 });
-                if (it == block.vtx.end())
+                if (it == block_.vtx.end())
                 {
                     continue;
                 }
@@ -3736,11 +3726,11 @@ private:
                                          ScriptErrorString(check.GetScriptError())));
                 if(g_connman)
                 {
-                    g_connman->getInvalidTxnPublisher().Publish( { *it, pindex, state } );
+                    g_connman->getInvalidTxnPublisher().Publish( { *it, pindex_, state } );
                 }
             }
 
-            return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs",
+            return state_.DoS(100, false, REJECT_INVALID, "blk-bad-inputs",
                              "parallel script check failed");
         }
 
@@ -3770,17 +3760,17 @@ private:
     }
 
     // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
-    const Config& config;
-    const CBlock& block;
-    CValidationState& state;
-    CBlockIndex* pindex;
-    CCoinsViewCache& view;
-    std::int32_t mostWorkBlockHeight;
-    const arith_uint256& mostWorkOnChain;
+    const Config& config_;
+    const CBlock& block_;
+    CValidationState& state_;
+    CBlockIndex* pindex_;
+    CCoinsViewCache& view_;
+    std::int32_t mostWorkBlockHeight_;
+    const arith_uint256& mostWorkOnChain_;
     // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
-    bool fJustCheck;
-    bool parallelBlockValidation;
-    bool parallelTxnValidation;
+    bool fJustCheck_;
+    bool parallelBlockValidation_;
+    bool parallelTxnValidation_;
 };
 
 /**
@@ -7200,9 +7190,10 @@ bool InitBlockIndex(const Config &config) {
     return true;
 }
 
-void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, std::atomic_bool& fReindex)
+void ReindexAllBlockFiles(const Config& config,
+                          CBlockTreeDB* p_blocktree,
+                          std::atomic_bool& reindex)
 {
-    
     int nFile = 0;
     while (true) {
         UniqueCFile file = BlockFileAccess::OpenBlockFile( nFile );
@@ -7219,8 +7210,8 @@ void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, std::a
         nFile++;
     }
 
-    pblocktree->WriteReindexing(false);
-    fReindex = false;
+    p_blocktree->WriteReindexing(false);
+    reindex = false;
     LogPrintf("Reindexing finished\n");
     // To avoid ending up in a situation without genesis block, re-try
     // initializing (no-op if reindexing worked):

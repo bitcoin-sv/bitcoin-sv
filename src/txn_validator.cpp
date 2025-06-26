@@ -458,7 +458,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                 "Txnval-asynch: Validation timeout occurred for %d txn(s) received from the Standard queue "
                                 "(forwarding them to the Non-standard queue)\n",
                                  nDetectedLowPriorityTxnsNum);
-                        std::unique_lock lock { mNonStdTxnsMtx };
+                        std::unique_lock lock_non_std{ mNonStdTxnsMtx };
                         enqueueTxnsNL(imdResult.mDetectedLowPriorityTxns.begin(), imdResult.mDetectedLowPriorityTxns.end(),
                             [this](const TxInputDataSPtr& txn){ enqueueNonStdTxnNL(txn); }
                         );

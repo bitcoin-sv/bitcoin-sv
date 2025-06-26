@@ -2,9 +2,13 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "invalid_txn_publisher.h"
+
 #include "core_io.h"
-#include "util.h"
 #include "memusage.h"
+#include "overload.h"
+#include "util.h"
+
+#include <variant>
 
 InvalidTxnInfo::InvalidTxnInfo(
     const CTransactionRef& tx,
@@ -104,31 +108,31 @@ void InvalidTxnInfo::PutOrigin(CJSONWriter& writer) const
     }
 }
 
-void InvalidTxnInfo::PutTx(
-    CJSONWriter& writer,
-    const std::variant<CTransactionRef, TxData>& transaction,
-    bool writeHex) const
+void InvalidTxnInfo::PutTx(CJSONWriter& writer,
+                           const std::variant<CTransactionRef, TxData>& transaction,
+                           bool writeHex) const
 {
-    if(auto tx = std::get_if<CTransactionRef>(&transaction))
-    {
-        if(*tx)
-        {
-            writer.pushKV("txid", (*tx)->GetId().GetHex());
-            writer.pushKV("size", int64_t((*tx)->GetTotalSize()));
-            if(writeHex)
-            {
-                writer.pushK("hex");
-                writer.pushQuote();
-                EncodeHexTx(**tx, writer.getWriter(), 0);
-                writer.pushQuote();
-            }
-        }
-    }
-    else if(auto tx = std::get_if<InvalidTxnInfo::TxData>(&transaction))
-    {
-        writer.pushKV("txid", tx->txid.GetHex());
-        writer.pushKV("size", tx->txSize);
-    }
+    std::visit(overload([&writer, &writeHex](const CTransactionRef& tx)
+                        {
+                            if(tx)
+                            {
+                                writer.pushKV("txid", tx->GetId().GetHex());
+                                writer.pushKV("size", int64_t(tx->GetTotalSize()));
+                                if(writeHex)
+                                {
+                                    writer.pushK("hex");
+                                    writer.pushQuote();
+                                    EncodeHexTx(*tx, writer.getWriter(), 0);
+                                    writer.pushQuote();
+                                }
+                            }
+                        },
+                        [&writer](const InvalidTxnInfo::TxData& txData)
+                        {
+                            writer.pushKV("txid", txData.txid.GetHex());
+                            writer.pushKV("size", txData.txSize);
+                        }), 
+                        transaction);
 }
 
 void InvalidTxnInfo::PutState(CJSONWriter& writer) const

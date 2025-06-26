@@ -197,10 +197,10 @@ std::string CRPCTable::help(Config &config, const std::string &strCommand,
 
         jreq.strMethod = strMethod;
         try {
-            JSONRPCRequest jreq;
-            jreq.fHelp = true;
+            JSONRPCRequest json_req;
+            json_req.fHelp = true;
             if (setDone.insert(pcmd).second) {
-                pcmd->call(config, jreq);
+                pcmd->call(config, json_req);
             }
         } catch (const std::exception &e) {
             // Help text is returned in an exception

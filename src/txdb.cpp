@@ -669,10 +669,10 @@ bool CoinsDB::HaveCoinInCache(const COutPoint &outpoint) const {
 
 uint256 CoinsDB::GetBestBlock() const {
     std::shared_lock lock { mCoinsViewCacheMtx };
-    if (hashBlock.IsNull()) {
-        hashBlock = DBGetBestBlock();
+    if(hashBlock_.IsNull()) {
+        hashBlock_ = DBGetBestBlock();
     }
-    return hashBlock;
+    return hashBlock_;
 }
 
 bool CoinsDB::BatchWrite(
@@ -690,7 +690,7 @@ bool CoinsDB::BatchWrite(
     else
     {
         mCache.BatchWrite(mapCoins);
-        hashBlock = hashBlockIn;
+        hashBlock_ = hashBlockIn;
     }
     return true;
 }
@@ -700,7 +700,7 @@ bool CoinsDB::Flush()
     WPUSMutex::Lock writeLock = mMutex.WriteLock();
     std::unique_lock lock { mCoinsViewCacheMtx };
 
-    if(hashBlock.IsNull())
+    if(hashBlock_.IsNull())
     {
         // nothing new was added
         return true;
@@ -708,7 +708,7 @@ bool CoinsDB::Flush()
 
     auto coins = mCache.MoveOutCoins();
 
-    return DBBatchWrite(coins, hashBlock);
+    return DBBatchWrite(coins, hashBlock_);
 }
 
 void CoinsDB::Uncache(const std::vector<COutPoint>& vOutpoints)

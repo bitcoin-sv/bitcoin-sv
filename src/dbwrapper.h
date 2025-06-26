@@ -55,10 +55,10 @@ const std::vector<uint8_t> &GetObfuscateKey(const CDBWrapper &w);
 // NOTE: Class is based on CDataStream and provides only read functionality
 class CDataStreamInput
 {
-    std::string_view buf;
+    std::string_view buf_;
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
-    const std::vector<std::uint8_t>& obfuscate_key;
-    unsigned int nReadPos{};
+    const std::vector<std::uint8_t>& obfuscate_key_;
+    unsigned int nReadPos_{};
 
 public:
     typedef std::string_view::size_type size_type;
@@ -75,14 +75,13 @@ public:
      * @note Both buf and obfuscate_key must outlive constructed CDataStreamInput object.
      */
     CDataStreamInput(std::string_view buf, const std::vector<uint8_t>& obfuscate_key)
-        : buf(buf)
-        , obfuscate_key(obfuscate_key)
-        , nReadPos(0)
+        : buf_{buf}
+        , obfuscate_key_{obfuscate_key}
     {}
 
     // Access to serialized data
-    const value_type* data() const { return buf.data() + nReadPos; }
-    size_type size() const { return buf.size() - nReadPos; }
+    const value_type* data() const { return buf_.data() + nReadPos_; }
+    size_type size() const { return buf_.size() - nReadPos_; }
 
     //
     // Stream subset
@@ -101,23 +100,23 @@ public:
         }
 
         // Read from buffer at current position
-        unsigned int nReadPosNext = nReadPos + nSize;
-        if (nReadPosNext >= buf.size())
+        unsigned int nReadPosNext = nReadPos_ + nSize;
+        if (nReadPosNext >= buf_.size())
         {
-            if (nReadPosNext > buf.size())
+            if (nReadPosNext > buf_.size())
             {
                 throw std::ios_base::failure("CDataStreamInput::read(): end of data");
             }
 
-            memcpy(pch, &buf[nReadPos], nSize);
-            XorBuf(pch, nSize, nReadPos);
-            nReadPos = 0;
-            buf = {};
+            memcpy(pch, &buf_[nReadPos_], nSize);
+            XorBuf(pch, nSize, nReadPos_);
+            nReadPos_ = 0;
+            buf_ = {};
             return;
         }
-        memcpy(pch, &buf[nReadPos], nSize);
-        XorBuf(pch, nSize, nReadPos);
-        nReadPos = nReadPosNext;
+        memcpy(pch, &buf_[nReadPos_], nSize);
+        XorBuf(pch, nSize, nReadPos_);
+        nReadPos_ = nReadPosNext;
     }
 
     void ignore(int nSize)
@@ -128,19 +127,19 @@ public:
             throw std::ios_base::failure("CDataStreamInput::ignore(): nSize negative");
         }
 
-        unsigned int nReadPosNext = nReadPos + nSize;
-        if (nReadPosNext >= buf.size())
+        unsigned int nReadPosNext = nReadPos_ + nSize;
+        if (nReadPosNext >= buf_.size())
         {
-            if (nReadPosNext > buf.size())
+            if (nReadPosNext > buf_.size())
             {
                 throw std::ios_base::failure("CDataStreamInput::ignore(): end of data");
             }
 
-            nReadPos = 0;
-            buf = {};
+            nReadPos_ = 0;
+            buf_ = {};
             return;
         }
-        nReadPos = nReadPosNext;
+        nReadPos_ = nReadPosNext;
     }
 
     template<typename T>
@@ -163,21 +162,21 @@ private:
      */
     void XorBuf(char* buf, std::size_t bufSize, unsigned int readPos)
     {
-        if (obfuscate_key.size() == 0)
+        if(obfuscate_key_.size() == 0)
         {
             return;
         }
 
-        for (size_type i = 0, j = readPos % obfuscate_key.size(); i != bufSize; i++)
+        for (size_type i = 0, j = readPos % obfuscate_key_.size(); i != bufSize; i++)
         {
             // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-            buf[i] ^= obfuscate_key[j++];
+            buf[i] ^= obfuscate_key_[j++];
 
             // This potentially acts on very many bytes of data, so it's
             // important that we calculate `j`, i.e. the `key` index in this way
             // instead of doing a %, which would effectively be a division for
             // each byte Xor'd -- much slower than need be.
-            if (j == obfuscate_key.size()) j = 0;
+            if (j == obfuscate_key_.size()) j = 0;
         }
     }
 };

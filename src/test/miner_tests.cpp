@@ -70,7 +70,7 @@ struct CoinsDB::UnitTestAccess<miner_tests_uid>
         CoinsDB& provider,
         const uint256& hashBlock)
     {
-        provider.hashBlock = hashBlock;
+        provider.hashBlock_ = hashBlock;
     }
 };
 using TestAccessCoinsDB = CoinsDB::UnitTestAccess<miner_tests_uid>;
