@@ -436,10 +436,21 @@ private:
         SigHashType sigHashType = SigHashType().withForkId(),
         unsigned int lenR = 32,
         unsigned int lenS = 32,
-        const Amount& amount = Amount(0))
+        const Amount& amount = Amount(0),
+        const std::optional<TxDigestAlgorithm>& forceTDA = std::nullopt)
     {
-        uint256 hash = SignatureHash(script, CTransaction(spendTx), 0,
-                                     sigHashType, amount, nullptr);
+        uint256 hash {};
+        if(forceTDA) {
+            if(forceTDA.value() == TxDigestAlgorithm::ORIGINAL) {
+                hash = SignatureHashOriginal(script, CTransaction(spendTx), 0, sigHashType);
+            }
+            else {
+                hash = SignatureHashBIP143(script, CTransaction(spendTx), 0, sigHashType, amount);
+            }
+        }
+        else {
+            hash = SignatureHash(script, CTransaction(spendTx), 0, sigHashType, amount);
+        }
         std::vector<uint8_t> vchSig, r, s;
         uint32_t iter = 0;
         do {
@@ -518,10 +529,10 @@ public:
         SigHashType sigHashType = SigHashType().withForkId(),
         unsigned int lenR = 32,
         unsigned int lenS = 32,
-        const Amount& amount = Amount(0))
+        const Amount& amount = Amount(0),
+        const std::optional<TxDigestAlgorithm>& forceTDA = std::nullopt)
     {
-
-        DoPush(MakeSig(script, key, sigHashType, lenR, lenS, amount));
+        DoPush(MakeSig(script, key, sigHashType, lenR, lenS, amount, forceTDA));
         return *this;
     }
 
@@ -1480,6 +1491,28 @@ BOOST_AUTO_TEST_CASE(script_json_test) {
             BOOST_TEST_MESSAGE("Exception: " << e.what());
             throw;
         }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(chronicle_misc)
+{
+    const KeyData keys;
+
+    std::vector<TestBuilder> tests;
+
+    auto preGenesisFlags { StandardScriptVerifyFlags(ProtocolEra::PreGenesis) | InputScriptVerifyFlags(ProtocolEra::PreGenesis, ProtocolEra::PreGenesis) };
+    auto preForkIDFlags { preGenesisFlags & ~SCRIPT_ENABLE_SIGHASH_FORKID & ~SCRIPT_VERIFY_STRICTENC };
+
+    // Pre-ForkID, signed with original TDA but sighash has forkid flag set
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                "PreForkID, forkid sighash set, chronicle sighash unset", preForkIDFlags, false)
+            .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, Amount{0}, TxDigestAlgorithm::ORIGINAL)
+            .ScriptError(SCRIPT_ERR_OK));
+
+    for (TestBuilder& test : tests)
+    {
+        test.Test();
     }
 }
 
@@ -3614,11 +3647,12 @@ namespace {
         bool CheckSig(
             const std::vector<uint8_t>& scriptSig,
             const std::vector<uint8_t>& vchPubKey,
-            const CScript& scriptCode) const override
+            const CScript& scriptCode,
+            bool enabledSighashForkid) const override
         {
             auto start = std::chrono::steady_clock::now();
             bool res =
-                CachingTransactionSignatureChecker::CheckSig(scriptSig, vchPubKey, scriptCode);
+                CachingTransactionSignatureChecker::CheckSig(scriptSig, vchPubKey, scriptCode, enabledSighashForkid);
             mDuration.check +=
                 std::chrono::duration_cast<std::chrono::microseconds>(
                     std::chrono::steady_clock::now() - start);
@@ -4172,7 +4206,8 @@ BOOST_AUTO_TEST_CASE(VerifyScript_lows)
     {
         bool CheckSig(const std::vector<uint8_t> &,
                       const std::vector<uint8_t> &,
-                      const CScript&) const override
+                      const CScript&,
+                      bool) const override
         {
             return true;
         }

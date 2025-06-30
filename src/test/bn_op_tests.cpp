@@ -1020,7 +1020,8 @@ namespace
     {
         bool CheckSig(const std::vector<uint8_t>& scriptsig,
                       const std::vector<uint8_t>& pubkey,
-                      const CScript&) const override
+                      const CScript&,
+                      bool) const override
         {
             return scriptsig == pubkey;
         }

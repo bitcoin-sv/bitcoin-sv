@@ -11,6 +11,7 @@
 #include "crypto/ripemd160.h"
 #include "crypto/sha1.h"
 #include "crypto/sha256.h"
+#include "hash.h"
 #include "primitives/transaction.h"
 #include "pubkey.h"
 #include "script/opcodes.h"
@@ -23,7 +24,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <hash.h>
 #include <optional>
 #include <utility>
 #include <variant>
@@ -1479,7 +1479,8 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         // Remove signature for pre-fork scripts
                         CleanupScriptCode(scriptCode, vchSig.GetElement(), flags);
 
-                        bool fSuccess = checker.CheckSig(vchSig.GetElement(), vchPubKey.GetElement(), scriptCode);
+                        bool fSuccess = checker.CheckSig(vchSig.GetElement(), vchPubKey.GetElement(),
+                            scriptCode, flags & SCRIPT_ENABLE_SIGHASH_FORKID);
 
                         // If the operation failed and the Chronicle sighash bit is not set,
                         // we require that the signature must be empty vector.
@@ -1604,7 +1605,8 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                             }
 
                             // Check signature
-                            bool fOk = checker.CheckSig(vchSig.GetElement(), vchPubKey.GetElement(), scriptCode);
+                            bool fOk = checker.CheckSig(vchSig.GetElement(), vchPubKey.GetElement(),
+                                scriptCode, flags & SCRIPT_ENABLE_SIGHASH_FORKID);
 
                             if (fOk) {
                                 isig++;
@@ -2001,72 +2003,62 @@ PrecomputedTransactionData::PrecomputedTransactionData(
     hashOutputs = GetOutputsHash(txTo);
 }
 
-uint256 SignatureHash(const CScript &scriptCode, const CTransaction &txTo,
-                      unsigned int nIn, SigHashType sigHashType,
-                      const Amount amount,
-                      const PrecomputedTransactionData* cache,
-                      const std::optional<TxDigestAlgorithm> forceTDA)
+uint256 SignatureHashBIP143(const CScript& scriptCode, const CTransaction& txTo,
+                            unsigned int nIn, SigHashType sigHashType,
+                            const Amount amount,
+                            const PrecomputedTransactionData* cache)
 {
-    auto PickTDA = [&sigHashType, &forceTDA]()
-    {
-        if(forceTDA)
-            return *forceTDA;
-        else if(sigHashType.hasForkId() && !sigHashType.hasChronicle())
-            return TxDigestAlgorithm::BIP_143;
-        return TxDigestAlgorithm::ORIGINAL;
-    };
+    uint256 hashPrevouts;
+    uint256 hashSequence;
+    uint256 hashOutputs;
 
-    if (PickTDA() == TxDigestAlgorithm::BIP_143)
-    {
-        uint256 hashPrevouts;
-        uint256 hashSequence;
-        uint256 hashOutputs;
-
-        if (!sigHashType.hasAnyoneCanPay()) {
-            hashPrevouts = cache ? cache->hashPrevouts : GetPrevoutHash(txTo);
-        }
-
-        if (!sigHashType.hasAnyoneCanPay() &&
-            (sigHashType.getBaseType() != BaseSigHashType::SINGLE) &&
-            (sigHashType.getBaseType() != BaseSigHashType::NONE)) {
-            hashSequence = cache ? cache->hashSequence : GetSequenceHash(txTo);
-        }
-
-        if ((sigHashType.getBaseType() != BaseSigHashType::SINGLE) &&
-            (sigHashType.getBaseType() != BaseSigHashType::NONE)) {
-            hashOutputs = cache ? cache->hashOutputs : GetOutputsHash(txTo);
-        } else if ((sigHashType.getBaseType() == BaseSigHashType::SINGLE) &&
-                   (nIn < txTo.vout.size())) {
-            CHashWriter ss(SER_GETHASH, 0);
-            ss << txTo.vout[nIn];
-            hashOutputs = ss.GetHash();
-        }
-
-        CHashWriter ss(SER_GETHASH, 0);
-        // Version
-        ss << txTo.nVersion;
-        // Input prevouts/nSequence (none/all, depending on flags)
-        ss << hashPrevouts;
-        ss << hashSequence;
-        // The input being signed (replacing the scriptSig with scriptCode +
-        // amount). The prevout may already be contained in hashPrevout, and the
-        // nSequence may already be contain in hashSequence.
-        ss << txTo.vin[nIn].prevout;
-        ss << scriptCode;
-        ss << amount.GetSatoshis();
-        ss << txTo.vin[nIn].nSequence;
-        // Outputs (none/one/all, depending on flags)
-        ss << hashOutputs;
-        // Locktime
-        ss << txTo.nLockTime;
-        // Sighash type
-        ss << sigHashType;
-
-        return ss.GetHash();
+    if (!sigHashType.hasAnyoneCanPay()) {
+        hashPrevouts = cache ? cache->hashPrevouts : GetPrevoutHash(txTo);
     }
 
-    static const uint256 one(uint256S(
-        "0000000000000000000000000000000000000000000000000000000000000001"));
+    if (!sigHashType.hasAnyoneCanPay() &&
+        (sigHashType.getBaseType() != BaseSigHashType::SINGLE) &&
+        (sigHashType.getBaseType() != BaseSigHashType::NONE)) {
+        hashSequence = cache ? cache->hashSequence : GetSequenceHash(txTo);
+    }
+
+    if ((sigHashType.getBaseType() != BaseSigHashType::SINGLE) &&
+        (sigHashType.getBaseType() != BaseSigHashType::NONE)) {
+        hashOutputs = cache ? cache->hashOutputs : GetOutputsHash(txTo);
+    } else if ((sigHashType.getBaseType() == BaseSigHashType::SINGLE) &&
+               (nIn < txTo.vout.size())) {
+        CHashWriter ss(SER_GETHASH, 0);
+        ss << txTo.vout[nIn];
+        hashOutputs = ss.GetHash();
+    }
+
+    CHashWriter ss(SER_GETHASH, 0);
+    // Version
+    ss << txTo.nVersion;
+    // Input prevouts/nSequence (none/all, depending on flags)
+    ss << hashPrevouts;
+    ss << hashSequence;
+    // The input being signed (replacing the scriptSig with scriptCode +
+    // amount). The prevout may already be contained in hashPrevout, and the
+    // nSequence may already be contain in hashSequence.
+    ss << txTo.vin[nIn].prevout;
+    ss << scriptCode;
+    ss << amount.GetSatoshis();
+    ss << txTo.vin[nIn].nSequence;
+    // Outputs (none/one/all, depending on flags)
+    ss << hashOutputs;
+    // Locktime
+    ss << txTo.nLockTime;
+    // Sighash type
+    ss << sigHashType;
+
+    return ss.GetHash();
+}
+
+uint256 SignatureHashOriginal(const CScript& scriptCode, const CTransaction& txTo,
+                              unsigned int nIn, SigHashType sigHashType)
+{
+    static const uint256 one(uint256S("0000000000000000000000000000000000000000000000000000000000000001"));
     if (nIn >= txTo.vin.size()) {
         //  nIn out of range
         return one;
@@ -2089,6 +2081,20 @@ uint256 SignatureHash(const CScript &scriptCode, const CTransaction &txTo,
     return ss.GetHash();
 }
 
+uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo,
+                      unsigned int nIn, SigHashType sigHashType,
+                      const Amount amount,
+                      const PrecomputedTransactionData* cache,
+                      bool enabledSighashForkid)
+{
+    if(enabledSighashForkid && sigHashType.hasForkId() && !sigHashType.hasChronicle())
+    {
+        return SignatureHashBIP143(scriptCode, txTo, nIn, sigHashType, amount, cache);
+    }
+
+    return SignatureHashOriginal(scriptCode, txTo, nIn, sigHashType);
+}
+
 bool TransactionSignatureChecker::VerifySignature(
     const std::vector<uint8_t> &vchSig, const CPubKey &pubkey,
     const uint256 &sighash) const {
@@ -2097,7 +2103,7 @@ bool TransactionSignatureChecker::VerifySignature(
 
 bool TransactionSignatureChecker::CheckSig(
     const std::vector<uint8_t> &vchSigIn, const std::vector<uint8_t> &vchPubKey,
-    const CScript &scriptCode) const
+    const CScript &scriptCode, bool enabledSighashForkid) const
 {
     CPubKey pubkey(vchPubKey);
     if (!pubkey.IsValid()) {
@@ -2112,7 +2118,7 @@ bool TransactionSignatureChecker::CheckSig(
     SigHashType sigHashType = GetHashType(vchSig);
     vchSig.pop_back();
 
-    uint256 sighash = SignatureHash(scriptCode, *txTo, nIn, sigHashType, amount, this->txdata);
+    uint256 sighash = SignatureHash(scriptCode, *txTo, nIn, sigHashType, amount, this->txdata, enabledSighashForkid);
 
     if (!VerifySignature(vchSig, pubkey, sighash)) {
         return false;

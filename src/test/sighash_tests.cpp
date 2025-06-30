@@ -25,8 +25,8 @@
 #include <univalue.h>
 
 // Old script.cpp SignatureHash function
-static uint256 SignatureHashOld(CScript scriptCode, const CTransaction &txTo,
-                                unsigned int nIn, uint32_t nHashType) {
+static uint256 Local_OriginalSignatureHash(CScript scriptCode, const CTransaction &txTo,
+                                     unsigned int nIn, uint32_t nHashType) {
     static const uint256 one(uint256S(
         "0000000000000000000000000000000000000000000000000000000000000001"));
     if (nIn >= txTo.vin.size()) {
@@ -147,8 +147,8 @@ BOOST_AUTO_TEST_CASE(sighash_test) {
         RandomScript(scriptCode);
         int nIn = InsecureRandRange(txTo.vin.size()); // NOLINT(*-narrowing-conversions)
 
-        uint256 shref = SignatureHashOld(scriptCode, CTransaction(txTo), nIn, nHashType);
-        uint256 shold = SignatureHash(scriptCode, CTransaction(txTo), nIn, sigHashType, Amount(0), nullptr, TxDigestAlgorithm::ORIGINAL);
+        uint256 shref = Local_OriginalSignatureHash(scriptCode, CTransaction(txTo), nIn, nHashType);
+        uint256 shold = SignatureHashOriginal(scriptCode, CTransaction(txTo), nIn, sigHashType);
         BOOST_CHECK(shold == shref);
 
         // Check the impact of the forkid & chronicle flags
@@ -236,7 +236,7 @@ BOOST_AUTO_TEST_CASE(sighash_from_data) {
         uint256 shreg = SignatureHash(scriptCode, *tx, nIn, sigHashType, Amount(0));
         BOOST_CHECK_MESSAGE(shreg.GetHex() == sigHashRegHex, strTest);
 
-        uint256 shold = SignatureHash(scriptCode, *tx, nIn, sigHashType, Amount(0), nullptr, TxDigestAlgorithm::ORIGINAL);
+        uint256 shold = SignatureHashOriginal(scriptCode, *tx, nIn, sigHashType);
         BOOST_CHECK_MESSAGE(shold.GetHex() == sigHashOldHex, strTest);
     }
 }
