@@ -6,8 +6,8 @@
 
 #include <algorithm>
 #include <cassert>
+#include <compare>
 #include <iostream>
-#include <limits>
 #include <sstream>
 #include <openssl/asn1.h>
 #include <openssl/bn.h>
@@ -172,14 +172,17 @@ void bsv::bint::swap(bint& other) noexcept
     swap(value_, other.value_);
 }
 
-// Relational operators
-bool bsv::operator<(const bint& a, const bint& b)
+std::strong_ordering bsv::operator<=>(const bint& a, const bint& b)
 {
-    return a.spaceship_operator(b) < 0;
+    const auto so{BN_cmp(a.value_.get(), b.value_.get())};
+    return (so == 0)  ? std::strong_ordering::equal
+           : (so < 0) ? std::strong_ordering::less
+                      : std::strong_ordering::greater;
 }
+
 bool bsv::operator==(const bint& a, const bint& b)
 {
-    return a.spaceship_operator(b) == 0;
+    return (a <=> b) == std::strong_ordering::equal;
 }
 
 // Arithmetic operators
@@ -379,13 +382,6 @@ uint8_t bsv::bint::lsb() const
         return 0;
 
     return buffer[buffer.size() - 1];
-}
-
-int bsv::bint::spaceship_operator(
-    const bint& other) const // auto operator<=>(const bint&) in C++20
-{
-    // assert(value_);
-    return BN_cmp(value_.get(), other.value_.get());
 }
 
 void bsv::bint::negate()

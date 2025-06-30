@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <compare>
 #include <memory>
 #include <span>
 #include <stdexcept>
@@ -34,7 +35,7 @@ namespace bsv
         void swap(bint&) noexcept;
 
         // Relational operators
-        friend bool operator<(const bint&, const bint&);
+        friend std::strong_ordering operator<=>(const bint&, const bint&);
         friend bool operator==(const bint&, const bint&);
 
         // Arithmetic operators
@@ -71,8 +72,6 @@ namespace bsv
         static bint deserialize(std::span<const uint8_t>);
 
     private:
-        int spaceship_operator(
-            const bint&) const; // auto operator<=>(const bint&) in C++20
         void negate();
 
         int size_bits() const;
@@ -93,14 +92,8 @@ namespace bsv
 
     inline void swap(bint& a, bint& b) noexcept { a.swap(b);}
 
-    bool operator<(const bint&, const bint&);
+    std::strong_ordering operator<=>(const bint&, const bint&);
     bool operator==(const bint&, const bint&);
-
-    inline bool operator!=(const bint& a, const bint& b) { return !(a == b); }
-
-    inline bool operator<=(const bint& a, const bint& b) { return !(b < a); }
-    inline bool operator>(const bint& a, const bint& b) { return b < a; }
-    inline bool operator>=(const bint& a, const bint& b) { return !(a < b); }
         
     inline bint operator+(bint a, const bint& b)
     {
@@ -140,16 +133,11 @@ namespace bsv
 
     std::ostream& operator<<(std::ostream& os, const bint&);
 
-    // int64_t overloads
-    inline bool operator==(const bint& a, const int64_t b) { return a == bint{b}; } 
-    inline bool operator==(const int64_t a, const bint& b)  { return bint{a} == b; }
-    inline bool operator!=(const bint& a, const int64_t b) { return a != bint(b); }
+    inline std::strong_ordering operator<=>(const bint& a, int64_t b) { return a <=> bint{b}; }
 
-    inline bool operator<(const bint& a, int64_t b) { return a < bint(b); }
-    inline bool operator<(int64_t a, const bint& b) { return bint(a) < b; }
-    inline bool operator<=(const bint& a, int64_t b) { return a <= bint(b); }
-    inline bool operator>(const bint& a, int64_t b) { return a > bint(b); }
-    inline bool operator>=(const bint& a, int64_t b) { return a >= bint(b); }
+    inline bool operator==(const int64_t a, const bint& b)  { return bint{a} == b; }
+    inline bool operator==(const size_t a, const bint& b)  { return bint{a} == b; }
+    inline bool operator==(const int a, const bint& b)  { return bint{a} == b; }
 
     // NOLINTBEGIN(performance-unnecessary-value-param)
     inline bint operator+(bint a, const int64_t b) { return a + bint(b); }
@@ -158,16 +146,6 @@ namespace bsv
     inline bint operator/(bint a, const int64_t b) { return a / bint(b); }
     inline bint operator%(bint a, const int64_t b) { return a % bint(b); }
     // NOLINTEND(performance-unnecessary-value-param)
-
-    // size_t overloads
-    inline bool operator==(const bint& a, const size_t b) { return a == bint{b}; } 
-    inline bool operator==(const size_t a, const bint& b)  { return bint{a} == b; }
-    inline bool operator!=(const bint& a, const size_t b) { return a != bint(b); }
-    
-    // int overloads
-    inline bool operator==(const bint& a, const int b) { return a == bint{b}; } 
-    inline bool operator==(const int a, const bint& b)  { return bint{a} == b; }
-    inline bool operator!=(const bint& a, const int b) { return a != bint(b); }
 
     inline uint8_t operator&(const bint& a, const uint8_t b) { 
         return a.lsb() & b;
