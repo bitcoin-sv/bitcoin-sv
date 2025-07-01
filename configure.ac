@@ -350,8 +350,8 @@ if test "x$CXXFLAGS_overridden" = "xno"; then
 
   ## Some compilers (gcc) ignore unknown -Wno-* options, but warn about all
   ## unknown options if any other warning is produced. Test the -Wfoo case, and
-  ## set the -Wno-foo case if it works.
-  AX_CHECK_COMPILE_FLAG([-Wunused-parameter],[CXXFLAGS="$CXXFLAGS -Wno-unused-parameter"],,[[$CXXFLAG_WERROR]])
+  ## set the -Wno-foo case if it works. e.g.
+  ## AX_CHECK_COMPILE_FLAG([-Wfoo],[CXXFLAGS="$CXXFLAGS -Wno-foo"],,[[$CXXFLAG_WERROR]])
 fi
 
 # Check for optional instruction set support. Enabling these does _not_ imply that all code will
