@@ -158,21 +158,9 @@ public:
      * Return the fee in satoshis for a size of 1000 bytes
      */
     Amount GetFeePerK() const { return nSatoshisPerK; }
-    friend bool operator<(const CFeeRate &a, const CFeeRate &b) {
-        return a.nSatoshisPerK < b.nSatoshisPerK;
-    }
-    friend bool operator>(const CFeeRate &a, const CFeeRate &b) {
-        return a.nSatoshisPerK > b.nSatoshisPerK;
-    }
-    friend bool operator==(const CFeeRate &a, const CFeeRate &b) {
-        return a.nSatoshisPerK == b.nSatoshisPerK;
-    }
-    friend bool operator<=(const CFeeRate &a, const CFeeRate &b) {
-        return a.nSatoshisPerK <= b.nSatoshisPerK;
-    }
-    friend bool operator>=(const CFeeRate &a, const CFeeRate &b) {
-        return a.nSatoshisPerK >= b.nSatoshisPerK;
-    }
+
+    friend auto operator<=>(const CFeeRate&, const CFeeRate&) = default;
+    
     CFeeRate &operator+=(const CFeeRate &a) {
         nSatoshisPerK += a.nSatoshisPerK;
         return *this;
