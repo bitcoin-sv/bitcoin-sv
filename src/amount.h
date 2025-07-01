@@ -39,28 +39,7 @@ public:
         return *this;
     }
 
-    /**
-     * Equality
-     */
-    friend constexpr bool operator==(const Amount a, const Amount b) {
-        return a.amount_ == b.amount_;
-    }
-
-    /**
-     * Comparison
-     */
-    friend constexpr bool operator<(const Amount a, const Amount b) {
-        return a.amount_ < b.amount_;
-    }
-    friend constexpr bool operator>(const Amount a, const Amount b) {
-        return b < a;
-    }
-    friend constexpr bool operator<=(const Amount a, const Amount b) {
-        return !(a > b);
-    }
-    friend constexpr bool operator>=(const Amount a, const Amount b) {
-        return !(a < b);
-    }
+    friend auto operator<=>(const Amount&, const Amount&) = default;
 
     /**
      * Unary minus
