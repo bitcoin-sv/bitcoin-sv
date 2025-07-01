@@ -199,14 +199,6 @@ std::string CBase58Data::ToString() const {
     return EncodeBase58Check(vch);
 }
 
-int CBase58Data::CompareTo(const CBase58Data &b58) const {
-    if (vchVersion < b58.vchVersion) return -1;
-    if (vchVersion > b58.vchVersion) return 1;
-    if (vchData < b58.vchData) return -1;
-    if (vchData > b58.vchData) return 1;
-    return 0;
-}
-
 namespace {
 class DestinationEncoder : public boost::static_visitor<std::string> {
 private:

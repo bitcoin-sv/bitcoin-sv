@@ -22,6 +22,7 @@
 #include "script/standard.h"
 #include "support/allocators/zeroafterfree.h"
 
+#include <compare>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -91,19 +92,8 @@ public:
     bool SetString(const char *psz, unsigned int nVersionBytes = 1);
     bool SetString(const std::string &str);
     std::string ToString() const;
-    int CompareTo(const CBase58Data &b58) const;
 
-    bool operator==(const CBase58Data &b58) const {
-        return CompareTo(b58) == 0;
-    }
-    bool operator<=(const CBase58Data &b58) const {
-        return CompareTo(b58) <= 0;
-    }
-    bool operator>=(const CBase58Data &b58) const {
-        return CompareTo(b58) >= 0;
-    }
-    bool operator<(const CBase58Data &b58) const { return CompareTo(b58) < 0; }
-    bool operator>(const CBase58Data &b58) const { return CompareTo(b58) > 0; }
+    auto operator<=>(const CBase58Data&) const = default;
 };
 
 /**
