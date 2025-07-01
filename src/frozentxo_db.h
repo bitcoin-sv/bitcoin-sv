@@ -246,11 +246,6 @@ public:
                        this->stop  == o.stop;
             }
 
-            bool operator!=(const HeightInterval& o) const
-            {
-                return !(*this == o);
-            }
-
             template<class Stream>
             void Serialize(Stream& os) const
             {

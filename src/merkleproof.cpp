@@ -94,11 +94,6 @@ bool operator==(const MerkleProof& a, const MerkleProof& b)
            a.mNodes == b.mNodes;
 }
 
-bool operator!=(const MerkleProof& a, const MerkleProof& b)
-{
-    return !(a == b);
-}
-
 std::ostream& operator<<(std::ostream& os, const MerkleProof::Node& node)
 {
     os << "Type: " << static_cast<int>(node.mType)

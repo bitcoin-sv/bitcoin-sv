@@ -31,11 +31,6 @@ public:
     friend std::ostream& operator<<(std::ostream&, const block_bind&);
 };
 
-inline bool operator!=(const block_bind& a, const block_bind& b)
-{
-    return !(a == b);
-}
-
 class miner_info_ref
 {
     uint256 txid_{};
@@ -50,11 +45,6 @@ class miner_info_ref
     friend bool operator==(const miner_info_ref&, const miner_info_ref&);
     friend std::ostream& operator<<(std::ostream&, const miner_info_ref&); 
 };
-
-inline bool operator!=(const miner_info_ref& a, const miner_info_ref& b)
-{
-    return !(a == b);
-}
 
 std::variant<miner_info_ref, miner_info_error> ParseMinerInfoRef(
     const std::span<const uint8_t> script);

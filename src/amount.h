@@ -45,9 +45,6 @@ public:
     friend constexpr bool operator==(const Amount a, const Amount b) {
         return a.amount_ == b.amount_;
     }
-    friend constexpr bool operator!=(const Amount a, const Amount b) {
-        return !(a == b);
-    }
 
     /**
      * Comparison

@@ -91,7 +91,6 @@ public:
     bool GetIn6Addr(struct in6_addr *pipv6Addr) const;
 
     friend bool operator==(const CNetAddr &a, const CNetAddr &b);
-    friend bool operator!=(const CNetAddr &a, const CNetAddr &b);
     friend bool operator<(const CNetAddr &a, const CNetAddr &b);
 
     ADD_SERIALIZE_METHODS
@@ -128,7 +127,6 @@ public:
     bool IsValid() const;
 
     friend bool operator==(const CSubNet &a, const CSubNet &b);
-    friend bool operator!=(const CSubNet &a, const CSubNet &b);
     friend bool operator<(const CSubNet &a, const CSubNet &b);
 
     ADD_SERIALIZE_METHODS
@@ -157,7 +155,6 @@ public:
     bool GetSockAddr(struct sockaddr *paddr, socklen_t *addrlen) const;
     bool SetSockAddr(const struct sockaddr *paddr);
     friend bool operator==(const CService &a, const CService &b);
-    friend bool operator!=(const CService &a, const CService &b);
     friend bool operator<(const CService &a, const CService &b);
     std::vector<uint8_t> GetKey() const;
     std::string ToString() const;

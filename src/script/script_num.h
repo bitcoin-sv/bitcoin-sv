@@ -110,10 +110,6 @@ private:
 
 // Equality operators
 bool operator==(const CScriptNum&, const CScriptNum&);
-inline bool operator!=(const CScriptNum& a, const CScriptNum& b)
-{
-    return !(a == b);
-}
 
 // Relational operators
 bool operator<(const CScriptNum&, const CScriptNum&);

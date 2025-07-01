@@ -37,11 +37,6 @@ public:
         return (nFile == other.nFile && nPos == other.nPos);
     }
 
-    bool operator!=(const CDiskBlockPos& other) const
-    {
-        return !(*this == other);
-    }
-
     bool IsNull() const { return (nFile == -1); }
 
     std::string ToString() const {

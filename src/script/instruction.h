@@ -51,12 +51,6 @@ namespace bsv
                a.operand().size() == b.operand().size();
     }
 
-    inline constexpr bool operator!=(const instruction& a,
-                                     const instruction& b) noexcept
-    {
-        return !(a == b);
-    }
-
     inline std::ostream& operator<<(std::ostream& os, const instruction& inst)
     {
         os << inst.opcode() << ' ' << (void*)inst.operand().data() << ' '

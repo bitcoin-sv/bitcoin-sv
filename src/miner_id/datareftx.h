@@ -46,8 +46,4 @@ class DataRefTx
 };
 
 bool operator==(const DataRefTx& msg1, const DataRefTx& msg2);
-inline bool operator!=(const DataRefTx& msg1, const DataRefTx& msg2)
-{
-    return !(msg1 == msg2);
-}
 

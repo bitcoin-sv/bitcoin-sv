@@ -107,7 +107,6 @@ public:
             return *this;
         }
         bool operator==(iterator x) const { return ptr == x.ptr; }
-        bool operator!=(iterator x) const { return ptr != x.ptr; }
         bool operator>=(iterator x) const { return ptr >= x.ptr; }
         bool operator<=(iterator x) const { return ptr <= x.ptr; }
         bool operator>(iterator x) const { return ptr > x.ptr; }
@@ -154,7 +153,6 @@ public:
             return copy;
         }
         bool operator==(reverse_iterator x) const { return ptr == x.ptr; }
-        bool operator!=(reverse_iterator x) const { return ptr != x.ptr; }
     };
 
     class const_iterator {
@@ -208,7 +206,6 @@ public:
             return *this;
         }
         bool operator==(const_iterator x) const { return ptr == x.ptr; }
-        bool operator!=(const_iterator x) const { return ptr != x.ptr; }
         bool operator>=(const_iterator x) const { return ptr >= x.ptr; }
         bool operator<=(const_iterator x) const { return ptr <= x.ptr; }
         bool operator>(const_iterator x) const { return ptr > x.ptr; }
@@ -254,7 +251,6 @@ public:
             return copy;
         }
         bool operator==(const_reverse_iterator x) const { return ptr == x.ptr; }
-        bool operator!=(const_reverse_iterator x) const { return ptr != x.ptr; }
     };
 
 private:
@@ -574,10 +570,6 @@ public:
             ++b2;
         }
         return true;
-    }
-
-    bool operator!=(const prevector<N, T, Size, Diff> &other) const {
-        return !(*this == other);
     }
 
     bool operator<(const prevector<N, T, Size, Diff> &other) const {

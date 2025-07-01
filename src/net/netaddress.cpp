@@ -219,10 +219,6 @@ bool operator==(const CNetAddr &a, const CNetAddr &b) {
     return (memcmp(a.ip, b.ip, 16) == 0);
 }
 
-bool operator!=(const CNetAddr &a, const CNetAddr &b) {
-    return (memcmp(a.ip, b.ip, 16) != 0);
-}
-
 bool operator<(const CNetAddr &a, const CNetAddr &b) {
     return (memcmp(a.ip, b.ip, 16) < 0);
 }
@@ -418,10 +414,6 @@ unsigned short CService::GetPort() const {
 // NOLINTBEGIN(cppcoreguidelines-slicing)
 bool operator==(const CService &a, const CService &b) {
     return (CNetAddr)a == (CNetAddr)b && a.port == b.port;
-}
-
-bool operator!=(const CService &a, const CService &b) {
-    return (CNetAddr)a != (CNetAddr)b || a.port != b.port;
 }
 
 bool operator<(const CService &a, const CService &b) {
@@ -642,10 +634,6 @@ bool CSubNet::IsValid() const {
 bool operator==(const CSubNet &a, const CSubNet &b) {
     return a.valid == b.valid && a.network == b.network &&
            !memcmp(a.netmask, b.netmask, 16);
-}
-
-bool operator!=(const CSubNet &a, const CSubNet &b) {
-    return !(a == b);
 }
 
 bool operator<(const CSubNet &a, const CSubNet &b) {
