@@ -201,7 +201,7 @@ template <typename I, typename O>
 I transform_hex(I f, I l, O o)
 {
     return transform_pairs(f, l, o, [](const auto a, const auto b) {
-        constexpr auto l = [](const char c) {
+        constexpr auto t = [](const char c) {
             if(isdigit(c))
                 return c - '0';
             else if(c >= 'a' && c <= 'f')
@@ -209,7 +209,7 @@ I transform_hex(I f, I l, O o)
             else
                 assert(false);
         };
-        return (0xf0 & (l(a) << 4)) | (0xf & l(b));
+        return (0xf0 & (t(a) << 4)) | (0xf & t(b));
     });
 }
 

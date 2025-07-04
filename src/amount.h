@@ -15,27 +15,27 @@
 
 struct Amount {
 private:
-    int64_t amount{};
+    int64_t amount_{};
 
 public:
     explicit constexpr Amount(std::integral auto amount) noexcept:
-        amount(amount)
+        amount_(amount)
     {}
 
     Amount() = default;
 
     // Allow access to underlying value for non-monetary operations
-    int64_t GetSatoshis() const { return amount; }
+    int64_t GetSatoshis() const { return amount_; }
 
     /**
      * Implement standard operators
      */
     Amount &operator+=(const Amount& a) {
-        amount += a.amount;
+        amount_ += a.amount_;
         return *this;
     }
     Amount &operator-=(const Amount& a) {
-        amount -= a.amount;
+        amount_ -= a.amount_;
         return *this;
     }
 
@@ -43,7 +43,7 @@ public:
      * Equality
      */
     friend constexpr bool operator==(const Amount a, const Amount b) {
-        return a.amount == b.amount;
+        return a.amount_ == b.amount_;
     }
     friend constexpr bool operator!=(const Amount a, const Amount b) {
         return !(a == b);
@@ -53,7 +53,7 @@ public:
      * Comparison
      */
     friend constexpr bool operator<(const Amount a, const Amount b) {
-        return a.amount < b.amount;
+        return a.amount_ < b.amount_;
     }
     friend constexpr bool operator>(const Amount a, const Amount b) {
         return b < a;
@@ -68,13 +68,13 @@ public:
     /**
      * Unary minus
      */
-    constexpr Amount operator-() const { return Amount(-amount); }
+    constexpr Amount operator-() const { return Amount(-amount_); }
 
     /**
      * Addition and subtraction.
      */
     friend constexpr Amount operator+(const Amount a, const Amount b) {
-        return Amount(a.amount + b.amount);
+        return Amount(a.amount_ + b.amount_);
     }
     friend constexpr Amount operator-(const Amount a, const Amount b) {
         return a + -b;
@@ -84,33 +84,33 @@ public:
      * Multiplication
      */
     friend constexpr Amount operator*(const int64_t a, const Amount b) {
-        return Amount(a * b.amount);
+        return Amount(a * b.amount_);
     }
     friend constexpr Amount operator*(const int a, const Amount b) {
-        return Amount(a * b.amount);
+        return Amount(a * b.amount_);
     }
 
     /**
      * Division
      */
     constexpr int64_t operator/(const Amount b) const {
-        return amount / b.amount;
+        return amount_ / b.amount_;
     }
     constexpr Amount operator/(const int64_t b) const {
-        return Amount(amount / b);
+        return Amount(amount_ / b);
     }
-    constexpr Amount operator/(const int b) const { return Amount(amount / b); }
+    constexpr Amount operator/(const int b) const { return Amount(amount_ / b); }
 
     /**
      * Modulus
      */
     constexpr int64_t operator%(const Amount b) const {
-        return amount % b.amount;
+        return amount_ % b.amount_;
     }
     constexpr Amount operator%(const int64_t b) const {
-        return Amount(amount % b);
+        return Amount(amount_ % b);
     }
-    constexpr Amount operator%(const int b) const { return Amount(amount % b); }
+    constexpr Amount operator%(const int b) const { return Amount(amount_ % b); }
 
     /**
      * Do not implement double ops to get an error with double and ensure
@@ -122,7 +122,7 @@ public:
 
     // ostream support
     friend std::ostream &operator<<(std::ostream &stream, const Amount &ca) {
-        return stream << ca.amount;
+        return stream << ca.amount_;
     }
 
     std::string ToString() const;
@@ -132,7 +132,7 @@ public:
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
-        READWRITE(amount);
+        READWRITE(amount_);
     }
 };
 

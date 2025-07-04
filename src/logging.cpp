@@ -124,8 +124,8 @@ std::string ListLogCategories() {
     return ret;
 }
 
-BCLog::Logger::Logger(const char* fileName)
-: fileName(fileName)
+BCLog::Logger::Logger(const char* file_name)
+: fileName(file_name)
 {
 }
 
