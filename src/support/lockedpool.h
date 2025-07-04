@@ -88,7 +88,7 @@ public:
      * This returns base <= ptr < (base+size) so only use it for (inclusive)
      * chunk starting addresses.
      */
-    bool addressInArena(void *ptr) const { return ptr >= base && ptr < end; }
+    bool addressInArena(void *ptr) const { return ptr >= base_ && ptr < end_; }
 
 private:
     // non construction-copyable
@@ -100,14 +100,14 @@ private:
      * Map of chunk address to chunk information. This class makes use of the
      * sorted order to merge previous and next chunks during deallocation.
      */
-    std::map<char *, size_t> chunks_free;
-    std::map<char *, size_t> chunks_used;
+    std::map<char *, size_t> chunks_free_;
+    std::map<char *, size_t> chunks_used_;
     /** Base address of arena */
-    char *base;
+    char* base_;
     /** End address of arena */
-    char *end;
+    char* end_;
     /** Minimum chunk alignment */
-    size_t alignment;
+    size_t alignment_;
 };
 
 /**
@@ -191,32 +191,35 @@ private:
     // non copyable
     LockedPool &operator=(const LockedPool &) = delete;
 
-    std::unique_ptr<LockedPageAllocator> allocator;
+    std::unique_ptr<LockedPageAllocator> allocator_;
 
     /** Create an arena from locked pages */
     // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
-    class LockedPageArena : public Arena {
+    class LockedPageArena : public Arena
+    {
     public:
-        LockedPageArena(LockedPageAllocator *alloc_in, void *base_in,
-                        size_t size, size_t align);
+        LockedPageArena(LockedPageAllocator*,
+                        void* base_in,
+                        size_t size,
+                        size_t align);
         // NOLINTNEXTLINE(cppcoreguidelines-explicit-virtual-functions)
         ~LockedPageArena();
 
     private:
-        void *base;
-        size_t size;
-        LockedPageAllocator *allocator;
+        void* base_;
+        size_t size_;
+        LockedPageAllocator* allocator_;
     };
 
     bool new_arena(size_t size, size_t align);
 
-    std::list<LockedPageArena> arenas;
-    LockingFailed_Callback lf_cb;
-    size_t cumulative_bytes_locked;
+    std::list<LockedPageArena> arenas_;
+    LockingFailed_Callback lf_cb_;
+    size_t cumulative_bytes_locked_{};
     /**
      * Mutex protects access to this pool's data structures, including arenas.
      */
-    mutable std::mutex mutex;
+    mutable std::mutex mutex_;
 };
 
 /**

@@ -85,9 +85,9 @@ size_t ser_size(const CBlock& block)
     return std::accumulate(block.cbegin(),
                            block.cend(),
                            total,
-                           [](auto total, const auto& sp_tx) {
-                               total += ser_size(*sp_tx);
-                               return total;
+                           [](auto acc, const auto& sp_tx) {
+                               acc += ser_size(*sp_tx);
+                               return acc;
                            });
 }
 

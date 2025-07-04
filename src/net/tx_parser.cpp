@@ -331,16 +331,16 @@ size_t tx_parser::buffer_size() const
 
     size += accumulate(ip_buffers_.cbegin(), ip_buffers_.cend(),
                        0,
-                       [](auto size, const auto& buffer)
+                       [](auto acc, const auto& buffer)
                        {
-                           return size + buffer.size();
+                           return acc + buffer.size();
                        });
 
     size += accumulate(op_buffers_.cbegin(), op_buffers_.cend(),
                        0,
-                       [](auto size, const auto& buffer)
+                       [](auto acc, const auto& buffer)
                        {
-                           return size + buffer.size();
+                           return acc + buffer.size();
                        });
     return size;
 }
