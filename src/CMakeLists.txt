@@ -162,8 +162,9 @@ add_subdirectory(leveldb)
 
 target_compile_options(leveldb
                        PRIVATE
-                       -Wno-unused-parameter
-                       -Wno-suggest-override)
+                       -Wno-shadow
+                       -Wno-suggest-override
+                       -Wno-unused-parameter)
 
 add_subdirectory(secp256k1)
 add_subdirectory(univalue)
