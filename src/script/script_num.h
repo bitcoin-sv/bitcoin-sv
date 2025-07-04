@@ -119,12 +119,12 @@ inline bool operator!=(const CScriptNum& a, const CScriptNum& b)
 bool operator<(const CScriptNum&, const CScriptNum&);
 inline bool operator<(const CScriptNum& a, int64_t b)
 {
-    return std::visit([b](const auto& a) { return a < b; }, a.m_value);
+    return std::visit([b](const auto& aa) { return aa < b; }, a.m_value);
 }
 
 inline bool operator<(int64_t a, const CScriptNum& b)
 {
-    return std::visit([a](const auto& b) { return a < b; }, b.m_value);
+    return std::visit([a](const auto& bb) { return a < bb; }, b.m_value);
 }
 
 inline bool operator>=(const CScriptNum& a, const CScriptNum& b)

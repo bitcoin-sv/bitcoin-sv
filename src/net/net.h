@@ -185,9 +185,15 @@ struct NodeConnectInfo
     : addrConnect{addr}, pszDest{dest}, fCountFailure{count}
     {}
 
-    NodeConnectInfo(const CAddress& addr, StreamType st, const std::string& streamPolicy,
-        const AssociationIDPtr& id)
-    : addrConnect{addr}, streamType{st}, streamPolicy{streamPolicy}, assocID{id}, fNewStream{true}
+    NodeConnectInfo(const CAddress& addr,
+                    StreamType st,
+                    const std::string& stream_policy,
+                    const AssociationIDPtr& id)
+        : addrConnect{addr},
+          streamType{st},
+          streamPolicy{stream_policy},
+          assocID{id},
+          fNewStream{true}
     {}
 
     CAddress addrConnect {};

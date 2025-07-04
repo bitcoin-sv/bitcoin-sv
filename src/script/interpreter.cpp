@@ -2101,9 +2101,10 @@ bool TransactionSignatureChecker::VerifySignature(
     return pubkey.Verify(sighash, vchSig);
 }
 
-bool TransactionSignatureChecker::CheckSig(
-    const std::vector<uint8_t> &vchSigIn, const std::vector<uint8_t> &vchPubKey,
-    const CScript &scriptCode, bool enabledSighashForkid) const
+bool TransactionSignatureChecker::CheckSig(const std::vector<uint8_t>& vchSigIn,
+                                           const std::vector<uint8_t>& vchPubKey,
+                                           const CScript& scriptCode,
+                                           bool enabledSighashForkid) const
 {
     CPubKey pubkey(vchPubKey);
     if (!pubkey.IsValid()) {
@@ -2118,7 +2119,13 @@ bool TransactionSignatureChecker::CheckSig(
     SigHashType sigHashType = GetHashType(vchSig);
     vchSig.pop_back();
 
-    uint256 sighash = SignatureHash(scriptCode, *txTo, nIn, sigHashType, amount, this->txdata, enabledSighashForkid);
+    uint256 sighash = SignatureHash(scriptCode,
+                                    *txTo_,
+                                    nIn_,
+                                    sigHashType,
+                                    amount_,
+                                    txdata_,
+                                    enabledSighashForkid);
 
     if (!VerifySignature(vchSig, pubkey, sighash)) {
         return false;
@@ -2136,16 +2143,16 @@ bool TransactionSignatureChecker::CheckLockTime(
     // We want to compare apples to apples, so fail the script unless the type
     // of nLockTime being tested is the same as the nLockTime in the
     // transaction.
-    if (!((txTo->nLockTime < LOCKTIME_THRESHOLD &&
+    if (!((txTo_->nLockTime < LOCKTIME_THRESHOLD &&
            nLockTime < LOCKTIME_THRESHOLD) ||
-          (txTo->nLockTime >= LOCKTIME_THRESHOLD &&
+          (txTo_->nLockTime >= LOCKTIME_THRESHOLD &&
            nLockTime >= LOCKTIME_THRESHOLD))) {
         return false;
     }
 
     // Now that we know we're comparing apples-to-apples, the comparison is a
     // simple numeric one.
-    if (nLockTime > int64_t(txTo->nLockTime)) {
+    if (nLockTime > int64_t(txTo_->nLockTime)) {
         return false;
     }
 
@@ -2158,7 +2165,7 @@ bool TransactionSignatureChecker::CheckLockTime(
     // Alternatively we could test all inputs, but testing just this input
     // minimizes the data required to prove correct CHECKLOCKTIMEVERIFY
     // execution.
-    if (CTxIn::SEQUENCE_FINAL == txTo->vin[nIn].nSequence) {
+    if (CTxIn::SEQUENCE_FINAL == txTo_->vin[nIn_].nSequence) {
         return false;
     }
 
@@ -2169,11 +2176,11 @@ bool TransactionSignatureChecker::CheckSequence(
     const CScriptNum &nSequence) const {
     // Relative lock times are supported by comparing the passed in operand to
     // the sequence number of the input.
-    const int64_t txToSequence = int64_t(txTo->vin[nIn].nSequence);
+    const int64_t txToSequence = int64_t(txTo_->vin[nIn_].nSequence);
 
     // Fail if the transaction's version number is not set high enough to
     // trigger BIP 68 rules.
-    if (static_cast<uint32_t>(txTo->nVersion) < 2) {
+    if (static_cast<uint32_t>(txTo_->nVersion) < 2) {
         return false;
     }
 
@@ -2217,7 +2224,7 @@ bool TransactionSignatureChecker::CheckSequence(
 
 int32_t TransactionSignatureChecker::Version() const
 {
-    return txTo->nVersion;
+    return txTo_->nVersion;
 }
 
 static constexpr bool valid_flags(const uint32_t flags)

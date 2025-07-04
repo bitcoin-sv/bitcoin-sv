@@ -30,8 +30,8 @@ class msg_buffer
 
     buffer_type::size_type read_pos_{};
 
-    int nType;
-    int nVersion;
+    int nType_;
+    int nVersion_;
 
 public:
     using size_type = buffer_type::size_type;
@@ -42,8 +42,8 @@ public:
     using const_iterator = buffer_type::const_iterator;
 
     explicit msg_buffer(int nType, int nVersion):
-            nType{nType},
-            nVersion{nVersion}
+        nType_{nType},
+        nVersion_{nVersion}
     {}
 
     size_type size() const;
@@ -51,10 +51,10 @@ public:
 
     const value_type* data() const;
 
-    int GetType() const { return nType; }
+    int GetType() const { return nType_; }
 
-    void SetVersion(int n) { nVersion = n; }
-    int GetVersion() const { return nVersion; }
+    void SetVersion(int n) { nVersion_ = n; }
+    int GetVersion() const { return nVersion_; }
 
     void command(const std::string& cmd);
     void payload_len(uint64_t len);

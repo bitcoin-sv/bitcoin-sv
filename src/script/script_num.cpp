@@ -94,11 +94,11 @@ bool operator==(const CScriptNum& a, const CScriptNum& b)
         return a.m_value == b.m_value;
     else 
     {
-        return visit([&b](const auto& a)
+        return visit([&b](const auto& aa)
         {
-            return visit([&a](const auto& b)
+            return visit([&aa](const auto& bb)
             {
-                return a == b;
+                return aa == bb;
             }, b.m_value);
         }, a.m_value);
     }
@@ -114,11 +114,11 @@ bool operator<(const CScriptNum& a, const CScriptNum& b)
         return a.m_value < b.m_value;
     else
     {
-        return visit([&b](const auto& a)
+        return visit([&b](const auto& aa)
                     {
-                        return visit([&a](const auto& b)
+                        return visit([&aa](const auto& bb)
                         {
-                            return a < b;
+                            return aa < bb;
                         }, b.m_value);
                     }, 
                     a.m_value);
@@ -224,7 +224,7 @@ CScriptNum CScriptNum::operator-() const
 
 std::ostream& operator<<(std::ostream& os, const CScriptNum& n)
 {
-    visit([&os](const auto& n) { os << n; }, n.m_value);
+    visit([&os](const auto& nn) { os << nn; }, n.m_value);
     return os;
 }
 

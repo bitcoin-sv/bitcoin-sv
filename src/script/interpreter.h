@@ -72,14 +72,14 @@ public:
     virtual ~BaseSignatureChecker() {}
 };
 
-class TransactionSignatureChecker : public BaseSignatureChecker {
-private:
-    const CTransaction *txTo;
-    unsigned int nIn;
+class TransactionSignatureChecker : public BaseSignatureChecker
+{
+    const CTransaction* txTo_;
+    unsigned int nIn_;
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
-    const Amount amount;
+    const Amount amount_;
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
-    const PrecomputedTransactionData *txdata;
+    const PrecomputedTransactionData* txdata_{nullptr};
 
 protected:
     virtual bool VerifySignature(const std::vector<uint8_t> &vchSig,
@@ -87,24 +87,23 @@ protected:
                                  const uint256 &sighash) const;
 
 public:
-    TransactionSignatureChecker(const CTransaction* txToIn,
-                                unsigned int nInIn,
-                                const Amount& amountIn)
-        : txTo(txToIn),
-          nIn(nInIn),
-          amount(amountIn),
-          txdata(nullptr)
+    TransactionSignatureChecker(const CTransaction* txTo,
+                                unsigned int nIn,
+                                const Amount& amount)
+        : txTo_{txTo},
+          nIn_{nIn},
+          amount_{amount}
     {
     }
 
-    TransactionSignatureChecker(const CTransaction* txToIn,
-                                unsigned int nInIn,
-                                const Amount& amountIn,
-                                const PrecomputedTransactionData& txdataIn)
-        : txTo(txToIn),
-          nIn(nInIn),
-          amount(amountIn),
-          txdata(&txdataIn)
+    TransactionSignatureChecker(const CTransaction* txTo,
+                                unsigned int nIn,
+                                const Amount& amount,
+                                const PrecomputedTransactionData& txdata)
+        : txTo_{txTo},
+          nIn_{nIn},
+          amount_{amount},
+          txdata_{&txdata}
     {
     }
 
