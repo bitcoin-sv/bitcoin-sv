@@ -343,7 +343,8 @@ BOOST_AUTO_TEST_CASE(secondary_mempool_first) {
 
 
 
-BOOST_AUTO_TEST_CASE(group) {
+BOOST_AUTO_TEST_CASE(group_test)
+{
     MempoolMockup mempool;
     std::vector<std::tuple<TxId, int, Amount>> confirmedInputs = {
         std::make_tuple<TxId, int, Amount>(TxId(), 0, Amount(10000000)),

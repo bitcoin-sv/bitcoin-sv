@@ -4,7 +4,6 @@
 
 #include "mining/journal_change_set.h"
 #include "validation.h"
-#include "mempooltxdb.h"
 
 #include "mempool_test_access.h"
 
@@ -31,17 +30,18 @@ namespace {
         TxId txId;
         bool forPrimary;
         size_t size;
-        Entry(TxId txId, bool forPrimary, size_t size)
-        : txId(txId), forPrimary(forPrimary), size(size) {}
     };
 
     using Predicate = std::function<bool(CTxMemPoolTestAccess&, const Entry&)>;
 
     // a collection of entries added to mempool
-	struct Entries {
-        CTxMemPool &pool; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
-        std::vector<Entry> entries;
-        Entries(CTxMemPool& pool) : pool(pool) {}
+    struct Entries
+    {
+        Entries(CTxMemPool& pool) : pool_{pool} {}
+
+        void push_back(const Entry& entry) {
+            entries_.push_back(entry);
+        }
     
         // return entries that satisfy the predicate by consulting the actual mempool entries
         Entries that(const Predicate& predicate) const {
@@ -56,10 +56,10 @@ namespace {
             return filter([](const Entry& entry){return !entry.forPrimary;});
         }
         // number of entries
-        size_t count() const { return entries.size(); }
-        // number of bytes consumed by transactions of entries
+        size_t count() const { return entries_.size(); }
+        // number of bytes consumed by transactions of entries_
         size_t size() const {
-            return std::accumulate(entries.begin(), entries.end(), static_cast<size_t>(0),
+            return std::accumulate(entries_.begin(), entries_.end(), static_cast<size_t>(0),
                                    [](size_t size, const Entry& entry) {
                 return size + entry.size;
                 });
@@ -68,10 +68,10 @@ namespace {
         using Filter = std::function<bool(const Entry&)>;
         Entries filter(Filter cond) const
         {
-            Entries ret(pool);
-            std::copy_if(entries.cbegin(),
-                         entries.cend(),
-                         std::back_inserter(ret.entries),
+            Entries ret(pool_);
+            std::copy_if(entries_.cbegin(),
+                         entries_.cend(),
+                         std::back_inserter(ret.entries_),
                          std::move(cond));
             return ret;
         }
@@ -80,10 +80,13 @@ namespace {
         {
             return [this, predicate](const Entry& entry)
             {
-                CTxMemPoolTestAccess testPoolAccess(pool);
+                CTxMemPoolTestAccess testPoolAccess(pool_);
                 return predicate(testPoolAccess, entry);
             };
         }
+        
+        CTxMemPool& pool_; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+        std::vector<Entry> entries_;
     };
 
     // Predicates
@@ -125,9 +128,8 @@ namespace {
 
     struct Demand
     {
-        int howMany;
+        int howMany{};
         CFeeRate fee;
-        Demand(int howMany, CFeeRate fee) : howMany(howMany), fee(fee) {}
     };
 
     std::vector<CTxMemPoolEntry> GetABunchOfEntries(const Demand& demand)
@@ -179,7 +181,7 @@ namespace {
                 const TxId txId = txn.GetTxId();
                 pool.AddUnchecked(txId, txn, TxStorage::memory, nullChangeSet);
                 bool isForPrimary = txn.GetFee() >= A_BLOCK_MIN_FEE.GetFee(txn.GetTxSize());
-                entries.entries.push_back({txId, isForPrimary, txn.GetTxSize()});
+                entries.push_back({txId, isForPrimary, txn.GetTxSize()});
             }
         }
         // test the basic assumptions how Entries interacts with the mempool

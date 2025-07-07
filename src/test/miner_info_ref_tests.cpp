@@ -90,7 +90,7 @@ BOOST_AUTO_TEST_CASE(parse_miner_id_ref_happy_case)
     
     constexpr uint8_t sig_len{70};
     script.push_back(sig_len);
-    generate_n(back_inserter(script), sig_len, [](){ static uint8_t i{}; return i++; });
+    generate_n(back_inserter(script), sig_len, [](){ static uint8_t n{}; return n++; });
 
     const auto status = ParseMinerInfoRef(script);
     BOOST_CHECK(std::holds_alternative<miner_info_ref>(status));

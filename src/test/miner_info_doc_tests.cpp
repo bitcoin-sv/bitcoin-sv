@@ -126,39 +126,39 @@ namespace
     std::string to_json(T first, T last)
     {
         bool first_pass{true};
-        string doc{R"({ )"};
-        doc = accumulate(first,
-                         last,
-                         doc,
-                         [&first_pass](auto&& doc, const auto& x) {
-                             const auto& [name, type, value] = x;
-                             if(first_pass)
-                                 first_pass = false;
-                             else
-                                 doc += ", ";
-                             doc += R"(")";
-                             doc += name;
-                             doc += R"(" : )";
-                             if(type == json_value_type::string)
-                             {
-                                 doc += R"(")";
-                                 doc += value;
-                                 doc += R"(")";
-                             }
-                             else if(type == json_value_type::number)
-                             {
-                                 doc += value;
-                             }
-                             else if(type == json_value_type::object)
-                             {
-                                 doc += R"({ )";
-                                 doc += value;
-                                 doc += R"( })";
-                             }
-                             return doc;
-                         });
-        doc.append("}");
-        return doc;
+        string s{R"({ )"};
+        s = accumulate(first,
+                       last,
+                       s,
+                       [&first_pass](auto&& doc, const auto& x) {
+                           const auto& [name, type, value] = x;
+                           if(first_pass)
+                               first_pass = false;
+                           else
+                               doc += ", ";
+                           doc += R"(")";
+                           doc += name;
+                           doc += R"(" : )";
+                           if(type == json_value_type::string)
+                           {
+                               doc += R"(")";
+                               doc += value;
+                               doc += R"(")";
+                           }
+                           else if(type == json_value_type::number)
+                           {
+                               doc += value;
+                           }
+                           else if(type == json_value_type::object)
+                           {
+                               doc += R"({ )";
+                               doc += value;
+                               doc += R"( })";
+                           }
+                           return doc;
+                       });
+        s.append("}");
+        return s;
     }
 
     template <typename T, typename U>
@@ -952,7 +952,7 @@ BOOST_AUTO_TEST_CASE(parse_datarefs_happy_case)
     const vector<string> expected_brfcids{"brfcid_1", "brfcid_2"};
     const vector<data_ref> expected{
         data_ref{expected_brfcids, expected_txid, 1, "gzip"}};
-    const auto actual = get<::data_refs>(var_data_refs);
+    const auto actual = get<::data_refs_type>(var_data_refs);
     BOOST_CHECK_EQUAL_COLLECTIONS(expected.cbegin(),
                                   expected.cend(),
                                   actual.cbegin(),

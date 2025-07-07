@@ -40,7 +40,7 @@ using UnitTestAccess = BlockReadCache::UnitTestAccess<tests_id>;
 
 BOOST_AUTO_TEST_SUITE(block_read_cache)
 
-BOOST_FIXTURE_TEST_CASE(cache, TestChain100Setup)
+BOOST_FIXTURE_TEST_CASE(block_read_cache_test, TestChain100Setup)
 {
     using namespace std::literals::chrono_literals;
 

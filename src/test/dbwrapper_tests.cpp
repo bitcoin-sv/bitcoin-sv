@@ -3,7 +3,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "dbwrapper.h"
-#include "random.h"
 #include "test/test_bitcoin.h"
 #include "uint256.h"
 
@@ -31,15 +30,15 @@ namespace {
 struct ScopedPathDeleter // NOLINT(cppcoreguidelines-special-member-functions)
 {
     ScopedPathDeleter(fs::path& p)
-    : p(p)
+    : path_{p}
     {}
 
     ~ScopedPathDeleter()
     {
-        fs::remove_all(p);
+        fs::remove_all(path_);
     }
 
-    fs::path& p; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+    fs::path& path_; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 };
 
 }

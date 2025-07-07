@@ -274,10 +274,10 @@ static void CCoinsInsertion(benchmark::State &state, bool V1) {
 
         auto shardedTarget = [](uint16_t shardIndex,
                                 CCoinsViewCache::Shard& shard,
-                                const std::vector<CTransactionRef>& txns)
+                                const std::vector<CTransactionRef>& txs)
         {
             CoinWithScript coin;
-            auto& tx = txns[shardIndex];
+            auto& tx = txs[shardIndex];
             for (auto& vin : tx->vin) {
                 shard.SpendCoin(vin.prevout, &coin);
             }

@@ -3579,8 +3579,8 @@ BOOST_AUTO_TEST_CASE(IsMinerIdScript)
     };
     for(const auto& [input, expected] : v)
     {
-        const vector<uint8_t> script{input};
-        BOOST_CHECK_EQUAL(expected, IsMinerId(script));
+        const vector<uint8_t> s{input};
+        BOOST_CHECK_EQUAL(expected, IsMinerId(s));
     }
 }
 
@@ -4593,16 +4593,16 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checksig_forkid_chronicle)
     {
         LimitedStack stack(UINT32_MAX);
         
-        const auto s{accumulate(sighashes.begin(), sighashes.end(), 
-                                vector<uint8_t>{}, 
-                                [](auto acc, const auto sighash)
-                                {
-                                    const auto s{make_op_checksig_script(make_signature(low_s_max(),
-                                                                                        sighash),
-                                                                         make_pub_key())};
-                                    acc.insert(acc.end(), s.begin(), s.end());
-                                    return acc;
-                                })};
+        const auto script{accumulate(sighashes.begin(), sighashes.end(), 
+                                     vector<uint8_t>{}, 
+                                     [](auto acc, const auto sighash)
+                                     {
+                                         const auto s{make_op_checksig_script(make_signature(low_s_max(),
+                                                                                             sighash),
+                                                                             make_pub_key())};
+                                         acc.insert(acc.end(), s.begin(), s.end());
+                                         return acc;
+                                     })};
         const uint32_t flags{SCRIPT_ENABLE_SIGHASH_FORKID
                             | SCRIPT_VERIFY_STRICTENC
                             | SCRIPT_CHRONICLE
@@ -4610,7 +4610,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checksig_forkid_chronicle)
         const auto status = EvalScript(params,
                                        source->GetToken(),
                                        stack,
-                                       CScript{s.begin(), s.end()},
+                                       CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{});
         assert(status);
@@ -4645,16 +4645,16 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checkmultisig_forkid_relax)
     {
         LimitedStack stack(UINT32_MAX);
 
-        const auto s{accumulate(sighashes.begin(), sighashes.end(), 
-                                vector<uint8_t>{}, 
-                                [](auto acc, const auto sighash)
-                                {
-                                    const auto s{make_op_check_multi_sig_script({make_signature(low_s_max(),
-                                                                                                sighash)},
-                                                                                {make_pub_key()})};
-                                    acc.insert(acc.end(), s.begin(), s.end());
-                                    return acc;
-                                })};
+        const auto script{accumulate(sighashes.begin(), sighashes.end(), 
+                                     vector<uint8_t>{}, 
+                                     [](auto acc, const auto sighash)
+                                     {
+                                         const auto s{make_op_check_multi_sig_script({make_signature(low_s_max(),
+                                                                                                     sighash)},
+                                                                                     {make_pub_key()})};
+                                         acc.insert(acc.end(), s.begin(), s.end());
+                                         return acc;
+                                     })};
 
         const uint32_t flags{SCRIPT_ENABLE_SIGHASH_FORKID
                             | SCRIPT_VERIFY_STRICTENC
@@ -4663,7 +4663,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checkmultisig_forkid_relax)
         const auto status = EvalScript(params,
                                        source->GetToken(),
                                        stack,
-                                       CScript{s.begin(), s.end()},
+                                       CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{});
         assert(status);

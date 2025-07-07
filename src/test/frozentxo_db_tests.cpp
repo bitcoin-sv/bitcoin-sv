@@ -420,12 +420,12 @@ BOOST_AUTO_TEST_CASE(db_tests)
 
                 // Check that records are actually removed from DB
 
-                CFrozenTXODB::FrozenTXOData ftd = CFrozenTXODB::FrozenTXOData::Create_Uninitialized();
+                CFrozenTXODB::FrozenTXOData ft_data = CFrozenTXODB::FrozenTXOData::Create_Uninitialized();
                 for(auto& txoid: txoid_front)
                 {
-                    BOOST_CHECK( !db.GetFrozenTXOData(txoid, ftd) );
+                    BOOST_CHECK( !db.GetFrozenTXOData(txoid, ft_data) );
                 }
-                BOOST_CHECK( !db.GetFrozenTXOData(txoid_last, ftd) );
+                BOOST_CHECK( !db.GetFrozenTXOData(txoid_last, ft_data) );
             });
             thd.join();
         }

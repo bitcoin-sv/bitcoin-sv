@@ -524,12 +524,12 @@ BOOST_AUTO_TEST_CASE(setcompact_test)
                                                  "00000000000000000000000000000000"),
     }; 
 
-    for(const auto& [input, exp_negative, exp_overflow, exp] : inputs)
+    for(const auto& [ip, exp_negative, exp_overflow, exp] : inputs)
     {
         bool is_negative{};
         bool is_overflow{};
         arith_uint256 a;
-        const auto b = a.SetCompact(input, &is_negative, &is_overflow);
+        const auto b = a.SetCompact(ip, &is_negative, &is_overflow);
         BOOST_CHECK_EQUAL(exp_negative, is_negative);
         BOOST_CHECK_EQUAL(exp_overflow, is_overflow);
         BOOST_CHECK_EQUAL(arith_uint256{exp}, a);

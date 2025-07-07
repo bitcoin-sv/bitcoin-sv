@@ -1486,12 +1486,12 @@ BOOST_FIXTURE_TEST_CASE(sharding, TestingSetup)
         // A lambda to call sharded which will receive the shard index, the shard itself, and additional test arguments
         auto shardedTarget = [blockHeight](uint16_t shardIndex,
                                            CCoinsViewCache::Shard& shard,
-                                           const TxIdArray& txIds,
-                                           const TxIdArray& pregenTxIds,
-                                           TxIdArray& newTxIds)
+                                           const TxIdArray& tx_ids,
+                                           const TxIdArray& pre_gen_tx_ids,
+                                           TxIdArray& new_tx_ids)
         {
             // Check coin exists via shard
-            const COutPoint spendCoin { txIds[shardIndex], 0 };
+            const COutPoint spendCoin { tx_ids[shardIndex], 0 };
             BOOST_CHECK(shard.HaveCoin(spendCoin));
 
             // Spend coin via shard
@@ -1499,8 +1499,8 @@ BOOST_FIXTURE_TEST_CASE(sharding, TestingSetup)
             BOOST_CHECK(! shard.HaveCoin(spendCoin));
 
             // Create 2 new coins
-            auto& newTxId = pregenTxIds[shardIndex];
-            newTxIds[shardIndex] = newTxId;
+            auto& newTxId = pre_gen_tx_ids[shardIndex];
+            new_tx_ids[shardIndex] = newTxId;
             COutPoint newCoin1 { newTxId, 0 };
             COutPoint newCoin2 { newTxId, 1 };
             CScript scr { OP_RETURN };
@@ -1626,10 +1626,10 @@ BOOST_FIXTURE_TEST_CASE(cache_all_inputs, TestingSetup)
 
         auto shardedTarget = [](uint16_t shardIndex,
                                 CCoinsViewCache::Shard& shard,
-                                const std::vector<CTransactionRef>& txns)
+                                const std::vector<CTransactionRef>& txs)
         {
             CoinWithScript coin;
-            auto& tx = txns[shardIndex];
+            auto& tx = txs[shardIndex];
             for (auto& vin : tx->vin) {
                 shard.SpendCoin(vin.prevout, &coin);
             }

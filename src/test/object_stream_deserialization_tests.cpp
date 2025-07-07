@@ -10,7 +10,7 @@
 
 BOOST_FIXTURE_TEST_SUITE(object_stream_deserialization_tests, BasicTestingSetup)
 
-BOOST_AUTO_TEST_CASE(block)
+BOOST_AUTO_TEST_CASE(block_test)
 {
     CBlock block{BuildRandomTestBlock()};
     std::vector<uint8_t> serializedData{Serialize(block)};

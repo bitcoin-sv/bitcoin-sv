@@ -263,18 +263,20 @@ BOOST_AUTO_TEST_CASE(multiple_outputs)
     // getting one value from eight threads and pushing them to the collectingQueue
     for(unsigned i = 0; i < nThreads; ++i)
     {
-        auto f = std::async(std::launch::async, 
-            [&theQueue, &collectingQueue, &sf](std::promise<void>* ready){ 
-
-                ready->set_value();
-                sf.wait();                
+        auto f = std::async(
+            std::launch::async,
+            [&theQueue, &collectingQueue, &sf](std::promise<void>* p)
+            {
+                p->set_value();
+                sf.wait();
 
                 std::optional<int> popped = theQueue.PopWait();
                 if(popped.has_value())
                 {
                     collectingQueue.PushWait(popped.value());
                 }
-            }, &ready[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+            },
+            &ready[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         outs.push_back(std::move(f));
     }
 

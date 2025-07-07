@@ -503,7 +503,7 @@ namespace
             }
 
             // Build and submit dataref txn to mempool
-            auto SubmitTxn = [this](const CTransactionRef& fundTxn, const std::string& dataRefJson)
+            auto SubmitTxn = [this](const CTransactionRef& fundTxn, const std::string& dataref_json)
             {
                 CMutableTransaction txn {};
                 txn.vin.resize(1);
@@ -511,7 +511,7 @@ namespace
                 txn.vout.resize(1);
                 txn.vout[0].nValue = Amount{0};
                 txn.vout[0].scriptPubKey = CScript() << OP_FALSE << OP_RETURN << MinerInfoProtocolPrefix
-                                                     << std::vector<uint8_t> { dataRefJson.begin(), dataRefJson.end() };
+                                                     << std::vector<uint8_t> { dataref_json.begin(), dataref_json.end() };
 
                 // Sign
                 std::vector<uint8_t> vchSig {};

@@ -238,14 +238,17 @@ namespace
             }
 
             // Build and submit txn to mempool
-            auto SubmitTxn = [this](const CTransaction& fundTxn, const std::string& dataRefJson)
+            auto SubmitTxn = [this](const CTransaction& fundTxn, const std::string& dataref_json)
             {
                 CMutableTransaction txn {};
                 txn.vin.resize(1);
                 txn.vin[0].prevout = COutPoint { fundTxn.GetId(), 0 };
                 txn.vout.resize(1);
                 txn.vout[0].nValue = Amount{1000};
-                txn.vout[0].scriptPubKey = CScript() << OP_FALSE << OP_RETURN << ProtocolPrefix << std::vector<uint8_t> { dataRefJson.begin(), dataRefJson.end() };
+                txn.vout[0].scriptPubKey = CScript()
+                                           << OP_FALSE << OP_RETURN << ProtocolPrefix
+                                           << std::vector<uint8_t>{dataref_json.begin(),
+                                                                   dataref_json.end()};
 
                 // Sign
                 std::vector<uint8_t> vchSig {};

@@ -459,20 +459,21 @@ BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
     CTxMemPoolTestAccess testPoolAccess{testPool};
     const TxId& txid = txParent.GetId();
     // A lambda-helper to add a txn to the empty testPool and to do basic checks.
-    const auto add_txn_to_testpool = [&testPool, &testPoolAccess](
-        const CMutableTransaction& txParent,
-        const TxId& txid) {
+    const auto add_txn_to_testpool =
+        [&testPool, &testPoolAccess](const CMutableTransaction& tx_parent,
+                                     const TxId& tx_id)
+    {
         BOOST_CHECK_EQUAL(testPool.Size(), 0UL);
-        testPool.AddUnchecked(txid, TestMemPoolEntryHelper{DEFAULT_TEST_TX_FEE}.FromTx(txParent),
+        testPool.AddUnchecked(tx_id, TestMemPoolEntryHelper{DEFAULT_TEST_TX_FEE}.FromTx(tx_parent),
                               TxStorage::memory, nullChangeSet);
         BOOST_CHECK_EQUAL(testPool.Size(), 1UL);
-        BOOST_CHECK(!testPoolAccess.mapDeltas().count(txid));
+        BOOST_CHECK(!testPoolAccess.mapDeltas().count(tx_id));
     };
     // A lambda-helper to check if an entry was added to the mapDeltas.
-    const auto check_entry_added_to_mapdeltas = [&testPoolAccess](const TxId& txid)
+    const auto check_entry_added_to_mapdeltas = [&testPoolAccess](const TxId& tx_id)
     {
-        BOOST_CHECK(testPoolAccess.mapDeltas().count(txid));
-        BOOST_CHECK_EQUAL(testPoolAccess.mapDeltas()[txid], MAX_MONEY);
+        BOOST_CHECK(testPoolAccess.mapDeltas().count(tx_id));
+        BOOST_CHECK_EQUAL(testPoolAccess.mapDeltas()[tx_id], MAX_MONEY);
     };
     // Case 1.
     // Instantiate txPrioritizer to prioritise a single txn.
@@ -847,7 +848,7 @@ BOOST_AUTO_TEST_CASE(InfoAllTest)
     BOOST_CHECK_EQUAL(allTxns.size(), 2);
 
     // InfoMatching gets just those matching the predicate
-    const auto& matchingTxns { pool.InfoMatching([](const CTxMemPoolEntry& entry){ return entry.IsInPrimaryMempool(); }) };
+    const auto& matchingTxns { pool.InfoMatching([](const CTxMemPoolEntry& e){ return e.IsInPrimaryMempool(); }) };
     BOOST_REQUIRE_EQUAL(matchingTxns.size(), 1);
     BOOST_CHECK_EQUAL(matchingTxns[0].GetTxId(), tx1.GetId());
 }

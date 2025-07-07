@@ -20,8 +20,8 @@ namespace MempoolTesting
     class CTimeLockedMempoolTester
     {
       public:
-        CTimeLockedMempoolTester(CTimeLockedMempool& mempool)
-        : mMempool{mempool}
+        CTimeLockedMempoolTester(CTimeLockedMempool& mem_pool)
+        : mMempool{mem_pool}
         {}
 
         // Check if the specified transaction is in the time-locked pool

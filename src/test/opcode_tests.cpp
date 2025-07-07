@@ -1444,12 +1444,12 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
 
     const Config& config = GlobalConfig::GetConfig();
 
-    using exp_stack_top = std::optional<std::vector<uint8_t>>;
+    using exp_stack_top_type = std::optional<std::vector<uint8_t>>;
     using test_args = tuple<int32_t,                    // tx_version
                             vector<uint8_t>,            // script
                             ScriptError,                // expected scriptError
                             LimitedStack::size_type,    // expected stack size 
-                            exp_stack_top>;             // expected top of stack
+                            exp_stack_top_type>;        // expected top of stack
     const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
     const vector<test_args> test_data 
     {
@@ -1457,66 +1457,66 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERIF,
               OP_2 }, 
-            SCRIPT_ERR_UNBALANCED_CONDITIONAL, 1, exp_stack_top{{2}} },
+            SCRIPT_ERR_UNBALANCED_CONDITIONAL, 1, exp_stack_top_type{{2}} },
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERIF,
               OP_2,
             OP_ELSE},
-            SCRIPT_ERR_UNBALANCED_CONDITIONAL, 1, exp_stack_top{{2}} },
+            SCRIPT_ERR_UNBALANCED_CONDITIONAL, 1, exp_stack_top_type{{2}} },
       
       // Non-matching cases
       // Too short
       { 1, {OP_PUSHDATA1, 1, 1,
             OP_VERIF, // no statements
-            OP_ENDIF}, SCRIPT_ERR_OK, 0, exp_stack_top{} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 0, exp_stack_top_type{} },
       { 1, {OP_PUSHDATA1, 1, 1,
             OP_VERIF,
               OP_2, // statement not executed
-            OP_ENDIF}, SCRIPT_ERR_OK, 0, exp_stack_top{} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 0, exp_stack_top_type{} },
       { 1, {OP_PUSHDATA1, 1, 1,
             OP_VERIF,
               OP_2,
             OP_ELSE,
               OP_3, // else executed 
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{3}} },
       { 1, {OP_PUSHDATA1, 1, 1,
             OP_VERIF,
               OP_2,
             OP_ELSE,
               OP_3,
               OP_NEGATE, // multiple statements
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{0x83}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{0x83}} },
       { 1, {OP_PUSHDATA1, 2, 1, 0,
             OP_VERIF,
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{3}} },
       { 1, {OP_PUSHDATA1, 3, 1, 0, 0, 
             OP_VERIF,
               OP_2,
             OP_ELSE,
               OP_3, 
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{3}} },
 
       { 1, {OP_PUSHDATA1, 5, 1, 0, 0, 0, 0, // Too long
             OP_VERIF,
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{3}} },
       { 1, {OP_PUSHDATA1, 4, 2, 0, 0, 0,    // Wrong value
             OP_VERIF,
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{3}} },
       { 1, {OP_PUSHDATA1, 4, 0, 0, 0, 1,    // Wrong endian
             OP_VERIF,
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{3}} },
       
       // Matching cases
       { 0, {OP_PUSHDATA1, 4, 0, 0, 0, 0,
@@ -1524,36 +1524,36 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERIF,
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
       { INT32_MAX, {OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0x7f,
                     OP_VERIF,
                       OP_2,
                     OP_ELSE,
                       OP_3,
-                    OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+                    OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
       { INT32_MIN, {OP_PUSHDATA1, 4, 0x0, 0x0, 0x0, 0x80,
                     OP_VERIF,
                       OP_2,
                     OP_ELSE,
                       OP_3,
-                    OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+                    OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERIF, // No statements
-            OP_ENDIF}, SCRIPT_ERR_OK, 0, exp_stack_top{} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 0, exp_stack_top_type{} },
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERIF,
               OP_2,   // no else 
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERIF,
               OP_2, OP_NEGATE,  // multiple statements
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{0x82}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{0x82}} },
       // nesting
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_PUSHDATA1, 4, 1, 0, 0, 0,
@@ -1561,7 +1561,7 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
               OP_VERIF,
                 OP_2,
               OP_ENDIF,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_PUSHDATA1, 4, 2, 0, 0, 0,
             OP_VERIF,
@@ -1569,7 +1569,7 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
               OP_VERIF,
                 OP_2,
               OP_ENDIF,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
       { 1, {OP_PUSHDATA1, 4, 2, 0, 0, 0,
             OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERIF,
@@ -1577,7 +1577,7 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
               OP_ELSE,
                 OP_2,
               OP_ENDIF,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
       { 1, {OP_PUSHDATA1, 4, 2, 0, 0, 0,
             OP_PUSHDATA1, 4, 2, 0, 0, 0,
             OP_VERIF,
@@ -1586,7 +1586,7 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
               OP_ELSE,
                 OP_2,
               OP_ENDIF,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
     };
 
     for(const auto& [tx_version,
@@ -1686,76 +1686,76 @@ BOOST_AUTO_TEST_CASE(op_vernotif_post_chronicle)
 
     const Config& config = GlobalConfig::GetConfig();
 
-    using exp_stack_top = std::optional<std::vector<uint8_t>>;
+    using exp_stack_top_type = std::optional<std::vector<uint8_t>>;
     using test_args = tuple<int32_t,                    // tx_version
                             vector<uint8_t>,            // script
                             ScriptError,                // expected scriptError
                             LimitedStack::size_type,    // expected stack size 
-                            exp_stack_top>;             // expected top of stack
+                            exp_stack_top_type>;        // expected top of stack
     const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
     const vector<test_args> test_data = 
     {
       // Unbalanced cases
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERNOTIF,
-              OP_2 }, SCRIPT_ERR_UNBALANCED_CONDITIONAL, 0, exp_stack_top{} },
+              OP_2 }, SCRIPT_ERR_UNBALANCED_CONDITIONAL, 0, {} },
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERNOTIF,
               OP_2,
-            OP_ELSE}, SCRIPT_ERR_UNBALANCED_CONDITIONAL, 0, exp_stack_top{} },
+            OP_ELSE}, SCRIPT_ERR_UNBALANCED_CONDITIONAL, 0, {} },
       
       // Too short
       { 1, {OP_PUSHDATA1, 1, 1,
             OP_VERNOTIF, // no statements
-            OP_ENDIF}, SCRIPT_ERR_OK, 0, exp_stack_top{} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 0, {} },
 
       { 1, {OP_PUSHDATA1, 1, 1,
             OP_VERNOTIF,
               OP_2, // statement executed
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{2}} },
       { 1, {OP_PUSHDATA1, 1, 2,
             OP_VERNOTIF,
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{2}} },
       { 1, {OP_PUSHDATA1, 1, 1,
             OP_VERNOTIF,
               OP_2,
               OP_NEGATE, // multiple statements
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{0x82}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{0x82}} },
       { 1, {OP_PUSHDATA1, 2, 1, 0,
             OP_VERNOTIF,
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{2}} },
       { 1, {OP_PUSHDATA1, 3, 1, 0, 0, 
             OP_VERNOTIF,
                 OP_2,
             OP_ELSE,
                 OP_3, 
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{2}} },
       { 1, {OP_PUSHDATA1, 5, 1, 0, 0, 0, 0,     // Too long
             OP_VERNOTIF,
                 OP_2,
             OP_ELSE,
                 OP_3,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{2}} },
       { 1, {OP_PUSHDATA1, 4, 2, 0, 0, 0,        // Wrong value
             OP_VERNOTIF,
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{2}} },
       { 1, {OP_PUSHDATA1, 4, 0, 0, 0, 1,        // Wrong endian
             OP_VERNOTIF,
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{2}} },
 
       // Matching cases
       { 0, {OP_PUSHDATA1, 4, 0, 0, 0, 0,
@@ -1763,38 +1763,38 @@ BOOST_AUTO_TEST_CASE(op_vernotif_post_chronicle)
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{3}} },
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERNOTIF,
               OP_2,
             OP_ELSE,
               OP_3,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{3}} },
       { INT32_MAX, {OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0x7f,
                     OP_VERNOTIF,
                       OP_2,
                     OP_ELSE,
                       OP_3,
-                    OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
+                    OP_ENDIF}, SCRIPT_ERR_OK, 1, {{3}} },
       { INT32_MIN, {OP_PUSHDATA1, 4, 0x0, 0x0, 0x0, 0x80,
                     OP_VERNOTIF,
                       OP_2,
                     OP_ELSE,
                       OP_3,
-                    OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
+                    OP_ENDIF}, SCRIPT_ERR_OK, 1, {{3}} },
 
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERNOTIF, // No statements
-            OP_ENDIF}, SCRIPT_ERR_OK, 0, exp_stack_top{} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 0, {} },
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERNOTIF,
               OP_2,   // no else 
-            OP_ENDIF}, SCRIPT_ERR_OK, 0, exp_stack_top{} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 0, {} },
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERNOTIF,
             OP_ELSE,
               OP_2, OP_NEGATE,  // multiple statements
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{0x82}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{0x82}} },
       // nesting
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_PUSHDATA1, 4, 1, 0, 0, 0,
@@ -1804,7 +1804,7 @@ BOOST_AUTO_TEST_CASE(op_vernotif_post_chronicle)
                 OP_ELSE,
                     OP_3,
                 OP_ENDIF,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{3}} },
       { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_PUSHDATA1, 4, 2, 0, 0, 0,
             OP_VERNOTIF,
@@ -1812,7 +1812,7 @@ BOOST_AUTO_TEST_CASE(op_vernotif_post_chronicle)
                 OP_ELSE,
                 OP_3,
               OP_ENDIF,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{3}} },
       { 1, {OP_PUSHDATA1, 4, 2, 0, 0, 0,
             OP_PUSHDATA1, 4, 1, 0, 0, 0,
             OP_VERNOTIF,
@@ -1820,14 +1820,14 @@ BOOST_AUTO_TEST_CASE(op_vernotif_post_chronicle)
                 OP_VERNOTIF,
                   OP_3,
                 OP_ENDIF,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{3}} },
       { 1, {OP_PUSHDATA1, 4, 2, 0, 0, 0,
             OP_PUSHDATA1, 4, 2, 0, 0, 0,
             OP_VERNOTIF,
                 OP_VERNOTIF,
                   OP_3,
                 OP_ENDIF,
-            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top{{3}} },
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{3}} },
     };
 
     for(const auto& [tx_version,
@@ -1913,59 +1913,59 @@ BOOST_AUTO_TEST_CASE(op_substr_post_chronicle)
 
     const Config& config = GlobalConfig::GetConfig();
 
-    using exp_stack_top = std::optional<std::vector<uint8_t>>;
+    using exp_stack_top_type = std::optional<std::vector<uint8_t>>;
     using test_args = tuple<vector<uint8_t>,            // script
                             ScriptError,                // expected scriptError
                             LimitedStack::size_type,    // expected stack size 
-                            exp_stack_top>;             // expected top of stack
+                            exp_stack_top_type>;             // expected top of stack
     const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
     const vector<test_args> test_data
     {
       // Stack too small
       { {OP_SUBSTR},
-            SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top{} },
+            SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top_type{} },
       { {OP_1, OP_SUBSTR},
-            SCRIPT_ERR_INVALID_STACK_OPERATION, 1, exp_stack_top{{1}} },
+            SCRIPT_ERR_INVALID_STACK_OPERATION, 1, exp_stack_top_type{{1}} },
       { {OP_1, OP_2, OP_SUBSTR},
-            SCRIPT_ERR_INVALID_STACK_OPERATION, 2, exp_stack_top{{2}} },
+            SCRIPT_ERR_INVALID_STACK_OPERATION, 2, exp_stack_top_type{{2}} },
       // negative start 
       { {OP_1, OP_2, OP_PUSHDATA1, 1, 0x81, OP_SUBSTR},
-            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top{{0x81}} },
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top_type{{0x81}} },
       // start out-of-bounds
       { {OP_PUSHDATA1, 3, 0, 1, 2, OP_3, OP_1, OP_SUBSTR},
-            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top{{1}} },
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top_type{{1}} },
       // negative length 
       { {OP_1, OP_PUSHDATA1, 1, 0x81, OP_3, OP_SUBSTR},
-            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top{{3}} },
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top_type{{3}} },
       // length out-of-bounds
       { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0, OP_4, OP_SUBSTR},
-            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top{{4}} },
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top_type{{4}} },
       // An empty stack element as input data is always an error - no valid start position
       { {OP_0, OP_0, OP_0, OP_SUBSTR}, // empty stacktop
-            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top{std::in_place} },
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top_type{std::in_place} },
 
       // Success cases
       // length zero 
       { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0, OP_0, OP_SUBSTR},
-            SCRIPT_ERR_OK, 1, exp_stack_top{std::in_place} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
       { {OP_PUSHDATA1, 3, 0, 1, 2, OP_1, OP_0, OP_SUBSTR},
-            SCRIPT_ERR_OK, 1, exp_stack_top{std::in_place} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
       { {OP_PUSHDATA1, 3, 0, 1, 2, OP_2, OP_0, OP_SUBSTR},
-            SCRIPT_ERR_OK, 1, exp_stack_top{std::in_place} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
 
       // length one 
       { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0, OP_1, OP_SUBSTR},
-            SCRIPT_ERR_OK, 1, exp_stack_top{{0}} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0}} },
       { {OP_PUSHDATA1, 3, 0, 1, 2, OP_1, OP_1, OP_SUBSTR},
-            SCRIPT_ERR_OK, 1, exp_stack_top{{1}} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{1}} },
       { {OP_PUSHDATA1, 3, 0, 1, 2, OP_2, OP_1, OP_SUBSTR},
-            SCRIPT_ERR_OK, 1, exp_stack_top{{2}} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
       
       // length two 
       { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0, OP_2, OP_SUBSTR},
-            SCRIPT_ERR_OK, 1, exp_stack_top{{0, 1}} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0, 1}} },
       { {OP_PUSHDATA1, 3, 0, 1, 2, OP_1, OP_2, OP_SUBSTR},
-            SCRIPT_ERR_OK, 1, exp_stack_top{{1, 2}} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{1, 2}} },
     };
 
     for(const auto& [script,
@@ -2047,46 +2047,46 @@ BOOST_AUTO_TEST_CASE(op_left_post_chronicle)
 
     const Config& config = GlobalConfig::GetConfig();
 
-    using exp_stack_top = std::optional<std::vector<uint8_t>>;
+    using exp_stack_top_type = std::optional<std::vector<uint8_t>>;
     using test_args = tuple<vector<uint8_t>,            // script
                             ScriptError,                // expected scriptError
                             LimitedStack::size_type,    // expected stack size 
-                            exp_stack_top>;             // expected top of stack
+                            exp_stack_top_type>;        // expected top of stack
     const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
     const vector<test_args> test_data
     {
       // Stack too small
       { {OP_LEFT},
-            SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top{} },
+            SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top_type{} },
       { {OP_1, OP_LEFT},
-            SCRIPT_ERR_INVALID_STACK_OPERATION, 1, exp_stack_top{{1}} },
+            SCRIPT_ERR_INVALID_STACK_OPERATION, 1, exp_stack_top_type{{1}} },
       // negative length 
       { {OP_1, OP_1, OP_NEGATE, OP_LEFT},
-            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top{{0x81}} },
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{0x81}} },
       
       // Empty string
       { {OP_0, OP_0, OP_LEFT},
-            SCRIPT_ERR_OK, 1, exp_stack_top{std::in_place} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
       { {OP_0, OP_1, OP_LEFT},
-            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top{{1}} },
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{1}} },
      
       // Single element
       { {OP_PUSHDATA1, 1, 0, OP_0, OP_LEFT},
-            SCRIPT_ERR_OK, 1, exp_stack_top{std::in_place} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
       { {OP_PUSHDATA1, 1, 0, OP_1, OP_LEFT},
-            SCRIPT_ERR_OK, 1, exp_stack_top{{0}} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0}} },
       { {OP_PUSHDATA1, 1, 0, OP_2, OP_LEFT},
-            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top{{2}} },
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{2}} },
      
       // Multiple elements
       { {OP_PUSHDATA1, 2, 0, 1, OP_0, OP_LEFT},
-            SCRIPT_ERR_OK, 1, exp_stack_top{std::in_place} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
       { {OP_PUSHDATA1, 2, 0, 1, OP_1, OP_LEFT},
-            SCRIPT_ERR_OK, 1, exp_stack_top{{0}} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0}} },
       { {OP_PUSHDATA1, 2, 0, 1, OP_2, OP_LEFT},
-            SCRIPT_ERR_OK, 1, exp_stack_top{{0, 1}} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0, 1}} },
       { {OP_PUSHDATA1, 2, 0, 1, OP_3, OP_LEFT}, // length out-of-bounds
-            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top{{3}} },
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{3}} },
     };
 
     for(const auto& [script,
@@ -2168,46 +2168,46 @@ BOOST_AUTO_TEST_CASE(op_right_post_chronicle)
 
     const Config& config = GlobalConfig::GetConfig();
 
-    using exp_stack_top = std::optional<std::vector<uint8_t>>;
+    using exp_stack_top_type = std::optional<std::vector<uint8_t>>;
     using test_args = tuple<vector<uint8_t>,            // script
                             ScriptError,                // expected scriptError
                             LimitedStack::size_type,    // expected stack size 
-                            exp_stack_top>;             // expected top of stack
+                            exp_stack_top_type>;             // expected top of stack
     const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
     const vector<test_args> test_data
     {
       // Stack too small
       { {OP_RIGHT},
-            SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top{} },
+            SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top_type{} },
       { {OP_1, OP_RIGHT},
-            SCRIPT_ERR_INVALID_STACK_OPERATION, 1, exp_stack_top{{1}} },
+            SCRIPT_ERR_INVALID_STACK_OPERATION, 1, exp_stack_top_type{{1}} },
       // negative length 
       { {OP_1, OP_1, OP_NEGATE, OP_RIGHT},
-            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top{{0x81}} },
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{0x81}} },
       
       // Empty string
       { {OP_0, OP_0, OP_RIGHT},
-            SCRIPT_ERR_OK, 1, exp_stack_top{std::in_place} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
       { {OP_0, OP_1, OP_RIGHT},
-            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top{{1}} },
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{1}} },
 
       // Single element
       { {OP_PUSHDATA1, 1, 0, OP_0, OP_RIGHT},
-            SCRIPT_ERR_OK, 1, exp_stack_top{std::in_place} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
       { {OP_PUSHDATA1, 1, 0, OP_1, OP_RIGHT},
-            SCRIPT_ERR_OK, 1, exp_stack_top{{0}} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0}} },
       { {OP_PUSHDATA1, 1, 0, OP_2, OP_RIGHT},
-            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top{{2}} },
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{2}} },
 
       // Multiple elements
       { {OP_PUSHDATA1, 2, 0, 1, OP_0, OP_RIGHT},
-            SCRIPT_ERR_OK, 1, exp_stack_top{std::in_place} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
       { {OP_PUSHDATA1, 2, 0, 1, OP_1, OP_RIGHT},
-            SCRIPT_ERR_OK, 1, exp_stack_top{{1}} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{1}} },
       { {OP_PUSHDATA1, 2, 0, 1, OP_2, OP_RIGHT},
-            SCRIPT_ERR_OK, 1, exp_stack_top{{0, 1}} },
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0, 1}} },
       { {OP_PUSHDATA1, 2, 0, 1, OP_3, OP_RIGHT},
-            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top{{3}} },
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{3}} },
     };
 
     for(const auto& [script,
@@ -2296,58 +2296,58 @@ BOOST_AUTO_TEST_CASE(op_2mul_post_chronicle)
 
     const Config& config = GlobalConfig::GetConfig();
     
-    using exp_stack_top = std::optional<std::vector<uint8_t>>;
+    using exp_stack_top_type = std::optional<std::vector<uint8_t>>;
     using test_args = tuple<vector<uint8_t>,            // script
                             ScriptError,                // expected scriptError
                             LimitedStack::size_type,    // expected stack size 
-                            exp_stack_top>;             // expected top of stack
+                            exp_stack_top_type>;             // expected top of stack
 
     const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
     const vector<test_args> test_data 
     {
         // stack too small
         {{OP_2MUL}, 
-                SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top{}},
+                SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top_type{}},
        
         // Happy cases
         {{OP_0, OP_2MUL}, 
-                SCRIPT_ERR_OK, 1, exp_stack_top{ std::in_place }},
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ std::in_place }},
         {{OP_1, OP_2MUL}, 
-                SCRIPT_ERR_OK, 1, exp_stack_top{ {2} }},
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {2} }},
         {{OP_1, OP_NEGATE, OP_2MUL}, 
-                SCRIPT_ERR_OK, 1, exp_stack_top{ {0x82} }},
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {0x82} }},
         {{OP_2, OP_2MUL}, 
-                SCRIPT_ERR_OK, 1, exp_stack_top{ {4} } },
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {4} } },
         {{OP_2, OP_NEGATE, OP_2MUL}, 
-                SCRIPT_ERR_OK, 1, exp_stack_top{ {0x84} }},
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {0x84} }},
 
         // byte boundary and sign convention 
         {{OP_PUSHDATA1, 1, 0xff, OP_2, OP_MUL, // -127 * 2
           OP_PUSHDATA1, 1, 0xff, OP_2MUL,      // -127 * 2
           OP_2DUP,
           OP_EQUALVERIFY}, 
-                SCRIPT_ERR_OK, 2, exp_stack_top{ {0xfe, 0x80} }},
+                SCRIPT_ERR_OK, 2, exp_stack_top_type{ {0xfe, 0x80} }},
         
         // INT64_MAX
         {{OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0x7f, OP_2MUL},
                 
-                SCRIPT_ERR_OK, 1, exp_stack_top{ {0xfe, 0xff, 0xff, 0xff, 0x0} }},
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {0xfe, 0xff, 0xff, 0xff, 0x0} }},
         // INT64_MIN
         {{OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0xff, OP_2MUL},
                 
-                SCRIPT_ERR_OK, 1, exp_stack_top{ {0xfe, 0xff, 0xff, 0xff, 0x80} }},
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {0xfe, 0xff, 0xff, 0xff, 0x80} }},
         
         // conditionals 
         {{OP_0,
           OP_IF,
             OP_1, OP_2MUL, // not executed
           OP_ENDIF}, 
-                SCRIPT_ERR_OK, 0, exp_stack_top{}},
+                SCRIPT_ERR_OK, 0, exp_stack_top_type{}},
         {{OP_1,
           OP_IF,
             OP_1, OP_2MUL,
           OP_ENDIF}, 
-                SCRIPT_ERR_OK, 1, exp_stack_top{ {2} }},
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {2} }},
     };
     for(const auto& [script,
                      exp_error,
@@ -2435,58 +2435,58 @@ BOOST_AUTO_TEST_CASE(op_2div_post_chronicle)
 
     const Config& config = GlobalConfig::GetConfig();
     
-    using exp_stack_top = std::optional<std::vector<uint8_t>>;
+    using exp_stack_top_type = std::optional<std::vector<uint8_t>>;
     using test_args = tuple<vector<uint8_t>,            // script
                             ScriptError,                // expected scriptError
                             LimitedStack::size_type,    // expected stack size 
-                            exp_stack_top>;             // expected top of stack
+                            exp_stack_top_type>;             // expected top of stack
 
     const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
     const vector<test_args> test_data 
     {
         // stack too small
         {{OP_2DIV}, 
-                SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top{}},
+                SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top_type{}},
        
         // Happy cases
         {{OP_0, OP_2DIV}, 
-                SCRIPT_ERR_OK, 1, exp_stack_top{ std::in_place }},
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ std::in_place }},
         {{OP_1, OP_2DIV}, 
-                SCRIPT_ERR_OK, 1, exp_stack_top{ std::in_place }},
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ std::in_place }},
         {{OP_1, OP_NEGATE, OP_2DIV}, 
-                SCRIPT_ERR_OK, 1, exp_stack_top{ std::in_place }},
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ std::in_place }},
         {{OP_2, OP_2DIV}, 
-                SCRIPT_ERR_OK, 1, exp_stack_top{ {1} }},
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {1} }},
         {{OP_2, OP_NEGATE, OP_2DIV}, 
-                SCRIPT_ERR_OK, 1, exp_stack_top{ {0x81} }},
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {0x81} }},
 
         // byte boundary and sign convention 
         {{OP_PUSHDATA1, 2, 0xfe, 0x80, OP_2, OP_DIV, // -127 * 2
           OP_PUSHDATA1, 2, 0xfe, 0x80, OP_2DIV,      // -127 * 2
           OP_2DUP,
           OP_EQUALVERIFY}, 
-                SCRIPT_ERR_OK, 2, exp_stack_top{ {0xff} }},
+                SCRIPT_ERR_OK, 2, exp_stack_top_type{ {0xff} }},
 
         // INT64_MAX
         {{OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0x7f, OP_2DIV},
                 
-                SCRIPT_ERR_OK, 1, exp_stack_top{ {0xff, 0xff, 0xff, 0x3f} }},
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {0xff, 0xff, 0xff, 0x3f} }},
         // INT64_MIN
         {{OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0xff, OP_2DIV},
                 
-                SCRIPT_ERR_OK, 1, exp_stack_top{ {0xff, 0xff, 0xff, 0xbf} }},
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {0xff, 0xff, 0xff, 0xbf} }},
 
         // conditionals 
         {{OP_0,
           OP_IF,
             OP_2, OP_2DIV, // not executed
           OP_ENDIF}, 
-                SCRIPT_ERR_OK, 0, exp_stack_top{}},
+                SCRIPT_ERR_OK, 0, exp_stack_top_type{}},
         {{OP_1,
           OP_IF,
             OP_2, OP_2DIV,
           OP_ENDIF}, 
-                SCRIPT_ERR_OK, 1, exp_stack_top{ {1} }},
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {1} }},
     };
     for(const auto& [script,
                      exp_error,
