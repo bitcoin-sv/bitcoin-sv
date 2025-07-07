@@ -634,15 +634,6 @@ Examples:
     // Parse scripts argument
     struct ScriptToVerify
     {
-        ScriptToVerify(CMutableTransaction&& tx, uint32_t n, CScript&& txo_lock, Amount txo_value, uint32_t flags, bool reportflags)
-        : tx{std::move(tx)}
-        , n{n}
-        , txo_lock{std::move(txo_lock)}
-        , txo_value{std::move(txo_value)}
-        , flags{flags}
-        , reportflags{reportflags}
-        {}
-
         // Data needed by script verification
         CTransaction tx;
         uint32_t n;
@@ -833,7 +824,12 @@ Examples:
                 }
             }
 
-            scripts_tmp.emplace_back(std::move(mtx), n, std::move(txo_lock), txo_value, flags, item["reportflags"].getBool());
+            scripts_tmp.emplace_back(CTransaction(std::move(mtx)),
+                                     n,
+                                     std::move(txo_lock),
+                                     txo_value,
+                                     flags,
+                                     item["reportflags"].getBool());
         }
 
         return scripts_tmp;

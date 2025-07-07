@@ -315,11 +315,11 @@ public:
 };
 
 CAsyncMempoolTxDB::CAsyncMempoolTxDB(const fs::path& dbPath, size_t cacheSize, bool inMemory)
-    : queue{new TaskQueue{EstimateTaskQueueSize(GlobalConfig::GetConfig())}},
-      txdb{std::make_shared<CMempoolTxDB>(dbPath, cacheSize, inMemory)},
-      worker{[this](){ Work(); }}
+    : queue_{new TaskQueue{EstimateTaskQueueSize(GlobalConfig::GetConfig())}},
+      txdb_{std::make_shared<CMempoolTxDB>(dbPath, cacheSize, inMemory)},
+      worker_{[this](){ Work(); }}
 {
-    const auto maxSize = queue->MaximalSize();
+    const auto maxSize = queue_->MaximalSize();
     if (maxSize > 5 * ONE_MEBIBYTE)
     {
         LogPrint(BCLog::MEMPOOL,
@@ -336,40 +336,40 @@ CAsyncMempoolTxDB::CAsyncMempoolTxDB(const fs::path& dbPath, size_t cacheSize, b
 
 CAsyncMempoolTxDB::~CAsyncMempoolTxDB()
 {
-    queue->Close(true);
-    worker.join();
+    queue_->Close(true);
+    worker_.join();
 }
 
 void CAsyncMempoolTxDB::Sync()
 {
-    queue->Synchronize();
+    queue_->Synchronize();
 }
 
 void CAsyncMempoolTxDB::Clear()
 {
-    queue->Synchronize({ClearTask{}}, true);
+    queue_->Synchronize({ClearTask{}}, true);
 }
 
 void CAsyncMempoolTxDB::Add(CTransactionWrapperRef&& transactionToAdd)
 {
-    const auto success = queue->PushWait(Task{AddTask{std::move(transactionToAdd)}});
+    const auto success = queue_->PushWait(Task{AddTask{std::move(transactionToAdd)}});
     assert(success && "Push to task queue failed");
 }
 
 void CAsyncMempoolTxDB::Remove(const CMempoolTxDB::TxData& transactionToRemove)
 {
-    const auto success = queue->PushWait(Task{RemoveTask{transactionToRemove}});
+    const auto success = queue_->PushWait(Task{RemoveTask{transactionToRemove}});
     assert(success && "Push to task queue failed");
 }
 
 std::shared_ptr<CMempoolTxDBReader> CAsyncMempoolTxDB::GetDatabase()
 {
-    return txdb;
+    return txdb_;
 }
 
 CMempoolTxDB::TxIdSet CAsyncMempoolTxDB::GetTxKeys()
 {
-    return txdb->GetKeys();
+    return txdb_->GetKeys();
 }
 
 bool CAsyncMempoolTxDB::SetXrefKey(const CMempoolTxDB::XrefKey& xrefKey)
@@ -380,7 +380,7 @@ bool CAsyncMempoolTxDB::SetXrefKey(const CMempoolTxDB::XrefKey& xrefKey)
         result = txdb.SetXrefKey(xrefKey);
     };
 
-    queue->Synchronize({InvokeTask{function}});
+    queue_->Synchronize({InvokeTask{function}});
     return result;
 }
 
@@ -392,7 +392,7 @@ bool CAsyncMempoolTxDB::GetXrefKey(CMempoolTxDB::XrefKey& xrefKey)
         result = txdb.GetXrefKey(xrefKey);
     };
 
-    queue->Synchronize({InvokeTask{function}});
+    queue_->Synchronize({InvokeTask{function}});
     return result;
 }
 
@@ -404,7 +404,7 @@ bool CAsyncMempoolTxDB::RemoveXrefKey()
         result = txdb.RemoveXrefKey();
     };
 
-    queue->Synchronize({InvokeTask{function}});
+    queue_->Synchronize({InvokeTask{function}});
     return result;
 }
 
@@ -419,7 +419,7 @@ void CAsyncMempoolTxDB::Work()
     CMempoolTxDB::Batch batch;
     const auto commit = [this, &batch]()
     {
-        if (!txdb->Commit(batch))
+        if (!txdb_->Commit(batch))
         {
             LogPrint(BCLog::MEMPOOL, "Mempool TxDB batch commit failed.\n");
         }
@@ -437,14 +437,14 @@ void CAsyncMempoolTxDB::Work()
     const auto clear = [this, &batch](const ClearTask&)
     {
         batch.Clear();
-        txdb->ClearDatabase();
+        txdb_->ClearDatabase();
     };
 
     // Invoke a function on the database.
     const auto invoke = [this, &commit](const InvokeTask& task)
     {
         commit();
-        task.function(*txdb);
+        task.function(*txdb_);
     };
 
     // Add transactions to the database and update the wrappers.
@@ -490,7 +490,7 @@ void CAsyncMempoolTxDB::Work()
     {
         try
         {
-            const auto tasks {queue->PopAllWait()};
+            const auto tasks {queue_->PopAllWait()};
             if (!tasks.has_value())
             {
                 break;
@@ -507,7 +507,7 @@ void CAsyncMempoolTxDB::Work()
             // There's really nothing we can do here to recover except terminate
             // the thread and close the queue so that producers will also fail.
             LogPrint(BCLog::MEMPOOL, "Unexpected exception in mempool TxDB worker thread.\n");
-            queue->Close();
+            queue_->Close();
             break;
         }
     }

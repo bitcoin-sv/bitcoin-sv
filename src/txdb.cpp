@@ -85,11 +85,15 @@ struct CDataStreamInput_NoScr : TBase
 {
     using Base = TBase;
 
-    CDataStreamInput_NoScr(std::string_view buf, const std::vector<uint8_t>& key, std::size_t maxScriptSize, std::optional<std::size_t>& actualScriptSize)
-    : Base(buf, key)
-    , maxScriptSize(maxScriptSize)
-    , actualScriptSize(actualScriptSize)
-    {}
+    CDataStreamInput_NoScr(std::string_view buf,
+                           const std::vector<uint8_t>& key,
+                           std::size_t max_script_size,
+                           std::optional<std::size_t>& actual_script_size)
+        : Base(buf, key),
+          maxScriptSize{max_script_size},
+          actualScriptSize{actual_script_size}
+    {
+    }
 
     template<typename T>
     CDataStreamInput_NoScr& operator>>(T& obj)
@@ -120,9 +124,9 @@ public:
     static void Unserialize(CScriptCompressor* self, Stream& s, unsigned int nSize)
     {
         // NOLINTNEXTLINE(bugprone-assert-side-effect)
-        assert([](auto& s){
-            bool result = !s.wasUnserializeScriptCalled;
-            s.wasUnserializeScriptCalled = true;
+        assert([](auto& stream){
+            bool result = !stream.wasUnserializeScriptCalled;
+            stream.wasUnserializeScriptCalled = true;
             return result;
         }(s)); // Cannot unserialize more than one script using only one CDataStreamInput_NoScr object!
                // NOTE: Lambda is used because we want to remember within assert expression that Unserialize was called since

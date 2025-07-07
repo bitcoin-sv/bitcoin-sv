@@ -713,16 +713,16 @@ public:
 
     // Create wallet with dummy database handle
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    CWallet(const CChainParams &chainParams)
-        : randomNumbers(std::random_device{}()), dbw(new CWalletDBWrapper()), chainParams(chainParams) {
+    CWallet(const CChainParams& chain_params)
+        : randomNumbers(std::random_device{}()), dbw(new CWalletDBWrapper()), chainParams(chain_params) {
         SetNull();
     }
 
     // Create wallet with passed-in database handle
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    CWallet(const CChainParams &chainParams,
+    CWallet(const CChainParams& chain_params,
             std::unique_ptr<CWalletDBWrapper> dbw_in)
-        : randomNumbers(std::random_device{}()), dbw(std::move(dbw_in)), chainParams(chainParams) {
+        : randomNumbers(std::random_device{}()), dbw(std::move(dbw_in)), chainParams(chain_params) {
         SetNull();
     }
 

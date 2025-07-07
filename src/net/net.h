@@ -1071,7 +1071,7 @@ public:
              */
             void Increment()
             {
-                counter.fetch_add(1, std::memory_order_relaxed);
+                counter_.fetch_add(1, std::memory_order_relaxed);
             }
 
             /**
@@ -1081,7 +1081,7 @@ public:
              */
             void Decrement()
             {
-                counter.fetch_sub(1, std::memory_order_relaxed);
+                counter_.fetch_sub(1, std::memory_order_relaxed);
             }
 
             /**
@@ -1100,14 +1100,14 @@ public:
              */
             bool IsBelowLimit(unsigned int& numPendingResponses) const
             {
-                if(max_allowed==0)
+                if(max_allowed_==0)
                 {
                     return true;
                 }
 
-                unsigned int n = counter.load(std::memory_order_relaxed);
+                unsigned int n = counter_.load(std::memory_order_relaxed);
                 numPendingResponses = n;
-                return n < max_allowed;
+                return n < max_allowed_;
             }
 
             /**
@@ -1115,15 +1115,15 @@ public:
              */
             unsigned int GetMaxAllowed() const
             {
-                return max_allowed;
+                return max_allowed_;
             }
 
         private:
             friend MonitoredPendingResponses;
             PendingResponses(unsigned int max_allowed);
 
-            std::atomic<unsigned int> counter {0};
-            const unsigned int max_allowed;
+            std::atomic<unsigned int> counter_{0};
+            const unsigned int max_allowed_;
         };
 
         PendingResponses getheaders;

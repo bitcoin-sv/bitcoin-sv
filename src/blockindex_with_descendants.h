@@ -27,10 +27,8 @@ public:
         /**
          * Constructor creates an item that has no parent and no children.
          */
-        Item(CBlockIndex* blockIndex)
-        : blockIndex(blockIndex)
-        , parent(nullptr)
-        , children()
+        Item(CBlockIndex* block_index)
+        : blockIndex{block_index}
         {}
 
         /**
@@ -136,8 +134,8 @@ public:
 
     private:
         CBlockIndex* blockIndex;
-        const Item* parent;
-        prevector<1, const Item*> children; // prevector is used to reduce number of small heap allocations since most blocks have only one child
+        const Item* parent{nullptr};
+        prevector<1, const Item*> children{}; // prevector is used to reduce number of small heap allocations since most blocks have only one child
     };
 
     /**

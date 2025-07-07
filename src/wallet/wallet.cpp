@@ -399,9 +399,10 @@ bool CWallet::LoadWatchOnly(const CScript &dest) {
     return CCryptoKeyStore::AddWatchOnly(dest);
 }
 
-bool CWallet::Unlock(const SecureString &strWalletPassphrase) {
+bool CWallet::Unlock(const SecureString& strWalletPassphrase)
+{
     CCrypter crypter;
-    CKeyingMaterial vMasterKey;
+    CKeyingMaterial masterKey;
 
     LOCK(cs_wallet);
     for (const MasterKeyMap::value_type &pMasterKey : mapMasterKeys) {
@@ -412,12 +413,12 @@ bool CWallet::Unlock(const SecureString &strWalletPassphrase) {
             return false;
         }
 
-        if (!crypter.Decrypt(pMasterKey.second.vchCryptedKey, vMasterKey)) {
+        if (!crypter.Decrypt(pMasterKey.second.vchCryptedKey, masterKey)) {
             // try another master key
             continue;
         }
 
-        if (CCryptoKeyStore::Unlock(vMasterKey)) {
+        if (CCryptoKeyStore::Unlock(masterKey)) {
             return true;
         }
     }
@@ -434,7 +435,7 @@ bool CWallet::ChangeWalletPassphrase(
     Lock();
 
     CCrypter crypter;
-    CKeyingMaterial vMasterKey;
+    CKeyingMaterial masterKey;
     for (MasterKeyMap::value_type &pMasterKey : mapMasterKeys) {
         if (!crypter.SetKeyFromPassphrase(
                 strOldWalletPassphrase, pMasterKey.second.vchSalt,
@@ -443,11 +444,11 @@ bool CWallet::ChangeWalletPassphrase(
             return false;
         }
 
-        if (!crypter.Decrypt(pMasterKey.second.vchCryptedKey, vMasterKey)) {
+        if (!crypter.Decrypt(pMasterKey.second.vchCryptedKey, masterKey)) {
             return false;
         }
 
-        if (CCryptoKeyStore::Unlock(vMasterKey)) {
+        if (CCryptoKeyStore::Unlock(masterKey)) {
             int64_t nStartTime = GetTimeMillis();
             crypter.SetKeyFromPassphrase(strNewWalletPassphrase,
                                          pMasterKey.second.vchSalt,
@@ -483,7 +484,7 @@ bool CWallet::ChangeWalletPassphrase(
                 return false;
             }
 
-            if (!crypter.Encrypt(vMasterKey, pMasterKey.second.vchCryptedKey)) {
+            if (!crypter.Encrypt(masterKey, pMasterKey.second.vchCryptedKey)) {
                 return false;
             }
 
@@ -752,10 +753,10 @@ bool CWallet::EncryptWallet(const SecureString &strWalletPassphrase) {
         return false;
     }
 
-    CKeyingMaterial vMasterKey;
+    CKeyingMaterial masterKey;
 
-    vMasterKey.resize(WALLET_CRYPTO_KEY_SIZE);
-    GetStrongRandBytes(&vMasterKey[0], WALLET_CRYPTO_KEY_SIZE);
+    masterKey.resize(WALLET_CRYPTO_KEY_SIZE);
+    GetStrongRandBytes(&masterKey[0], WALLET_CRYPTO_KEY_SIZE);
 
     CMasterKey kMasterKey;
 
@@ -792,7 +793,7 @@ bool CWallet::EncryptWallet(const SecureString &strWalletPassphrase) {
         return false;
     }
 
-    if (!crypter.Encrypt(vMasterKey, kMasterKey.vchCryptedKey)) {
+    if (!crypter.Encrypt(masterKey, kMasterKey.vchCryptedKey)) {
         return false;
     }
 
@@ -808,7 +809,7 @@ bool CWallet::EncryptWallet(const SecureString &strWalletPassphrase) {
         }
         pwalletdbEncryption->WriteMasterKey(nMasterKeyMaxID, kMasterKey);
 
-        if (!EncryptKeys(vMasterKey)) {
+        if (!EncryptKeys(masterKey)) {
             pwalletdbEncryption->TxnAbort();
             delete pwalletdbEncryption;
             pwalletdbEncryption = nullptr;

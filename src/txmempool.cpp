@@ -394,9 +394,9 @@ void CTxMemPool::AcceptSingleGroupNL(const CTxMemPool::setEntriesTopoSorted& gro
     for(auto entry: groupMembers)
     {
         // moving from secondary mempool to the primary
-        mapTx.modify(entry, [&group](CTxMemPoolEntry& entry) {
-                                entry.group = group;
-                                entry.groupingData = std::nullopt;
+        mapTx.modify(entry, [&group](CTxMemPoolEntry& e) {
+                                e.group = group;
+                                e.groupingData = std::nullopt;
                             });
         secondaryMempoolStats.Remove(entry);
         TrackEntryModified(entry);
@@ -635,7 +635,7 @@ CTxMemPool::setEntriesTopoSorted CTxMemPool::RemoveFromPrimaryMempoolNL(CTxMemPo
                 if(entriesToIgnore == nullptr || entriesToIgnore->find(groupMember) == entriesToIgnore->end())
                 {
                     mapTx.modify(groupMember, 
-                        [](CTxMemPoolEntry& entry) {entry.group.reset();});
+                        [](CTxMemPoolEntry& e) {e.group.reset();});
                     // we have removed group object so it will look like it is accepted as standalone in next round
                     toRemove.insert(groupMember);
                 }
@@ -690,8 +690,8 @@ void CTxMemPool::UpdateAncestorsCountNL(CTxMemPool::setEntriesTopoSorted entries
         {
             ancestorsCount = std::max(ancestorsCount, parent->ancestorsCount + 1);
         }
-        mapTx.modify(entry, [ancestorsCount](CTxMemPoolEntry& entry) {
-                                entry.ancestorsCount = ancestorsCount;
+        mapTx.modify(entry, [ancestorsCount](CTxMemPoolEntry& e) {
+                                e.ancestorsCount = ancestorsCount;
                              });
     }
 }
@@ -788,8 +788,8 @@ void CTxMemPool::AddUncheckedNL(
             updateParentNL(newit, pit, true);
         }
     }
-    mapTx.modify(newit, [ancestorsCount](CTxMemPoolEntry& entry) {
-        entry.ancestorsCount = ancestorsCount;
+    mapTx.modify(newit, [ancestorsCount](CTxMemPoolEntry& e) {
+        e.ancestorsCount = ancestorsCount;
     });
 
     updateAncestorsOfNL(true, newit);

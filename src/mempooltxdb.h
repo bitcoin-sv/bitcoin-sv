@@ -187,19 +187,19 @@ public:
     // Get the size of the data in the database.
     uint64_t GetDiskUsage()
     {
-        return txdb->GetDiskUsage();
+        return txdb_->GetDiskUsage();
     }
 
     // Get the number of transactions in the database.
     uint64_t GetTxCount()
     {
-        return txdb->GetTxCount();
+        return txdb_->GetTxCount();
     }
 
     // Get the number of batch writes performed on the database.
     uint64_t GetWriteCount()
     {
-        return txdb->GetWriteCount();
+        return txdb_->GetWriteCount();
     }
 
     // Return a read-only database reference
@@ -223,11 +223,11 @@ public:
 private:
     // Task queue for the worker thread.
     class TaskQueue;
-    std::unique_ptr<TaskQueue> queue;
+    std::unique_ptr<TaskQueue> queue_;
 
     // Initialize the database and worker thread after the queue.
-    std::shared_ptr<CMempoolTxDB> txdb;
-    std::thread worker;
+    std::shared_ptr<CMempoolTxDB> txdb_;
+    std::thread worker_;
     void Work();
 };
 

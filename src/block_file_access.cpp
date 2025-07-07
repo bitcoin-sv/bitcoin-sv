@@ -72,9 +72,9 @@ namespace
                     return UniqueCFile{ fsbridge::fopen(path, "rb+") };
                 }
 
-                if (UniqueCFile file{ fsbridge::fopen(path, "rb+") }; file)
+                if (UniqueCFile f{ fsbridge::fopen(path, "rb+") }; f)
                 {
-                    return file;
+                    return f;
                 }
 
                 // Only create directories for new files

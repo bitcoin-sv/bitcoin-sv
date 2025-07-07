@@ -564,31 +564,29 @@ CTxnValidator::CIntermediateResult CTxnValidator::processNewTransactionsNL(
     std::chrono::milliseconds maxasynctasksrunduration) {
 
     // Trigger parallel validation
-    auto results {
-        g_connman->
-            ParallelTxnValidation(
-                [](const TxInputDataSPtrRefVec& vTxInputData,
-                    const Config* config,
-                    CTxMemPool *pool,
-                    CTxnHandlers& handlers,
-                    bool fUseLimits,
-                    std::chrono::steady_clock::time_point end_time_point) {
-                    return TxnValidationProcessingTask(
-                                vTxInputData,
-                               *config,
-                               *pool,
-                                handlers,
-                                fUseLimits,
-                                end_time_point);
-                },
-                &mConfig,
-                &mMempool,
-                txns,
-                handlers,
-                fUseLimits,
-                maxasynctasksrunduration,
-                mConfig.GetPTVTaskScheduleStrategy())
-    };
+    auto results{g_connman->ParallelTxnValidation(
+        [](const TxInputDataSPtrRefVec& vTxInputData,
+           const Config* config,
+           CTxMemPool* pool,
+           CTxnHandlers& tx_handlers,
+           bool useLimits,
+           std::chrono::steady_clock::time_point end_time_point)
+        {
+            return TxnValidationProcessingTask(vTxInputData,
+                                               *config,
+                                               *pool,
+                                               tx_handlers,
+                                               useLimits,
+                                               end_time_point);
+        },
+        &mConfig,
+        &mMempool,
+        txns,
+        handlers,
+        fUseLimits,
+        maxasynctasksrunduration,
+        mConfig.GetPTVTaskScheduleStrategy())};
+
     CIntermediateResult imdResult {};
     // Process validation results
     for(auto& task_result : results) {

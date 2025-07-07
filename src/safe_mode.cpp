@@ -478,20 +478,20 @@ void SafeMode::SafeModeResult::ToJson(CJSONWriter& writer) const
         return status;
     };
 
-    auto WriteBlock = [&](CJSONWriter& writer,
+    auto WriteBlock = [&](CJSONWriter& w,
                           const std::string& jsonObjectName,
                           const CBlockIndex* block)
     {
-        writer.writeBeginObject(jsonObjectName);
+        w.writeBeginObject(jsonObjectName);
         if(block)
         {
-            writer.pushKV("hash", block->GetBlockHash().ToString());
-            writer.pushKV("height", block->GetHeight());
-            writer.pushKV("blocktime", DateTimeStrFormat("%Y-%m-%dT%H:%M:%SZ", block->GetBlockTime()));
-            writer.pushKV("firstseentime", DateTimeStrFormat("%Y-%m-%dT%H:%M:%SZ", block->GetHeaderReceivedTime()));
-            writer.pushKV("status", GetStatusString(block));
+            w.pushKV("hash", block->GetBlockHash().ToString());
+            w.pushKV("height", block->GetHeight());
+            w.pushKV("blocktime", DateTimeStrFormat("%Y-%m-%dT%H:%M:%SZ", block->GetBlockTime()));
+            w.pushKV("firstseentime", DateTimeStrFormat("%Y-%m-%dT%H:%M:%SZ", block->GetHeaderReceivedTime()));
+            w.pushKV("status", GetStatusString(block));
         }
-        writer.writeEndObject();
+        w.writeEndObject();
     };
 
     writer.writeBeginObject();

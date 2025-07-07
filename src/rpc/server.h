@@ -164,62 +164,62 @@ public:
      * Config is const or not, so we can call the command through the proper pointer.
      * Casting constness on parameters of function is undefined behavior.
      */
-    CRPCCommand(std::string category, // NOLINT(cppcoreguidelines-pro-type-member-init)
-                std::string name,
-                bool okSafeMode,
-                bool useConstConfig,
-                bool useHTTPRequest,
-                std::vector<std::string> argNames)
-        : category{std::move(category)},
-          name{std::move(name)},
-          okSafeMode{okSafeMode},
-          useConstConfig{useConstConfig},
-          useHTTPRequest{useHTTPRequest},
-          argNames{std::move(argNames)}
+    CRPCCommand(std::string cat, // NOLINT(cppcoreguidelines-pro-type-member-init)
+                std::string n,
+                bool ok_safe_mode,
+                bool use_const_config,
+                bool use_http_request,
+                std::vector<std::string> arg_names)
+        : category{std::move(cat)},
+          name{std::move(n)},
+          okSafeMode{ok_safe_mode},
+          useConstConfig{use_const_config},
+          useHTTPRequest{use_http_request},
+          argNames{std::move(arg_names)}
     {
     }
 
-    CRPCCommand(std::string category,
-                std::string name,
+    CRPCCommand(std::string cat,
+                std::string n,
                 rpcfn_type fn,
-                bool okSafeMode,
-                std::vector<std::string> argNames)
-        : CRPCCommand{std::move(category),
-                      std::move(name),
-                      okSafeMode,
+                bool ok_safe_mode,
+                std::vector<std::string> arg_names)
+        : CRPCCommand{std::move(cat),
+                      std::move(n),
+                      ok_safe_mode,
                       false,
                       false,
-                      std::move(argNames)}
+                      std::move(arg_names)}
     {
         actor.fn = fn; // NOLINT(cppcoreguidelines-pro-type-union-access)
     }
 
-    CRPCCommand(std::string category,
-                std::string name,
+    CRPCCommand(std::string cat,
+                std::string n,
                 const_rpcfn_type fn,
-                bool okSafeMode,
-                std::vector<std::string> argNames)
-        : CRPCCommand{std::move(category),
-                      std::move(name),
-                      okSafeMode,
+                bool ok_safe_mode,
+                std::vector<std::string> arg_names)
+        : CRPCCommand{std::move(cat),
+                      std::move(n),
+                      ok_safe_mode,
                       true,
                       false,
-                      std::move(argNames)}
+                      std::move(arg_names)}
     {
         actor.cfn = fn; // NOLINT(cppcoreguidelines-pro-type-union-access)
     }
 
-    CRPCCommand(std::string category,
-                std::string name,
+    CRPCCommand(std::string cat,
+                std::string n,
                 rpcfn_http_type fn,
-                bool okSafeMode,
-                std::vector<std::string> argNames)
-        : CRPCCommand{std::move(category),
-                      std::move(name),
-                      okSafeMode,
+                bool ok_safe_mode,
+                std::vector<std::string> arg_names)
+        : CRPCCommand{std::move(cat),
+                      std::move(n),
+                      ok_safe_mode,
                       true,
                       true,
-                      std::move(argNames)}
+                      std::move(arg_names)}
     {
         actor.http_fn = fn; // NOLINT(cppcoreguidelines-pro-type-union-access)
     }

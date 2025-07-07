@@ -897,9 +897,9 @@ static UniValue verifyblockcandidate(const Config &config,
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
     }
 
-    auto verifyBlock = [](const Config& config, const std::shared_ptr<CBlock>& blockptr)
+    auto verifyBlock = [](const Config& cfg, const std::shared_ptr<CBlock>& sp_block)
     {
-        return VerifyNewBlock(config, *blockptr);
+        return VerifyNewBlock(cfg, *sp_block);
     };
     return processBlock(config, blockptr, verifyBlock);
 }
@@ -935,10 +935,10 @@ static UniValue submitblock(const Config &config,
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
     }
 
-    auto submitBlock = [](const Config& config , const std::shared_ptr<CBlock>& blockptr)
+    auto submitBlock = [](const Config& cfg , const std::shared_ptr<CBlock>& sp_block)
     {
-        CScopedBlockOriginRegistry reg(blockptr->GetHash(), "submitblock");
-        return ProcessNewBlock(config, blockptr, true, nullptr, CBlockSource::MakeRPC());
+        CScopedBlockOriginRegistry reg(sp_block->GetHash(), "submitblock");
+        return ProcessNewBlock(cfg, sp_block, true, nullptr, CBlockSource::MakeRPC());
     };
     return processBlock(config, blockptr, submitBlock);
 }

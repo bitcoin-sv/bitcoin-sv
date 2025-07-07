@@ -305,8 +305,8 @@ size_t ser_size(const BlockTransactions& txns)
     return std::accumulate(txns.txn.cbegin(),
                            txns.txn.cend(),
                            total,
-                           [](auto total, const auto& sp_tx) {
-                               total += ser_size(*sp_tx);
-                               return total;
+                           [](auto acc, const auto& sp_tx) {
+                               acc += ser_size(*sp_tx);
+                               return acc;
                            });
 }

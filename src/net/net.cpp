@@ -3001,7 +3001,7 @@ void CConnman::SyncMempool()
 }
 
 CNode::MonitoredPendingResponses::PendingResponses::PendingResponses(unsigned int max_allowed)
-: max_allowed(max_allowed)
+: max_allowed_{max_allowed}
 {}
 
 CNode::MonitoredPendingResponses::MonitoredPendingResponses()

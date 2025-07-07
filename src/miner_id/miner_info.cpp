@@ -79,8 +79,8 @@ uint256 modify_merkle_root(const CBlock& block)
     coinbase_tx.vin[0].prevout = op;
     const auto it = find_if(coinbase_tx.vout.begin(),
                             coinbase_tx.vout.end(),
-                            [](const CTxOut& op) {
-                                return IsMinerInfo(op.scriptPubKey);
+                            [](const CTxOut& tx_out) {
+                                return IsMinerInfo(tx_out.scriptPubKey);
                             });
     if(it != coinbase_tx.vout.cend())
     {
@@ -207,8 +207,8 @@ namespace
             return mie::brfcid_invalid_content;
 
         const auto& values{uv.getValues()};
-        if(!all_of(values.cbegin(), values.cend(), [](const auto& uv) {
-               return uv.isObject();
+        if(!all_of(values.cbegin(), values.cend(), [](const auto& v) {
+               return v.isObject();
            }))
             return mie::brfcid_invalid_value_type;
 

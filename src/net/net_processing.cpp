@@ -2020,8 +2020,8 @@ static bool ProcessAuthChMessage(const Config& config,
             using namespace rpc::client;
             if (g_pWebhookClient) {
                 RPCClientConfig rpcConfig { RPCClientConfig::CreateForMinerIdGenerator(config, 5) };
-                using HTTPRequest = rpc::client::HTTPRequest;
-                auto request { std::make_shared<HTTPRequest>(HTTPRequest::CreateGetMinerIdRequest(
+                using HTTP_Request = rpc::client::HTTPRequest;
+                auto request { std::make_shared<HTTP_Request>(HTTP_Request::CreateGetMinerIdRequest(
                                         rpcConfig,
                                         config.GetMinerIdGeneratorAlias())) };
                 auto response { std::make_shared<StringHTTPResponse>() };
@@ -2066,8 +2066,8 @@ static bool ProcessAuthChMessage(const Config& config,
             } else {
                 LogPrint(BCLog::MINERID, "sending signature request to MinerID Generator\n");
                 RPCClientConfig rpcConfig { RPCClientConfig::CreateForMinerIdGenerator(config, 5) };
-                using HTTPRequest = rpc::client::HTTPRequest;
-                auto request { std::make_shared<HTTPRequest>(HTTPRequest::CreateMinerIdGeneratorSigningRequest(
+                using HTTP_Request = rpc::client::HTTPRequest;
+                auto request { std::make_shared<HTTP_Request>(HTTP_Request::CreateMinerIdGeneratorSigningRequest(
                         rpcConfig,
                         config.GetMinerIdGeneratorAlias(),
                         HexStr(hash))) };
@@ -3063,10 +3063,10 @@ public:
     // Default constructor is only needed by serialization framework
     CBlockHeaderEnriched() = default;
 
-    CBlockHeaderEnriched(const CBlockIndex* blockIndex)
-    : blockHeader { blockIndex->GetBlockHeader() }
-    , nTx { blockIndex->GetBlockTxCount() }
-    , blockIndex { blockIndex }
+    CBlockHeaderEnriched(const CBlockIndex* block_index)
+    : blockHeader { block_index->GetBlockHeader() }
+    , nTx { block_index->GetBlockTxCount() }
+    , blockIndex { block_index }
     {
     }
 
@@ -3677,10 +3677,10 @@ static void ProcessBlockTxnMessage(const Config& config,
 
                 if(fNewBlock)
                 {
-                    auto pfrom = weakFrom.lock();
-                    if(pfrom)
+                    auto from = weakFrom.lock();
+                    if(from)
                     {
-                        pfrom->nLastBlockTime = GetTime();
+                        from->nLastBlockTime = GetTime();
                     }
                 }
             },
@@ -3960,10 +3960,10 @@ static bool ProcessCompactBlockMessage(
 
                     if(fNewBlock)
                     {
-                        auto pfrom = weakFrom.lock();
-                        if(pfrom)
+                        auto from = weakFrom.lock();
+                        if(from)
                         {
-                            pfrom->nLastBlockTime = GetTime();
+                            from->nLastBlockTime = GetTime();
                         }
                     }
                 },
@@ -4037,10 +4037,10 @@ static void ProcessBlockMessage(const Config& config,
 
             if(fNewBlock)
             {
-                auto pfrom = weakFrom.lock();
-                if(pfrom)
+                auto from = weakFrom.lock();
+                if(from)
                 {
-                    pfrom->nLastBlockTime = GetTime();
+                    from->nLastBlockTime = GetTime();
                 }
             }
         },
@@ -4601,8 +4601,8 @@ static void ProcessDoubleSpendMessage(const Config& config,
         if(!config.GetDoubleSpendDetectedWebhookAddress().empty() && g_pWebhookClient)
         {
             RPCClientConfig rpcConfig { RPCClientConfig::CreateForDoubleSpendDetectedWebhook(config) };
-            using HTTPRequest = rpc::client::HTTPRequest;
-            auto request { std::make_shared<HTTPRequest>(HTTPRequest::CreateJSONPostRequest(rpcConfig, msg.ToJSON(config))) };
+            using HTTP_Request = rpc::client::HTTPRequest;
+            auto request { std::make_shared<HTTP_Request>(HTTP_Request::CreateJSONPostRequest(rpcConfig, msg.ToJSON(config))) };
             auto response { std::make_shared<StringHTTPResponse>() };
             g_pWebhookClient->SubmitRequest(rpcConfig, std::move(request), std::move(response));
         }

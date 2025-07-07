@@ -656,8 +656,8 @@ Examples:
         std::int32_t enforceAtHeight;
         CTransaction confiscationTx;
 
-        WLCTX(std::int32_t enforceAtHeight, const std::string& confiscationTxHex)
-        : enforceAtHeight(enforceAtHeight)
+        WLCTX(std::int32_t enforce_at_height, const std::string& confiscationTxHex)
+        : enforceAtHeight(enforce_at_height)
         , confiscationTx([&]{
             try
             {

@@ -41,11 +41,12 @@ struct MinerInfoClass_ScopeExit {
 	InitFunc initFunc;
 	ExitFunc exitFunc;
 	bool success = false;
-    MinerInfoClass_ScopeExit (InitFunc initFunc, ExitFunc exitFunc)
-	    : initFunc(initFunc)
-	    , exitFunc(exitFunc)
+
+    MinerInfoClass_ScopeExit (InitFunc init_func, ExitFunc exit_func)
+	    : initFunc(init_func)
+	    , exitFunc(exit_func)
     {
-        initFunc();
+        init_func();
     }
 
     void good() {
@@ -129,23 +130,31 @@ static std::mutex mut;
 class DatarefFunding {
     class FundingKey
     {
-        CKey privKey{};
-        CTxDestination destination{};
+        CKey privKey_{};
+        CTxDestination destination_{};
+
     public:
-        FundingKey(std::string const & privKey, std::string const & destination, Config const & config)
-                : privKey(privKeyFromStringBIP32(privKey))
-                , destination(DecodeDestination(destination, config.GetChainParams()))
+        FundingKey(std::string const& privKey,
+                   std::string const& destination,
+                   Config const& config)
+            : privKey_(privKeyFromStringBIP32(privKey)),
+              destination_(DecodeDestination(destination, config.GetChainParams()))
         {
         }
-        [[nodiscard]] CKey const & getPrivKey() const {return privKey;};
-        [[nodiscard]]CTxDestination const & getDestination() const {return destination;};
+        [[nodiscard]] CKey const & getPrivKey() const {return privKey_;};
+        [[nodiscard]]CTxDestination const & getDestination() const {return destination_;};
     };
-    COutPoint fundingSeed; // Funding for the first minerinfo-txn of this miner
-    FundingKey fundingKey; // Keys needed to spend the funding seed and also the minerinfo-txns
+
+    COutPoint fundingSeed_; // Funding for the first minerinfo-txn of this miner
+    FundingKey fundingKey_; // Keys needed to spend the funding seed and also the minerinfo-txns
+
 public:
-    DatarefFunding (COutPoint const & fundingSeed, std::string const & privateKey, std::string const & destination, Config const & config)
-            : fundingSeed{fundingSeed}
-            , fundingKey{FundingKey(privateKey, destination, config)}
+    DatarefFunding(COutPoint const& fundingSeed,
+                   std::string const& privateKey,
+                   std::string const& destination,
+                   Config const& config)
+        : fundingSeed_{fundingSeed},
+          fundingKey_{FundingKey(privateKey, destination, config)}
     {
     }
 
@@ -156,10 +165,10 @@ public:
             // A potential new funding seed has preceedence.
             std::optional<COutPoint> fundingOutPoint;
             std::optional<CoinWithScript> coin;
-            if (!mempool.IsSpent(fundingSeed))
-                coin = GetSpendableCoin(fundingSeed);
+            if (!mempool.IsSpent(fundingSeed_))
+                coin = GetSpendableCoin(fundingSeed_);
             if (coin.has_value())
-                fundingOutPoint = fundingSeed;
+                fundingOutPoint = fundingSeed_;
 
             if (!fundingOutPoint) {
 
@@ -199,12 +208,12 @@ public:
             SignatureData sigdata;
             CBasicKeyStore keystore;
             SigHashType sigHash;
-            CScript const & scriptPubKey = GetScriptForDestination(fundingKey.getDestination()); //p2pkh script
+            CScript const & scriptPubKey = GetScriptForDestination(fundingKey_.getDestination()); //p2pkh script
 
             mtx.vout.push_back(CTxOut {Amount{fundingAmount}, scriptPubKey});
             mtx.vin.emplace_back(*fundingOutPoint, CTxIn::SEQUENCE_FINAL);
 
-            keystore.AddKeyPubKey(fundingKey.getPrivKey(), fundingKey.getPrivKey().GetPubKey());
+            keystore.AddKeyPubKey(fundingKey_.getPrivKey(), fundingKey_.getPrivKey().GetPubKey());
             SignAndVerify(config,
                           true,
                           MutableTransactionSignatureCreator(&keystore,
@@ -362,27 +371,25 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
     std::lock_guard lock{mut};
 
     auto blockHeight = chainActive.Height() + 1;
-    auto prevBlockHash = chainActive.Tip()->GetBlockHash();
 
-    auto GetOrRemoveCachedMinerInfoTx = [](int32_t blockHeight,
-                                           uint256 const& /*prevBlockHash*/,
-                                           bool overridetx,
-                                           CScript const& scriptPubKey) -> CTransactionRef
+    auto GetOrRemoveCachedMinerInfoTx = [](int32_t block_height,
+                                           bool override_tx,
+                                           CScript const& script_pubkey) -> CTransactionRef
     {
         try
         {
-            if (currentMinerInfoTx && currentMinerInfoTx->height == blockHeight)
+            if (currentMinerInfoTx && currentMinerInfoTx->height == block_height)
             {
                 CTransactionRef tx = mempool.Get(currentMinerInfoTx->txid);
                 if (!tx)
                     return nullptr;
 
                 // if we do not override, we return what we have
-                if (!overridetx)
+                if (!override_tx)
                     return  tx;
 
                 // if we do override with no change at all we are also done
-                if(tx->vout[0].scriptPubKey == scriptPubKey)
+                if(tx->vout[0].scriptPubKey == script_pubkey)
                     return  tx;
 
                 // If we get here, we override, hence we must remove the previously created tx
@@ -410,18 +417,18 @@ std::string CreateReplaceMinerinfotx(const Config& config, const CScript& script
 
     // If such a transaction already exists in the mempool, then it is the one we need and return
     // unless we want to override
-    CTransactionRef trackedTransaction = GetOrRemoveCachedMinerInfoTx (blockHeight, prevBlockHash, overridetx, scriptPubKey);
+    CTransactionRef trackedTransaction = GetOrRemoveCachedMinerInfoTx (blockHeight, overridetx, scriptPubKey);
     if (trackedTransaction)
         return trackedTransaction->GetId().ToString();
 
     // check the height in the minerinfo document
     if (true)
     {
-        auto ExtractMinerInfoDoc = [](CScript const & scriptPubKey) -> miner_info_doc {
+        auto ExtractMinerInfoDoc = [](CScript const & script_pubkey) -> miner_info_doc {
 
-            if (!IsMinerInfo(scriptPubKey))
+            if (!IsMinerInfo(script_pubkey))
                 throw std::runtime_error ("Calling ParseMinerInfoScript on ill formed script.");
-            const auto var_doc_sig = ParseMinerInfoScript(scriptPubKey);
+            const auto var_doc_sig = ParseMinerInfoScript(script_pubkey);
             if(std::holds_alternative<miner_info_error>(var_doc_sig))
                 throw std::runtime_error(strprintf(
                         "failed to extract miner info document from scriptPubKey: %s",

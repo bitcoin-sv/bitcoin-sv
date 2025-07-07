@@ -40,11 +40,14 @@ public:
     /**
      * @param disk_block_pos Which block is being read. Used for logging.
      */
-    CBlockStreamReader(Reader&& reader, const CStreamVersionAndType& version, bool calculateDiskBlockMetadata=false, const CDiskBlockPos& disk_block_pos=CDiskBlockPos())
-        : mCalculateDiskBlockMetadata(calculateDiskBlockMetadata)
-        , mReader{std::move(reader)}
-        , mDeserializationStream{this, version.type, version.version}
-        , disk_block_pos(disk_block_pos)
+    CBlockStreamReader(Reader&& reader,
+                       const CStreamVersionAndType& version,
+                       bool calculateDiskBlockMetadata = false,
+                       const CDiskBlockPos& diskBlockPos = CDiskBlockPos())
+        : mCalculateDiskBlockMetadata{calculateDiskBlockMetadata},
+          mReader{std::move(reader)},
+          mDeserializationStream{this, version.type, version.version},
+          mDiskBlockPos{diskBlockPos}
     {
         mDeserializationStream >> mBlockHeader;
         mRemainingTransactionsCounter = ReadCompactSize(mDeserializationStream);
@@ -89,8 +92,8 @@ public:
 
         // After reading the last transactions, we can finalize the hash.
         if (EndOfStream() && mCalculateDiskBlockMetadata) {
-            hasher.Finalize(CHash256::span{diskBlockMetaData.diskDataHash.begin(),
-                                           CHash256::OUTPUT_SIZE});
+            mHasher.Finalize(CHash256::span{mDiskBlockMetaData.diskDataHash.begin(),
+                                            CHash256::OUTPUT_SIZE});
         }
 
         return *mTransaction;
@@ -109,7 +112,7 @@ public:
         catch(const std::exception &e)
         {
             error("%s: Deserialize or I/O error - %s at %s", __func__,
-                e.what(), disk_block_pos.ToString());
+                e.what(), mDiskBlockPos.ToString());
         }
         return nullptr;
     }
@@ -144,21 +147,21 @@ public:
     {
         if (EndOfStream() && mCalculateDiskBlockMetadata)
         {
-            return diskBlockMetaData;
+            return mDiskBlockMetaData;
         }
 
         throw std::runtime_error("Cannot access disk block metadata while block is still being read!");
     }
 
 private:
-    CHash256 hasher;
-    CDiskBlockMetaData diskBlockMetaData;
+    CHash256 mHasher;
+    CDiskBlockMetaData mDiskBlockMetaData;
     bool mCalculateDiskBlockMetadata;
 
     void updateDiskBlockMetadata(uint8_t* begin, size_t chunkSize)
     {
-        hasher.Write(begin, chunkSize);
-        diskBlockMetaData.diskDataSize += chunkSize;
+        mHasher.Write(begin, chunkSize);
+        mDiskBlockMetaData.diskDataSize += chunkSize;
     }
 
     Reader mReader;
@@ -167,7 +170,7 @@ private:
     size_t mRemainingTransactionsCounter;
     CBlockHeader mBlockHeader;
     std::unique_ptr<const CTransaction> mTransaction;
-    CDiskBlockPos disk_block_pos;
+    CDiskBlockPos mDiskBlockPos;
 };
 
 /**

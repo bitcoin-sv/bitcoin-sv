@@ -80,8 +80,8 @@ class DataDB
         // Datatype for reading from the database
         static constexpr char DB_STORAGE_TYPE = STORAGE_TYPE;
 
-        DBTxInfo(CTransactionRef txn, uint256 blockid, MerkleProof proof)
-                : txn{std::move(txn)}, blockId{blockid}, proof{std::move(proof)}
+        DBTxInfo(CTransactionRef tx, uint256 block_id, MerkleProof merkle_proof)
+                : txn{std::move(tx)}, blockId{block_id}, proof{std::move(merkle_proof)}
         {}
 
         explicit DBTxInfo(Readable && r)
@@ -174,11 +174,11 @@ class DataDB
     void DeleteEntry(const uint256& key)
     {
         // Lookup txn before remove so we can calculate its size
-        auto GetEntrySize = [this](const uint256& key) -> size_t
+        auto GetEntrySize = [this](const uint256& k) -> size_t
         {
-            std::optional<Entry> entry { LookupEntry<Entry>(key) };
+            std::optional<Entry> entry { LookupEntry<Entry>(k) };
             if (!entry) {
-                LogPrint(BCLog::MINERID, strprintf("Failed to remove non existant dataRef/minerinfo transaction with ID %s from DB\n", key));
+                LogPrint(BCLog::MINERID, strprintf("Failed to remove non existant dataRef/minerinfo transaction with ID %s from DB\n", k));
                 return 0;
             }
 

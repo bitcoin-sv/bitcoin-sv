@@ -68,55 +68,55 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // Takes ownership of result of opendir() and closes it in destructor.
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
-class CAutoCloseDir : public boost::noncopyable {
-  DIR * dir;
-  std::function<void(const std::string& message)> warning;
+class CAutoCloseDir : public boost::noncopyable
+{
+    DIR* dir_;
+    std::function<void(const std::string& message)> warning_;
+
 public:
     CAutoCloseDir(DIR* dir, std::function<void(const std::string& message)> warning)
-        : dir{dir},
-          warning{std::move(warning)}
+        : dir_{dir},
+          warning_{std::move(warning)}
     {}
 
   ~CAutoCloseDir()
   {
-    if (closedir(dir))
-    {
-      char* msg = strerror(errno);
-      warning(std::string("unable to closedir. ") +  std::string(msg));
-    }
+      if(closedir(dir_))
+      {
+          const char* msg = strerror(errno);
+          warning_(std::string("unable to closedir. ") + std::string(msg));
+      }
   }
 };
 
 // Takes ownership of memory mapped region and unmaps it in destructor unless Release() is called
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
-class CAutoMunmap : public boost::noncopyable {
-  void* mem = nullptr;
-  uint64_t len_of_range = 0;
-  std::function<void(const std::string& message)> warning;
+class CAutoMunmap : public boost::noncopyable
+{
+    void* mem_ = nullptr;
+    uint64_t len_of_range_ = 0;
+    std::function<void(const std::string& message)> warning_;
+
 public:
     CAutoMunmap(void* mem,
                 uint64_t len_of_range,
                 std::function<void(const std::string& message)> warning)
-        : mem{mem},
-          len_of_range{len_of_range},
-          warning{std::move(warning)}
+        : mem_{mem},
+          len_of_range_{len_of_range},
+          warning_{std::move(warning)}
     {}
 
-  void Release()
-  {
-    mem = nullptr;
-  }
+    void Release() { mem_ = nullptr; }
 
-  ~CAutoMunmap()
-  {
-    if (mem && munmap(mem, len_of_range) != 0) {
-      char* msg = strerror(errno);
-      warning(std::string("unable to munmap file. ") +  std::string(msg));
+    ~CAutoMunmap()
+    {
+        if(mem_ && munmap(mem_, len_of_range_) != 0)
+        {
+            char* msg = strerror(errno);
+            warning_(std::string("unable to munmap file. ") + std::string(msg));
+        }
     }
-  }
-
 };
-
 
 VMTouch::VMTouch() : pagesize(sysconf(_SC_PAGESIZE))
 {

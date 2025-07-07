@@ -348,10 +348,10 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
         // Ensure we run full checks on submitted block
         block->fChecked = false;
 
-        auto submitBlock = [](const Config& config , const std::shared_ptr<CBlock>& blockptr) 
+        auto submitBlock = [](const Config& cfg , const std::shared_ptr<CBlock>& blockptr) 
         {
             CScopedBlockOriginRegistry reg(blockptr->GetHash(), "submitminingsolution");
-            return ProcessNewBlock(config, blockptr, true, nullptr, CBlockSource::MakeRPC());
+            return ProcessNewBlock(cfg, blockptr, true, nullptr, CBlockSource::MakeRPC());
         };
         submitted = processBlock(config, block, submitBlock); // returns string on failure
     }

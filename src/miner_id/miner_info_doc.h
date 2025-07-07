@@ -135,5 +135,5 @@ std::variant<mi_doc_sig, miner_info_error> ParseMinerInfoScript(
 std::variant<miner_info_doc, miner_info_error> ParseMinerInfoDoc(
     std::string_view miner_info_doc);
 
-using data_refs = std::vector<data_ref>;
-std::variant<data_refs, miner_info_error> ParseDataRefs(std::string_view sv);
+using data_refs_type = std::vector<data_ref>;
+std::variant<data_refs_type, miner_info_error> ParseDataRefs(std::string_view sv);
