@@ -10,7 +10,6 @@
 #include "hash.h"
 #include "netaddress.h"
 #include "tinyformat.h"
-#include "utilstrencodings.h"
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
 static const uint8_t pchIPv4[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff};
@@ -630,12 +629,21 @@ bool CSubNet::IsValid() const {
     return valid;
 }
 
-bool operator==(const CSubNet &a, const CSubNet &b) {
-    return a.valid == b.valid && a.network == b.network &&
-           !memcmp(a.netmask, b.netmask, 16);
+std::strong_ordering operator<=>(const CSubNet& a, const CSubNet& b)
+{
+    const auto cmp = a.network <=> b.network;
+    if(cmp != std::strong_ordering::equal)
+        return cmp;
+
+    const auto cmp2 = memcmp(a.netmask, b.netmask, 16);
+    return cmp2 == 0  ? std::strong_ordering::equal
+                      : cmp2 < 0 ? std::strong_ordering::less
+                                 : std::strong_ordering::greater;
 }
 
-bool operator<(const CSubNet &a, const CSubNet &b) {
-    return (a.network < b.network ||
-            (a.network == b.network && memcmp(a.netmask, b.netmask, 16) < 0));
+bool operator==(const CSubNet& a, const CSubNet& b)
+{
+    return a.valid == b.valid
+           && a <=> b == std::strong_ordering::equal;
 }
+

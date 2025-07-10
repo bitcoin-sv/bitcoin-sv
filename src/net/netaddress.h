@@ -104,8 +104,8 @@ public:
     friend class CSubNet;
 };
 
-class CSubNet {
-protected:
+class CSubNet
+{
     /// Network (base) address
     CNetAddr network;
     /// Netmask, in network byte order
@@ -127,13 +127,13 @@ public:
     std::string ToString() const;
     bool IsValid() const;
 
-    friend bool operator==(const CSubNet &a, const CSubNet &b);
-    friend bool operator<(const CSubNet &a, const CSubNet &b);
+    friend std::strong_ordering operator<=>(const CSubNet&, const CSubNet&);
+    friend bool operator==(const CSubNet&, const CSubNet&);
 
     ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream &s, Operation ser_action) {
+    void SerializationOp(Stream &s, Operation ser_action) {
         READWRITE(network);
         READWRITE(FLATDATA(netmask));
         READWRITE(FLATDATA(valid));
