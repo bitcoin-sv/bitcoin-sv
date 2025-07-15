@@ -33,6 +33,7 @@ BITCOIN_TESTS =\
   test/array_parser_tests.cpp \
   test/base32_tests.cpp \
   test/base58_tests.cpp \
+  test/base58data_tests.cpp \
   test/base64_tests.cpp \
   test/bip32_tests.cpp \
   test/big_int_tests.cpp \

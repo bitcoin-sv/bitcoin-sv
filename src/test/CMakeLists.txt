@@ -60,6 +60,7 @@ add_test_to_suite(bitcoin test_bitcoin
     array_parser_tests.cpp
 	base32_tests.cpp
 	base58_tests.cpp
+	base58data_tests.cpp
 	base64_tests.cpp
     big_int_tests.cpp
 	bip32_tests.cpp
