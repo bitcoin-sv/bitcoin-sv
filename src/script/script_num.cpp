@@ -5,6 +5,7 @@
 // LICENSE.
 #include "script_num.h"
 
+#include <compare>
 #include <cstdint>
 #include <limits>
 #include <iostream>
@@ -87,38 +88,23 @@ bool CScriptNum::equal_index(const CScriptNum& other) const
 
 bool operator==(const CScriptNum& a, const CScriptNum& b)
 {
-    static_assert(std::variant_size_v<CScriptNum::value_type> == 2);
-
-    // clang-format off
-    if(a.equal_index(b))
-        return a.m_value == b.m_value;
-    else 
-    {
-        return visit([&b](const auto& aa)
-        {
-            return visit([&aa](const auto& bb)
-            {
-                return aa == bb;
-            }, b.m_value);
-        }, a.m_value);
-    }
-    // clang-format on
+    return a <=> b == std::strong_ordering::equal;
 }
 
-bool operator<(const CScriptNum& a, const CScriptNum& b)
+std::strong_ordering operator<=>(const CScriptNum& a, const CScriptNum& b)
 {
     static_assert(variant_size_v<CScriptNum::value_type> == 2);
 
     // clang-format off
     if(a.equal_index(b))
-        return a.m_value < b.m_value;
+        return a.m_value <=> b.m_value;
     else
     {
         return visit([&b](const auto& aa)
                     {
                         return visit([&aa](const auto& bb)
                         {
-                            return aa < bb;
+                            return aa <=> bb;
                         }, b.m_value);
                     }, 
                     a.m_value);

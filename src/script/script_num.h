@@ -7,6 +7,7 @@
 #pragma once
 
 #include <cassert>
+#include <compare>
 #include <iosfwd>
 #include <stdexcept>
 #include <variant>
@@ -76,11 +77,10 @@ public:
         return *this;
     }
 
+    friend std::strong_ordering operator<=>(const CScriptNum&, const CScriptNum&);
     friend bool operator==(const CScriptNum&, const CScriptNum&);
 
-    friend bool operator<(const CScriptNum&, const CScriptNum&);
-    friend bool operator<(const CScriptNum&, int64_t);
-    friend bool operator<(int64_t, const CScriptNum&);
+    friend auto operator<=>(const CScriptNum&, int64_t);
 
     CScriptNum& operator+=(const CScriptNum&);
     CScriptNum& operator-=(const CScriptNum&);
@@ -108,43 +108,11 @@ private:
     value_type m_value;
 };
 
-// Equality operators
-bool operator==(const CScriptNum&, const CScriptNum&);
-
-// Relational operators
-bool operator<(const CScriptNum&, const CScriptNum&);
-inline bool operator<(const CScriptNum& a, int64_t b)
+inline auto operator<=>(const CScriptNum& a, int64_t b)
 {
-    return std::visit([b](const auto& aa) { return aa < b; }, a.m_value);
+    return std::visit([b](const auto& aa) { return aa <=> b; }, a.m_value);
 }
 
-inline bool operator<(int64_t a, const CScriptNum& b)
-{
-    return std::visit([a](const auto& bb) { return a < bb; }, b.m_value);
-}
-
-inline bool operator>=(const CScriptNum& a, const CScriptNum& b)
-{
-    return !(a < b);
-}
-inline bool operator>(const CScriptNum& a, const CScriptNum& b)
-{
-    return b < a;
-}
-inline bool operator<=(const CScriptNum& a, const CScriptNum& b)
-{
-    return !(b < a);
-}
-
-inline bool operator>=(const CScriptNum& a, int64_t b) { return !(a < b); }
-inline bool operator>(const CScriptNum& a, int64_t b) { return b < a; }
-inline bool operator<=(const CScriptNum& a, int64_t b) { return !(b < a); }
-
-inline bool operator>=(int64_t a, const CScriptNum& b) { return !(a < b); }
-inline bool operator>(int64_t a, const CScriptNum& b) { return b < a; }
-inline bool operator<=(int64_t a, const CScriptNum& b) { return !(b < a); }
-
-// Arithmetic operators
 inline CScriptNum operator+(CScriptNum a, const CScriptNum& b)
 {
     a += b;
