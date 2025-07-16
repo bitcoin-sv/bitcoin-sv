@@ -12,7 +12,6 @@
 
 #include <string>
 #include <set>
-#include <tuple>
 #include <vector>
 
 #include <search.h>
@@ -27,11 +26,7 @@ struct dev_and_inode
     dev_t dev;
     ino_t ino;
 
-    // required for std::Set
-    bool operator<(const dev_and_inode& other) const
-    {
-        return std::tie (dev, ino) < std::tie (other.dev, other.ino);        
-    } 
+    auto operator<=>(const dev_and_inode&) const = default;
 };
 
 
