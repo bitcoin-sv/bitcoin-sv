@@ -155,8 +155,9 @@ public:
     unsigned short GetPort() const;
     bool GetSockAddr(struct sockaddr *paddr, socklen_t *addrlen) const;
     bool SetSockAddr(const struct sockaddr *paddr);
-    friend bool operator==(const CService &a, const CService &b);
-    friend bool operator<(const CService &a, const CService &b);
+
+    friend auto operator<=>(const CService&, const CService&) = default;
+
     std::vector<uint8_t> GetKey() const;
     std::string ToString() const;
     std::string ToStringPort() const;
@@ -175,5 +176,5 @@ public:
         if (ser_action.ForRead()) port = ntohs(portN);
     }
 };
-
+    
 #endif // BITCOIN_NETADDRESS_H
