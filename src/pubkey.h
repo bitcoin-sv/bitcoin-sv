@@ -10,6 +10,7 @@
 #include "serialize.h"
 #include "uint256.h"
 
+#include <compare>
 #include <span>
 #include <stdexcept>
 #include <vector>
@@ -91,20 +92,22 @@ public:
     const_pointer data() const noexcept { return vch.data(); }
     const uint8_t& operator[](unsigned int pos) const { return vch[pos]; }
 
-    //! Comparator implementation.
-    friend bool operator==(const CPubKey& a, const CPubKey& b)
+    friend auto operator<=>(const CPubKey& a, const CPubKey& b)
     {
-        return a.vch[0] == b.vch[0] && memcmp(a.vch.data(),
-                                              b.vch.data(),
-                                              a.size()) == 0;
+        if(const auto cmp = a.vch[0] <=> b.vch[0]; cmp != std::strong_ordering::equal)
+            return cmp;
+        else
+        {
+            const auto x = memcmp(a.vch.data(), b.vch.data(), a.size());
+            return (x == 0) ? std::strong_ordering::equal
+                            : (x < 0) ? std::strong_ordering::less
+                                      : std::strong_ordering::greater;
+        }
     }
 
-    friend bool operator<(const CPubKey& a, const CPubKey& b)
+    friend bool operator==(const CPubKey& a, const CPubKey& b)
     {
-        return a.vch[0] < b.vch[0] ||
-               (a.vch[0] == b.vch[0] && memcmp(a.vch.data(),
-                                               b.vch.data(),
-                                               a.size()) < 0);
+        return (a <=> b) == std::strong_ordering::equal;
     }
 
     //! Implement serialization, as if this was a byte vector.
