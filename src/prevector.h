@@ -106,11 +106,8 @@ public:
             ptr -= n;
             return *this;
         }
-        bool operator==(iterator x) const { return ptr == x.ptr; }
-        bool operator>=(iterator x) const { return ptr >= x.ptr; }
-        bool operator<=(iterator x) const { return ptr <= x.ptr; }
-        bool operator>(iterator x) const { return ptr > x.ptr; }
-        bool operator<(iterator x) const { return ptr < x.ptr; }
+        
+        auto operator<=>(const iterator& other) const = default;
 
         friend iterator operator+(difference_type n, const iterator& it)
         {
@@ -205,11 +202,8 @@ public:
             ptr -= n;
             return *this;
         }
-        bool operator==(const_iterator x) const { return ptr == x.ptr; }
-        bool operator>=(const_iterator x) const { return ptr >= x.ptr; }
-        bool operator<=(const_iterator x) const { return ptr <= x.ptr; }
-        bool operator>(const_iterator x) const { return ptr > x.ptr; }
-        bool operator<(const_iterator x) const { return ptr < x.ptr; }
+
+        auto operator<=>(const const_iterator& x) const = default;
 
         friend const_iterator operator+(difference_type n, const const_iterator& it)
         {
