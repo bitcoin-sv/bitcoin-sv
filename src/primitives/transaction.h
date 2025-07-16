@@ -11,8 +11,8 @@
 #include "script/script.h"
 #include "serialize.h"
 #include "uint256.h"
-#include <optional>
-#include <ostream>
+
+#include <iosfwd>
 
 struct TxId;
 /**
@@ -70,14 +70,7 @@ public:
     const TxId &GetTxId() const { return txid; }
     uint32_t GetN() const { return n; }
 
-    friend bool operator<(const COutPoint &a, const COutPoint &b) {
-        int cmp = a.txid.Compare(b.txid);
-        return cmp < 0 || (cmp == 0 && a.n < b.n);
-    }
-
-    friend bool operator==(const COutPoint &a, const COutPoint &b) {
-        return (a.txid == b.txid && a.n == b.n);
-    }
+    friend auto operator<=>(const COutPoint&, const COutPoint&) = default;
 
     std::string ToString() const;
 
