@@ -197,7 +197,8 @@ void getrawtransaction(const Config& config,
     {
         throw JSONRPCError(
             RPC_INVALID_ADDRESS_OR_KEY,
-            std::string(fTxIndex ? "No such mempool or blockchain transaction"
+            std::string(fTxIndex ? "No such mempool or blockchain transaction. "
+                                   "If using -prune, the transaction may be in a pruned block"
                                  : "No such mempool transaction. Use -txindex "
                                    "to enable blockchain transaction queries") +
                 ". Use gettransaction for wallet transactions.");
@@ -330,7 +331,8 @@ static CBlockIndex* GetBlockIndex(const Config& config,
             foundBlockHash.IsNull())
         {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
-                               "Transaction not yet in block or -txindex is not enabled");
+                               "Transaction not yet in block, -txindex is not enabled, "
+                               "or the block containing the transaction has been pruned");
         }
 
         pblockindex = mapBlockIndex.Get(foundBlockHash);

@@ -2070,10 +2070,13 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     // also see: InitParameterInteraction()
 
-    // if using block pruning, then disallow txindex
+    // if using block pruning, then warn about also using txindex
     if (gArgs.GetArg("-prune", 0)) {
-        if (gArgs.GetBoolArg("-txindex", DEFAULT_TXINDEX))
-            return InitError(_("Prune mode is incompatible with -txindex."));
+        if (gArgs.GetBoolArg("-txindex", DEFAULT_TXINDEX)) {
+            LogPrintf("Warning: Using -prune in combination with -txindex will mean "
+                "the node cannot fetch the details for old transactions in blocks "
+                "that have been pruned.\n");
+        }
     }
 
     // Make sure enough file descriptors are available

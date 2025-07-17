@@ -2183,7 +2183,7 @@ bool GetTransaction(const Config &config,
         if (pblocktree->ReadTxIndex(txid, postx)) {
             if (!BlockFileAccess::LoadBlockHashAndTx( postx, hashBlock, txOut ))
             {
-                return false;
+                return error("%s: block containing transaction %s has been pruned", __func__, txid.ToString());
             }
             if (txOut->GetId() != txid) {
                 return error("%s: txid mismatch", __func__);
