@@ -16,9 +16,10 @@
 #include <array>
 #include <cassert>
 #include <climits>
+#include <concepts>
 #include <cstdint>
 #include <cstring>
-#include <limits>
+#include <iterator>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -42,6 +43,10 @@ class CScriptNum;
 
 typedef prevector<28, uint8_t> CScriptBase;
 
+template<typename InputIt>
+concept uint8_iterator = std::input_iterator<InputIt> 
+                         && std::same_as<std::iter_value_t<InputIt>, uint8_t>;
+
 namespace bsv
 {
     class instruction_iterator;
@@ -54,13 +59,16 @@ protected:
 
 public:
     CScript() {}
-    CScript(const_iterator pbegin, const_iterator pend)
-        : CScriptBase(pbegin, pend) {}
-    CScript(std::vector<uint8_t>::const_iterator pbegin,
-            std::vector<uint8_t>::const_iterator pend)
-        : CScriptBase(pbegin, pend) {}
-    CScript(const uint8_t *pbegin, const uint8_t *pend)
-        : CScriptBase(pbegin, pend) {}
+
+    template<uint8_iterator InputIt>
+    CScript(InputIt first, InputIt last): CScriptBase{first, last}
+    {}
+
+    CScript(int64_t b) { operator<<(b); }
+
+    explicit CScript(opcodetype b) { operator<<(b); }
+    explicit CScript(const CScriptNum& b) { operator<<(b); }
+    explicit CScript(const std::vector<uint8_t>& b) { operator<<(b); }
 
     ADD_SERIALIZE_METHODS
 
@@ -79,12 +87,6 @@ public:
         ret += b;
         return ret;
     }
-
-    CScript(int64_t b) { operator<<(b); }
-
-    explicit CScript(opcodetype b) { operator<<(b); }
-    explicit CScript(const CScriptNum &b) { operator<<(b); }
-    explicit CScript(const std::vector<uint8_t> &b) { operator<<(b); }
 
     CScript &operator<<(int64_t b) { return push_int64(b); }
 
