@@ -28,6 +28,14 @@ configure_file(config.ini.in config.ini @ONLY)
 ###
 # Setup symlinks for testing
 ### 
+
+function(compare_paths src dst result)
+    cmake_path(NORMAL_PATH src OUTPUT_VARIABLE normalized_src)
+    cmake_path(NORMAL_PATH dst OUTPUT_VARIABLE normalized_dst)
+    cmake_path(COMPARE ${normalized_src} EQUAL ${normalized_dst} paths_equal)
+    set(${result} ${paths_equal} PARENT_SCOPE)
+endfunction()
+
 macro(make_link src dest)
   if (WIN32)  
     # Although recent versions of Windows 10 enables creation of symbolic for non-admin users, this 
@@ -53,19 +61,25 @@ endmacro()
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/functional/)
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/util/)
-
-make_link(
-	${CMAKE_CURRENT_SOURCE_DIR}/functional/test_runner.py
-	${CMAKE_CURRENT_BINARY_DIR}/functional/test_runner.py
-)
-make_link(
-	${CMAKE_CURRENT_SOURCE_DIR}/functional/create_cache.py
-	${CMAKE_CURRENT_BINARY_DIR}/functional/create_cache.py
-)
-make_link(
-	${CMAKE_CURRENT_SOURCE_DIR}/util/bitcoin-util-test.py
-	${CMAKE_CURRENT_BINARY_DIR}/util/bitcoin-util-test.py
-)
+  
+# Don't create symlinks if source and destination are equal.
+compare_paths("${CMAKE_CURRENT_SOURCE_DIR}"
+              "${CMAKE_CURRENT_BINARY_DIR}"
+              paths_equal)
+if(NOT paths_equal)
+  make_link(
+  	${CMAKE_CURRENT_SOURCE_DIR}/functional/test_runner.py
+  	${CMAKE_CURRENT_BINARY_DIR}/functional/test_runner.py
+  )
+  make_link(
+  	${CMAKE_CURRENT_SOURCE_DIR}/functional/create_cache.py
+  	${CMAKE_CURRENT_BINARY_DIR}/functional/create_cache.py
+  )
+  make_link(
+  	${CMAKE_CURRENT_SOURCE_DIR}/util/bitcoin-util-test.py
+  	${CMAKE_CURRENT_BINARY_DIR}/util/bitcoin-util-test.py
+  )
+endif()
 
 # target needed to copy scripts into build directory for manual functional testing
 add_custom_target(testrunner
