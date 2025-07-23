@@ -50,7 +50,7 @@ jobs:
     strategy:
       matrix:
         org_repo: [nchain/svn_dev]
-        tag: [ubuntu_24.04, debian_12, centos_9]
+        tag: [ubuntu_24.04, debian_12, centos_10]
         toolset: [gcc]
     runs-on: arc-runner-svnode
     container:
