@@ -1,7 +1,7 @@
 # Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
 # software license, see the accompanying file LICENSE
 
-FROM debian:11
+FROM debian:12
 
 ENV TZ=Europe/London
 
@@ -18,7 +18,7 @@ RUN set -xeu \
     python3-ecdsa python3-zmq python3-bip32utils \
     git \
     libgoogle-perftools-dev \
-    gcc-10 g++-10
+    gcc g++
 
 RUN set -xeu \
     && apt-get update \
