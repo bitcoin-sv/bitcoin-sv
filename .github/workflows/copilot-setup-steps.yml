@@ -1,0 +1,32 @@
+# Copyright (c) 2025 BSV Blockchain Association
+# Distributed under the Open BSV software license,
+# see the accompanying file LICENSE.
+
+name: "Copilot Setup Steps"
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    container:
+      image: nchain/svn_dev:ubuntu_22.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Benchmark
+        uses: ./.github/actions/benchmark/ 
+      - name: Select toolset version
+        uses: ./.github/actions/select_toolset_version
+        with: 
+          toolset: clang 
+          version: 19
