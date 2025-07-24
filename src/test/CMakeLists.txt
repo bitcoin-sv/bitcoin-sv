@@ -221,6 +221,31 @@ add_test_to_suite(bitcoin test_bitcoin
 	# Tests generated from JSON
 	${JSON_HEADERS}
 )
+
+set_source_files_properties(
+    blockfile_reading_tests.cpp
+    blockindex_with_descendants_tests.cpp
+    dsdetected_tests.cpp
+    int_serialization_tests.cpp
+    journal_tests.cpp
+    mempool_limit_tests.cpp
+    mempool_tests.cpp
+    mempooltxdb_tests.cpp 
+    miner_id_db_tests3.cpp
+    msg_buffer_tests.cpp
+    net_message_tests.cpp
+    prefilled_tx_parser_tests.cpp
+    scriptflags.cpp
+    test_bitcoin_main.cpp
+    test_txnvalidator.cpp
+    txn_grouper_tests.cpp
+    txs_parser_tests.cpp
+    undo_tests.cpp
+    validation_tests.cpp
+    PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
+
+set_target_properties(test_bitcoin PROPERTIES UNITY_BUILD_BATCH_SIZE 5)
+
 enable_coverage(test_bitcoin)
 
 target_include_directories(test_bitcoin

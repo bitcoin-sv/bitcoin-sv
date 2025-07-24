@@ -24,6 +24,8 @@ option(BUILD_BITCOIN_BENCH "Build benchmarks" ON)
 option(ENABLE_TCMALLOC "Use TCMAlloc" ON)
 option(ENABLE_CLANG_TIDY "Use ClangTidy" OFF)
 
+option(CMAKE_UNITY_BUILD "Enable Unity build")
+
 # Ensure that WINDRES_PREPROC is enabled when using windres.
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	list(APPEND CMAKE_RC_FLAGS "-DWINDRES_PREPROC")
@@ -441,6 +443,14 @@ add_library(common
 	write_preferring_upgradable_mutex.cpp
 	write_preferring_upgradable_mutex.h
 )
+
+set_source_files_properties(
+    cfile_util.cpp
+    config.cpp
+    net/netaddress.cpp
+    net/netbase.cpp
+    PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
+
 enable_coverage(common)
 
 target_include_directories(common SYSTEM PUBLIC secp256k1/include)
@@ -469,6 +479,12 @@ add_library(bitcoinconsensus
     verify_script_flags.h
     verify_script_flags.cpp
 )
+
+set_source_files_properties(
+    script/malleability_status.cpp
+    taskcancellation.cpp # linker
+    PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
+
 enable_coverage(bitcoinconsensus)
 
 target_link_libraries(bitcoinconsensus common)
@@ -666,6 +682,20 @@ add_library(server
 	vmtouch.cpp
 	vmtouch.h
 )
+
+set_source_files_properties(
+    rpc/abc.cpp
+    rpc/blockchain.cpp 
+    rpc/frozentxo_rpc.cpp # cjg put in rpc/
+    rpc/miner_info.cpp 
+    rpc/mining-fbb.cpp
+    rpc/mining.cpp
+    rpc/misc.cpp
+    rpc/net.cpp
+    rpc/safe_mode.cpp
+    validation.cpp
+    PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
+
 enable_coverage(server)
 
 # This require libevent
@@ -764,6 +794,9 @@ endif()
 # bitcoin-tx
 if(BUILD_BITCOIN_TX)
 	add_executable(bitcoin-tx bitcoin-tx.cpp)
+
+    set_source_files_properties(bitcoin-tx.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
+
     enable_coverage(bitcoin-tx)
 
 	if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")

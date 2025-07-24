@@ -8,6 +8,7 @@ BUILD_TYPE=${2,,}
 args=()
 args+=(-DCMAKE_BUILD_TYPE="${BUILD_TYPE}")
 args+=(-DCMAKE_CXX_FLAGS=-Werror\ -fno-omit-frame-pointer)
+args+=(-DCMAKE_UNITY_BUILD=ON)
 
 if [[ $TOOLSET == clang ]]; then
     args+=(-DENABLE_CLANG_TIDY=ON)

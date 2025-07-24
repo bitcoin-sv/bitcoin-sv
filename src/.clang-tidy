@@ -4,6 +4,7 @@ Checks: '-*,
 
          bugprone*,
          -bugprone-easily-swappable-parameters,
+         -bugprone-suspicious-include, # Unity builds
 
          cert-*,
 
