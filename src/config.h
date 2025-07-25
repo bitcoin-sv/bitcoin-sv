@@ -30,6 +30,8 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 class CChainParams;
 struct DefaultBlockSizeParams;
 
+inline bool fRequireStandard{true};
+
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions, cppcoreguidelines-virtual-class-destructor)
 class Config : public boost::noncopyable
 {

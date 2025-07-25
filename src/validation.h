@@ -236,7 +236,6 @@ extern std::atomic_bool fImporting;
 extern std::atomic_bool fReindex;
 extern bool fTxIndex;
 extern bool fIsBareMultisigStd;
-extern bool fRequireStandard;
 extern bool fCheckBlockIndex;
 extern bool fCheckpointsEnabled;
 extern size_t nCoinCacheUsage;

@@ -35,9 +35,6 @@
 static bool fCreateBlank; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 static std::map<std::string, UniValue> registers; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
-// not in use but required by config.h dependency
-bool fRequireStandard = true; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
-
 // Assume Chronicle active release unless configured otherwise
 ProtocolEra ActiveEra { ProtocolEra::PostChronicle }; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
