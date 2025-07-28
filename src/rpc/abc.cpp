@@ -102,17 +102,18 @@ static UniValue setblockmaxsize(Config &config,
     return UniValue(ret.str());
 }
 
-// clang-format off
-static const CRPCCommand commands[] = {
-    //  category            name                      actor (function)        okSafeMode
-    //  ------------------- ------------------------  ----------------------  ----------
-    { "network",            "getexcessiveblock",      getexcessiveblock,      true, {}},
-    { "network",            "setexcessiveblock",      setexcessiveblock,      true, {"maxBlockSize"}},
-    { "network",            "setblockmaxsize",        setblockmaxsize,        true, {"maxBlockSize"}},
-};
-// clang-format on
+void RegisterABCRPCCommands(CRPCTable& table_rpc)
+{
+    // clang-format off
+    static const CRPCCommand commands[] = {
+        //  category            name                      actor (function)        okSafeMode
+        //  ------------------- ------------------------  ----------------------  ----------
+        { "network",            "getexcessiveblock",      getexcessiveblock,      true, {}},
+        { "network",            "setexcessiveblock",      setexcessiveblock,      true, {"maxBlockSize"}},
+        { "network",            "setblockmaxsize",        setblockmaxsize,        true, {"maxBlockSize"}},
+    };
+    // clang-format on
 
-void RegisterABCRPCCommands(CRPCTable& table_rpc) {
     for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++) {
         table_rpc.appendCommand(commands[vcidx].name, &commands[vcidx]);
     }

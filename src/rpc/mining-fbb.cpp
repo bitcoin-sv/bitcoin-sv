@@ -371,18 +371,18 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
 
 /** Mining-Candidate end */
 
-const CRPCCommand commands[] =
-{
-  //  category              name                      actor (function)         okSafeMode
-  //  --------------------- ------------------------  -----------------------  ----------
-    { "mining",             "getminingcandidate",     getminingcandidate,     true, {"coinbase"}  },
-    { "mining",             "submitminingsolution",   submitminingsolution,   true, {}  },
-};
-
 } // namespace
 
-void RegisterMiningFBBRPCCommands(CRPCTable &t)
+void RegisterMiningFBBRPCCommands(CRPCTable& t)
 {
+    static const CRPCCommand commands[] =
+    {
+    //  category              name                      actor (function)         okSafeMode
+    //  --------------------- ------------------------  -----------------------  ----------
+        { "mining",             "getminingcandidate",     getminingcandidate,     true, {"coinbase"}  },
+        { "mining",             "submitminingsolution",   submitminingsolution,   true, {}  },
+    };
+
     for (auto& cmd : commands)
         t.appendCommand(cmd.name, &cmd);
 }

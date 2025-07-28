@@ -1041,28 +1041,29 @@ static UniValue getdatareftxid(const Config&, const JSONRPCRequest &request)
 
 } // namespace mining
 
-// clang-format off
-static const CRPCCommand commands[] = {
-    //  category   name                     actor (function)       okSafeMode
-    //  ---------- ------------------------ ---------------------- ----------
-    {"minerid", "createminerinfotx",                  mining::createminerinfotx,                  true, {"minerinfo"}},
-    {"minerid", "createdatareftx",                    mining::createdatareftx,                    true, {"minerinfo"}},
-    {"minerid", "replaceminerinfotx",                 mining::replaceminerinfotx,                 true, {"minerinfo"}},
-    {"minerid", "getminerinfotxid",                   mining::getminerinfotxid,                   true, {"minerinfo"}},
-    {"minerid", "getdatareftxid",                     mining::getdatareftxid,                     true, {"minerinfo"}},
-    {"minerid", "makeminerinfotxsigningkey",          mining::makeminerinfotxsigningkey,          true, {"minerinfo"}},
-    {"minerid", "getminerinfotxfundingaddress",       mining::getminerinfotxfundingaddress,       true, {"minerinfo"}},
-    {"minerid", "setminerinfotxfundingoutpoint",      mining::setminerinfotxfundingoutpoint,      true, {"minerinfo"}},
-    {"minerid", "datarefindexdump",                   mining::datarefindexdump,                   true, {} },
-    {"minerid", "datareftxndelete",                   mining::datareftxndelete,                   true, {"txid"} },
-    {"minerid", "rebuildminerids",                    mining::rebuildminerids,                    true, {"fullrebuild"} },
-    {"minerid", "revokeminerid",                      mining::revokeminerid,                      true, {"input"} },
-    {"minerid", "getmineridinfo",                     mining::getmineridinfo,                     true, {"minerid"} },
-    {"minerid", "dumpminerids",                       mining::dumpminerids,                       true, {} },
-};
-// clang-format on
+void RegisterMinerIdRPCCommands(CRPCTable& t)
+{
+    // clang-format off
+    static const CRPCCommand commands[] = {
+        //  category   name                     actor (function)       okSafeMode
+        //  ---------- ------------------------ ---------------------- ----------
+        {"minerid", "createminerinfotx",                  mining::createminerinfotx,                  true, {"minerinfo"}},
+        {"minerid", "createdatareftx",                    mining::createdatareftx,                    true, {"minerinfo"}},
+        {"minerid", "replaceminerinfotx",                 mining::replaceminerinfotx,                 true, {"minerinfo"}},
+        {"minerid", "getminerinfotxid",                   mining::getminerinfotxid,                   true, {"minerinfo"}},
+        {"minerid", "getdatareftxid",                     mining::getdatareftxid,                     true, {"minerinfo"}},
+        {"minerid", "makeminerinfotxsigningkey",          mining::makeminerinfotxsigningkey,          true, {"minerinfo"}},
+        {"minerid", "getminerinfotxfundingaddress",       mining::getminerinfotxfundingaddress,       true, {"minerinfo"}},
+        {"minerid", "setminerinfotxfundingoutpoint",      mining::setminerinfotxfundingoutpoint,      true, {"minerinfo"}},
+        {"minerid", "datarefindexdump",                   mining::datarefindexdump,                   true, {} },
+        {"minerid", "datareftxndelete",                   mining::datareftxndelete,                   true, {"txid"} },
+        {"minerid", "rebuildminerids",                    mining::rebuildminerids,                    true, {"fullrebuild"} },
+        {"minerid", "revokeminerid",                      mining::revokeminerid,                      true, {"input"} },
+        {"minerid", "getmineridinfo",                     mining::getmineridinfo,                     true, {"minerid"} },
+        {"minerid", "dumpminerids",                       mining::dumpminerids,                       true, {} },
+    };
+    // clang-format on
 
-void RegisterMinerIdRPCCommands(CRPCTable &t) {
     for (auto& c: commands)
         t.appendCommand(c.name, &c);
 }

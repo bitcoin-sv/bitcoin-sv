@@ -3747,55 +3747,56 @@ UniValue waitforptvcompletion(const Config&, const JSONRPCRequest& request)
     return NullUniValue;
 }
 
-// clang-format off
-static const CRPCCommand commands[] = {
-    //  category            name                      actor (function)        okSafe argNames
-    //  ------------------- ------------------------  ----------------------  ------ ----------
-    { "blockchain",         "getblockchaininfo",      getblockchaininfo,      true,  {} },
-    { "blockchain",         "getchaintxstats",        &getchaintxstats,       true,  {"nblocks", "blockhash"} },
-    { "blockchain",         "getbestblockhash",       getbestblockhash,       true,  {} },
-    { "blockchain",         "getblockcount",          getblockcount,          true,  {} },
-    { "blockchain",         "getblock",               getblock,               true,  {"blockhash","verbosity|verbose"} },
-    { "blockchain",         "getblockbyheight",       getblockbyheight,       true,  {"blockhash","verbosity|verbose"} },
-    { "blockchain",         "getblockhash",           getblockhash,           true,  {"height"} },
-    { "blockchain",         "getblockheader",         getblockheader,         true,  {"blockhash","verbosity|verbose"} },
-    { "blockchain",         "getblockstats",          getblockstats,          true,  {"blockhash","stats"} },
-    { "blockchain",         "getblockstatsbyheight",  getblockstatsbyheight,  true,  {"height","stats"} },
-    { "blockchain",         "getchaintips",           getchaintips,           true,  {} },
-    { "blockchain",         "getdifficulty",          getdifficulty,          true,  {} },
-    { "blockchain",         "getmempoolancestors",    getmempoolancestors,    true,  {"txid","verbose"} },
-    { "blockchain",         "getmempooldescendants",  getmempooldescendants,  true,  {"txid","verbose"} },
-    { "blockchain",         "getmempoolentry",        getmempoolentry,        true,  {"txid"} },
-    { "blockchain",         "getmempoolinfo",         getmempoolinfo,         true,  {} },
-    { "blockchain",         "getrawmempool",          getrawmempool,          true,  {"verbose"} },
-    { "blockchain",         "getrawnonfinalmempool",  getrawnonfinalmempool,  true,  {} },
-    { "blockchain",         "gettxout",               gettxout,               true,  {"txid","n","include_mempool"} },
-    { "blockchain",         "gettxouts",              gettxouts,              true,  {"txids_vouts","return_fields","include_mempool"} },
-    { "blockchain",         "gettxoutsetinfo",        gettxoutsetinfo,        true,  {} },
-    { "blockchain",         "pruneblockchain",        pruneblockchain,        true,  {"height"} },
-    { "blockchain",         "verifychain",            verifychain,            true,  {"checklevel","nblocks"} },
-    { "blockchain",         "preciousblock",          preciousblock,          true,  {"blockhash"} },
-    { "blockchain",         "checkjournal",           checkjournal,           true,  {} },
-    { "blockchain",         "rebuildjournal",         rebuildjournal,         true,  {} },
+void RegisterBlockchainRPCCommands(CRPCTable& t)
+{
+    // clang-format off
+    static const CRPCCommand commands[] = {
+        //  category            name                      actor (function)        okSafe argNames
+        //  ------------------- ------------------------  ----------------------  ------ ----------
+        { "blockchain",         "getblockchaininfo",      getblockchaininfo,      true,  {} },
+        { "blockchain",         "getchaintxstats",        &getchaintxstats,       true,  {"nblocks", "blockhash"} },
+        { "blockchain",         "getbestblockhash",       getbestblockhash,       true,  {} },
+        { "blockchain",         "getblockcount",          getblockcount,          true,  {} },
+        { "blockchain",         "getblock",               getblock,               true,  {"blockhash","verbosity|verbose"} },
+        { "blockchain",         "getblockbyheight",       getblockbyheight,       true,  {"blockhash","verbosity|verbose"} },
+        { "blockchain",         "getblockhash",           getblockhash,           true,  {"height"} },
+        { "blockchain",         "getblockheader",         getblockheader,         true,  {"blockhash","verbosity|verbose"} },
+        { "blockchain",         "getblockstats",          getblockstats,          true,  {"blockhash","stats"} },
+        { "blockchain",         "getblockstatsbyheight",  getblockstatsbyheight,  true,  {"height","stats"} },
+        { "blockchain",         "getchaintips",           getchaintips,           true,  {} },
+        { "blockchain",         "getdifficulty",          getdifficulty,          true,  {} },
+        { "blockchain",         "getmempoolancestors",    getmempoolancestors,    true,  {"txid","verbose"} },
+        { "blockchain",         "getmempooldescendants",  getmempooldescendants,  true,  {"txid","verbose"} },
+        { "blockchain",         "getmempoolentry",        getmempoolentry,        true,  {"txid"} },
+        { "blockchain",         "getmempoolinfo",         getmempoolinfo,         true,  {} },
+        { "blockchain",         "getrawmempool",          getrawmempool,          true,  {"verbose"} },
+        { "blockchain",         "getrawnonfinalmempool",  getrawnonfinalmempool,  true,  {} },
+        { "blockchain",         "gettxout",               gettxout,               true,  {"txid","n","include_mempool"} },
+        { "blockchain",         "gettxouts",              gettxouts,              true,  {"txids_vouts","return_fields","include_mempool"} },
+        { "blockchain",         "gettxoutsetinfo",        gettxoutsetinfo,        true,  {} },
+        { "blockchain",         "pruneblockchain",        pruneblockchain,        true,  {"height"} },
+        { "blockchain",         "verifychain",            verifychain,            true,  {"checklevel","nblocks"} },
+        { "blockchain",         "preciousblock",          preciousblock,          true,  {"blockhash"} },
+        { "blockchain",         "checkjournal",           checkjournal,           true,  {} },
+        { "blockchain",         "rebuildjournal",         rebuildjournal,         true,  {} },
 
-    /* Not shown in help */
-    { "hidden",             "invalidateblock",        invalidateblock,        true,  {"blockhash"} },
-    { "hidden",             "reconsiderblock",        reconsiderblock,        true,  {"blockhash"} },
-    { "hidden",             "softrejectblock",        softrejectblock,        true,  {"blockhash","numblocks"} },
-    { "hidden",             "acceptblock",            acceptblock,            true,  {"blockhash","numblocks"} },
-    { "hidden",             "getsoftrejectedblocks",  getsoftrejectedblocks,  true,  {"onlymarked"} },
-    { "hidden",             "waitfornewblock",        waitfornewblock,        true,  {"timeout"} },
-    { "hidden",             "waitforblockheight",     waitforblockheight,     true,  {"height","timeout"} },
-    { "hidden",             "getblockchainactivity",  getblockchainactivity,  true,  {} },
-    { "hidden",             "getcurrentlyvalidatingblocks",     getcurrentlyvalidatingblocks,     true,  {} },
-    { "hidden",             "waitaftervalidatingblock",         waitaftervalidatingblock,         true,  {"blockhash","action"} },
-    { "hidden",             "getwaitingblocks",                 getwaitingblocks,            true,  {} },
-    { "hidden",             "getorphaninfo",                    getorphaninfo, true, {} },
-    { "hidden",             "waitforptvcompletion",             waitforptvcompletion, true, {} },
-};
-// clang-format on
+        /* Not shown in help */
+        { "hidden",             "invalidateblock",        invalidateblock,        true,  {"blockhash"} },
+        { "hidden",             "reconsiderblock",        reconsiderblock,        true,  {"blockhash"} },
+        { "hidden",             "softrejectblock",        softrejectblock,        true,  {"blockhash","numblocks"} },
+        { "hidden",             "acceptblock",            acceptblock,            true,  {"blockhash","numblocks"} },
+        { "hidden",             "getsoftrejectedblocks",  getsoftrejectedblocks,  true,  {"onlymarked"} },
+        { "hidden",             "waitfornewblock",        waitfornewblock,        true,  {"timeout"} },
+        { "hidden",             "waitforblockheight",     waitforblockheight,     true,  {"height","timeout"} },
+        { "hidden",             "getblockchainactivity",  getblockchainactivity,  true,  {} },
+        { "hidden",             "getcurrentlyvalidatingblocks",     getcurrentlyvalidatingblocks,     true,  {} },
+        { "hidden",             "waitaftervalidatingblock",         waitaftervalidatingblock,         true,  {"blockhash","action"} },
+        { "hidden",             "getwaitingblocks",                 getwaitingblocks,            true,  {} },
+        { "hidden",             "getorphaninfo",                    getorphaninfo, true, {} },
+        { "hidden",             "waitforptvcompletion",             waitforptvcompletion, true, {} },
+    };
+    // clang-format on
 
-void RegisterBlockchainRPCCommands(CRPCTable &t) {
     for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++) {
         t.appendCommand(commands[vcidx].name, &commands[vcidx]);
     }

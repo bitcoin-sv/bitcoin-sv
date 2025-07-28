@@ -1317,31 +1317,32 @@ std::optional<uint32_t> GetFlagNumber(const std::string& flagName, std::string& 
     return flagNumber;
 }
 
-// clang-format off
-static const CRPCCommand commands[] = {
-    //  category            name                      actor (function)        okSafeMode
-    //  ------------------- ------------------------  ----------------------  ----------
-    { "control",            "getinfo",                getinfo,                true,  {} }, /* uses wallet if enabled */
-    { "control",            "getmemoryinfo",          getmemoryinfo,          true,  {} },
-    { "control",            "dumpparameters",         dumpparameters,         true,  {} },
-    { "control",            "getsettings",            getsettings,            true,  {} },
-    { "control",            "activezmqnotifications", activezmqnotifications, true,  {} },
-    { "util",               "validateaddress",        validateaddress,        true,  {"address"} }, /* uses wallet if enabled */
-    { "util",               "createmultisig",         createmultisig,         true,  {"nrequired","keys"} },
-    { "util",               "verifymessage",          verifymessage,          true,  {"address","signature","message"} },
-    { "util",               "verifyscript",           verifyscript,           true,  {"scripts", "stopOnFirstInvalid", "totalTimeout"} },
-    { "util",               "signmessagewithprivkey", signmessagewithprivkey, true,  {"privkey","message"} },
+void RegisterMiscRPCCommands(CRPCTable& t)
+{
+    // clang-format off
+    static const CRPCCommand commands[] = {
+        //  category            name                      actor (function)        okSafeMode
+        //  ------------------- ------------------------  ----------------------  ----------
+        { "control",            "getinfo",                getinfo,                true,  {} }, /* uses wallet if enabled */
+        { "control",            "getmemoryinfo",          getmemoryinfo,          true,  {} },
+        { "control",            "dumpparameters",         dumpparameters,         true,  {} },
+        { "control",            "getsettings",            getsettings,            true,  {} },
+        { "control",            "activezmqnotifications", activezmqnotifications, true,  {} },
+        { "util",               "validateaddress",        validateaddress,        true,  {"address"} }, /* uses wallet if enabled */
+        { "util",               "createmultisig",         createmultisig,         true,  {"nrequired","keys"} },
+        { "util",               "verifymessage",          verifymessage,          true,  {"address","signature","message"} },
+        { "util",               "verifyscript",           verifyscript,           true,  {"scripts", "stopOnFirstInvalid", "totalTimeout"} },
+        { "util",               "signmessagewithprivkey", signmessagewithprivkey, true,  {"privkey","message"} },
 
-    { "util",               "clearinvalidtransactions",clearinvalidtransactions, true,  {} },
+        { "util",               "clearinvalidtransactions",clearinvalidtransactions, true,  {} },
 
-    /* Not shown in help */
-    { "hidden",             "setmocktime",            setmocktime,            true,  {"timestamp"}},
-    { "hidden",             "echo",                   echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
-    { "hidden",             "echojson",               echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
-};
-// clang-format on
+        /* Not shown in help */
+        { "hidden",             "setmocktime",            setmocktime,            true,  {"timestamp"}},
+        { "hidden",             "echo",                   echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
+        { "hidden",             "echojson",               echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
+    };
+    // clang-format on
 
-void RegisterMiscRPCCommands(CRPCTable &t) {
     for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++) {
         t.appendCommand(commands[vcidx].name, &commands[vcidx]);
     }

@@ -943,22 +943,24 @@ static UniValue submitblock(const Config &config,
     return processBlock(config, blockptr, submitBlock);
 }
 
-// clang-format off
-static const CRPCCommand commands[] = {
-    //  category   name                     actor (function)       okSafeMode
-    //  ---------- ------------------------ ---------------------- ----------
-    {"mining",     "getnetworkhashps",      getnetworkhashps,      true, {"nblocks", "height"}},
-    {"mining",     "getmininginfo",         getmininginfo,         true, {}},
-    {"mining",     "prioritisetransaction", prioritisetransaction, true, {"txid", "priority_delta", "fee_delta"}},
-    {"mining",     "getblocktemplate",      getblocktemplate,      true, {"template_request"}},
-    {"mining",     "verifyblockcandidate",  verifyblockcandidate,  true, {"hexdata", "parameters"}},
-    {"mining",     "submitblock",           submitblock,           true, {"hexdata", "parameters"}},
+void RegisterMiningRPCCommands(CRPCTable& t)
+{
+    // clang-format off
+    static const CRPCCommand commands[] = {
+        //  category   name                     actor (function)       okSafeMode
+        //  ---------- ------------------------ ---------------------- ----------
+        {"mining",     "getnetworkhashps",      getnetworkhashps,      true, {"nblocks", "height"}},
+        {"mining",     "getmininginfo",         getmininginfo,         true, {}},
+        {"mining",     "prioritisetransaction", prioritisetransaction, true, {"txid", "priority_delta", "fee_delta"}},
+        {"mining",     "getblocktemplate",      getblocktemplate,      true, {"template_request"}},
+        {"mining",     "verifyblockcandidate",  verifyblockcandidate,  true, {"hexdata", "parameters"}},
+        {"mining",     "submitblock",           submitblock,           true, {"hexdata", "parameters"}},
 
-    {"generating", "generatetoaddress",     generatetoaddress,     true, {"nblocks", "address", "maxtries"}},
-};
-// clang-format on
+        {"generating", "generatetoaddress",     generatetoaddress,     true, {"nblocks", "address", "maxtries"}},
+    };
+    // clang-format on
 
-void RegisterMiningRPCCommands(CRPCTable &t) {
     for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
         t.appendCommand(commands[vcidx].name, &commands[vcidx]);
 }
+

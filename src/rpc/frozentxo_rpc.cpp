@@ -892,30 +892,25 @@ Examples:
         httpReq->StopWritingChunks();
     }
 }
-
-
-// clang-format off
-const CRPCCommand commands[] = {
-  //  category      name                            actor (function)                okSafeMode
-  //  ------------- -----------------------         ---------------------           ----------
-    { "frozentxo", "addToPolicyBlacklist",          addToPolicyBlacklist,           true ,  {"funds"} },
-    { "frozentxo", "addToConsensusBlacklist",       addToConsensusBlacklist,        true ,  {"funds"} },
-    { "frozentxo", "removeFromPolicyBlacklist",     removeFromPolicyBlacklist,      true ,  {"funds"} },
-    { "frozentxo", "queryBlacklist",                queryBlacklist,                 true ,  {}        },
-    { "frozentxo", "clearBlacklists",               clearBlacklists,                true ,  {"removeAllEntries"} },
-    { "frozentxo", "addToConfiscationTxidWhitelist",addToConfiscationTxidWhitelist, true ,  {"txs"}   },
-    { "frozentxo", "clearConfiscationWhitelist",    clearConfiscationWhitelist,     true ,  {}        },
-    { "frozentxo", "queryConfiscationTxidWhitelist",queryConfiscationTxidWhitelist, true ,  {"verbose"} }
-};
-// clang-format on
-
 } // anonymous namespace
-
-
-
 
 void RegisterFrozenTransactionRPCCommands(CRPCTable& t)
 {
+    // clang-format off
+    const CRPCCommand commands[] = {
+    //  category      name                            actor (function)                okSafeMode
+    //  ------------- -----------------------         ---------------------           ----------
+        { "frozentxo", "addToPolicyBlacklist",          addToPolicyBlacklist,           true ,  {"funds"} },
+        { "frozentxo", "addToConsensusBlacklist",       addToConsensusBlacklist,        true ,  {"funds"} },
+        { "frozentxo", "removeFromPolicyBlacklist",     removeFromPolicyBlacklist,      true ,  {"funds"} },
+        { "frozentxo", "queryBlacklist",                queryBlacklist,                 true ,  {}        },
+        { "frozentxo", "clearBlacklists",               clearBlacklists,                true ,  {"removeAllEntries"} },
+        { "frozentxo", "addToConfiscationTxidWhitelist",addToConfiscationTxidWhitelist, true ,  {"txs"}   },
+        { "frozentxo", "clearConfiscationWhitelist",    clearConfiscationWhitelist,     true ,  {}        },
+        { "frozentxo", "queryConfiscationTxidWhitelist",queryConfiscationTxidWhitelist, true ,  {"verbose"} }
+    };
+    // clang-format on
+
     for (auto& vc: commands)
     {
         t.appendCommand(vc.name, &vc);

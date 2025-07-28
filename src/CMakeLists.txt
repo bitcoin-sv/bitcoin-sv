@@ -673,19 +673,6 @@ add_library(server
 	vmtouch.h
 )
 
-set_source_files_properties(
-    rpc/abc.cpp
-    rpc/blockchain.cpp 
-    rpc/frozentxo_rpc.cpp # cjg put in rpc/
-    rpc/miner_info.cpp 
-    rpc/mining-fbb.cpp
-    rpc/mining.cpp
-    rpc/misc.cpp
-    rpc/net.cpp
-    rpc/safe_mode.cpp
-    validation.cpp
-    PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
-
 enable_coverage(server)
 
 # This require libevent

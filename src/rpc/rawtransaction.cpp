@@ -2575,27 +2575,28 @@ static UniValue verifymerkleproof(const Config&, const JSONRPCRequest& request)
     return(calculatedMerkleRoot == headerMerkleRoot);
 }
 
-// clang-format off
-static const CRPCCommand commands[] = {
-    //  category            name                      actor (function)        okSafeMode
-    //  ------------------- ------------------------  ----------------------  ----------
-    { "rawtransactions",    "getrawtransaction",      getrawtransaction,      true,  {"txid","verbose"} },
-    { "rawtransactions",    "createrawtransaction",   createrawtransaction,   true,  {"inputs","outputs","locktime"} },
-    { "rawtransactions",    "decoderawtransaction",   decoderawtransaction,   true,  {"hexstring"} },
-    { "rawtransactions",    "decodescript",           decodescript,           true,  {"hexstring"} },
-    { "rawtransactions",    "sendrawtransaction",     sendrawtransaction,     false, {"hexstring","allowhighfees","dontcheckfee"} },
-    { "rawtransactions",    "sendrawtransactions",    sendrawtransactions,    false, {"inputs"} },
-    { "rawtransactions",    "signrawtransaction",     signrawtransaction,     false, {"hexstring","prevtxs","privkeys","sighashtype"} }, /* uses wallet if enabled */
+void RegisterRawTransactionRPCCommands(CRPCTable& t)
+{
+    // clang-format off
+    static const CRPCCommand commands[] = {
+        //  category            name                      actor (function)        okSafeMode
+        //  ------------------- ------------------------  ----------------------  ----------
+        { "rawtransactions",    "getrawtransaction",      getrawtransaction,      true,  {"txid","verbose"} },
+        { "rawtransactions",    "createrawtransaction",   createrawtransaction,   true,  {"inputs","outputs","locktime"} },
+        { "rawtransactions",    "decoderawtransaction",   decoderawtransaction,   true,  {"hexstring"} },
+        { "rawtransactions",    "decodescript",           decodescript,           true,  {"hexstring"} },
+        { "rawtransactions",    "sendrawtransaction",     sendrawtransaction,     false, {"hexstring","allowhighfees","dontcheckfee"} },
+        { "rawtransactions",    "sendrawtransactions",    sendrawtransactions,    false, {"inputs"} },
+        { "rawtransactions",    "signrawtransaction",     signrawtransaction,     false, {"hexstring","prevtxs","privkeys","sighashtype"} }, /* uses wallet if enabled */
 
-    { "blockchain",         "gettxoutproof",          gettxoutproof,          true,  {"txids", "blockhash"} },
-    { "blockchain",         "verifytxoutproof",       verifytxoutproof,       true,  {"proof"} },
-    { "blockchain",         "getmerkleproof",         getmerkleproof,         true,  {"txid", "blockhash"} },
-    { "blockchain",         "getmerkleproof2",        getmerkleproof2,        true,  {"txid", "blockhash","includeFullTx","targetType","format"} },
-    { "blockchain",         "verifymerkleproof",      verifymerkleproof,      true,  {"proof", "txid"} },
-};
-// clang-format on
+        { "blockchain",         "gettxoutproof",          gettxoutproof,          true,  {"txids", "blockhash"} },
+        { "blockchain",         "verifytxoutproof",       verifytxoutproof,       true,  {"proof"} },
+        { "blockchain",         "getmerkleproof",         getmerkleproof,         true,  {"txid", "blockhash"} },
+        { "blockchain",         "getmerkleproof2",        getmerkleproof2,        true,  {"txid", "blockhash","includeFullTx","targetType","format"} },
+        { "blockchain",         "verifymerkleproof",      verifymerkleproof,      true,  {"proof", "txid"} },
+    };
+    // clang-format on
 
-void RegisterRawTransactionRPCCommands(CRPCTable &t) {
     for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++) {
         t.appendCommand(commands[vcidx].name, &commands[vcidx]);
     }
