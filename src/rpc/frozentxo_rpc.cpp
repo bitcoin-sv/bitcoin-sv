@@ -897,7 +897,7 @@ Examples:
 void RegisterFrozenTransactionRPCCommands(CRPCTable& t)
 {
     // clang-format off
-    const CRPCCommand commands[] = {
+    static const CRPCCommand commands[] = {
     //  category      name                            actor (function)                okSafeMode
     //  ------------- -----------------------         ---------------------           ----------
         { "frozentxo", "addToPolicyBlacklist",          addToPolicyBlacklist,           true ,  {"funds"} },

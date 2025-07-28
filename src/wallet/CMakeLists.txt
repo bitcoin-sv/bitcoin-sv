@@ -19,11 +19,6 @@ add_library(wallet
 	walletdb.cpp
 )
 
-set_source_files_properties(
-    rpcdump.cpp
-    rpcwallet.cpp
-    PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
-
 enable_coverage(wallet)
 
 target_link_libraries(wallet util univalue ${BDBXX_LIBRARY} ${EVENT_LIBRARY})
