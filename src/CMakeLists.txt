@@ -180,6 +180,8 @@ add_subdirectory(univalue)
 # Various completely unrelated features shared by all executables.
 add_library(util
 	amount.h
+	cfile_util.cpp
+	cfile_util.h
 	chainparamsbase.cpp
 	chainparamsbase.h
 	clientversion.cpp
@@ -291,8 +293,6 @@ add_library(common
 	blockstreams.h
 	blockvalidation.h
 	bloom.h
-	cfile_util.cpp
-	cfile_util.h
 	chain.h
 	chainparams.cpp
 	chainparams.h
@@ -445,7 +445,6 @@ add_library(common
 )
 
 set_source_files_properties(
-    cfile_util.cpp
     config.cpp
     net/netaddress.cpp
     net/netbase.cpp
@@ -753,8 +752,6 @@ endif()
 
 # RPC client support
 add_library(rpcclient
-	cfile_util.cpp
-	cfile_util.h
     net/netaddress.cpp
     net/netaddress.h
     net/netbase.cpp

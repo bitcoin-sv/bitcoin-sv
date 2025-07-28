@@ -492,8 +492,6 @@ libbitcoin_consensus_a_SOURCES = \
   arith_uint256.h \
   big_int.cpp \
   big_int.h \
-  cfile_util.cpp \
-  cfile_util.h \
   consensus/merkle.cpp \
   consensus/merkle.h \
   consensus/params.h \
@@ -546,6 +544,8 @@ libbitcoin_common_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_common_a_SOURCES = \
   amount.cpp \
   base58.cpp \
+  cfile_util.cpp \
+  cfile_util.h \
   chainparams.cpp \
   config.cpp \
   coins.cpp \
