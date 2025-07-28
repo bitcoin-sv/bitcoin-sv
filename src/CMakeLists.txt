@@ -478,7 +478,6 @@ add_library(bitcoinconsensus
 )
 
 set_source_files_properties(
-    script/malleability_status.cpp
     taskcancellation.cpp # linker
     PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
 

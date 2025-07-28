@@ -6,18 +6,18 @@
 
 using namespace std;
 
-constexpr malleability::status ms{malleability::non_malleable};
-static_assert(malleability::non_malleable == ms);
-static_assert(!is_malleable(ms));
-static_assert(!is_unclean_stack(ms));
-static_assert(!is_non_minimal_push(ms));
-static_assert(!is_non_minimal_scriptnum(ms));
-static_assert(!is_high_s(ms));
-static_assert(!has_non_push_data(ms));
-static_assert(!is_null_fail(ms));
-static_assert(!is_null_dummy(ms));
-static_assert(!is_minimal_if(ms));
-static_assert(!is_disallowed(ms));
+constexpr malleability::status ms_non_malleable{malleability::non_malleable};
+static_assert(malleability::non_malleable == ms_non_malleable);
+static_assert(!is_malleable(ms_non_malleable));
+static_assert(!is_unclean_stack(ms_non_malleable));
+static_assert(!is_non_minimal_push(ms_non_malleable));
+static_assert(!is_non_minimal_scriptnum(ms_non_malleable));
+static_assert(!is_high_s(ms_non_malleable));
+static_assert(!has_non_push_data(ms_non_malleable));
+static_assert(!is_null_fail(ms_non_malleable));
+static_assert(!is_null_dummy(ms_non_malleable));
+static_assert(!is_minimal_if(ms_non_malleable));
+static_assert(!is_disallowed(ms_non_malleable));
     
 constexpr malleability::status ms_unclean_stack{malleability::unclean_stack};
 static_assert(malleability::unclean_stack == ms_unclean_stack);
