@@ -20,7 +20,6 @@ add_library(wallet
 )
 
 set_source_files_properties(
-    finaltx.cpp
     rpcdump.cpp
     rpcwallet.cpp
     PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
