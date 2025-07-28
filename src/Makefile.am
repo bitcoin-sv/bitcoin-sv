@@ -555,7 +555,6 @@ libbitcoin_common_a_SOURCES = \
   core_write.cpp \
   key.cpp \
   keystore.cpp \
-  net/netaddress.cpp \
   net/netbase.cpp \
   protocol.cpp \
   protocol_era.cpp \
@@ -584,6 +583,7 @@ libbitcoin_util_a_SOURCES = \
   fs.cpp \
   logging.cpp \
   overload.h \
+  net/netaddress.cpp \
   random.cpp \
   rpc/protocol.cpp \
   rpc/text_writer.cpp \
