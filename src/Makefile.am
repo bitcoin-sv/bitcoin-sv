@@ -414,7 +414,6 @@ libbitcoin_server_a_SOURCES = \
   script/scriptcache.cpp \
   script/sigcache.cpp \
   script/ismine.cpp \
-  taskcancellation.cpp \
   timedata.cpp \
   time_locked_mempool.cpp \
   txdb.cpp \

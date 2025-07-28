@@ -414,8 +414,6 @@ add_library(common
 	support/allocators/zeroafterfree.h
 	task.h
 	task_helpers.h
-	taskcancellation.cpp
-	taskcancellation.h
 	thread_safe_queue.h
 	threadpool.h
 	threadpoolT.h
@@ -476,10 +474,6 @@ add_library(bitcoinconsensus
     verify_script_flags.h
     verify_script_flags.cpp
 )
-
-set_source_files_properties(
-    taskcancellation.cpp # linker
-    PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
 
 enable_coverage(bitcoinconsensus)
 
