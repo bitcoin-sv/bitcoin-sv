@@ -766,8 +766,6 @@ endif()
 if(BUILD_BITCOIN_TX)
 	add_executable(bitcoin-tx bitcoin-tx.cpp)
 
-    set_source_files_properties(bitcoin-tx.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
-
     enable_coverage(bitcoin-tx)
 
 	if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
