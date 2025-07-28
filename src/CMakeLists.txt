@@ -200,6 +200,8 @@ add_library(util
 	logging.h
 	net/netaddress.cpp
 	net/netaddress.h
+	net/netbase.cpp
+	net/netbase.h
 	prevector.h
 	random.cpp
 	random.h
@@ -365,8 +367,6 @@ add_library(common
 	net/net.h
 	net/net_message.h
 	net/net_types.h
-	net/netbase.cpp
-	net/netbase.h
 	net/node_stats.h
     net/prefilled_tx_parser.h
     net/prefilled_tx_parser.cpp
@@ -446,7 +446,6 @@ add_library(common
 
 set_source_files_properties(
     config.cpp
-    net/netbase.cpp
     PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
 
 enable_coverage(common)
@@ -751,8 +750,6 @@ endif()
 
 # RPC client support
 add_library(rpcclient
-    net/netbase.cpp
-    net/netbase.h
 	rpc/client.cpp
 	rpc/client.h
 	rpc/client_config.cpp

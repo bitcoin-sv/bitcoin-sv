@@ -584,6 +584,7 @@ libbitcoin_util_a_SOURCES = \
   logging.cpp \
   overload.h \
   net/netaddress.cpp \
+  net/netbase.cpp \
   random.cpp \
   rpc/protocol.cpp \
   rpc/text_writer.cpp \
