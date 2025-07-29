@@ -37,7 +37,7 @@ namespace
                         make_pair("prevRevocationKeySig",
                                    json_value_type::string)};
     
-    const string version{"0.3"};
+    const string miner_id_version{"0.3"};
     const string height{"1234"};
     constexpr int h{1234};
     const string compressed_key_2{[]{ return string{"02"} + string(64, '0');}()};
@@ -59,7 +59,7 @@ namespace
         "a8d30fce5f15a4fe9fb6088f802201df8b523690ee3c3a721"
         "703ef3696a47b836e93f8dcbc3bd2bdca77a0d8a2dff"};
     
-    const vector<string> required_values{version,
+    const vector<string> required_values{miner_id_version,
                                          height,
                                          miner_id,
                                          prev_miner_id,
