@@ -51,7 +51,7 @@
 // Uncomment if you want to output updated JSON tests.
 //#define UPDATE_JSON_TESTS
 
-static const unsigned int flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC;
+static const unsigned int g_flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC;
 
 struct ScriptErrorDesc {
     ScriptError_t err;
@@ -2551,14 +2551,14 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
 
     CScript goodsig1 =
         sign_multisig(scriptPubKey12, key1, CTransaction(txTo12));
-    const auto params{make_verify_script_params(testConfig, flags, true)};
+    const auto params{make_verify_script_params(testConfig, g_flags, true)};
     auto source = task::CCancellationSource::Make();
     auto res =
         VerifyScript(params,
                      source->GetToken(),
                      goodsig1,
                      scriptPubKey12,
-                     flags,
+                     g_flags,
                      MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
                      ms);
     assert(res);
@@ -2569,7 +2569,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
                      source->GetToken(),
                      goodsig1,
                      scriptPubKey12,
-                     flags,
+                     g_flags,
                      MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
                      ms);
     assert(res);
@@ -2584,7 +2584,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
                      source->GetToken(),
                      goodsig2,
                      scriptPubKey12,
-                     flags,
+                     g_flags,
                      MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
                      ms);
     assert(res);
@@ -2596,7 +2596,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG12) {
                      source->GetToken(),
                      badsig1,
                      scriptPubKey12,
-                     flags,
+                     g_flags,
                      MutableTransactionSignatureChecker(&txTo12, 0, txFrom12.vout[0].nValue),
                      ms);
     assert(res);
@@ -2637,14 +2637,14 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
     keys.push_back(key1);
     keys.push_back(key2);
     CScript goodsig1 = sign_multisig(scriptPubKey23, keys, txTo23);
-    const auto params{make_verify_script_params(testConfig, flags, true)};
+    const auto params{make_verify_script_params(testConfig, g_flags, true)};
     auto source = task::CCancellationSource::Make();
     auto res =
         VerifyScript(params,
                      source->GetToken(),
                      goodsig1,
                      scriptPubKey23,
-                     flags,
+                     g_flags,
                      TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
                      ms);
     assert(res);
@@ -2659,7 +2659,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
                      source->GetToken(),
                      goodsig2,
                      scriptPubKey23,
-                     flags,
+                     g_flags,
                      TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
                      ms);
     assert(res);
@@ -2674,7 +2674,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
                      source->GetToken(),
                      goodsig3,
                      scriptPubKey23,
-                     flags,
+                     g_flags,
                      TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
                      ms);
     assert(res);
@@ -2689,7 +2689,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
                      source->GetToken(),
                      badsig1,
                      scriptPubKey23,
-                     flags,
+                     g_flags,
                      TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
                      ms);
     assert(res);
@@ -2705,7 +2705,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
                      source->GetToken(),
                      badsig2,
                      scriptPubKey23,
-                     flags,
+                     g_flags,
                      TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
                      ms);
     assert(res);
@@ -2721,7 +2721,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
                      source->GetToken(),
                      badsig3,
                      scriptPubKey23,
-                     flags,
+                     g_flags,
                      TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
                      ms);
     assert(res);
@@ -2737,7 +2737,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
                      source->GetToken(),
                      badsig4,
                      scriptPubKey23,
-                     flags,
+                     g_flags,
                      TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
                      ms);
     assert(res);
@@ -2753,7 +2753,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
                      source->GetToken(),
                      badsig5,
                      scriptPubKey23,
-                     flags,
+                     g_flags,
                      TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
                      ms);
     assert(res);
@@ -2767,7 +2767,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23)
                      source->GetToken(),
                      badsig6,
                      scriptPubKey23,
-                     flags,
+                     g_flags,
                      TransactionSignatureChecker(&txTo23, 0, txFrom23.vout[0].nValue),
                      ms);
     assert(res);
@@ -3668,7 +3668,7 @@ namespace {
 BOOST_AUTO_TEST_CASE(caching_invalid_signatures)
 {
     auto source = task::CCancellationSource::Make();
-    const uint32_t flags_genesis{flags | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS};
+    const uint32_t flags_genesis{g_flags | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS};
     const auto params{make_verify_script_params(testConfig, flags_genesis, true)};
   
     int iterations = 30;
@@ -4572,7 +4572,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checksig_forkid_chronicle)
     using namespace std;
         
     const Config& config = GlobalConfig::GetConfig();
-    const auto params{make_eval_script_params(config, flags, false)};
+    const auto params{make_eval_script_params(config, g_flags, false)};
     auto source = task::CCancellationSource::Make();
     
     using test_args = tuple<vector<uint8_t>,   // sighashes
@@ -4624,7 +4624,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checkmultisig_forkid_relax)
     using namespace std;
 
     const Config& config = GlobalConfig::GetConfig();
-    const auto params{make_eval_script_params(config, flags, false)};
+    const auto params{make_eval_script_params(config, g_flags, false)};
     auto source = task::CCancellationSource::Make();
     
     using test_args = tuple<vector<uint8_t>,   // sighashes
