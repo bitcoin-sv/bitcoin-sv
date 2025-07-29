@@ -48,6 +48,11 @@ namespace std
     
 const inline mining::CJournalChangeSetPtr nullChangeSet{nullptr};
 
+constexpr size_t script_len_1{1};
+constexpr size_t script_len_2{2};
+constexpr size_t script_len_3{3};
+constexpr size_t script_len_4{4};
+
 // RAII class to instantiate global miner ID database
 class MakeGlobalMinerIdDb
 {

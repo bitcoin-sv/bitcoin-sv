@@ -11,6 +11,7 @@
 
 #include "net/tx_parser.h"
 #include "net/p2p_msg_lengths.h"
+#include "testutil.h"
 
 using namespace std;
 using namespace bsv;
@@ -107,11 +108,6 @@ static const std::vector<uint8_t> tx = []
 
     return txn;
 }();
-
-constexpr size_t script_len_1{1};
-constexpr size_t script_len_2{2};
-constexpr size_t script_len_3{3};
-constexpr size_t script_len_4{4};
 
 BOOST_AUTO_TEST_SUITE(tx_parser_tests)
 

@@ -11,6 +11,7 @@
 #include "net/array_parser.h"
 #include "net/parser_utils.h"
 #include "net/p2p_msg_lengths.h"
+#include "test/testutil.h"
 
 using namespace std;
 using namespace bsv;
@@ -108,9 +109,6 @@ static const std::vector<uint8_t> txs = []
 
     return tx;
 }();
-
-constexpr size_t script_len_1{1};
-constexpr size_t script_len_2{2};
 
 constexpr auto tx_n_len{1U};
 constexpr auto tx1_len{120U};

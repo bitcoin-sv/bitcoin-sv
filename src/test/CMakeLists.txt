@@ -223,10 +223,6 @@ add_test_to_suite(bitcoin test_bitcoin
 )
 
 set_source_files_properties(
-    test_bitcoin_main.cpp
-    test_txnvalidator.cpp
-    txn_grouper_tests.cpp
-    txs_parser_tests.cpp
     undo_tests.cpp
     validation_tests.cpp
     PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
