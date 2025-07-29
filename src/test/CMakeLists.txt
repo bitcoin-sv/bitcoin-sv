@@ -223,11 +223,8 @@ add_test_to_suite(bitcoin test_bitcoin
 )
 
 set_source_files_properties(
-    undo_tests.cpp
-    validation_tests.cpp
+    test_bitcoin_main.cpp
     PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
-
-set_target_properties(test_bitcoin PROPERTIES UNITY_BUILD_BATCH_SIZE 5)
 
 enable_coverage(test_bitcoin)
 
