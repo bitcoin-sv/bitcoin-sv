@@ -14,7 +14,8 @@ the candidate size
 
 from test_framework.blocktools import create_coinbase, merkle_root_from_merkle_proof, solve_bad, create_block_from_candidate
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import CBlock, ToHex
+from test_framework.mininode import CBlock, CTransaction, ToHex, FromHex
+from test_framework.script import OP_CHECKSIG
 from test_framework.util import connect_nodes_bi, create_confirmed_utxos, \
     satoshi_round, assert_raises_rpc_error, assert_equal, wait_until, sync_blocks
 from decimal import Decimal
@@ -298,9 +299,32 @@ class MiningTest(BitcoinTestFramework):
         # size of transactions + 80 bytes for header
         assert_equal(size_txs + 80, candidate['sizeWithoutCoinbase'])
 
+    def test_coinbase_flag(self):
+        self.nodes[1].generate(1)
+
+        # Test coinbase=False
+        candidate = self.nodes[1].getminingcandidate(False)
+        assert 'coinbase' not in candidate, "Unexpected 'coinbase' field in candidate"
+
+        # Test coinbase=True
+        candidate = self.nodes[1].getminingcandidate(True)
+        assert 'coinbase' in candidate, "Missing 'coinbase' field in candidate"
+        coinbase_tx = FromHex(CTransaction(), candidate["coinbase"])
+        # Check that coinbase txn has a proper scriptPubKey
+        assert_equal(len(coinbase_tx.vout), 1)
+        assert len(coinbase_tx.vout[0].scriptPubKey) > 0, "Coinbase scriptPubKey is empty"
+        got_checksig = False
+        for opcode in coinbase_tx.vout[0].scriptPubKey:
+            if opcode == OP_CHECKSIG:
+                got_checksig = True
+                break
+        assert got_checksig, "Coinbase scriptPubKey does not contain OP_CHECKSIG"
+
     def run_test(self):
         txnNode = self.nodes[0]
         blockNode = self.nodes[1]
+
+        self.test_coinbase_flag()
 
         self.test_mine_block(txnNode, blockNode, True)
         self.test_mine_block(txnNode, blockNode, False)

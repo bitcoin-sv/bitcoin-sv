@@ -21,10 +21,13 @@
 #include "validation.h"
 #include "versionbits.h"
 #include "invalid_txn_publisher.h"
+
 #include <cstdint>
 #include <iomanip>
 #include <limits>
+#include <optional>
 #include <queue>
+
 #include <boost/lexical_cast.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
@@ -68,7 +71,8 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
     static int64_t nStart = 0;
     static unsigned int nTransactionsUpdatedLast = std::numeric_limits<unsigned int>::max();
     static std::unique_ptr<CBlockTemplate> pblocktemplate { std::make_unique<CBlockTemplate>() };
-    if (pindexPrev != chainActive.Tip() || assembler->GetTemplateUpdated() ||
+    static std::optional<bool> containsCoinbase { std::nullopt };
+    if (containsCoinbase != coinbaseRequired || pindexPrev != chainActive.Tip() || assembler->GetTemplateUpdated() ||
         (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5)) 
     {
         // Clear pindexPrev so future calls make a new block, despite any failures from here on
@@ -77,6 +81,7 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
         // Update other fields for tracking state of this candidate
         nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
         nStart = GetTime();
+        containsCoinbase = coinbaseRequired;
 
         // Dummy script; the real one is either created by the wallet below, or will be replaced by one
         // from the miner when they submit the mining solution
