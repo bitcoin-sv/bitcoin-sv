@@ -12,8 +12,8 @@
 #include <optional>
 #include <ostream>
 
-#include "fs.h"
-#include "mining/journal_builder.h"
+#include "config.h"
+#include "miner_id/miner_id_db.h"
 
 fs::path GetTempPath();
 
@@ -48,5 +48,23 @@ namespace std
     
 const inline mining::CJournalChangeSetPtr nullChangeSet{nullptr};
 
+// RAII class to instantiate global miner ID database
+class MakeGlobalMinerIdDb
+{
+    public:
+    MakeGlobalMinerIdDb()
+    {
+        g_minerIDs = std::make_unique<MinerIdDatabase>(GlobalConfig::GetConfig());
+    }
+    ~MakeGlobalMinerIdDb()
+    {
+        g_minerIDs.reset();
+    }
+
+    MakeGlobalMinerIdDb(const MakeGlobalMinerIdDb&) = delete;
+    MakeGlobalMinerIdDb(MakeGlobalMinerIdDb&&) = delete;
+    MakeGlobalMinerIdDb& operator=(const MakeGlobalMinerIdDb&) = delete;
+    MakeGlobalMinerIdDb& operator=(MakeGlobalMinerIdDb&&) = delete;
+};
 
 #endif // BITCOIN_TEST_TESTUTIL_H

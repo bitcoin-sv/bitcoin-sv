@@ -4,23 +4,20 @@
 #include "miner_id/miner_id_db.h"
 
 #include "block_index_store.h"
-#include "blockstreams.h"
 #include "config.h"
 #include "logging.h"
 #include "merkleproof.h"
 #include "merkletreestore.h"
 #include "miner_id/miner_id.h"
-#include "miner_id/miner_info_tracker.h"
 #include "miner_id/revokemid.h"
 #include "miner_id/dataref_index.h"
+#include "miner_id/miner_info_tracker.h"
 #include "scheduler.h"
 #include "univalue.h"
 
 #include <algorithm>
 
 #include <boost/uuid/uuid_io.hpp>
-
-std::unique_ptr<MinerIdDatabase> g_minerIDs {nullptr};
 
 namespace
 {

@@ -13,6 +13,7 @@
 #include "rpc/mining.h"
 #include "script/instruction_iterator.h"
 #include "txn_validator.h"
+#include "test/testutil.h"
 
 #include "test/test_bitcoin.h"
 
@@ -24,7 +25,7 @@
 namespace
 {
     // Initial number of blocks to create
-    constexpr size_t INITIAL_NUM_BLOCKS { 100 + 1 + 10 };
+    constexpr size_t MINERID_DB_INITIAL_NUM_BLOCKS { 100 + 1 + 10 };
     // Miner ID protocol prefix
     const std::vector<uint8_t> ProtocolPrefix { 0xac, 0x1e, 0xed, 0x88 };
 
@@ -137,9 +138,9 @@ namespace
     }
 
     // Testing fixture that creates a REGTEST-mode block chain with minerIDs
-    struct SetupMinerIDChain : public TestChain100Setup
+    struct SetupMinerIDDBChain : public TestChain100Setup
     {
-        SetupMinerIDChain() : TestChain100Setup{}
+        SetupMinerIDDBChain() : TestChain100Setup{}
         {
             // Create dataref index
             int64_t nMerkleTreeIndexDBCache = 10; // MB
@@ -215,7 +216,7 @@ namespace
             forkBlockId = forkBlock.GetHash();
         }
 
-        ~SetupMinerIDChain()
+        ~SetupMinerIDDBChain()
         {
             g_dataRefIndex.reset();
             pMerkleTreeFactory.reset();
@@ -355,25 +356,6 @@ namespace
 
     // For ID only
     class miner_id_tests_id;
-
-    // RAII class to instantiate global miner ID database
-    class MakeGlobalMinerIdDb
-    {
-      public:
-        MakeGlobalMinerIdDb()
-        {
-            g_minerIDs = std::make_unique<MinerIdDatabase>(GlobalConfig::GetConfig());
-        }
-        ~MakeGlobalMinerIdDb()
-        {
-            g_minerIDs.reset();
-        }
-
-        MakeGlobalMinerIdDb(const MakeGlobalMinerIdDb&) = delete;
-        MakeGlobalMinerIdDb(MakeGlobalMinerIdDb&&) = delete;
-        MakeGlobalMinerIdDb& operator=(const MakeGlobalMinerIdDb&) = delete;
-        MakeGlobalMinerIdDb& operator=(MakeGlobalMinerIdDb&&) = delete;
-    };
 }
 
 // MinerIdDatabase class inspection
@@ -509,7 +491,7 @@ using UnitTestAccess = MinerIdDatabase::UnitTestAccess<miner_id_tests_id>;
 BOOST_AUTO_TEST_SUITE(miner_id_db)
 
 // Test initial create of miner ID database from an existing blockchain, and saving/restoring from disk
-BOOST_FIXTURE_TEST_CASE(InitialiseFromExistingChain, SetupMinerIDChain)
+BOOST_FIXTURE_TEST_CASE(InitialiseFromExistingChain, SetupMinerIDDBChain)
 {
     // Set M/N in config
     GlobalConfig::GetModifiableGlobalConfig().SetMinerIdReputationM(3, nullptr);
@@ -517,7 +499,7 @@ BOOST_FIXTURE_TEST_CASE(InitialiseFromExistingChain, SetupMinerIDChain)
 
     // Check we've got the expected number of blocks
     CBlockIndex* tip { chainActive.Tip() };
-    BOOST_CHECK_EQUAL(tip->GetHeight(), static_cast<int32_t>(INITIAL_NUM_BLOCKS));
+    BOOST_CHECK_EQUAL(tip->GetHeight(), static_cast<int32_t>(MINERID_DB_INITIAL_NUM_BLOCKS));
 
     // Check miner ID db contains the expected miner details
     auto dbCheckLambda = [this](const MinerIdDatabase& minerid_db)
@@ -609,7 +591,7 @@ BOOST_FIXTURE_TEST_CASE(InitialiseFromExistingChain, SetupMinerIDChain)
 }
 
 // Test updates to the miner ID database after updates to the chain
-BOOST_FIXTURE_TEST_CASE(UpdatesToBlockchain, SetupMinerIDChain)
+BOOST_FIXTURE_TEST_CASE(UpdatesToBlockchain, SetupMinerIDDBChain)
 {
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
@@ -681,7 +663,7 @@ BOOST_FIXTURE_TEST_CASE(UpdatesToBlockchain, SetupMinerIDChain)
 }
 
 // Test miner ID key rotation
-BOOST_FIXTURE_TEST_CASE(KeyRotation, SetupMinerIDChain)
+BOOST_FIXTURE_TEST_CASE(KeyRotation, SetupMinerIDDBChain)
 {
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
@@ -760,7 +742,7 @@ BOOST_FIXTURE_TEST_CASE(KeyRotation, SetupMinerIDChain)
 }
 
 // Test recent blocks tracking and expiry
-BOOST_FIXTURE_TEST_CASE(RecentBlocksTracking, SetupMinerIDChain)
+BOOST_FIXTURE_TEST_CASE(RecentBlocksTracking, SetupMinerIDDBChain)
 {
     // Increase speed of test by reducing the number of blocks we will need to mine
     GlobalConfig::GetModifiableGlobalConfig().SetMinerIdReputationN(200, nullptr);
@@ -776,7 +758,7 @@ BOOST_FIXTURE_TEST_CASE(RecentBlocksTracking, SetupMinerIDChain)
     BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
     BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), 1U);
     auto blocksList { UnitTestAccess::GetRecentBlocksOrderedByHeight(minerid_db) };
-    size_t blockListStartSize { INITIAL_NUM_BLOCKS + 1 };   // Mined blocks + Genesis
+    size_t blockListStartSize { MINERID_DB_INITIAL_NUM_BLOCKS + 1 };   // Mined blocks + Genesis
     BOOST_REQUIRE_EQUAL(blocksList.size(), blockListStartSize);
     BOOST_CHECK_EQUAL(blocksList[0].mHeight, 0);
     BOOST_CHECK_EQUAL(blocksList[blockListStartSize - 1].mHeight, static_cast<int32_t>(blockListStartSize - 1));
@@ -837,7 +819,7 @@ BOOST_FIXTURE_TEST_CASE(RecentBlocksTracking, SetupMinerIDChain)
 }
 
 // Test processing of an invalid block
-BOOST_FIXTURE_TEST_CASE(InvalidBlock, SetupMinerIDChain)
+BOOST_FIXTURE_TEST_CASE(InvalidBlock, SetupMinerIDDBChain)
 {
     // Set M/N in config
     GlobalConfig::GetModifiableGlobalConfig().SetMinerIdReputationM(3, nullptr);
