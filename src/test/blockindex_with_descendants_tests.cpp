@@ -10,18 +10,18 @@
 #include <random>
 
 
-namespace{ class Unique; }
+namespace{ class blockindex_with_descendants_tests; }
 
 template<>
-struct CBlockIndex::PrivateTag::UnitTestAccess<class Unique>
+struct CBlockIndex::PrivateTag::UnitTestAccess<class blockindex_with_descendants_tests>
 {
 public:
     static PrivateTag GetPrivateTag() { return PrivateTag{}; }
 };
-using TestAccessCBlockIndexPrivateTag = CBlockIndex::PrivateTag::UnitTestAccess<class Unique>;
+using TestAccessCBlockIndexWithDescendantsTestsPrivateTag = CBlockIndex::PrivateTag::UnitTestAccess<class blockindex_with_descendants_tests>;
 
 template <>
-struct CBlockIndex::UnitTestAccess<class Unique>
+struct CBlockIndex::UnitTestAccess<class blockindex_with_descendants_tests>
 {
     UnitTestAccess() = delete;
 
@@ -41,23 +41,23 @@ struct CBlockIndex::UnitTestAccess<class Unique>
     }
 
 };
-using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<class Unique>;
+using TestAccessCBlockIndexWithDescendantsTests = CBlockIndex::UnitTestAccess<class blockindex_with_descendants_tests>;
 
 BOOST_AUTO_TEST_SUITE(blockindex_with_descendants_tests)
 
 // Helper to create block with given id and parent
 std::unique_ptr<CBlockIndex> CreateBlockIndex(std::int32_t id, CBlockIndex* pprev)
 {
-    std::unique_ptr<CBlockIndex> bi = std::make_unique<CBlockIndex>(TestAccessCBlockIndexPrivateTag::GetPrivateTag());
-    TestAccessCBlockIndex::SetVersion(bi,id); // member nVersion is (ab)used to store id of a block to simplify referencing it
-    TestAccessCBlockIndex::SetPrev(bi, pprev);
+    std::unique_ptr<CBlockIndex> bi = std::make_unique<CBlockIndex>(TestAccessCBlockIndexWithDescendantsTestsPrivateTag::GetPrivateTag());
+    TestAccessCBlockIndexWithDescendantsTests::SetVersion(bi,id); // member nVersion is (ab)used to store id of a block to simplify referencing it
+    TestAccessCBlockIndexWithDescendantsTests::SetPrev(bi, pprev);
     if(bi->GetPrev())
     {
-        TestAccessCBlockIndex::SetHeight(bi, bi->GetPrev()->GetHeight() + 1);
+        TestAccessCBlockIndexWithDescendantsTests::SetHeight(bi, bi->GetPrev()->GetHeight() + 1);
     }
     else
     {
-        TestAccessCBlockIndex::SetHeight(bi, 0);
+        TestAccessCBlockIndexWithDescendantsTests::SetHeight(bi, 0);
     }
     return bi;
 }
