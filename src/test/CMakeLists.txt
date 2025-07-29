@@ -223,8 +223,6 @@ add_test_to_suite(bitcoin test_bitcoin
 )
 
 set_source_files_properties(
-    dsdetected_tests.cpp
-    int_serialization_tests.cpp
     journal_tests.cpp
     mempool_limit_tests.cpp
     mempool_tests.cpp

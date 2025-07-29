@@ -94,7 +94,7 @@ BOOST_AUTO_TEST_CASE(serialize_int64_t)
         serialize(n, back_inserter(op));
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(s), end(s), begin(op), end(op));
 
-        const auto ip{deserialize<int64_t>(op.begin(), op.end())};
+        const auto ip{bsv::deserialize<int64_t>(op.begin(), op.end())};
         BOOST_CHECK_EQUAL(n, ip);
     }
 }
