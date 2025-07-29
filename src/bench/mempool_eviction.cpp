@@ -9,8 +9,7 @@
 
 namespace
 {
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-    mining::CJournalChangeSetPtr nullChangeSet {nullptr};
+    const mining::CJournalChangeSetPtr nullChangeSet {nullptr};
 }
 
 static void AddTx(const CTransaction &tx, const Amount &nFee,

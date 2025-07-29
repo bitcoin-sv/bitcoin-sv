@@ -13,6 +13,7 @@
 #include <ostream>
 
 #include "fs.h"
+#include "mining/journal_builder.h"
 
 fs::path GetTempPath();
 
@@ -44,5 +45,8 @@ namespace std
         return os;
     }
 }
+    
+const inline mining::CJournalChangeSetPtr nullChangeSet{nullptr};
+
 
 #endif // BITCOIN_TEST_TESTUTIL_H

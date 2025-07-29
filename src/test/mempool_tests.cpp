@@ -4,25 +4,20 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "config.h"
+#include "mempool_test_access.h"
 #include "mining/journal_change_set.h"
 #include "policy/policy.h"
+#include "test/test_bitcoin.h"
+#include "test/testutil.h"
 #include "txmempool.h"
-#include "util.h"
 #include "validation.h"
 
-#include "mempool_test_access.h"
-
-#include "test/test_bitcoin.h"
-#include "mempool_test_access.h"
-
 #include <boost/test/unit_test.hpp>
-#include <list>
+
 #include <vector>
 
 namespace
 {
-    mining::CJournalChangeSetPtr nullChangeSet {nullptr}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
-
     std::vector<CTxMemPoolEntry> GetABunchOfEntries(int howMany, int baseValue)
     {
         TestMemPoolEntryHelper entry;

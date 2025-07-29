@@ -25,7 +25,6 @@ namespace
         RegtestingSetup() : TestingSetup(CBaseChainParams::REGTEST) {}
     };
 
-    mining::CJournalChangeSetPtr nullChangeSet {nullptr}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 }
 
 BOOST_FIXTURE_TEST_SUITE(blockencodings_tests, RegtestingSetup)

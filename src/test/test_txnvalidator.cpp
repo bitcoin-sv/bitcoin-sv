@@ -447,7 +447,6 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
         int32_t height = 1;
         bool spendsCoinbase = false;
         LockPoints lp;
-        mining::CJournalChangeSetPtr nullChangeSet{nullptr};
         auto& tx = *txnsData[doubleSpendIdx]->GetTxnPtr();
         pool.AddUnchecked(
             tx.GetId(),

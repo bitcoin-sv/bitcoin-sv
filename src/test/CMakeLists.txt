@@ -223,7 +223,6 @@ add_test_to_suite(bitcoin test_bitcoin
 )
 
 set_source_files_properties(
-    mempool_limit_tests.cpp
     mempool_tests.cpp
     mempooltxdb_tests.cpp 
     miner_id_db_tests3.cpp

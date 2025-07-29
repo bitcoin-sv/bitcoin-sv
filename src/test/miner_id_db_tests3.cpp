@@ -81,7 +81,6 @@ namespace
     {
         mempool.Clear();
 
-        mining::CJournalChangeSetPtr nullChangeSet {nullptr};
         for(const auto& entry : contents)
         {
             mempool.AddUnchecked(entry.GetTxId(), entry, TxStorage::memory, nullChangeSet);

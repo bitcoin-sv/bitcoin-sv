@@ -34,8 +34,6 @@ using mining::JournalingBlockAssembler;
 
 namespace
 {
-    mining::CJournalChangeSetPtr nullChangeSet {nullptr}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
-    
     class JournalingTestingSetup : public TestingSetup
     {
     public:

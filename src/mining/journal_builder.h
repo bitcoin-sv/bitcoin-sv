@@ -6,15 +6,15 @@
 #include <memory>
 #include <shared_mutex>
 
+#include "mining/journal_change_set.h"
+
 namespace mining
 {
 
 // Required forward declarations
 class CJournal;
-class CJournalChangeSet;
 enum class JournalUpdateReason;
 using CJournalPtr = std::shared_ptr<CJournal>;
-using CJournalChangeSetPtr = std::unique_ptr<CJournalChangeSet>;
 
 /**
 * A class to handle building & updating mining journals.

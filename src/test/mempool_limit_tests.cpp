@@ -2,7 +2,6 @@
 // Distributed under the Open BSV software license, see the accompanying file
 // LICENSE.
 
-#include "mining/journal_change_set.h"
 #include "validation.h"
 
 #include "mempool_test_access.h"
@@ -13,9 +12,8 @@
 
 #include <vector>
 
-namespace {
-    mining::CJournalChangeSetPtr nullChangeSet{nullptr}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
-
+namespace
+{
     // large enough count to control integer rounding errors in fractions
     constexpr unsigned N_PRIMARY = 50;
     // fixed size transactions so we can correlate sizes and counts
