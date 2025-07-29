@@ -223,8 +223,6 @@ add_test_to_suite(bitcoin test_bitcoin
 )
 
 set_source_files_properties(
-    net_message_tests.cpp
-    prefilled_tx_parser_tests.cpp
     scriptflags.cpp
     test_bitcoin_main.cpp
     test_txnvalidator.cpp
