@@ -18,12 +18,12 @@ using namespace mining;
 namespace
 {
     // Only used as unique identifier
-    class journal_tests_uid;
+    class journal_group_tests;
 }
 
 // For private member access to CJournalEntry
 template<>
-struct CJournalEntry::UnitTestAccess<journal_tests_uid>
+struct CJournalEntry::UnitTestAccess<journal_group_tests>
 {
     template<typename... Args>
     static CJournalEntry Make(Args&&... args)
@@ -31,7 +31,7 @@ struct CJournalEntry::UnitTestAccess<journal_tests_uid>
         return { std::forward<Args>(args)... };
     }
 };
-using JournalEntryAccess = CJournalEntry::UnitTestAccess<journal_tests_uid>;
+using JournalEntryGroupAccess = CJournalEntry::UnitTestAccess<journal_group_tests>;
 
 namespace
 {
@@ -47,7 +47,7 @@ namespace
         // NOLINTNEXTLINE(*-narrowing-conversions)
         txn.vout[0].scriptPubKey = CScript() << stuff << OP_DROP << unique++ << OP_DROP;
         const auto tx = MakeTransactionRef(std::move(txn));
-        return JournalEntryAccess::Make(
+        return JournalEntryGroupAccess::Make(
             std::make_shared<CTransactionWrapper>(tx, nullptr),
             tx->GetTotalSize(), Amount{0}, GetTime(), groupId, isPaying);
     }
@@ -106,7 +106,7 @@ namespace
         {
             const auto& txn = *iter;
             const auto tx = MakeTransactionRef(*txn);
-            CJournalEntry entry { JournalEntryAccess::Make(
+            CJournalEntry entry { JournalEntryGroupAccess::Make(
                 std::make_shared<CTransactionWrapper>(tx, nullptr),
                 tx->GetTotalSize(), Amount{0}, GetTime(), std::nullopt, false) };
             changeSet->addOperation(CJournalChangeSet::Operation::REMOVE, entry);
