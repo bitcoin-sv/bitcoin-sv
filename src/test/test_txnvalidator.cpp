@@ -5,10 +5,11 @@
 #include "config.h"
 #include "key.h"
 #include "pubkey.h"
+#include "test/mempool_test_access.h"
 #include "test/test_bitcoin.h"
+#include "testutil.h"
 #include "txmempool.h"
 #include "txn_validator.h"
-#include "test/mempool_test_access.h"
 
 #include <algorithm>
 #include <boost/test/unit_test.hpp>
@@ -28,12 +29,7 @@ namespace {
         static std::string expectedException("GetValueOut: value out of range");
         return expectedException == e.what();
     }
-    // Support for P2P node.
-    CService ip(uint32_t i) {
-        struct in_addr s; // NOLINT(cppcoreguidelines-pro-type-member-init)
-        s.s_addr = i;
-        return CService(CNetAddr(s), Params().GetDefaultPort());
-    }
+
     // Create scriptPubKey from a given key
     CScript GetScriptPubKey(CKey& key) {
         CScript scriptPubKey = CScript() << ToByteVector(key.GetPubKey())

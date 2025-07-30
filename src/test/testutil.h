@@ -35,6 +35,8 @@ bool wait_for(T callback, std::chrono::milliseconds duration)
     return false;
 }
 
+CService ip(uint32_t ip_address);
+
 namespace std
 {
     // Serialisation for std::optional

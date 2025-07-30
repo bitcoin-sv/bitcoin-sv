@@ -23,12 +23,8 @@
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/test/unit_test.hpp>
 
-namespace {
-    CService ip(uint32_t i) {
-        struct in_addr s; // NOLINT(cppcoreguidelines-pro-type-member-init)
-        s.s_addr = i;
-        return CService(CNetAddr(s), Params().GetDefaultPort());
-    }
+namespace
+{
     NodeId id = 0; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 }
 
