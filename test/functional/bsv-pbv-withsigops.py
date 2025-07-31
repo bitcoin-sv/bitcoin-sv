@@ -169,7 +169,7 @@ class PBVWithSigOps(BitcoinTestFramework):
                 self.log.info(f"block2_hard took {line[len(line) - 1]} to verify")
             elif text_block3 in line:
                 line = line.split()
-                self.log.info(f"block3_easy took {line[len(line)-1]} to verify")
+                self.log.info(f"block3_easy took {line[len(line) - 1]} to verify")
 
         assert_equal(block3_easier.hash, self.nodes[0].getbestblockhash())
         node0.connection.close()

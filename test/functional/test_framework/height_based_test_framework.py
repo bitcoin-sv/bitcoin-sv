@@ -356,7 +356,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
 
         wait_until(tt,
                    timeout=(p2p_accept_timeout * self.options.timeoutfactor), check_interval=0.2,
-                   label=f"Waiting txs to be accepted. At {test_label} {height_label} tx:{','.join(tx.hash[:8]+'...' for tx in to_accept)}")
+                   label=f"Waiting txs to be accepted. At {test_label} {height_label} tx:{','.join(tx.hash[:8] + '...' for tx in to_accept)}")
         self.check_mp()
 
     def _assert_height(self, connection, desired_height):
@@ -442,7 +442,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                 if len(new_maxnonstdtxvalidationduration) > 0:
                     new_maxnonstdtxvalidationduration = new_maxnonstdtxvalidationduration[0]
                     if (DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION * 1000 <= new_maxnonstdtxvalidationduration):
-                        self.log.info(f"Setting -maxtxnvalidatorasynctasksrunduration to {new_maxnonstdtxvalidationduration+1} ms.")
+                        self.log.info(f"Setting -maxtxnvalidatorasynctasksrunduration to {new_maxnonstdtxvalidationduration + 1} ms.")
                         test.ARGS.append("-maxtxnvalidatorasynctasksrunduration={}".format(new_maxnonstdtxvalidationduration + 1))
 
             with self.run_node_with_connections(title=test.NAME,

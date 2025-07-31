@@ -189,7 +189,7 @@ class FrozenTXOTransactionMining(BitcoinTestFramework):
                     }]
             })
 
-        self.log.info(f"Generating blocks so that mempool reaches height {enforce_stop_height+1}")
+        self.log.info(f"Generating blocks so that mempool reaches height {enforce_stop_height + 1}")
         while self.nodes[0].getblockcount() < enforce_stop_height:
             self.nodes[0].generate(1)
         sync_blocks(self.nodes)

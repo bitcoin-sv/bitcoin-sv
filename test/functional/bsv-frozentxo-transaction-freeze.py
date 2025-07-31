@@ -374,7 +374,7 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         spend_frozen_tx3 = self._create_tx(PreviousSpendableOutput(spend_frozen_tx2, 0), b'', CScript([OP_TRUE]))
         MineAndCheckRejected(spend_frozen_tx3)
 
-        self.log.info(f"Unfreezing TXO {spend_frozen_tx2.hash},0 from consensus blacklist at height {enforce_height+2}")
+        self.log.info(f"Unfreezing TXO {spend_frozen_tx2.hash},0 from consensus blacklist at height {enforce_height + 2}")
         result = node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
@@ -400,7 +400,7 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         spend_frozen_tx3_2 = self._create_tx(PreviousSpendableOutput(spend_frozen_tx2, 0), b'', CScript([OP_TRUE, OP_NOP, OP_NOP]))
         SendTxAndCheckRejected(spend_frozen_tx3_2)
 
-        self.log.info(f"Unfreezing TXO {spend_frozen_tx2.hash},0 from consensus and policy blacklist at height {enforce_height+2}")
+        self.log.info(f"Unfreezing TXO {spend_frozen_tx2.hash},0 from consensus and policy blacklist at height {enforce_height + 2}")
         result = node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
@@ -430,7 +430,7 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
             h = node.rpc.getblockcount()
             self.log.info(f"Current height: {h}")
 
-            self.log.info(f"Freezing TXO {tx.hash},0 on consensus blacklist at heights [{h+1}, {h+3}), [{h+5}, {h+7})")
+            self.log.info(f"Freezing TXO {tx.hash},0 on consensus blacklist at heights [{h + 1}, {h + 3}), [{h + 5}, {h + 7})")
             result = node.rpc.addToConsensusBlacklist({
                 "funds": [
                     {
