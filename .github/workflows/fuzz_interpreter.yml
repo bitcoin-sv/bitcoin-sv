@@ -15,7 +15,7 @@ jobs:
   fuzz_interpreter:
     runs-on: arc-runner-svnode
     container:
-      image: nchain/svn_dev:ubuntu_22.04
+      image: nchain/svn_dev:ubuntu_24.04
     steps:
       - name: No-op
         run: echo "Placeholder for interpreter fuzzing"

@@ -23,7 +23,7 @@ jobs:
     strategy:
       matrix:
         org_repo: [nchain/svn_dev]
-        tag : [ubuntu_22.04]
+        tag : [ubuntu_24.04]
     runs-on: arc-runner-svnode
     container:
       image: "${{ matrix.org_repo }}:${{ matrix.tag }}"
@@ -50,7 +50,7 @@ jobs:
     strategy:
       matrix:
         org_repo: [nchain/svn_dev]
-        tag: [ubuntu_22.04, debian_12, centos_9]
+        tag: [ubuntu_24.04, debian_12, centos_9]
         toolset: [gcc]
     runs-on: arc-runner-svnode
     container:
@@ -78,7 +78,7 @@ jobs:
     strategy:
       matrix:
         org_repo: [nchain/svn_dev]
-        tag : [ubuntu_22.04]
+        tag : [ubuntu_24.04]
         toolset: [clang]
         version: [ 19 ]
         build_type: [ Release, Debug ]
