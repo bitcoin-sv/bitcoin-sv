@@ -78,9 +78,9 @@ UniValue CallRPC(std::string args) {
 // Because some RPC methods now push JSON text in chunks, the JSON response changed.
 // In this cases we first have to search for the "result" element in JSON response 
 // to get the old JSON structure 
-const UniValue& find_value_in_result(const UniValue& obj, const std::string& name)
+UniValue find_value_in_result(const UniValue& obj, const std::string& name)
 {
-    auto& response = find_value(obj, "result");
+    const auto response = find_value(obj, "result");
     if (response.isNull())
     {
         return find_value(obj, name);

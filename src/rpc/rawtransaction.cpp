@@ -568,7 +568,7 @@ static UniValue createrawtransaction(const Config &config,
 
         uint256 txid = ParseHashO(o, "txid");
 
-        const UniValue &vout_v = find_value(o, "vout");
+        const UniValue vout_v = find_value(o, "vout");
         if (!vout_v.isNum()) {
             throw JSONRPCError(RPC_INVALID_PARAMETER,
                                "Invalid parameter, missing vout key");
@@ -585,7 +585,7 @@ static UniValue createrawtransaction(const Config &config,
                              : std::numeric_limits<uint32_t>::max());
 
         // Set the sequence number if passed in the parameters object.
-        const UniValue &sequenceObj = find_value(o, "sequence");
+        const UniValue sequenceObj = find_value(o, "sequence");
         if (sequenceObj.isNum()) {
             int64_t seqNr64 = sequenceObj.get_int64();
             if (seqNr64 < 0 || seqNr64 > std::numeric_limits<uint32_t>::max()) {
@@ -1964,7 +1964,7 @@ void sendrawtransactions(const Config& config,
                     std::string("Invalid parameter: An empty json object"));
         }
         // Read and decode transaction's data.
-        const UniValue &txn_data = find_value(o, "hex");
+        const UniValue txn_data = find_value(o, "hex");
         if (txn_data.isNull() || !txn_data.isStr()) {
             throw JSONRPCError(RPC_INVALID_PARAMETER,
                     std::string("Invalid parameter: Missing the hex string of the raw transaction"));
@@ -1978,7 +1978,7 @@ void sendrawtransactions(const Config& config,
         const TxId& txid = tx->GetId();
         // Read allowhighfees.
         Amount nMaxRawTxFee = maxTxFee;
-        const UniValue &allowhighfees = find_value(o, "allowhighfees");
+        const UniValue allowhighfees = find_value(o, "allowhighfees");
         if (!allowhighfees.isNull()) {
             if (!allowhighfees.isBool()) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER,
@@ -1991,7 +1991,7 @@ void sendrawtransactions(const Config& config,
         bool listUnconfirmedAncestors = false;
         bool fTxInMempools = mempool.Exists(txid) || mempool.getNonFinalPool().exists(txid);
         // Read dontcheckfee.
-        const UniValue &dontcheckfee = find_value(o, "dontcheckfee");
+        const UniValue dontcheckfee = find_value(o, "dontcheckfee");
         if (!dontcheckfee.isNull()) {
             if (!dontcheckfee.isBool()) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER,
@@ -2004,7 +2004,7 @@ void sendrawtransactions(const Config& config,
         //Check for config per input
         std::shared_ptr<TransactionSpecificConfig> tsc;
         uint32_t skipFlagsValue = 0;
-        const UniValue& configPolicies = find_value(o, "config");
+        const UniValue configPolicies = find_value(o, "config");
         if(!configPolicies.isNull())
         {
             tsc = std::make_shared<TransactionSpecificConfig>(*globalConfig);
@@ -2031,7 +2031,7 @@ void sendrawtransactions(const Config& config,
         else
         {
             // Read listunconfirmedancestors.
-            const UniValue& listunconfirmedancestors = find_value(o, "listunconfirmedancestors");
+            const UniValue listunconfirmedancestors = find_value(o, "listunconfirmedancestors");
             if (!listunconfirmedancestors.isNull())
             {
                 if (!listunconfirmedancestors.isBool())
