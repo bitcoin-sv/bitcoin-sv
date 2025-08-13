@@ -7,13 +7,14 @@ Test P2P version message error handling.
 '''
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import mininode_lock, NetworkThread, NodeConn, NodeConnCB, wait_until, msg_version, ser_string
+from test_framework.mininode import mininode_lock, P2PHandler, P2PEventHandler, wait_until, msg_version, ser_string
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import assert_equal, p2p_port, check_for_log_msg
 
 import struct
 
 
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
     def __init__(self):
         super().__init__()
         self.last_reject = None
@@ -59,13 +60,16 @@ class P2PVersion(BitcoinTestFramework):
         # setup before we call NetworkThread().start()
 
         # Create a P2P connection just so that the test framework is happy we're connected
-        dummyCB = NodeConnCB()
-        dummyConn = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], dummyCB, nullAssocID=True)
+        dummyCB = P2PEventHandler()
+        dummyConn = P2PHandler(Connection('127.0.0.1', p2p_port(0), dummyCB),
+                               self.nodes[0], nullAssocID=True)
         dummyCB.add_connection(dummyConn)
 
-        # By setting the assocID on this second NodeConn we prevent it sending a version message
+        # By setting the assocID on this second P2PHandler we prevent it sending a version message
         badConnCB = TestNode()
-        badConn = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], badConnCB, assocID=0x01)
+        badConn = P2PHandler(Connection('127.0.0.1', p2p_port(0), badConnCB),
+                             self.nodes[0],
+                             assocID=0x01)
         badConnCB.add_connection(badConn)
 
         # Start up network handling in another thread. This needs to be called

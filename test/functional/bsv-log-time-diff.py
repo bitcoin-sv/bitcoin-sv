@@ -59,11 +59,11 @@ class LogTimeDiffTest(BitcoinTestFramework):
             # 3. connection1 sends HEADERS msg to bitcoind and waits for GETDATA (received time is set)
             headers_message = msg_headers()
             headers_message.headers = [CBlockHeader(block)]
-            connection1.cb.send_message(headers_message)
-            wait_until(lambda: self.getDataLambda(connection1.cb, block.sha256), lock=mininode_lock)
+            connection1.transport.cb.send_message(headers_message)
+            wait_until(lambda: self.getDataLambda(connection1.transport.cb, block.sha256), lock=mininode_lock)
 
             # 4. connection1 sends BLOCK
-            connection1.cb.send_message(msg_block(block))
+            connection1.transport.cb.send_message(msg_block(block))
 
             # 5. create second block
             block = self.prepareBlock(2)
@@ -71,15 +71,15 @@ class LogTimeDiffTest(BitcoinTestFramework):
             # 6. connection2 sends HEADERS msg to bitcoind
             headers_message = msg_headers()
             headers_message.headers = [CBlockHeader(block)]
-            connection2.cb.send_message(headers_message)
+            connection2.transport.cb.send_message(headers_message)
 
             # 7. connection2 waits for GETDATA and sends BLOCK
-            wait_until(lambda: self.getDataLambda(connection2.cb, block.sha256), lock=mininode_lock)
-            connection2.cb.send_message(msg_block(block))
+            wait_until(lambda: self.getDataLambda(connection2.transport.cb, block.sha256), lock=mininode_lock)
+            connection2.transport.cb.send_message(msg_block(block))
 
             # syncing
-            connection1.cb.sync_with_ping()
-            connection2.cb.sync_with_ping()
+            connection1.transport.cb.sync_with_ping()
+            connection2.transport.cb.sync_with_ping()
 
             # check log file for logging about block timestamp and received headers timestamp difference
             time_difference_log_found = False

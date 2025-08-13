@@ -91,7 +91,9 @@ from test_framework.script import CScript, OP_TRUE
 from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal, p2p_port, wait_until, check_for_log_msg
 from test_framework.comptool import TestManager, TestInstance, TestNode, RejectResult, DiscardResult
-from test_framework.mininode import NodeConn, msg_getdata, CInv, mininode_lock
+from test_framework.mininode import P2PHandler, msg_getdata, CInv, mininode_lock
+from test_framework.transport import Connection
+
 import time
 import copy
 
@@ -130,8 +132,9 @@ class MyTestManager(TestManager):
             # Create a p2p connection to each node
             test_node = MyNode(self.block_store, self.tx_store, self.blocks_recvd)
             self.test_nodes.append(test_node)
-            self.connections.append(NodeConn('127.0.0.1', p2p_port(i), nodes[i], test_node))
-            # Make sure the TestNode (callback class) has a reference to its associated NodeConn
+            self.connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(i), test_node),
+                                    nodes[i]))
+            # Make sure the TestNode (callback class) has a reference to its associated P2PHandler
             test_node.add_connection(self.connections[-1])
 
 

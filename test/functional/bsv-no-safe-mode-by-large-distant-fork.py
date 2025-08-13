@@ -95,7 +95,7 @@ class NoSafeModeByLargeDistantFork(BitcoinTestFramework):
                             conn.send_message(msg_block(block))
                             break
 
-            conn2.cb.on_getdata = on_getdata
+            conn2.transport.cb.on_getdata = on_getdata
 
             # send sencond branch full blocks
             for block in branch_2_blocks:

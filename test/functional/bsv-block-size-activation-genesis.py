@@ -25,7 +25,7 @@ class BSVBlockSizeTest(ComparisonTestFramework):
         self.extra_args = [['-whitelist=127.0.0.1', '-genesisactivationheight=%d' % self.genesisactivationheight, '-rpcservertimeout=500', '-excessiveblocksize=%d' % self.maxBlockSize]]
 
     def run_test(self):
-        # Increase timeout when testing with big blocks (mininode's handle_write is not very efficient)
+        # Increase timeout when testing with big blocks (mininode's write is not very efficient)
         self.test.waitForPingTimeout = 360
         self.test.run()
 

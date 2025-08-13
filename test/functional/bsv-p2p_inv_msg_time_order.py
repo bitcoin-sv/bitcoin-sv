@@ -49,7 +49,7 @@ class P2PInvMsgTimeOrder(BitcoinTestFramework):
                     if im.type == 1:
                         txinvs.append(hashToHex(im.hash))
 
-            connection2.cb.on_inv = on_inv
+            connection2.transport.cb.on_inv = on_inv
 
             # initialize
             self.nodes[0].generate(1)

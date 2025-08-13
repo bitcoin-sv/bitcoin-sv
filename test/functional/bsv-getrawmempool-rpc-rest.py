@@ -73,7 +73,7 @@ class GetRawMempoolTest(BitcoinTestFramework):
                 block = self.chain.next_block(block_count)
                 block_count += 1
                 self.chain.save_spendable_output()
-                connection.cb.send_message(msg_block(block))
+                connection.transport.cb.send_message(msg_block(block))
             out = []
             for i in range(starting_blocks):
                 out.append(self.chain.get_spendable_output())
@@ -83,14 +83,14 @@ class GetRawMempoolTest(BitcoinTestFramework):
             transactions = []
             for i in range(2):
                 tx = create_transaction(out[i].tx, out[i].n, b"", 100000, CScript([OP_TRUE]))
-                connection.cb.send_message(msg_tx(tx))
+                connection.transport.cb.send_message(msg_tx(tx))
                 transactions.append(tx)
             self.check_mempool(self.nodes[0], transactions)
 
             # Create large transaction that depends on previous two transactions.
             txSize = 1000
             largeTx = self.createLargeTransaction(txSize, transactions)
-            connection.cb.send_message(msg_tx(largeTx))
+            connection.transport.cb.send_message(msg_tx(largeTx))
             self.check_mempool(self.nodes[0], [largeTx])
 
             # getrawmempool, verbosity = False

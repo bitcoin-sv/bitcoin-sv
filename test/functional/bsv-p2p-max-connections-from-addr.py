@@ -4,8 +4,9 @@
 
 # A test to limit p2p connections from the same address
 
-from test_framework.mininode import NodeConn, NodeConnCB
+from test_framework.mininode import P2PHandler, P2PEventHandler
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import Connection
 from test_framework.util import assert_equal, check_for_log_msg, p2p_port, wait_until
 
 
@@ -35,8 +36,9 @@ class P2PMaxConnectionsFromAddr(BitcoinTestFramework):
 
             assert_equal(len(self.nodes[0].getpeerinfo()), maxconnectionsfromaddr)
 
-            connCb = NodeConnCB()
-            c = NodeConn(ip, p2p_port(0), self.nodes[0], connCb)
+            connCb = P2PEventHandler()
+            c = P2PHandler(Connection(ip, p2p_port(0), connCb),
+                           self.nodes[0])
             connCb.add_connection(c)
             err = f"connection from {ip} dropped: too many connections from the same address"
             wait_until(lambda: check_for_log_msg(self.nodes[0], err))

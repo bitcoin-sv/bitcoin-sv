@@ -27,9 +27,7 @@ Test:
 import glob
 
 from test_framework.mininode import (
-    NetworkThread,
-    NodeConn,
-    NodeConnCB,
+    P2PHandler,
     msg_block,
     msg_headers,
     CBlockHeader
@@ -43,6 +41,7 @@ from test_framework.util import (
 from test_framework.script import CScript, OP_TRUE
 from test_framework.blocktools import create_transaction, PreviousSpendableOutput
 from test_framework.cdefs import MIN_TTOR_VALIDATION_DISTANCE
+
 import time
 
 
@@ -73,14 +72,8 @@ class BSVCheckTTORViolation(BitcoinTestFramework):
     def run_test(self):
         block_count = 0
 
-        # Create a P2P connections
-        node0 = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node0)
-        node0.add_connection(connection)
-
-        NetworkThread().start()
-        # wait_for_verack ensures that the P2P connection is fully up.
-        node0.wait_for_verack()
+        # Create a P2P connection
+        node0 = P2PHandler.connect('127.0.0.1', p2p_port(0), self.nodes[0])
 
         self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))
 

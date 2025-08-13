@@ -8,9 +8,9 @@ This is needed due to MAPI sending the same transaction to multiple nodes via se
 with parameter "donotcheckfee" set to True
 """
 
-from test_framework.mininode import COIN, mininode_lock, NetworkThread, \
-    NodeConn, NodeConnCB
+from test_framework.mininode import COIN, mininode_lock, P2PHandler, P2PEventHandler
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import assert_equal, create_confirmed_utxos, \
     hashToHex, p2p_port, satoshi_round, sync_blocks
 
@@ -30,7 +30,7 @@ def allInvsMatch(invsExpected, testnode):
     return False
 
 
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
     def __init__(self):
         super().__init__()
         self.txinvs = []
@@ -76,9 +76,8 @@ class NoCheckCollisionTest(BitcoinTestFramework):
 
         # Setup the p2p connections and start up the network thread.
         test_node = TestNode()
-        connection = NodeConn(
-            '127.0.0.1', p2p_port(0), node0, test_node)
-        test_node.add_connection(connection)
+        test_node.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), test_node),
+                                            node0))
         NetworkThread().start()
         test_node.wait_for_verack()
 

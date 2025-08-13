@@ -7,18 +7,19 @@ from time import sleep
 from test_framework.blocktools import calc_needed_data_size, create_transaction
 from test_framework.cdefs import MAX_SCRIPT_SIZE_BEFORE_GENESIS, ONE_MEGABYTE
 from test_framework.mininode import COutPoint, CTxIn, CTxOut, CTransaction, \
-    FromHex, mininode_lock, msg_tx, NetworkThread, NodeConn, NodeConnCB, \
+    FromHex, mininode_lock, msg_tx, P2PHandler, P2PEventHandler, \
     ToHex, uint256_from_str
 from test_framework.script import OP_CHECKSIG, OP_FALSE, OP_RETURN, CScript, \
     OP_EQUALVERIFY, OP_HASH160, OP_DUP, OP_TRUE, OP_DROP
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import assert_equal, check_mempool_equals, \
     ensure_no_rejection, hex_str_to_bytes, p2p_port, wait_for_reject_message
 
 CHUNK_SIZE = len(CScript([b"a" * 500]))
 
 
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
     def __init__(self):
         super().__init__()
         self.txinvs = []
@@ -46,7 +47,8 @@ class MaxScriptSizeTest(BitcoinTestFramework):
 
     def run_test_node(self, node_index=0, dstaddr='127.0.0.1', dstportno=0, num_of_connections=1):
         test_node = TestNode()
-        conn = NodeConn(dstaddr, p2p_port(dstportno), self.nodes[node_index], test_node)
+        conn = P2PHandler(Connection(dstaddr, p2p_port(dstportno), test_node),
+                          self.nodes[node_index])
         test_node.add_connection(conn)
         return test_node, conn
 
@@ -142,7 +144,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         def on_reject(conn, msg):
             rejected_txs.append(msg)
 
-        conn.cb.on_reject = on_reject
+        conn.transport.cb.on_reject = on_reject
 
         thr = NetworkThread()
         thr.start()

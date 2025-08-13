@@ -14,17 +14,16 @@ if uploadtarget has been reached.
 '''
 
 from test_framework.cdefs import LEGACY_MAX_BLOCK_SIZE
-from test_framework.mininode import CInv, msg_getdata, NetworkThread, \
-    NodeConn, NodeConnCB
+from test_framework.mininode import CInv, msg_getdata, P2PHandler, P2PEventHandler
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal, mine_large_block, \
-    p2p_port
+from test_framework.transport import NetworkThread, Connection
+from test_framework.util import assert_equal, mine_large_block, p2p_port
 
 from collections import defaultdict
 import time
 
 
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
 
     def __init__(self):
         super().__init__()
@@ -67,8 +66,8 @@ class MaxUploadTest(BitcoinTestFramework):
 
         for i in range(3):
             test_nodes.append(TestNode())
-            connections.append(
-                NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], test_nodes[i]))
+            connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(0), test_nodes[i]),
+                                          self.nodes[0]))
             test_nodes[i].add_connection(connections[i])
 
         # Start up network handling in another thread
@@ -165,9 +164,10 @@ class MaxUploadTest(BitcoinTestFramework):
 
         # recreate/reconnect a test node
         test_nodes = [TestNode()]
-        connections = [NodeConn('127.0.0.1', p2p_port(
-            0), self.nodes[0], test_nodes[0])]
-        test_nodes[0].add_connection(connections[0])
+        connection = P2PHandler(Connection('127.0.0.1', p2p_port(0), test_nodes[0]),
+                                self.nodes[0])
+        connections.append(connection)
+        test_nodes[0].add_connection(connection)
 
         NetworkThread().start()  # Start up network handling in another thread
         test_nodes[0].wait_for_verack()

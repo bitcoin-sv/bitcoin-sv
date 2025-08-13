@@ -11,7 +11,7 @@ the node by sending duplicate blocktxn messages with invalid data.
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.mininode import (
-    NodeConnCB,
+    P2PEventHandler,
     msg_cmpctblock,
     msg_blocktxn,
     BlockTransactions,
@@ -30,7 +30,7 @@ from test_framework.util import wait_until, check_for_log_msg, open_log_file
 import os
 
 
-class GetBlockTxnNode(NodeConnCB):
+class GetBlockTxnNode(P2PEventHandler):
     """Custom node connection to intercept getblocktxn messages"""
 
     def __init__(self):
@@ -137,12 +137,12 @@ class DuplicateBlockTxnCrashTest(BitcoinTestFramework):
 
                 # Wait for node to request missing transactions
                 def received_getblocktxn():
-                    return test_conn.cb.getblocktxn_received is not None
+                    return test_conn.transport.cb.getblocktxn_received is not None
 
                 wait_until(received_getblocktxn, timeout=10, lock=mininode_lock)
 
                 # Verify the request is for the expected block (the modified one)
-                received_blockhash = test_conn.cb.getblocktxn_received.block_txn_request.blockhash
+                received_blockhash = test_conn.transport.cb.getblocktxn_received.block_txn_request.blockhash
                 expected_blockhash = modified_block_hash
                 assert received_blockhash == expected_blockhash, \
                     f"Block hash mismatch: received {received_blockhash}, expected {expected_blockhash}"

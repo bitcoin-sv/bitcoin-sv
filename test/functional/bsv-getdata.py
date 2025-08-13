@@ -43,17 +43,17 @@ class GetDataTest(BitcoinTestFramework):
             self.nodes[0].generate(5)
 
             connection = p2p_connections[0]
-            connection.cb.on_block = on_block
-            connection.cb.on_tx = on_tx
-            connection.cb.on_notfound = on_notfound
+            connection.transport.cb.on_block = on_block
+            connection.transport.cb.on_tx = on_tx
+            connection.transport.cb.on_notfound = on_notfound
 
             # 1. Check that sending GETDATA of unknown block does no action.
             unknown_hash = 0xdecaf
-            connection.cb.send_message(msg_getdata([CInv(CInv.BLOCK, unknown_hash)]))
+            connection.transport.cb.send_message(msg_getdata([CInv(CInv.BLOCK, unknown_hash)]))
 
             # 2. Check that sending GETDATA of known block returns BLOCK message.
             known_hash = self.nodes[0].getbestblockhash()
-            connection.cb.send_message(msg_getdata([CInv(CInv.BLOCK, int(known_hash, 16))]))
+            connection.transport.cb.send_message(msg_getdata([CInv(CInv.BLOCK, int(known_hash, 16))]))
             wait_until(lambda: known_hash in receivedBlocks)
             # previously requested unknown block is not in the received list
             assert_equal(unknown_hash not in receivedBlocks, True)
@@ -62,12 +62,12 @@ class GetDataTest(BitcoinTestFramework):
             assert_equal(len(receivedBlocks) >= 1, True)
 
             # 3. Check that sending GETDATA of unknown transaction returns NOTFOUND message.
-            connection.cb.send_message(msg_getdata([CInv(CInv.TX, unknown_hash)]))
+            connection.transport.cb.send_message(msg_getdata([CInv(CInv.TX, unknown_hash)]))
             wait_until(lambda: unknown_hash in receivedTxsNotFound)
 
             # 4. Check that sending GETDATA of known transaction returns TX message.
             known_hash = self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 1.0)
-            connection.cb.send_message(msg_getdata([CInv(CInv.TX, int(known_hash, 16))]))
+            connection.transport.cb.send_message(msg_getdata([CInv(CInv.TX, int(known_hash, 16))]))
             wait_until(lambda: known_hash in receivedTxs)
             assert_equal(len(receivedTxs), 1)
 

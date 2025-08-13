@@ -21,9 +21,8 @@ from test_framework.key import CECKey
 from test_framework.mininode import (
     COIN,
     COutPoint,
-    NetworkThread,
-    NodeConn,
-    NodeConnCB,
+    P2PHandler,
+    P2PEventHandler,
     msg_block,
     msg_tx,
     ToHex,
@@ -46,6 +45,7 @@ from test_framework.script import (
     CScriptOp
 )
 from test_framework.test_framework import BitcoinTestFramework, ChainManager
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import (
     assert_equal,
     assert_raises_rpc_error,
@@ -124,13 +124,15 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         self.pubkey = self.prvkey.get_pubkey()
 
         # Create a P2P connections
-        node = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node)
+        node = P2PEventHandler()
+        connection = P2PHandler(Connection('127.0.0.1', p2p_port(0), node),
+                                self.nodes[0])
         node.add_connection(connection)
         node.rpc = connection.rpc
 
-        node1 = NodeConnCB()
-        connection1 = NodeConn('127.0.0.1', p2p_port(1), self.nodes[1], node1)
+        node1 = P2PEventHandler()
+        connection1 = P2PHandler(Connection('127.0.0.1', p2p_port(1), node1),
+                                 self.nodes[1])
         node1.add_connection(connection1)
         node1.rpc = self.nodes[1]
 

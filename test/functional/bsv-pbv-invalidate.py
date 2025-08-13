@@ -19,9 +19,7 @@ Because blocks are ordered by validation completion time block 4 should be activ
 """
 from test_framework.blocktools import prepare_init_chain
 from test_framework.mininode import (
-    NetworkThread,
-    NodeConn,
-    NodeConnCB,
+    P2PHandler,
     msg_block,
 )
 from test_framework.test_framework import BitcoinTestFramework, ChainManager
@@ -47,23 +45,12 @@ class PBVInvalidate(BitcoinTestFramework):
 
         block_count = 0
 
-        node0 = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node0)
-        node0.add_connection(connection)
-
-        node1 = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node1)
-        node1.add_connection(connection)
-
-        node2 = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node2)
-        node2.add_connection(connection)
-
-        NetworkThread().start()
-        # wait_for_verack ensures that the P2P connection is fully up.
-        node0.wait_for_verack()
-        node1.wait_for_verack()
-        node2.wait_for_verack()
+        # Create P2P connections
+        node0, node1, node2 = P2PHandler.connect_multiple([
+            ('127.0.0.1', p2p_port(0), self.nodes[0]),
+            ('127.0.0.1', p2p_port(0), self.nodes[0]),
+            ('127.0.0.1', p2p_port(0), self.nodes[0]),
+        ])
 
         self.log.info("Sending blocks to get spendable output")
         self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))

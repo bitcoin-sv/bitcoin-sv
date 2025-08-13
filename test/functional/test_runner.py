@@ -569,7 +569,9 @@ class TestHandler:
                             log_job.terminate()
                             log_job = None
                         log_out.seek(0), log_err.seek(0)
-                        [stdout, stderr] = [x.read().decode('utf-8')
+                        # Decode logs robustly: some tests may emit non-UTF-8 bytes.
+                        # Use UTF-8 with replacement to prevent the runner from crashing.
+                        [stdout, stderr] = [x.read().decode('utf-8', errors='replace')
                                             for x in (log_out, log_err)]
                         log_out.close(), log_err.close()
                         if proc.returncode == TEST_EXIT_PASSED and (stderr == "" or name in TESTS_WITH_DISABLED_STDERROR_CHECK):

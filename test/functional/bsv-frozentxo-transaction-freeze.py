@@ -18,15 +18,15 @@ from test_framework.util import (
     assert_raises_rpc_error
 )
 from test_framework.mininode import (
-    NetworkThread,
-    NodeConn,
-    NodeConnCB,
+    P2PHandler,
+    P2PEventHandler,
     msg_block,
     msg_tx,
     ToHex
 )
 
 from test_framework.test_framework import BitcoinTestFramework, ChainManager
+from test_framework.transport import NetworkThread, Connection
 from test_framework.blocktools import create_transaction, PreviousSpendableOutput
 from test_framework.script import CScript, OP_NOP, OP_TRUE
 
@@ -92,7 +92,7 @@ class P2P_send_node(Send_node):
 
         def on_reject(conn, msg):
             self.rejected_txs.append(msg)
-        self.p2p.connection.cb.on_reject = on_reject
+        self.p2p.connection.transport.cb.on_reject = on_reject
 
     def send_block(self, block, expect_reject=False):
         self.p2p.send_and_ping(msg_block(block))
@@ -134,9 +134,9 @@ class FrozenTXOTransactionFreeze(BitcoinTestFramework):
         node_no = 0
 
         # Create a P2P connections
-        node = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[node_no], node)
-        node.add_connection(connection)
+        node = P2PEventHandler()
+        node.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), node),
+                                       self.nodes[node_no]))
 
         NetworkThread().start()
         # wait_for_verack ensures that the P2P connection is fully up.

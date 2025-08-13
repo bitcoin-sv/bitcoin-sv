@@ -25,7 +25,7 @@ from test_framework.authproxy import JSONRPCException
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.script import CScript, OP_TRUE
 from test_framework.util import p2p_port, wait_until, check_for_log_msg, sync_blocks
-from test_framework.mininode import (NodeConn, NodeConnCB, NetworkThread, msg_tx, CTransaction, COutPoint,
+from test_framework.mininode import (P2PHandler, msg_tx, CTransaction, COutPoint,
                                      CTxIn, CTxOut, FromHex, ToHex)
 import time
 import copy
@@ -45,7 +45,7 @@ class NonFinalP2PTest(BitcoinTestFramework):
         if conn is not None:
             def on_reject(conn, message):
                 self.err = "{}: {}".format(message.code, message.reason.decode('UTF-8'))
-            conn.cb.on_reject = on_reject
+            conn.transport.cb.on_reject = on_reject
             conn.send_message(msg_tx(tx))
         elif rpcsend is not None:
             try:
@@ -153,23 +153,14 @@ class NonFinalP2PTest(BitcoinTestFramework):
 
     def run_test(self):
         # Create a P2P connection to the first node
-        node0 = NodeConnCB()
-        connections = []
-        connections.append(NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node0))
-        node0.add_connection(connections[0])
-
-        # Start up network handling in another thread. This needs to be called
-        # after the P2P connections have been created.
-        NetworkThread().start()
-        # wait_for_verack ensures that the P2P connection is fully up.
-        node0.wait_for_verack()
+        node0 = P2PHandler.connect('127.0.0.1', p2p_port(0), self.nodes[0])
 
         # Out of IBD and get a spendable output
         self.nodes[0].generate(102)
         sync_blocks(self.nodes)
 
         # Create shortcuts.
-        conn = connections[0]
+        conn = node0.connection
         rpc = conn.rpc
 
         # Use p2p interface.

@@ -6,15 +6,18 @@ Check P2P message sendhdrsen
 """
 from test_framework.blocktools import create_block, create_coinbase, create_transaction, merkle_root_from_branch
 from test_framework.miner_id import MinerIdKeys, make_miner_id_block
-from test_framework.mininode import COIN, CBlock, CInv, CTxOut, FromHex, mininode_lock, MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, msg_gethdrsen, msg_sendhdrsen, msg_sendheaders, NetworkThread, NodeConn, NodeConnCB, ToHex
+from test_framework.mininode import COIN, CBlock, CInv, CTxOut, FromHex, mininode_lock, \
+    MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, msg_gethdrsen, msg_sendhdrsen, msg_sendheaders, \
+    P2PHandler, P2PEventHandler, ToHex
 from test_framework.script import CScript, OP_FALSE, OP_RETURN, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import assert_equal, assert_greater_than, p2p_port, wait_until, sync_blocks
 
 import time
 
 
-class SPVNode(NodeConnCB):
+class SPVNode(P2PEventHandler):
     def __init__(self):
         super().__init__()
         self.hdrsen = [] # array of received hdrsen messages
@@ -42,7 +45,8 @@ class SPVNode(NodeConnCB):
         peers_info = node.getpeerinfo()
 
         # Find the element corresponding to info about this peer in peers_info
-        our_peer_info = [peer for peer in peers_info if ("addrlocal" in peer) and (peer["addrlocal"] == (self.connection.dstaddr + ":" + str(self.connection.dstport)))]
+        our_peer_info = [peer for peer in peers_info if ("addrlocal" in peer)
+                         and (peer["addrlocal"] == (self.connection.transport.dstaddr + ":" + str(self.connection.transport.dstport)))]
         assert_equal(len(our_peer_info), 1)
 
         return our_peer_info[0]
@@ -124,7 +128,8 @@ class SendHdrsEnTest(BitcoinTestFramework):
 
         # Node that will receive enriched header announcements from node
         spv_node = SPVNode()
-        spv_node.add_connection(NodeConn('127.0.0.1', p2p_port(0), node, spv_node))
+        spv_node.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), spv_node),
+                                           node))
         NetworkThread().start()
         spv_node.wait_for_verack()
         spv_node.sync_with_ping()

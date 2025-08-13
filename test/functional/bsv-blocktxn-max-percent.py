@@ -12,15 +12,16 @@ Check the -maxblocktxnpercent parameter correctly limits blocktxn responses.
 
 from test_framework.blocktools import prepare_init_chain
 from test_framework.cdefs import ONE_MEGABYTE
-from test_framework.mininode import BlockTransactionsRequest, NodeConn, NodeConnCB, msg_getblocktxn, mininode_lock
+from test_framework.mininode import BlockTransactionsRequest, P2PHandler, P2PEventHandler, msg_getblocktxn, mininode_lock
 from test_framework.test_framework import ComparisonTestFramework
+from test_framework.transport import Connection
 from test_framework.util import wait_until, p2p_port
 
 import random
 
 
 # TestNode: A peer we use to send messages to bitcoind, and store responses.
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
 
     def __init__(self):
         self.last_block = None
@@ -65,7 +66,8 @@ class MaxBlockTxn(ComparisonTestFramework):
         # Wait for connection to be etablished
         node = self.nodes[0]
         peer = TestNode()
-        peer.add_connection(NodeConn('127.0.0.1', p2p_port(0), node, peer))
+        peer.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), peer),
+                                       node))
         peer.wait_for_verack()
 
         # Send a large block with numerous transactions.

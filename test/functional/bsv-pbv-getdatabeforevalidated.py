@@ -30,15 +30,15 @@ Second test (__test_getblocks):
 """
 
 from test_framework.mininode import (
-    NetworkThread,
-    NodeConn,
-    NodeConnCB,
+    P2PHandler,
+    P2PEventHandler,
     msg_block,
     msg_getdata,
     msg_getblocks,
     CInv
 )
 from test_framework.test_framework import BitcoinTestFramework, ChainManager
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import (
     p2p_port,
     wait_until,
@@ -61,9 +61,9 @@ class PBVCallGetDataBeforeBlockIsValidated(BitcoinTestFramework):
         block_count = 0
 
         # Create a P2P connection
-        node0 = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node0)
-        node0.add_connection(connection)
+        node0 = P2PEventHandler()
+        node0.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), node0),
+                                        self.nodes[0]))
 
         NetworkThread().start()
         # wait_for_verack ensures that the P2P connection is fully up.

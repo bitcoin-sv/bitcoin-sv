@@ -5,8 +5,9 @@
 
 from test_framework.comptool import logger
 from test_framework.mininode import CInv, LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH, \
-    NodeConn, NodeConnCB, NetworkThread, msg_protoconf, CProtoconf, msg_inv
+    P2PHandler, P2PEventHandler, msg_protoconf, CProtoconf, msg_inv
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import assert_equal, assert_greater_than, p2p_port
 from math import ceil
 
@@ -42,7 +43,7 @@ class BsvProtoconfTest(BitcoinTestFramework):
         self.start_node(0, start_params)
 
         # Create a connection and connect to the node
-        test_node = NodeConnCB()
+        test_node = P2PEventHandler()
         test_node.wanted_inv_lengths = []
 
         def on_getdata(conn, message):
@@ -53,7 +54,7 @@ class BsvProtoconfTest(BitcoinTestFramework):
         def send_protoconf_default_msg_length(conn):
             conn.send_message(msg_protoconf(CProtoconf(1, LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)))
         test_node.send_protoconf = send_protoconf_default_msg_length
-        connections = [NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], test_node)]
+        connections = [P2PHandler(Connection('127.0.0.1', p2p_port(0), test_node), self.nodes[0])]
         test_node.add_connection(connections[0])
         NetworkThread().start()  # Start up network handling in another thread
 

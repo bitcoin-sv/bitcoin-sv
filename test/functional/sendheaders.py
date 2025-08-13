@@ -73,19 +73,19 @@ e. Announce one more that doesn't connect.
    Expect: disconnect.
 """
 
-from test_framework.mininode import CBlockHeader, CInv, NetworkThread, \
-    NodeConn, NodeConnCB, \
+from test_framework.mininode import CBlockHeader, CInv, P2PHandler, P2PEventHandler, \
     mininode_lock, msg_block, msg_getblocks, msg_getdata, msg_getheaders, \
     msg_headers, msg_sendheaders, msg_inv
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, p2p_port, sync_blocks, wait_until
 from test_framework.blocktools import create_block, create_coinbase
+from test_framework.transport import NetworkThread, Connection
 
 
 direct_fetch_response_time = 0.05
 
 
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
     def __init__(self):
         super().__init__()
         self.block_announced = False
@@ -231,12 +231,17 @@ class SendHeadersTest(BitcoinTestFramework):
         self.p2p_connections = [inv_node, test_node]
 
         connections = []
-        connections.append(
-            NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], inv_node))
+
+        connection1 = P2PHandler(Connection('127.0.0.1', p2p_port(0), inv_node),
+                                 self.nodes[0])
+        connections.append(connection1)
+
         # Set nServices to 0 for test_node, so no block download will occur outside of
         # direct fetching
-        connections.append(NodeConn('127.0.0.1', p2p_port(
-            0), self.nodes[0], test_node, services=0))
+        connection2 = P2PHandler(Connection('127.0.0.1', p2p_port(0), test_node),
+                                 self.nodes[0],
+                                 services=0)
+        connections.append(connection2)
         inv_node.add_connection(connections[0])
         test_node.add_connection(connections[1])
 

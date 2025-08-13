@@ -26,18 +26,7 @@ class BsvProtoconfViolationTest(BitcoinTestFramework):
         self.setup_nodes()
 
     def run_test(self):
-        test_node = mininode.NodeConnCB()
-
-        connections = []
-        connections.append(
-            mininode.NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], test_node))
-
-        test_node.add_connection(connections[0])
-
-        mininode.NetworkThread().start()  # Start up network handling in another thread
-
-        # 1. Test that protoconf is sent after verack
-        test_node.wait_for_verack()
+        test_node = mininode.P2PHandler.connect('127.0.0.1', p2p_port(0), self.nodes[0])
         test_node.wait_for_protoconf()
 
         logger.info("Received time of verack: {} ".format(test_node.msg_timestamp["verack"]))

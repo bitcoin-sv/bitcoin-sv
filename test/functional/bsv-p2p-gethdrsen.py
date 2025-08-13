@@ -84,8 +84,8 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
 
     def send_block(self, unspent_txns, bigCoinbaseTx=False):
         block, coinbase_tx = self.make_block(unspent_txns, bigCoinbaseTx)
-        self.test_node.cb.send_message(msg_block(block))
-        self.test_node.cb.sync_with_ping()
+        self.test_node.transport.cb.send_message(msg_block(block))
+        self.test_node.transport.cb.sync_with_ping()
 
         return block, coinbase_tx
 
@@ -93,8 +93,8 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
         msg = msg_gethdrsen()
         msg.locator.vHave = [locator_hash]
         msg.hashstop = hashstop
-        self.test_node.cb.send_message(msg)
-        self.test_node.cb.sync_with_ping()
+        self.test_node.transport.cb.send_message(msg)
+        self.test_node.transport.cb.sync_with_ping()
 
     def check_hdrsen_message(self, hdrsen, num_of_txs, coinbase_tx, block):
         assert_equal(hdrsen.nTx, num_of_txs)
@@ -122,7 +122,7 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
                 for h in message.headers:
                     headersEnriched.append(h)
 
-            self.test_node.cb.on_hdrsen = on_hdrsen
+            self.test_node.transport.cb.on_hdrsen = on_hdrsen
 
             startingHeight = 120
             self.nodes[0].generate(startingHeight)
@@ -142,7 +142,7 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
             assert_equal(startingHeight + 2, self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height'])
 
             self.send_gethdrsen(hash_at_120)
-            self.test_node.cb.wait_for_hdrsen()
+            self.test_node.transport.cb.wait_for_hdrsen()
 
             assert_equal(len(headersEnriched), 2)
 
@@ -163,14 +163,14 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
 
             # Obtain hdrsen for block with big coinbase transaction.
             self.send_gethdrsen(hash_at_122)
-            self.test_node.cb.wait_for_hdrsen()
+            self.test_node.transport.cb.wait_for_hdrsen()
             assert_equal(len(headersEnriched), 1)
 
             headersEnriched = []
             # Obtain hdrsen for last 2 blocks (1 normal and one with big coinbase transaction)
             hash_at_121 = int(self.nodes[0].getblockhash(self.nodes[0].getblockcount() - 2), 16)
             self.send_gethdrsen(hash_at_121)
-            self.test_node.cb.wait_for_hdrsen()
+            self.test_node.transport.cb.wait_for_hdrsen()
             assert_equal(len(headersEnriched), 1)
             # There are more headers to fetch (but we cannot do it in this message)
             assert_equal(headersEnriched[0].noMoreHeaders, False)
@@ -181,12 +181,12 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
             # gethdrsen between (120 and 122] should get 2 hdrsen
             headersEnriched = []
             self.send_gethdrsen(hash_at_120, hash_at_122)
-            self.test_node.cb.wait_for_hdrsen()
+            self.test_node.transport.cb.wait_for_hdrsen()
             assert_equal(len(headersEnriched), 2)
             # gethdrsen between (120 and 121] should get 1 hdrsen
             headersEnriched = []
             self.send_gethdrsen(hash_at_120, hash_at_121)
-            self.test_node.cb.wait_for_hdrsen()
+            self.test_node.transport.cb.wait_for_hdrsen()
             assert_equal(len(headersEnriched), 1)
 
 

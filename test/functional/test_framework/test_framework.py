@@ -5,7 +5,8 @@
 """Base class for RPC testing."""
 
 from test_framework.comptool import TestManager, TestInstance
-from test_framework.mininode import NodeConn, NodeConnCB, NetworkThread, StopNetworkThread
+from test_framework.mininode import P2PHandler, P2PEventHandler
+from test_framework.transport import NetworkThread, StopNetworkThread, Connection
 
 from .associations import Association, AssociationCB
 
@@ -326,7 +327,7 @@ class BitcoinTestFramework():
     # This method runs and stops bitcoind node with index 'node_index'.
     # It also creates (and handles closing of) 'number_of_connections' connections to bitcoind node with index 'node_index'.
     @contextlib.contextmanager
-    def run_node_with_connections(self, title, node_index, args, number_of_connections, connArgs=[{}], cb_class=NodeConnCB, ip='127.0.0.1', wait_for_verack=True):
+    def run_node_with_connections(self, title, node_index, args, number_of_connections, connArgs=[{}], cb_class=P2PEventHandler, ip='127.0.0.1', wait_for_verack=True):
         logger.debug("setup %s", title)
 
         self.start_node(node_index, args)
@@ -341,9 +342,10 @@ class BitcoinTestFramework():
             if len(connArgs) > i:
                 thisConnArgs = connArgs[i]
 
-            connection = NodeConn(ip, p2p_port(node_index), self.nodes[node_index], connCb, **thisConnArgs)
-            connections.append(connection)
-            connCb.add_connection(connection)
+            connection = Connection(ip, p2p_port(node_index), connCb)
+            handler = P2PHandler(connection, self.nodes[node_index], **thisConnArgs)
+            connections.append(handler)
+            connCb.add_connection(handler)
 
         thr = NetworkThread()
         thr.start()
@@ -365,13 +367,13 @@ class BitcoinTestFramework():
 
     # this method creates following network graph
     #
-    #      NodeConnCB
+    #      P2PEventHandler
     #          |
     #          v
     #      self.node[0] ---> self.node[1]  ---> ... ---> self.node[n]
     #
     @contextlib.contextmanager
-    def run_all_nodes_connected(self, title=None, args=None, ip='127.0.0.1', strSubVer=None, wait_for_verack=True, p2pConnections=[0], cb_class=NodeConnCB):
+    def run_all_nodes_connected(self, title=None, args=None, ip='127.0.0.1', strSubVer=None, wait_for_verack=True, p2pConnections=[0], cb_class=P2PEventHandler):
         if not title:
             title = "None"
         logger.debug("setup %s", title)
@@ -387,8 +389,10 @@ class BitcoinTestFramework():
         connCb = None
         if p2pConnections:
             connCb = cb_class()  # one mininode connection  to node 0
+
         for i in p2pConnections:
-            connection = NodeConn(ip, p2p_port(i), self.nodes[i], connCb, strSubVer=strSubVer)
+            connection = P2PHandler(Connection(ip, p2p_port(i), connCb),
+                                    self.nodes[i], strSubVer=strSubVer)
             connections.append(connection)
             connCb.add_connection(connection)
 

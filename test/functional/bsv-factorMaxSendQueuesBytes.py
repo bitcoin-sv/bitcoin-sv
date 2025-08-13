@@ -7,7 +7,7 @@ from test_framework.blocktools import ChainManager, prepare_init_chain
 from test_framework.cdefs import ONE_MEGABYTE
 from test_framework.comptool import logger
 from test_framework.mininode import CInv, msg_block, msg_getdata, \
-    NetworkThread, NodeConn, NodeConnCB
+    P2PHandler
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, assert_greater_than, \
     p2p_port
@@ -60,25 +60,18 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
         getdata_request = msg_getdata([CInv(CInv.BLOCK, block)])
 
         for test_node in test_nodes:
-            test_node.cb.on_block = on_block
-            test_node.cb.on_reject = on_reject
-            test_node.cb.send_message(getdata_request)
+            test_node.transport.cb.on_block = on_block
+            test_node.transport.cb.on_reject = on_reject
+            test_node.transport.cb.send_message(getdata_request)
 
         # Let bitcoind process and send all the messages.
         for test_node in test_nodes:
-            test_node.cb.sync_with_ping()
+            test_node.transport.cb.sync_with_ping()
 
         return numberOfReceivedBlocks, numberOfRejectedMsgs
 
     def prepareChain(self):
-        node = NodeConnCB()
-        connections = []
-        connections.append(
-            NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node))
-        node.add_connection(connections[0])
-
-        NetworkThread().start()
-        node.wait_for_verack()
+        node = P2PHandler.connect('127.0.0.1', p2p_port(0), self.nodes[0])
 
         # Generate some old blocks
         self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))

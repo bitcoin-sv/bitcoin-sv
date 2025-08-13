@@ -29,13 +29,13 @@ class P2PMempoolTests(BitcoinTestFramework):
         def runTestWithParams(description, args, expectedReject):
             with self.run_node_with_connections(description, 0, args, self.num_peers) as connections:
                 # request mempool
-                connections[0].cb.send_message(msg_mempool())
+                connections[0].transport.cb.send_message(msg_mempool())
                 if not expectedReject:
                     time.sleep(1)
                     # mininode must not be disconnected at this point
                     assert_equal(len(self.nodes[0].getpeerinfo()), 1)
                 else:
-                    connections[0].cb.wait_for_disconnect()
+                    connections[0].transport.cb.wait_for_disconnect()
                     # mininode must be disconnected at this point
                     assert_equal(len(self.nodes[0].getpeerinfo()), 0)
 

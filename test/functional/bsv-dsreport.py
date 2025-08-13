@@ -7,7 +7,7 @@ from ds_callback_service.CallbackService import CallbackService, RECEIVE, \
     STATUS, RESPONSE_TIME, FLAG
 from test_framework.comptool import logger
 from test_framework.mininode import CallbackMessage, COutPoint, CTransaction, \
-    CTxIn, CTxOut, FromHex, msg_tx, NetworkThread, NodeConn, NodeConnCB, ToHex
+    CTxIn, CTxOut, FromHex, msg_tx, P2PHandler, ToHex
 from test_framework.script import CScript, OP_ADD, OP_DROP, OP_FALSE, OP_MUL, \
     OP_RETURN, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
@@ -111,12 +111,7 @@ class DoubleSpendReport(BitcoinTestFramework):
             raise Exception("Server thread did not terminate")
 
     def createConnection(self):
-        self.node0 = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], self.node0)
-        self.node0.add_connection(connection)
-
-        NetworkThread().start()
-        self.node0.wait_for_verack()
+        self.node0 = P2PHandler.connect('127.0.0.1', p2p_port(0), self.nodes[0])
 
     def create_and_send_transaction(self, inputs, outputs):
         tx = CTransaction()

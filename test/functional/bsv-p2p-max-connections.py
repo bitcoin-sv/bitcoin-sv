@@ -4,8 +4,9 @@
 
 # A test to limit p2p connections
 
-from test_framework.mininode import NodeConn, NodeConnCB
+from test_framework.mininode import P2PHandler, P2PEventHandler
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import Connection
 from test_framework.util import assert_equal, check_for_log_msg, p2p_port, wait_until
 
 
@@ -37,9 +38,9 @@ class P2PMaxConnections(BitcoinTestFramework):
 
             assert_equal(len(self.nodes[0].getpeerinfo()), connections)
 
-            connCb = NodeConnCB()
-            c = NodeConn(ip, p2p_port(0), self.nodes[0], connCb)
-            connCb.add_connection(c)
+            event_handler = P2PEventHandler()
+            event_handler.add_connection(P2PHandler(Connection(ip, p2p_port(0), event_handler),
+                                                    self.nodes[0]))
             err = "failed to find an eviction candidate - connection dropped (full)"
             wait_until(lambda: check_for_log_msg(self.nodes[0], err))
 

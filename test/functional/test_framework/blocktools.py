@@ -276,7 +276,7 @@ def send_by_headers(conn, blocks, do_send_blocks):
             del hash_block_map[i.hash]
             conn.send_message(msg_block(bl))
 
-    with conn.cb.temporary_override_callback(on_getdata=on_getdata):
+    with conn.transport.cb.temporary_override_callback(on_getdata=on_getdata):
         headers_message = msg_headers()
         headers_message.headers = [CBlockHeader(b) for b in blocks]
         conn.send_message(headers_message)
@@ -612,7 +612,7 @@ class TxCreator:
 
 def create_simple_chain(conn, num_blocks=120, scriptPubKey=None):
     """
-    Create 'num_blocks' number of empty blocks after the current tip, send them to node via NodeConn P2P connection 'conn', wait until the last one becomes the tip and return an array of them.
+    Create 'num_blocks' number of empty blocks after the current tip, send them to node via P2PHandler P2P connection 'conn', wait until the last one becomes the tip and return an array of them.
 
     If scriptPubKey is specified, output of coinbases transaction in these blocks is locked with it, otherwise it is trivially spendable (OP_TRUE).
 
@@ -636,7 +636,7 @@ def create_simple_chain(conn, num_blocks=120, scriptPubKey=None):
         block = create_block(int(tip_hash, 16), txcb, tip_time + 1)
         block.nNonce = 0
         block.solve()
-        conn.cb.send_message(msg_block(block))
+        conn.transport.cb.send_message(msg_block(block))
         tip_hash = block.hash
         tip_height += 1
         tip_time = block.nTime

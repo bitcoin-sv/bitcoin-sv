@@ -99,7 +99,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
             def on_reject(conn, msg):
                 rejected_txs.append(msg)
 
-            connection.cb.on_reject = on_reject
+            connection.transport.cb.on_reject = on_reject
 
             # Create one transaction with size of dataCarrierSize
             tx_valid = self.make_tx_script_size(n_outputs, script_op_codes, 10000, dataCarrierSize)
@@ -110,7 +110,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
             connection.send_message(msg_tx(tx_invalid))
 
             # Wait for rejection.
-            connection.cb.wait_for_reject()
+            connection.transport.cb.wait_for_reject()
 
             # Only second transaction should be rejected.
             assert_equal(len(rejected_txs), 1)
@@ -130,7 +130,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
             def on_reject(conn, msg):
                 rejected_txs.append(msg)
 
-            connection.cb.on_reject = on_reject
+            connection.transport.cb.on_reject = on_reject
 
             # Create one transaction with size of MAX_TX_SIZE_POLICY_BEFORE_GENESIS
             tx_valid = self.make_tx_total_size(n_outputs, script_op_codes,
@@ -143,7 +143,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
             connection.send_message(msg_tx(tx_invalid))
 
             # Wait for rejection.
-            connection.cb.wait_for_reject()
+            connection.transport.cb.wait_for_reject()
 
             # Only second transaction should be rejected.
             assert_equal(len(rejected_txs), 1)

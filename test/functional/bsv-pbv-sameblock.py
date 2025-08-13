@@ -7,9 +7,7 @@ be processed and the other ignored
 """
 
 from test_framework.mininode import (
-    NetworkThread,
-    NodeConn,
-    NodeConnCB,
+    P2PHandler,
     msg_block,
 )
 from test_framework.test_framework import BitcoinTestFramework, ChainManager
@@ -35,19 +33,11 @@ class PBVSameBlock(BitcoinTestFramework):
     def run_test(self):
         block_count = 0
 
-        # Create a P2P connections
-        node0 = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node0)
-        node0.add_connection(connection)
-
-        node1 = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node1)
-        node1.add_connection(connection)
-
-        NetworkThread().start()
-        # wait_for_verack ensures that the P2P connection is fully up.
-        node0.wait_for_verack()
-        node1.wait_for_verack()
+        # Create P2P connections
+        node0, node1 = P2PHandler.connect_multiple([
+            ('127.0.0.1', p2p_port(0), self.nodes[0]),
+            ('127.0.0.1', p2p_port(0), self.nodes[0]),
+        ])
 
         # send one to get out of IBD state
         self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))

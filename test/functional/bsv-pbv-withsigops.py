@@ -29,8 +29,7 @@ import glob
 from test_framework.blocktools import create_transaction, prepare_init_chain, \
     sign_tx
 from test_framework.key import CECKey
-from test_framework.mininode import CTransaction, msg_block, NetworkThread, \
-    NodeConn, NodeConnCB
+from test_framework.mininode import CTransaction, msg_block, P2PHandler
 from test_framework.script import CScript, hash160, OP_CHECKSIG, OP_DROP, \
     OP_DUP, OP_EQUALVERIFY, OP_HASH160, OP_TRUE, SIGHASH_FORKID, SIGHASH_ALL, \
     SignatureHash
@@ -88,14 +87,7 @@ class PBVWithSigOps(BitcoinTestFramework):
         block_count = 0
 
         # Create a P2P connection
-        node0 = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node0)
-        node0.add_connection(connection)
-
-        network_thread = NetworkThread()
-        network_thread.start()
-        # wait_for_verack ensures that the P2P connection is fully up.
-        node0.wait_for_verack()
+        node0 = P2PHandler.connect('127.0.0.1', p2p_port(0), self.nodes[0])
 
         self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))
 

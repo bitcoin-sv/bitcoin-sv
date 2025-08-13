@@ -60,15 +60,15 @@ over the network (`CBlock`, `CTransaction`, etc, along with the network-level
 wrappers for them, `msg_block`, `msg_tx`, etc).
 
 - P2P tests have two threads. One thread handles all network communication
-with the bitcoind(s) being tested (using python's asyncore package); the other
+with the bitcoind(s) being tested (using python's selectors module); the other
 implements the test logic.
 
-- `NodeConn` is the class used to connect to a bitcoind.  If you implement
-a callback class that derives from `NodeConnCB` and pass that to the
-`NodeConn` object, your code will receive the appropriate callbacks when
+- `P2PHandler` is the class used to connect to a bitcoind.  If you implement
+a callback class that derives from `P2PEventHandler` and pass that to the
+`P2PHandler` object, your code will receive the appropriate callbacks when
 events of interest arrive.
 
-- Call `NetworkThread.start()` after all `NodeConn` objects are created to
+- Call `NetworkThread.start()` after all `P2PHandler` objects are created to
 start the networking thread.  (Continue with the test logic in your existing
 thread.)
 

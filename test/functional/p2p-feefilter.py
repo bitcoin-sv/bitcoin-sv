@@ -4,9 +4,9 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #
 
-from test_framework.mininode import mininode_lock, msg_feefilter, \
-    NetworkThread, NodeConn, NodeConnCB
+from test_framework.mininode import mininode_lock, msg_feefilter, P2PHandler, P2PEventHandler
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import Connection, NetworkThread
 from test_framework.util import hashToHex, p2p_port, sync_blocks, sync_mempools
 
 from decimal import Decimal
@@ -27,7 +27,7 @@ def allInvsMatch(invsExpected, testnode):
     return False
 
 
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
     def __init__(self):
         super().__init__()
         self.txinvs = []
@@ -55,9 +55,7 @@ class FeeFilterTest(BitcoinTestFramework):
 
         # Setup the p2p connections and start up the network thread.
         test_node = TestNode()
-        connection = NodeConn(
-            '127.0.0.1', p2p_port(0), self.nodes[0], test_node)
-        test_node.add_connection(connection)
+        test_node.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), test_node), self.nodes[0]))
         NetworkThread().start()
         test_node.wait_for_verack()
 

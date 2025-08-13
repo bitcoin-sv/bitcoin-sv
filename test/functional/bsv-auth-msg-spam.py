@@ -31,7 +31,7 @@ class AuthMsgSpam(BitcoinTestFramework):
                 pass
 
             # Wait for disconnection
-            conn.cb.wait_for_disconnect()
+            conn.transport.cb.wait_for_disconnect()
 
         # Reconnect
         with self.run_node_with_connections("AuthMsgSpam", 0, ['-minerid=1'], number_of_connections=1) as (conn,):
@@ -44,7 +44,7 @@ class AuthMsgSpam(BitcoinTestFramework):
                 pass
 
             # Wait for disconnection
-            conn.cb.wait_for_disconnect()
+            conn.transport.cb.wait_for_disconnect()
 
 
 if __name__ == '__main__':

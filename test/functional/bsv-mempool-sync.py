@@ -11,7 +11,7 @@ Add txns with different ages to each node's mempool (some in primary, some only 
 Check the behaviour of both the syncing and non-syncing nodes.
 '''
 
-from test_framework.mininode import COIN, COutPoint, CTxIn, CTxOut, CTransaction, ToHex, NodeConnCB, msg_mempool
+from test_framework.mininode import COIN, COutPoint, CTxIn, CTxOut, CTransaction, ToHex, P2PEventHandler, msg_mempool
 from test_framework.script import CScript, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, wait_until, disconnect_nodes_bi, connect_nodes, check_for_log_msg, open_log_file
@@ -20,7 +20,7 @@ import time
 
 
 # Our message callback handler
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
     last_inv_count = None
     last_mempool_request = None
     mempool_request_count = 0
@@ -124,7 +124,7 @@ class MempoolSync(BitcoinTestFramework):
             # Check new-style mempool request to peer not configured to synchronise with us is ignored
             conn2.send_message(msg_mempool(age=1))
             wait_until(lambda: check_for_log_msg(self, "Ignoring mempool sync request from unknown peer", "/node2"))
-            assert (conn2.cb.last_inv_count is None)
+            assert (conn2.transport.cb.last_inv_count is None)
 
         # Restart node2
         self.start_node(2)
@@ -139,12 +139,12 @@ class MempoolSync(BitcoinTestFramework):
 
             # Should get @5 mempool requests in 10 seconds
             time.sleep(10)
-            assert (conn1.cb.mempool_request_count >= 4 and conn1.cb.mempool_request_count <= 6)
+            assert (conn1.transport.cb.mempool_request_count >= 4 and conn1.transport.cb.mempool_request_count <= 6)
 
             # Check old-style mempool msg from a non-whitelisted is disabled
             conn1.send_message(msg_mempool_old())
             wait_until(lambda: check_for_log_msg(self, "mempool request from nonwhitelisted peer disabled", "/node1"))
-            assert (conn1.cb.last_inv_count is None)
+            assert (conn1.transport.cb.last_inv_count is None)
 
         # Restart node1
         self.start_node(1)
@@ -167,46 +167,46 @@ class MempoolSync(BitcoinTestFramework):
 
             # Old style mempool request from whitelisted node should still get us everything (4 txns)
             conn0.send_message(msg_mempool_old())
-            wait_until(lambda: conn0.cb.last_inv_count == 4)
+            wait_until(lambda: conn0.transport.cb.last_inv_count == 4)
 
             # Mempool request with age 4 second will not get any response because txn ages are 0,1,2,3
-            conn0.cb.last_inv_count = None
+            conn0.transport.cb.last_inv_count = None
             conn0.send_message(msg_mempool(age=4))
             time.sleep(1)
-            assert (conn0.cb.last_inv_count is None)
+            assert (conn0.transport.cb.last_inv_count is None)
 
             # Mempool request with age 3 will get 1 response
-            conn0.cb.last_inv_count = None
+            conn0.transport.cb.last_inv_count = None
             conn0.send_message(msg_mempool(age=3))
-            wait_until(lambda: conn0.cb.last_inv_count == 1)
+            wait_until(lambda: conn0.transport.cb.last_inv_count == 1)
 
             # Mempool request with age 2 will get 2 responses
-            conn0.cb.last_inv_count = None
+            conn0.transport.cb.last_inv_count = None
             conn0.send_message(msg_mempool(age=2))
-            wait_until(lambda: conn0.cb.last_inv_count == 2)
+            wait_until(lambda: conn0.transport.cb.last_inv_count == 2)
 
             # Mempool request with age 1 will get 3 responses
-            conn0.cb.last_inv_count = None
+            conn0.transport.cb.last_inv_count = None
             conn0.send_message(msg_mempool(age=1))
-            wait_until(lambda: conn0.cb.last_inv_count == 3)
+            wait_until(lambda: conn0.transport.cb.last_inv_count == 3)
 
             # Mempool request with age 0 will still only get 3 responses because 4th txn is only in secondary pool
-            conn0.cb.last_inv_count = None
+            conn0.transport.cb.last_inv_count = None
             conn0.send_message(msg_mempool(age=0))
-            wait_until(lambda: conn0.cb.last_inv_count == 3)
+            wait_until(lambda: conn0.transport.cb.last_inv_count == 3)
 
             # Move time on so every txn ages 1 second
             self.nodes[0].setmocktime(cur_time + 1)
 
             # Now a mempool request with age 4 will get 1 response
-            conn0.cb.last_inv_count = None
+            conn0.transport.cb.last_inv_count = None
             conn0.send_message(msg_mempool(age=4))
-            wait_until(lambda: conn0.cb.last_inv_count == 1)
+            wait_until(lambda: conn0.transport.cb.last_inv_count == 1)
 
             # Should get @5 mempool requests in 5 seconds
-            conn0.cb.mempool_request_count = 0
+            conn0.transport.cb.mempool_request_count = 0
             time.sleep(5)
-            assert (conn0.cb.mempool_request_count >= 4 and conn0.cb.mempool_request_count <= 6)
+            assert (conn0.transport.cb.mempool_request_count >= 4 and conn0.transport.cb.mempool_request_count <= 6)
 
             # Check nodes 0 and 1 sync their primary mempools once proper time is restored
             assert_equal(len(self.nodes[0].getrawmempool()), 4)

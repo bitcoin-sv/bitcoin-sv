@@ -13,13 +13,13 @@ from test_framework.util import (
     p2p_port
 )
 from test_framework.mininode import (
-    NetworkThread,
-    NodeConn,
-    NodeConnCB,
+    P2PHandler,
+    P2PEventHandler,
     msg_block
 )
 
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import NetworkThread, Connection
 from test_framework.blocktools import create_transaction
 from test_framework.script import CScript, OP_TRUE
 
@@ -38,7 +38,7 @@ class Send_node():
     def _register_on_reject(self):
         def on_reject(conn, msg):
             self.rejected_blocks.append(msg)
-        self.p2p.connection.cb.on_reject = on_reject
+        self.p2p.connection.transport.cb.on_reject = on_reject
 
     def restart_node(self, extra_args=None):
         self.log.info("Restarting node ...")
@@ -46,8 +46,8 @@ class Send_node():
         self.rpc.wait_until_stopped()
         self.rpc.start(True, extra_args)
         self.rpc.wait_for_rpc_connection()
-        self.p2p = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.rpc, self.p2p)
+        self.p2p = P2PEventHandler()
+        connection = P2PHandler(Connection('127.0.0.1', p2p_port(0), self.p2p), self.rpc)
         NetworkThread().start()
         self.p2p.add_connection(connection)
         self.p2p.wait_for_verack()
@@ -95,9 +95,9 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
         node_no = 0
 
         # Create a P2P connections
-        node = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[node_no], node)
-        node.add_connection(connection)
+        node = P2PEventHandler()
+        node.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), node),
+                                       self.nodes[node_no]))
 
         NetworkThread().start()
         # wait_for_verack ensures that the P2P connection is fully up.

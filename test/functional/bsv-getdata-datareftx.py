@@ -3,7 +3,7 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import msg_block, msg_getdata, CInv, CTransaction, NodeConnCB
+from test_framework.mininode import msg_block, msg_getdata, CInv, CTransaction, P2PEventHandler
 from test_framework.blocktools import merkle_root_from_branch
 from test_framework.miner_id import MinerIdKeys, make_miner_id_block, create_dataref_txn, create_dataref
 from test_framework.util import create_confirmed_utxos, wait_until, assert_equal
@@ -27,7 +27,7 @@ Test P2P handling of getdata requests for dataref txns.
 '''
 
 
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
     def __init__(self):
         super().__init__()
         self.notFound = []
@@ -120,7 +120,7 @@ class GetdataDataref(BitcoinTestFramework):
             conn.send_message(msg_getdata([CInv(CInv.DATAREF_TX, dataref1.sha256), CInv(CInv.DATAREF_TX, dataref2.sha256)]))
 
             def datarefReceived(tx):
-                for dataref in conn.cb.datarefTx:
+                for dataref in conn.transport.cb.datarefTx:
                     if dataref.tx.hash == tx.hash:
                         return True
                 return False
@@ -129,7 +129,7 @@ class GetdataDataref(BitcoinTestFramework):
 
             # Check merkle proof on received dataref txns
             for dataref in [dataref1, dataref2]:
-                msg = conn.cb.GetDatarefTx(dataref.hash)
+                msg = conn.transport.cb.GetDatarefTx(dataref.hash)
                 calculatedRootHash = merkle_root_from_branch(msg.proof.txOrId, msg.proof.index, [x.value for x in msg.proof.nodes])
                 assert_equal(calculatedRootHash, block.hashMerkleRoot)
 
@@ -138,11 +138,11 @@ class GetdataDataref(BitcoinTestFramework):
             badTx.nLockTime = 1
             badTx.rehash()
             conn.send_message(msg_getdata([CInv(CInv.DATAREF_TX, badTx.sha256)]))
-            wait_until(lambda: badTx.sha256 in conn.cb.notFound, timeout=10, lock=mininode_lock)
+            wait_until(lambda: badTx.sha256 in conn.transport.cb.notFound, timeout=10, lock=mininode_lock)
 
             # Send getdata for datref that wasn't referenced in the miner-info document
             conn.send_message(msg_getdata([CInv(CInv.DATAREF_TX, dataref3.sha256)]))
-            wait_until(lambda: dataref3.sha256 in conn.cb.notFound, timeout=10, lock=mininode_lock)
+            wait_until(lambda: dataref3.sha256 in conn.transport.cb.notFound, timeout=10, lock=mininode_lock)
 
 
 if __name__ == '__main__':

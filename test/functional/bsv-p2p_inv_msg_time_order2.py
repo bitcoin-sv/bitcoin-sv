@@ -60,7 +60,7 @@ class TxnInvOrder(BitcoinTestFramework):
                     if im.type == 1:
                         txinvs.append(hashToHex(im.hash))
 
-            connection2.cb.on_inv = on_inv
+            connection2.transport.cb.on_inv = on_inv
 
             fee0 = Decimal("0.00200000")
             fees = [fee0, fee0 * 2, fee0 * 3, fee0 * 2]
@@ -75,7 +75,7 @@ class TxnInvOrder(BitcoinTestFramework):
             for tx in txs:
                 connection.send_message(msg_tx(tx))
                 # wait for transaction to be processed
-                connection.cb.sync_with_ping()
+                connection.transport.cb.sync_with_ping()
 
             # have to wait to receive one inv message with all transactions
             wait_until(lambda: len(txinvs) > 0, timeout=60, lock=mininode_lock)

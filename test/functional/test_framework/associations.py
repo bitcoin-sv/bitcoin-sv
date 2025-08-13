@@ -2,9 +2,10 @@
 # Copyright (c) 2020 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from .mininode import (NodeConn, NodeConnCB, msg_createstream)
-from .util import p2p_port
+from .mininode import (P2PHandler, P2PEventHandler, msg_createstream)
 from .streams import StreamType
+from .transport import Connection
+from .util import p2p_port
 
 
 # Association callbacks
@@ -99,7 +100,7 @@ class Stream():
 
 
 # Connection callback for stream within an association
-class StreamCB(NodeConnCB):
+class StreamCB(P2PEventHandler):
     def __init__(self, association):
         super().__init__()
         self.association = association
@@ -246,7 +247,9 @@ class Association():
         # Create GENERAL stream connection
         general_cb = StreamCB(self)
         self.stream_callbacks[StreamType.GENERAL] = general_cb
-        conn = NodeConn(ip, p2p_port(0), node, general_cb, **connArgs)
+        conn = P2PHandler(Connection(ip, p2p_port(0), general_cb),
+                          node,
+                          **connArgs)
         general_stream = Stream(StreamType.GENERAL, conn)
         self.streams[StreamType.GENERAL] = general_stream
         self.conn_to_stream_map[conn] = general_stream
@@ -255,7 +258,10 @@ class Association():
         for additional_stream_type in self.stream_policy.additional_streams:
             stream_cb = StreamCB(self)
             self.stream_callbacks[additional_stream_type] = stream_cb
-            conn = NodeConn(ip, p2p_port(0), node, stream_cb, assocID=general_stream.conn.assocID, **connArgs)
+            conn = P2PHandler(Connection(ip, p2p_port(0), stream_cb),
+                              node,
+                              assocID=general_stream.conn.assocID,
+                              **connArgs)
             stream = Stream(additional_stream_type, conn)
             self.streams[additional_stream_type] = stream
             self.conn_to_stream_map[conn] = stream

@@ -107,7 +107,7 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
                 block = self.chain.next_block(block_count)
                 block_count += 1
                 self.chain.save_spendable_output()
-                connection.cb.send_message(msg_block(block))
+                connection.transport.cb.send_message(msg_block(block))
             out = []
             for i in range(starting_blocks):
                 out.append(self.chain.get_spendable_output())
@@ -117,14 +117,14 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
             transactions = []
             for i in range(2):
                 tx = create_transaction(out[i].tx, out[i].n, b"", 100000, CScript([OP_TRUE]))
-                connection.cb.send_message(msg_tx(tx))
+                connection.transport.cb.send_message(msg_tx(tx))
                 transactions.append(tx)
             self.check_mempool(self.nodes[0], transactions)
 
             # Create large transaction that depends on previous two transactions.
             # If transaction pubkey contains 1/2 of BUFFER_SIZE_HttpTextWriter of data, it means that final result will for sure be chunked.
             largeTx = self.createLargeTransaction(int(BUFFER_SIZE_HttpTextWriter / 2), transactions)
-            connection.cb.send_message(msg_tx(largeTx))
+            connection.transport.cb.send_message(msg_tx(largeTx))
             self.check_mempool(self.nodes[0], [largeTx])
 
             # Check getblocktemplate response.

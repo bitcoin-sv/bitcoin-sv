@@ -256,7 +256,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         def on_reject(conn, msg):
             rejects.append(msg)
 
-        with connection.cb.temporary_override_callback(on_reject=on_reject):
+        with connection.transport.cb.temporary_override_callback(on_reject=on_reject):
             for tx, reason in zip(txs, reasons):
                 del rejects[:]
                 block, _ = self._new_block(connection, tip_hash=tip["hash"], tip_height=tip["height"], txs=block_txs + [tx])
@@ -332,7 +332,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         def on_reject(_, msg):
             rejects.append(msg)
 
-        with connection.cb.temporary_override_callback(on_reject=on_reject):
+        with connection.transport.cb.temporary_override_callback(on_reject=on_reject):
             for tx, reason in zip(to_reject, reasons):
                 self.log.info(f"Sending and processing the reject tx {loghash(tx.hash)} for expecting reason {reason}")
                 del rejects[:]

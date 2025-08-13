@@ -3,7 +3,7 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import NodeConnCB, COIN
+from test_framework.mininode import P2PEventHandler, COIN
 from test_framework.util import wait_until
 
 """
@@ -13,7 +13,7 @@ feefilter to reset the limit.
 """
 
 
-class MyConnCB(NodeConnCB):
+class MyConnCB(P2PEventHandler):
 
     def __init__(self):
         super().__init__()
@@ -41,14 +41,14 @@ class FeeFilterIBD(BitcoinTestFramework):
             # Node is currently in IBD.
             # Exact fee filter node will send depends on several things, so just
             # check it's at least 1 cent
-            wait_until(lambda: conn.cb.last_feerate >= COIN / 100)
-            ibd_feerate = conn.cb.last_feerate
+            wait_until(lambda: conn.transport.cb.last_feerate >= COIN / 100)
+            ibd_feerate = conn.transport.cb.last_feerate
 
             # Get node out of IBD
             self.nodes[0].generate(1)
 
             # Node will now send out its real feerate, which will be lower than the IBD rate
-            wait_until(lambda: conn.cb.last_feerate < ibd_feerate)
+            wait_until(lambda: conn.transport.cb.last_feerate < ibd_feerate)
 
 
 if __name__ == '__main__':

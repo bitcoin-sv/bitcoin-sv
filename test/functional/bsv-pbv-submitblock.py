@@ -32,9 +32,7 @@ from test_framework.util import (
     wait_until
 )
 from test_framework.mininode import (
-    NetworkThread,
-    NodeConn,
-    NodeConnCB,
+    P2PHandler,
     msg_block,
     msg_sendcmpct,
     msg_getheaders,
@@ -59,30 +57,19 @@ class PBVSubmitBlock(BitcoinTestFramework):
     def run_test(self):
         block_count = 0
 
-        # Create a P2P connections
-        node0 = NodeConnCB()
-        connection0 = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node0)
-        node0.add_connection(connection0)
-
-        node1 = NodeConnCB()
-        connection1 = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node1)
-        node1.add_connection(connection1)
-
-        # *** Prepare node connection for early announcements testing
-        node2 = NodeConnCB()
-        node2.add_connection(NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node2))
-
-        NetworkThread().start()
-        # wait_for_verack ensures that the P2P connection is fully up.
-        node0.wait_for_verack()
-        node1.wait_for_verack()
+        # Create P2P connections
+        # *** node2 is used for early announcements testing
+        node0, node1, node2 = P2PHandler.connect_multiple([
+            ('127.0.0.1', p2p_port(0), self.nodes[0]),
+            ('127.0.0.1', p2p_port(0), self.nodes[0]),
+            ('127.0.0.1', p2p_port(0), self.nodes[0]),
+        ])
 
         # *** Activate early announcement functionality for this connection
         #     After this point the early announcements are not received yet -
         #     we still need to set latest announced block (CNode::pindexBestKnownBlock)
         #     which is set for e.g. by calling best headers message with locator
         #     set to non-null
-        node2.wait_for_verack()
         node2.send_message(msg_sendcmpct(announce=True))
 
         self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))

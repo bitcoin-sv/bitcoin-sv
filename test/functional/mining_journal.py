@@ -14,9 +14,10 @@ setting up situations for that testing to happen here.
 
 from test_framework.cdefs import ONE_MEGABYTE
 from test_framework.blocktools import create_block_from_candidate
-from test_framework.mininode import COIN, NetworkThread, NodeConn, NodeConnCB, \
+from test_framework.mininode import COIN, P2PHandler, P2PEventHandler, \
     ToHex
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import assert_equal, assert_greater_than, \
     bytes_to_hex_str, connect_nodes, create_confirmed_utxos, disconnect_nodes, \
     p2p_port, satoshi_round, sync_blocks, wait_until
@@ -28,7 +29,7 @@ import random
 import time
 
 
-class MyNode(NodeConnCB):
+class MyNode(P2PEventHandler):
     def __init__(self):
         super().__init__()
         self.setup_finished = False
@@ -218,7 +219,9 @@ class MiningJournal(BitcoinTestFramework):
         for i in range(len(self.nodes)):
             node = MyNode()
             self.conncbs.append(node)
-            connections.append(NodeConn('127.0.0.1', p2p_port(i), self.nodes[i], node))
+            connection = P2PHandler(Connection('127.0.0.1', p2p_port(i), node),
+                                    self.nodes[i])
+            connections.append(connection)
             node.add_connection(connections[i])
 
         # Start up network handling in another thread. This needs to be called after the P2P connections have been created.

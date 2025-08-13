@@ -2,8 +2,9 @@
 # Copyright (c) 2022 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.mininode import NodeConnCB, NodeConn, NetworkThread, msg_feefilter, mininode_lock
+from test_framework.mininode import P2PEventHandler, P2PHandler, msg_feefilter, mininode_lock
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import sync_blocks, p2p_port, wait_until, hashToHex
 import time
 
@@ -43,7 +44,7 @@ def allInvsMatch(invsExpected, testnode):
     return False
 
 
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
     def __init__(self):
         super().__init__()
         self.txinvs = []
@@ -76,9 +77,8 @@ class FeeFilterTest(BitcoinTestFramework):
 
         # Setup the p2p connections and start up the network thread.
         test_node = TestNode()
-        connection = NodeConn(
-            '127.0.0.1', p2p_port(0), self.nodes[0], test_node)
-        test_node.add_connection(connection)
+        test_node.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), test_node),
+                                            self.nodes[0]))
         NetworkThread().start()
         test_node.wait_for_verack()
 

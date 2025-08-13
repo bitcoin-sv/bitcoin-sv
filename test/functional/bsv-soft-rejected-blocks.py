@@ -593,8 +593,8 @@ class SoftRejectedBlocks(BitcoinTestFramework):
             chain = ChainManager()
             genesis_hash = self.nodes[0].getbestblockhash()
             chain.set_genesis_hash(int(genesis_hash, 16))
-            _, out, _ = prepare_init_chain(chain, 200, 12, block_0=False, start_block=1001, node=conn0.cb)
-            conn0.cb.sync_with_ping()
+            _, out, _ = prepare_init_chain(chain, 200, 12, block_0=False, start_block=1001, node=conn0.transport.cb)
+            conn0.transport.cb.sync_with_ping()
 
             # Check that we have created a chain that we wanted
             assert_equal(self.nodes[0].getblockcount(), 200)
@@ -609,8 +609,8 @@ class SoftRejectedBlocks(BitcoinTestFramework):
                 #       Spending different outputs is only used as a convenient way
                 #       to make two blocks different if they have the same parent.
                 b = chain.next_block(idx, spend=out[idx])
-                conn0.cb.send_message(msg_block(b)) # send block to node
-                conn0.cb.sync_with_ping() # wait until node has processed the block
+                conn0.transport.cb.send_message(msg_block(b)) # send block to node
+                conn0.transport.cb.sync_with_ping() # wait until node has processed the block
                 self.log.debug("Created block: idx=%i prev=%i hash=%s" % (idx, prev_idx, b.hash))
 
             new_blk(1, 1200)
@@ -733,7 +733,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
             b4_invalid.hashMerkleRoot = b4_invalid.calc_merkle_root()
             b4_invalid.solve()
             b4_invalid.rehash()
-            conn0.cb.send_message(msg_block(b4_invalid))
+            conn0.transport.cb.send_message(msg_block(b4_invalid))
             # b1 must still be at the tip
             self.wait_for_chain_tips(self.nodes[0], {b1_hash, b4_invalid.hash})
             wait_until(lambda: self.nodes[0].getbestblockhash() == b1_hash) # NOTE: need to wait, since reorg back to b1 can take a while even after chaintips are already as expected
@@ -742,7 +742,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
             b2a = create_block(int(b1_hash, 16), create_coinbase(102))
             b2a.solve()
             b2a.rehash()
-            conn0.cb.send_message(msg_block(b2a))
+            conn0.transport.cb.send_message(msg_block(b2a))
             # b2a must become new tip
             self.wait_for_chain_tips(self.nodes[0], {b2a.hash, b4_invalid.hash})
             assert_equal(self.nodes[0].getbestblockhash(), b2a.hash)
@@ -753,7 +753,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
             b4a_invalid.hashMerkleRoot = b4a_invalid.calc_merkle_root()
             b4a_invalid.solve()
             b4a_invalid.rehash()
-            conn0.cb.send_message(msg_block(b4a_invalid))
+            conn0.transport.cb.send_message(msg_block(b4a_invalid))
             # b2a must still be at the tip
             self.wait_for_chain_tips(self.nodes[0], {b2a.hash, b4_invalid.hash, b4a_invalid.hash})
             wait_until(lambda: self.nodes[0].getbestblockhash() == b2a.hash)
@@ -801,7 +801,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
             b4a_invalid.hashMerkleRoot = b4a_invalid.calc_merkle_root()
             b4a_invalid.solve()
             b4a_invalid.rehash()
-            conn0.cb.send_message(msg_block(b4a_invalid))
+            conn0.transport.cb.send_message(msg_block(b4a_invalid))
 
             # b1 must still be at the tip
             self.wait_for_chain_tips(self.nodes[0], {b1_hash, b4a_invalid.hash})

@@ -6,7 +6,7 @@
 from test_framework.blocktools import create_coinbase_P2SH, create_block_from_candidate, create_block, create_coinbase
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import p2p_port, assert_equal, assert_raises_rpc_error
-from test_framework.mininode import CBlock, NodeConn, NodeConnCB, NetworkThread, ToHex, msg_block
+from test_framework.mininode import CBlock, P2PHandler, ToHex, msg_block
 
 example_script_hash = "748284390f9e263a4b766a75d0633c50426eb875"
 
@@ -36,12 +36,7 @@ class MiningCoinbaseWithP2SHTest(BitcoinTestFramework):
         return block
 
     def run_test(self):
-        test_node = NodeConnCB()
-        connections = []
-        connections.append(NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], test_node))
-        test_node.add_connection(connections[0])
-        NetworkThread().start()
-        test_node.wait_for_verack()
+        test_node = P2PHandler.connect('127.0.0.1', p2p_port(0), self.nodes[0])
 
         starting_height = 3
         self.nodes[0].generate(starting_height)

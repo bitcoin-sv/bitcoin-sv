@@ -8,7 +8,8 @@ This test checks whether block files are created as expected in different cases.
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.cdefs import (ONE_MEGABYTE)
 from test_framework.blocktools import ChainManager, prepare_init_chain
-from test_framework.mininode import (NetworkThread, NodeConn, NodeConnCB, msg_block)
+from test_framework.mininode import (P2PHandler, P2PEventHandler, msg_block)
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import (p2p_port, assert_equal)
 import glob
 
@@ -23,7 +24,7 @@ During initialization it:
 """
 
 
-class RunnerNode(NodeConnCB):
+class RunnerNode(P2PEventHandler):
     def __init__(self, remote_node, node_number):
         super(RunnerNode, self).__init__()
         self.chain = ChainManager()
@@ -32,8 +33,8 @@ class RunnerNode(NodeConnCB):
         self.node_number = node_number
 
         connections = []
-        connections.append(
-            NodeConn('127.0.0.1', p2p_port(self.node_number), self.remote_node, self))
+        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(self.node_number), self),
+                                      self.remote_node))
         self.add_connection(connections[0])
 
     def finish_setup_after_network_is_started(self, tmp_dir):

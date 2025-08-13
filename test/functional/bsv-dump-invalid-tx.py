@@ -211,9 +211,9 @@ class InvalidTx(BitcoinTestFramework):
             self.zmqSubSocket.connect(self.address)
             invalid_tx1 = make_invalid_tx(invalid_coinbases[0], 0)
             _, block = new_block(conn, [invalid_tx1], wait_for_confirmation=False)
-            conn.cb.sync_with_ping()
+            conn.transport.cb.sync_with_ping()
             conn.send_message(msg_tx(invalid_tx1))
-            conn.cb.sync_with_ping()
+            conn.transport.cb.sync_with_ping()
             assert_raises_rpc_error(-26, "mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)",
                                     conn.rpc.sendrawtransaction, ToHex(invalid_tx1))
 
