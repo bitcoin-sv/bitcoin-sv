@@ -214,7 +214,12 @@ uint64_t CMempoolTxDB::GetWriteCount()
 
 
 // Task queue managment for CAsyncMempoolTxDB
-namespace {
+// Note: This cannot be an anonymous namespace because Task is used as a base class
+// for CThreadSafeQueue<Task> which has external-linkage (it's in a header file),
+// and that requires the base class to also have external linkage
+// otherwise, the compiler will issue a subobject-linkage warning/error.
+namespace mempooltxdb_detail
+{
     struct SyncTask
     {
         std::promise<void>* sync;
@@ -262,7 +267,8 @@ namespace {
         assert(maxTaskSize < std::numeric_limits<size_t>::max() / sizeFactor);
         return sizeFactor * maxTaskSize;
     }
-} // anonymous namespace
+}
+using namespace mempooltxdb_detail;
 
 class CAsyncMempoolTxDB::TaskQueue : CThreadSafeQueue<Task>
 {
