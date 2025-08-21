@@ -4,6 +4,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <unordered_map>
 
@@ -57,22 +58,23 @@ public:
         auto mi =
             mStore.try_emplace(
                 block.GetHash(),
-                block,
-                (prev != mStore.end() ? &prev->second : nullptr),
-                mDirtyBlockIndex,
-                CBlockIndex::PrivateTag{})
+                std::make_unique<CBlockIndex>(
+                    block,
+                    (prev != mStore.end() ? prev->second.get() : nullptr),
+                    mDirtyBlockIndex,
+                    CBlockIndex::PrivateTag{}))
             .first;
 
         auto& indexNew = mi->second;
-        indexNew.CBlockIndex_SetBlockHash( &mi->first, CBlockIndex::PrivateTag{} );
+        indexNew->CBlockIndex_SetBlockHash( &mi->first, CBlockIndex::PrivateTag{} );
 
         if (mBestHeader == nullptr ||
-            CBlockIndexWorkComparator()(mBestHeader, &indexNew))
+            CBlockIndexWorkComparator()(mBestHeader, indexNew.get()))
         {
-            mBestHeader = &indexNew;
+            mBestHeader = indexNew.get();
         }
 
-        return &indexNew;
+        return indexNew.get();
     }
 
     CBlockIndex* Get( const uint256& blockHash )
@@ -106,7 +108,7 @@ public:
 
         for (auto& item : mStore)
         {
-            callback( item.second );
+            callback( *(item.second) );
         }
     }
 
@@ -117,7 +119,7 @@ public:
 
         for (auto& item : mStore)
         {
-            callback( item.second );
+            callback( *(item.second) );
         }
     }
 
@@ -169,26 +171,26 @@ private:
         auto [mi, inserted] =
             mStore.try_emplace(
                 blockHash,
-                CBlockIndex::PrivateTag{} );
+                std::make_unique<CBlockIndex>(CBlockIndex::PrivateTag{}));
         assert( inserted );
         auto& indexNew = mi->second;
-        indexNew.CBlockIndex_SetBlockHash( &mi->first, CBlockIndex::PrivateTag{} );
+        indexNew->CBlockIndex_SetBlockHash( &mi->first, CBlockIndex::PrivateTag{} );
 
-        return indexNew;
+        return *indexNew;
     }
 
     CBlockIndex* getNL( const uint256& blockHash )
     {
         if (auto it = mStore.find( blockHash ); it != mStore.end())
         {
-            return &it->second;
+            return it->second.get();
         }
 
         return nullptr;
     }
 
     mutable std::shared_mutex mMutex;
-    std::unordered_map<uint256, CBlockIndex, BlockHasher> mStore;
+    std::unordered_map<uint256, std::unique_ptr<CBlockIndex>, BlockHasher> mStore;
 
     /**
      * Best header we've seen so far (used for getheaders queries' starting
