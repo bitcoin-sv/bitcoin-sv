@@ -14,7 +14,7 @@ int main(int /*argc*/, char** /*argv*/)
     SetupEnvironment();
 
     // don't want to write to bitcoind.log file
-    GetLogger().fPrintToDebugLog = false;
+    GetLogger().SetPrintToDebugLog(false);
 
     benchmark::BenchRunner::RunAll();
 }

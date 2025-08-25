@@ -196,6 +196,9 @@ add_library(util
 	enum_cast.h
 	fs.cpp
 	fs.h
+	logging_flags.h
+	logging_impl.cpp
+	logging_impl.h
 	logging.cpp
 	logging.h
 	net/netaddress.cpp

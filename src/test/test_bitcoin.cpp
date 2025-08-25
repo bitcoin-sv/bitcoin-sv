@@ -75,7 +75,7 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(
     ResetGlobalRandomContext();
 
     // Don't want to write to bitcoind.log file.
-    GetLogger().fPrintToDebugLog = false;
+    GetLogger().SetPrintToDebugLog(false);
 
     fCheckBlockIndex = true;
     SelectParams(chainName);

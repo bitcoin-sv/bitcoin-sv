@@ -282,7 +282,7 @@ void HandleSIGTERM(int) {
 }
 
 void HandleSIGHUP(int) {
-    GetLogger().fReopenDebugLog = true;
+    GetLogger().SetReopenDebugLog(true);
 }
 
 static bool Bind(CConnman &connman, const CService &addr, unsigned int flags) {
@@ -1968,11 +1968,9 @@ static std::string ResolveErrMsg(const char *const optname,
 
 void InitLogging() {
     BCLog::Logger &logger = GetLogger();
-    logger.fPrintToConsole = gArgs.GetBoolArg("-printtoconsole", false);
-    logger.fLogTimestamps =
-        gArgs.GetBoolArg("-logtimestamps", DEFAULT_LOGTIMESTAMPS);
-    logger.fLogTimeMicros =
-        gArgs.GetBoolArg("-logtimemicros", DEFAULT_LOGTIMEMICROS);
+    logger.SetPrintToConsole(gArgs.GetBoolArg("-printtoconsole", false));
+    logger.SetLogTimestamps(gArgs.GetBoolArg("-logtimestamps", DEFAULT_LOGTIMESTAMPS));
+    logger.SetLogTimeMicros(gArgs.GetBoolArg("-logtimemicros", DEFAULT_LOGTIMEMICROS));
 
     fLogIPs = gArgs.GetBoolArg("-logips", DEFAULT_LOGIPS);
 
@@ -3319,13 +3317,13 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
         logger.ShrinkDebugFile();
     }
 
-    if (logger.fPrintToDebugLog) {
+    if (logger.PrintToDebugLog()) {
         if (logger.OpenDebugLog()) {
             return InitError(strprintf(_("Unable to open log file.")));
         }
     }
 
-    if (!logger.fLogTimestamps) {
+    if (!logger.LogTimestamps()) {
         LogPrintf("Startup time: %s\n",
                   DateTimeStrFormat("%Y-%m-%d %H:%M:%S", GetTime()));
     }

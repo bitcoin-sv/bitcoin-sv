@@ -144,6 +144,8 @@ BITCOIN_CORE_H = \
   limitedmap.h \
   limited_cache.h \
   locked_ref.h \
+  logging_flags.h \
+  logging_impl.h \
   logging.h \
   memusage.h \
   mempooltxdb.h \
@@ -580,6 +582,7 @@ libbitcoin_util_a_SOURCES = \
   compat/glibcxx_sanity.cpp \
   compat/strnlen.cpp \
   fs.cpp \
+  logging_impl.cpp \
   logging.cpp \
   overload.h \
   net/netaddress.cpp \
