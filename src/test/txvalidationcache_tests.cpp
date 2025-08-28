@@ -566,15 +566,13 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
 
         auto shouldPass = [](uint32_t flags) -> bool {
             bool isUtxoAfterGenesis = flags & SCRIPT_UTXO_AFTER_GENESIS;
-            bool p2shExecuted = (flags & SCRIPT_VERIFY_P2SH) && !isUtxoAfterGenesis;
-            bool isCleanStackEnforced = (flags & SCRIPT_VERIFY_CLEANSTACK) && (!(flags & SCRIPT_CHRONICLE) || p2shExecuted);
-
+            bool isCleanStackEnforced = flags & SCRIPT_VERIFY_CLEANSTACK;
             return !(isUtxoAfterGenesis && isCleanStackEnforced); 
         };
 
         CoinsDBSpan cache{*pcoinsTip};
 
-        // This spends p2sh so after genesis it should fail if cleans stack rule is enforced
+        // This spends p2sh so after genesis it should fail if clean stack rule is enforced
         ValidateCheckInputsForAllFlags(tx, shouldPass,  true, false, frozenTXOCheckTransaction, cache);
 
         // Check that if the second input is invalid, but the first input is
