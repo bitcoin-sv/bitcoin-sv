@@ -28,10 +28,15 @@
 #include <utility>
 #include <variant>
 
-namespace {
+namespace
+{
+    constexpr auto bits_per_byte{8};
 
-constexpr auto bits_per_byte{8};
-
+    inline constexpr bool TxnVersionIsMalleable(const int32_t version)
+    {
+        // Post-Chronicle, malleability is permitted if txn version > 1
+        return (version > 1);
+    }
 } // namespace
 
 inline uint8_t make_rshift_mask(size_t n) {
@@ -286,23 +291,6 @@ std::variant<ScriptError, malleability::status> CheckSignatureEncoding(
 
         if(forkIdEnabled && !usesForkId)
             return SCRIPT_ERR_MUST_USE_FORKID;
-
-        if(forkIdEnabled)
-        {
-            if(chronicleEnabled)
-            {
-                if(!usesChronicle)
-                {
-                    // Post-Chronicle, strict malleability rules enforced if Chronicle sighash bit unset
-                    ms |= malleability::disallowed;
-                }
-            }
-            else
-            {
-                // Pre-Chronicle still enforce strict malleability rules
-                ms |= malleability::disallowed;
-            }
-        }
     }
 
     return ms;
@@ -748,8 +736,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                                 return SCRIPT_ERR_UNBALANCED_CONDITIONAL;
 
                             const LimitedVector& vch = stack.stacktop(-1);
-                            if((opcode == OP_IF || opcode == OP_NOTIF)
-                                && VerifyMinimalIf(flags))
+                            if((opcode == OP_IF || opcode == OP_NOTIF) && VerifyMinimalIf(flags))
                             {
                                 if(vch.size() > 1
                                    || (vch.size() == 1 && vch[0] != 1))
@@ -1482,11 +1469,11 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         bool fSuccess = checker.CheckSig(vchSig.GetElement(), vchPubKey.GetElement(),
                             scriptCode, flags & SCRIPT_ENABLE_SIGHASH_FORKID);
 
-                        // If the operation failed and the Chronicle sighash bit is not set,
+                        // If the operation failed and the txn is non-malleable,
                         // we require that the signature must be empty vector.
                         if(!fSuccess && VerifyNullFail(flags) && !vchSig.empty())
                         {
-                            if((flags & SCRIPT_CHRONICLE) && GetHashType(vchSig.GetElement()).hasChronicle())
+                            if(IsChronicle(flags) && TxnVersionIsMalleable(checker.Version()))
                             {
                                 ms |= malleability::null_fail;
                             }
@@ -1625,12 +1612,12 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
                         // Clean up stack of actual arguments
                         while (i-- > 1) {
-                            // If the operation failed and the Chronicle sighash bit is not set,
+                            // If the operation failed and the txn is non-malleable,
                             // we require that all signatures must be empty vector
                             const auto& vchSig { stack.stacktop(-1) };
                             if (!fSuccess && VerifyNullFail(flags) && !ikey2 && !vchSig.empty())
                             {
-                                if((flags & SCRIPT_CHRONICLE) && GetHashType(vchSig.GetElement()).hasChronicle())
+                                if(IsChronicle(flags) && TxnVersionIsMalleable(checker.Version()))
                                 {
                                     ms |= malleability::null_fail;
                                 }
@@ -1657,10 +1644,14 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
  
                         if(VerifyNullDummy(flags) && !stack.stacktop(-1).empty())
                         {
-                            if(IsChronicle(flags))
+                            if(IsChronicle(flags) && TxnVersionIsMalleable(checker.Version()))
+                            {
                                 ms |= malleability::null_dummy;
+                            }
                             else
+                            {
                                 return SCRIPT_ERR_SIG_NULLDUMMY;
+                            }
                         }
 
                         stack.pop_back();
@@ -2283,13 +2274,28 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     if(!valid_flags(flags))
         return std::make_pair(false, SCRIPT_ERR_INVALID_FLAGS);
 
-    // If FORKID is enabled, we also ensure strict encoding.
-    if (flags & SCRIPT_ENABLE_SIGHASH_FORKID) {
-        flags |= SCRIPT_VERIFY_STRICTENC;
-    }
-
     // Track malleability for just this execution of VerifyScript
     malleability::status malleability {};
+
+    if (flags & SCRIPT_ENABLE_SIGHASH_FORKID)
+    {
+        // If FORKID is enabled, we also ensure strict encoding.
+        flags |= SCRIPT_VERIFY_STRICTENC;
+
+        if(flags & SCRIPT_CHRONICLE)
+        {
+            // Post-Chronicle, strict malleability rules enforced if txn version <= 1
+            if(!TxnVersionIsMalleable(checker.Version()))
+            {
+                malleability |= malleability::disallowed;
+            }
+        }
+        else
+        {
+            // Pre-Chronicle (but post-FORKID) enforce strict malleability rules
+            malleability |= malleability::disallowed;
+        }
+    }
 
     if(!scriptSig.IsPushOnly())
     {
@@ -2467,13 +2473,13 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
                 if(is_null_fail(malleability))
                     return std::make_pair(false, SCRIPT_ERR_SIG_NULLFAIL);
             }
-           
+
             if(flags & SCRIPT_VERIFY_NULLDUMMY)
             {
                 if(is_null_dummy(malleability))
                     return std::make_pair(false, SCRIPT_ERR_SIG_NULLDUMMY);
             }
-            
+
             if(flags & SCRIPT_VERIFY_MINIMALIF)
             {
                 if(is_minimal_if(malleability))
