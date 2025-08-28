@@ -173,7 +173,7 @@ std::optional<bool> DSAttemptHandler::ValidateDoubleSpend(
 
     return CheckInputScripts(token, mConfig, false, scriptdetails.scriptPubKey, scriptdetails.amount,
         *doubleSpend, state, input, scriptdetails.coinHeight, scriptdetails.spendHeight, scriptVerifyFlags,
-        false, txdata, std::make_shared<std::atomic<malleability::status>>(), nullptr);
+        false, txdata, nullptr);
 }
 
 // Check if either of the given transactions are notification enabled, and if so whether there are any

@@ -20,7 +20,6 @@
 #include "protocol_era.h"
 #include "rpc/client_utils.h"
 #include "script/interpreter.h"
-#include "script/malleability_status.h"
 #include "script/sign.h"
 #include "taskcancellation.h"
 #include "univalue.h"
@@ -658,7 +657,6 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
     const CKeyStore &keystore = tempKeystore;
 
     // Sign what we can:
-    std::atomic<malleability::status> ms {};
     for (size_t i = 0; i < mergedTx.vin.size(); i++) {
         CTxIn &txin = mergedTx.vin[i];
         auto coin = view.GetCoinWithScript(txin.prevout);
@@ -722,8 +720,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                                       std_input_flags,
                                       MutableTransactionSignatureChecker(&mergedTx,
                                                                          i,
-                                                                         amount),
-                                      ms);
+                                                                         amount));
         if(!res.has_value() || !res->first)
         {
             fComplete = false;

@@ -11,7 +11,6 @@
 #include "policy/policy.h"
 #include "protocol_era.h"
 #include "script/ismine.h"
-#include "script/malleability_status.h"
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/sign.h"
@@ -51,7 +50,6 @@ static bool Verify(const CScript& scriptSig,
     txTo.vin[0].scriptSig = scriptSig;
     txTo.vout[0].nValue = Amount(1);
 
-    std::atomic<malleability::status> ms {};
     const auto res = VerifyScript(params,
                                   task::CCancellationSource::Make()->GetToken(),
                                   scriptSig,
@@ -60,8 +58,7 @@ static bool Verify(const CScript& scriptSig,
                                   MutableTransactionSignatureChecker(&txTo,
                                                                      0,
                                                                      txFrom.vout[0]
-                                                                         .nValue),
-                                  ms);
+                                                                         .nValue));
     assert(res);
     err = res->second;
     return res->first;
@@ -177,9 +174,7 @@ BOOST_AUTO_TEST_CASE(sign) {
                                             0,
                                             flags,
                                             false,
-                                            txdata,
-                                            std::make_shared<
-                                                std::atomic<malleability::status>>())(
+                                            txdata)(
                 source->GetToken());
             assert(sigOK);
             if (i == j) {

@@ -1138,7 +1138,6 @@ static UniValue signrawtransaction(const Config &config,
     ProtocolEra era { GetProtocolEra(config, activeChainHeight + 1) };
 
     // Sign what we can:
-    std::atomic<malleability::status> malleability {};
     for (size_t i = 0; i < mergedTx.vin.size(); i++) {
         CTxIn &txin = mergedTx.vin[i];
         auto coin = view.GetCoinWithScript(txin.prevout);
@@ -1202,8 +1201,7 @@ static UniValue signrawtransaction(const Config &config,
                                       txin.scriptSig,
                                       prevPubKey,
                                       std_input_flags,
-                                      TransactionSignatureChecker(&txConst, i, amount),
-                                      malleability);
+                                      TransactionSignatureChecker(&txConst, i, amount));
         if(!res.has_value())
         {
             TxInErrorToJSON(txin, vErrors, "Validation timeout");

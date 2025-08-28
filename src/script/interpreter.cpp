@@ -2278,8 +2278,7 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     const CScript& scriptSig,
     const CScript& scriptPubKey,
     uint32_t flags,       
-    const BaseSignatureChecker& checker, 
-    std::atomic<malleability::status>& malleability)
+    const BaseSignatureChecker& checker)
 {
     if(!valid_flags(flags))
         return std::make_pair(false, SCRIPT_ERR_INVALID_FLAGS);
@@ -2290,11 +2289,11 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     }
 
     // Track malleability for just this execution of VerifyScript
-    malleability::status our_malleability {};
+    malleability::status malleability {};
 
     if(!scriptSig.IsPushOnly())
     {
-        our_malleability |= malleability::non_push_data;
+        malleability |= malleability::non_push_data;
     }
     
     LimitedStack stack{params.MaxStackMemoryUsage()};
@@ -2315,7 +2314,7 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
         if(std::holds_alternative<ScriptError>(v))
             return std::make_pair(false, std::get<ScriptError>(v));
         else
-            our_malleability |= std::get<malleability::status>(v);
+            malleability |= std::get<malleability::status>(v);
     }
 
     if ((flags & SCRIPT_VERIFY_P2SH)  && !(flags & SCRIPT_UTXO_AFTER_GENESIS)) {
@@ -2338,12 +2337,8 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
         if(std::holds_alternative<ScriptError>(v))
             return std::make_pair(false, std::get<ScriptError>(v));
         else
-            our_malleability |= std::get<malleability::status>(v);
+            malleability |= std::get<malleability::status>(v);
     }
-
-    // Combine malleability status (so far) so that if we abort script
-    // evaluation and return FALSE we don't lose malleability information
-    malleability |= our_malleability;
 
     if(stack.empty())
         return std::make_pair(false, SCRIPT_ERR_EVAL_FALSE);
@@ -2389,7 +2384,7 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
             if(std::holds_alternative<ScriptError>(v))
                 return std::make_pair(false, std::get<ScriptError>(v));
             else
-                our_malleability |= std::get<malleability::status>(v);
+                malleability |= std::get<malleability::status>(v);
         }
 
         if(stack.empty())
@@ -2402,14 +2397,7 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
 
     // Set unclean stack bit in malleability status
     if(stack.size() != 1)
-        our_malleability |= malleability::unclean_stack;
-
-    // malleability::status fully atomically combined for us after this point.
-    // We then use value we wrote to atomic without reading it again to
-    // ensure this thread doesn't see different values at different times
-    // below (not that it would really matter if we did see different values,
-    // but it avoids confusion).
-    malleability::status combined_malleability { malleability |= our_malleability };
+        malleability |= malleability::unclean_stack;
 
     // The CLEANSTACK check is only performed after potential P2SH evaluation,
     // as the non-P2SH evaluation of a P2SH script will obviously not result in
@@ -2423,12 +2411,12 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
         if(!(flags & SCRIPT_VERIFY_P2SH))
             return std::make_pair(false, SCRIPT_ERR_INVALID_FLAGS);
 
-        // If Chronicle is activated then apply clean stack check only if FORKID is set.
+        // If Chronicle is activated then apply clean stack check depending on txn version.
         // (Since clean stack rule was only ever a policy rule (not consensus) it doesn't
         // make sense to make it dependent on UTXO age).
-        bool checkCleanStack { (flags & SCRIPT_CHRONICLE)? is_disallowed(combined_malleability) : true };
+        bool checkCleanStack { (flags & SCRIPT_CHRONICLE)? is_disallowed(malleability) : true };
 
-        if(checkCleanStack && is_unclean_stack(combined_malleability))
+        if(checkCleanStack && is_unclean_stack(malleability))
         {
             return std::make_pair(false, SCRIPT_ERR_CLEANSTACK);
         }
@@ -2445,11 +2433,11 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
         }
         else if(flags & SCRIPT_CHRONICLE)
         {
-            // After Chronicle apply push only checks if FORKID is set
-            checkSigPushOnly = is_disallowed(combined_malleability);
+            // After Chronicle apply push only checks depending on txn version
+            checkSigPushOnly = is_disallowed(malleability);
         }
 
-        if(checkSigPushOnly && has_non_push_data(combined_malleability))
+        if(checkSigPushOnly && has_non_push_data(malleability))
         {
             return std::make_pair(false, SCRIPT_ERR_SIG_PUSHONLY);
         }
@@ -2457,38 +2445,38 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
 
     if(flags & SCRIPT_CHRONICLE)
     {
-        if(is_disallowed(combined_malleability))
+        if(is_disallowed(malleability))
         {
             if(flags & SCRIPT_VERIFY_LOW_S)
             {
-                if(is_high_s(combined_malleability))
+                if(is_high_s(malleability))
                     return std::make_pair(false, SCRIPT_ERR_SIG_HIGH_S);
             }
 
             if(flags & SCRIPT_VERIFY_MINIMALDATA)
             {
-                if(is_non_minimal_push(combined_malleability))
+                if(is_non_minimal_push(malleability))
                     return std::make_pair(false, SCRIPT_ERR_MINIMALDATA);
 
-                if(is_non_minimal_scriptnum(combined_malleability))
+                if(is_non_minimal_scriptnum(malleability))
                     return std::make_pair(false, SCRIPT_ERR_SCRIPTNUM_MINENCODE);
             }
 
             if(flags & SCRIPT_VERIFY_NULLFAIL)
             {
-                if(is_null_fail(combined_malleability))
+                if(is_null_fail(malleability))
                     return std::make_pair(false, SCRIPT_ERR_SIG_NULLFAIL);
             }
            
             if(flags & SCRIPT_VERIFY_NULLDUMMY)
             {
-                if(is_null_dummy(combined_malleability))
+                if(is_null_dummy(malleability))
                     return std::make_pair(false, SCRIPT_ERR_SIG_NULLDUMMY);
             }
             
             if(flags & SCRIPT_VERIFY_MINIMALIF)
             {
-                if(is_minimal_if(combined_malleability))
+                if(is_minimal_if(malleability))
                     return std::make_pair(false, SCRIPT_ERR_MINIMALIF);
             }
         }

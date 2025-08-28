@@ -8,7 +8,6 @@
 #include "primitives/transaction.h"
 #include "pubkey.h"
 #include "script/interpreter.h"
-#include "script/malleability_status.h"
 #include "script/script_error.h"
 #include "taskcancellation.h"
 #include "version.h"
@@ -95,7 +94,6 @@ static int verify_script(const Config& config,
 
         PrecomputedTransactionData txdata(tx);
         auto source = task::CCancellationSource::Make();
-        std::atomic<malleability::status> ms {};
 
         constexpr bool consensus{true};
         const auto params{make_verify_script_params(config, flags, consensus)};
@@ -105,8 +103,7 @@ static int verify_script(const Config& config,
                                tx.vin[nIn].scriptSig,
                                CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen),
                                flags,
-                               TransactionSignatureChecker(&tx, nIn, amount, txdata),
-                               ms);
+                               TransactionSignatureChecker(&tx, nIn, amount, txdata));
 
         return (res.has_value() && res->first);
     }

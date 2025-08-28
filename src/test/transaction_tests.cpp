@@ -139,7 +139,6 @@ void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
                 size_t i = 0;
                 ScriptError err = SCRIPT_ERR_UNKNOWN_ERROR;
 
-                std::atomic<malleability::status> malleability {};
                 for (i = 0; i < tx.vin.size() && is_valid; i++) {
                     if (!mapprevOutScriptPubKeys.count(tx.vin[i].prevout)) {
                         BOOST_ERROR("Bad test: " << strTest);
@@ -157,8 +156,7 @@ void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
                                      tx.vin[i].scriptSig,
                                      mapprevOutScriptPubKeys[tx.vin[i].prevout],
                                      verify_flags,
-                                     TransactionSignatureChecker(&tx, i, amount, txdata),
-                                     malleability);
+                                     TransactionSignatureChecker(&tx, i, amount, txdata));
                     assert(o);
                     if(o->first)
                     {
@@ -474,7 +472,6 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
         coins.push_back(CoinWithScript::MakeOwning(std::move(out), 1, false, false));
     }
 
-    const auto malleability { std::make_shared<std::atomic<malleability::status>>() };
     for (size_t i = 0; i < mtx.vin.size(); i++) {
         std::vector<CScriptCheck> vChecks;
         const CTxOut& out = coins[tx.vin[i].prevout.GetN()].GetTxOut();
@@ -489,8 +486,7 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
                              static_cast<unsigned int>(i),
                              PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS,
                              false,
-                             txdata,
-                             malleability);
+                             txdata);
         vChecks.emplace_back(make_verify_script_params(testConfig,
                                                        POST_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS,
                                                        consensus),
@@ -500,8 +496,7 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
                              static_cast<unsigned int>(i),
                              POST_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS,
                              false,
-                             txdata,
-                             malleability);
+                             txdata);
 
         control.Add(vChecks);
     }
@@ -512,104 +507,6 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
     threadGroup.interrupt_all();
     threadGroup.join_all();
 }
-
-BOOST_AUTO_TEST_CASE(test_combined_malleability_status)
-{
-    CKey key;
-    key.MakeNewKey(false);
-    CBasicKeyStore keystore;
-    keystore.AddKeyPubKey(key, key.GetPubKey());
-    CScript scriptPubKey = CScript() << ToByteVector(key.GetPubKey()) << OP_CHECKSIG;
-
-    // Test transaction with 2 inputs, one signed with Chronicle and one without.
-    // One of the inputs will leave an unclean stack.
-    // Repeat test with inputs signed the other way around.
-    std::vector<std::vector<SigHashType>> sigHashList = {
-        {
-            SigHashType { SIGHASH_ALL | SIGHASH_FORKID },
-            SigHashType { SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE }
-        },
-        {
-            SigHashType { SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE },
-            SigHashType { SIGHASH_ALL | SIGHASH_FORKID }
-        }
-    };
-
-    for(const auto& sigHashes : sigHashList)
-    {
-        CMutableTransaction mtx;
-        mtx.nVersion = 1;
-
-        // Create a transaction with 2 inputs
-        mtx.vin.resize(2);
-        mtx.vin[0].prevout = COutPoint { GetRandHash(), 0 };
-        mtx.vin[0].scriptSig = CScript();
-        mtx.vin[1].prevout = COutPoint { GetRandHash(), 0 };
-        mtx.vin[1].scriptSig = CScript();
-        mtx.vout.emplace_back(Amount{1000}, CScript() << OP_1);
-
-        // Sign all inputs
-        for (size_t i = 0; i < 2; i++)
-        {
-            bool hashSigned =
-                SignSignature(testConfig, keystore, ProtocolEra::PostChronicle, ProtocolEra::PostChronicle, scriptPubKey,
-                              mtx, i, Amount{1000}, sigHashes[i]);
-            BOOST_CHECK_MESSAGE(hashSigned, "Failed to sign test transaction");
-        }
-
-        // Modify one of the scriptSig to leave an unclean stack
-        mtx.vin[1].scriptSig = (CScript() << OP_TRUE) + mtx.vin[1].scriptSig;
-
-        CTransaction tx { mtx };
-
-        // Check all inputs concurrently
-        PrecomputedTransactionData txdata {tx};
-        boost::thread_group threadGroup;
-        checkqueue::CCheckQueuePool<CScriptCheck, int> pool { 1, threadGroup, 20, 128 };
-        auto source = task::CCancellationSource::Make();
-        auto control = pool.GetChecker(0, source->GetToken());
-
-        std::vector<CoinWithScript> coins;
-        for (size_t i = 0; i < mtx.vin.size(); i++)
-        {
-            CTxOut out;
-            out.nValue = Amount{1000};
-            out.scriptPubKey = scriptPubKey;
-            coins.push_back(CoinWithScript::MakeOwning(std::move(out), 1, false, false));
-        }
-
-        uint32_t flags { StandardScriptVerifyFlags(ProtocolEra::PostChronicle) | InputScriptVerifyFlags(ProtocolEra::PostChronicle, ProtocolEra::PostChronicle) };
-        const auto malleability { std::make_shared<std::atomic<malleability::status>>() };
-        for (size_t i = 0; i < mtx.vin.size(); i++)
-        {
-            std::vector<CScriptCheck> vChecks;
-            const CTxOut& out = coins[tx.vin[i].prevout.GetN()].GetTxOut();
-            constexpr bool consensus{true};
-            vChecks.emplace_back(make_verify_script_params(testConfig, flags, consensus),
-                                 out.scriptPubKey,
-                                 out.nValue,
-                                 tx,
-                                 static_cast<unsigned int>(i),
-                                 flags,
-                                 false,
-                                 txdata,
-                                 malleability);
-            control.Add(vChecks);
-        }
-
-        std::vector<CScriptCheck> failedChecks {};
-        auto controlCheck = control.Wait(&failedChecks);
-        BOOST_CHECK(controlCheck && !controlCheck.value());
-        BOOST_CHECK(failedChecks.size() >= 1);
-        BOOST_CHECK_EQUAL(failedChecks[0].GetScriptError(), SCRIPT_ERR_CLEANSTACK);
-        BOOST_CHECK_EQUAL(*malleability,
-                          malleability::disallowed | malleability::unclean_stack);
-
-        threadGroup.interrupt_all();
-        threadGroup.join_all();
-    }
-}
-
 
 using CheckFlagParams = std::tuple<const CTransactionRef&, const CMutableTransaction&, const std::vector<std::pair<int,bool>>&>;
 void CheckWithFlag(const CheckFlagParams& params)
@@ -626,15 +523,13 @@ void CheckWithFlag(const CheckFlagParams& params)
     {
         const auto flags{flag_item.first | SCRIPT_ENABLE_SIGHASH_FORKID};
         const auto verify_params{make_verify_script_params(config, flags, true)};
-        std::atomic<malleability::status> ms {};
         const auto o =
             VerifyScript(verify_params,
                          task::CCancellationSource::Make()->GetToken(),
                          inputi.vin[0].scriptSig,
                          output->vout[0].scriptPubKey,
                          flags,
-                         TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue),
-                         ms);
+                         TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue));
         assert(o);
         const bool ret = o->first;
         BOOST_CHECK_MESSAGE(ret == flag_item.second, std::string("failed result: ") + (ret? "true":"false"));

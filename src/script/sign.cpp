@@ -192,15 +192,13 @@ bool SignAndVerify(const Config& config,
     // because wallet only produces standard transactions
     auto source = task::CCancellationSource::Make();
     uint32_t flags = StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra);
-    std::atomic<malleability::status> ms{};
     const auto params{make_verify_script_params(config, flags, consensus)};
     const auto o = VerifyScript(params,
                                 source->GetToken(),
                                 sigdata.scriptSig,
                                 fromPubKey,
                                 flags,
-                                creator.Checker(),
-                                ms);
+                                creator.Checker());
 
     return (o.has_value() && o->first);
 }

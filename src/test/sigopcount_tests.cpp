@@ -219,15 +219,13 @@ ScriptError VerifyWithFlag(const CTransaction& output,
 {
     const auto params{make_verify_script_params(GlobalConfig::GetConfig(), flags, true)};
     CTransaction inputi(input);
-    std::atomic<malleability::status> ms {};
     const auto ret =
         VerifyScript(params,
                      task::CCancellationSource::Make(),
                      inputi.vin[0].scriptSig,
                      output.vout[0].scriptPubKey,
                      flags,
-                     TransactionSignatureChecker(&inputi, 0, output.vout[0].nValue),
-                     ms);
+                     TransactionSignatureChecker(&inputi, 0, output.vout[0].nValue));
     assert(ret.has_value());
     BOOST_CHECK(!ret->first);
     return ret->second;

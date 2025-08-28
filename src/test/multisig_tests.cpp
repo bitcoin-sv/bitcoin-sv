@@ -7,7 +7,6 @@
 #include "policy/policy.h"
 #include "protocol_era.h"
 #include "script/ismine.h"
-#include "script/malleability_status.h"
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/sighashtype.h"
@@ -86,7 +85,6 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
 
     std::vector<CKey> keys;
     CScript s;
-    std::atomic<malleability::status> ms {};
 
     // Test a AND b:
     keys.assign(1, key[0]);
@@ -99,8 +97,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
                      s,
                      a_and_b,
                      flags,
-                     MutableTransactionSignatureChecker(&txTo[0], 0, amount),
-                     ms);
+                     MutableTransactionSignatureChecker(&txTo[0], 0, amount));
     BOOST_CHECK(res.has_value() && res->first);
 
     for (int i = 0; i < 4; i++) {
@@ -112,8 +109,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
                          s,
                          a_and_b,
                          flags,
-                         MutableTransactionSignatureChecker(&txTo[0], 0, amount),
-                         ms);
+                         MutableTransactionSignatureChecker(&txTo[0], 0, amount));
         BOOST_CHECK(res.has_value());
         BOOST_CHECK_MESSAGE(!res->first, strprintf("a&b 1: %d", i));
         err = res->second;
@@ -129,8 +125,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
                          s,
                          a_and_b,
                          flags,
-                         MutableTransactionSignatureChecker(&txTo[0], 0, amount),
-                         ms);
+                         MutableTransactionSignatureChecker(&txTo[0], 0, amount));
         BOOST_CHECK(res.has_value());
         BOOST_CHECK_MESSAGE(!res->first, strprintf("a&b 2: %d", i));
         err = res->second;
@@ -149,8 +144,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
                              s,
                              a_or_b,
                              flags,
-                             MutableTransactionSignatureChecker(&txTo[1], 0, amount),
-                             ms);
+                             MutableTransactionSignatureChecker(&txTo[1], 0, amount));
             BOOST_CHECK(res.has_value());
             BOOST_CHECK_MESSAGE(res->first, strprintf("a|b: %d", i));
         } else {
@@ -160,8 +154,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
                              s,
                              a_or_b,
                              flags,
-                             MutableTransactionSignatureChecker(&txTo[1], 0, amount),
-                             ms);
+                             MutableTransactionSignatureChecker(&txTo[1], 0, amount));
             BOOST_CHECK(res.has_value());
             BOOST_CHECK_MESSAGE(!res->first, strprintf("a|b: %d", i));
             err = res->second;
@@ -177,8 +170,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
                      s,
                      a_or_b,
                      flags,
-                     MutableTransactionSignatureChecker(&txTo[1], 0, amount),
-                     ms);
+                     MutableTransactionSignatureChecker(&txTo[1], 0, amount));
     BOOST_CHECK(res.has_value());
     BOOST_CHECK(!res->first);
     err = res->second;
@@ -196,8 +188,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
                                  s,
                                  escrow,
                                  flags,
-                                 MutableTransactionSignatureChecker(&txTo[2], 0, amount),
-                                 ms);
+                                 MutableTransactionSignatureChecker(&txTo[2], 0, amount));
                 BOOST_CHECK(res.has_value());
                 BOOST_CHECK_MESSAGE(res->first, strprintf("escrow 1: %d %d", i, j));
             } else {
@@ -207,8 +198,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
                                  s,
                                  escrow,
                                  flags,
-                                 MutableTransactionSignatureChecker(&txTo[2], 0, amount),
-                                 ms);
+                                 MutableTransactionSignatureChecker(&txTo[2], 0, amount));
                 BOOST_CHECK(res.has_value());
                 BOOST_CHECK_MESSAGE(!res->first, strprintf("escrow 2: %d %d", i, j));
                 err = res->second;

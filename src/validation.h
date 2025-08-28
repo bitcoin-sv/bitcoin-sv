@@ -20,7 +20,6 @@
 #include "protocol.h" // For CMessageHeader::MessageMagic
 #include "protocol_era.h"
 #include "script/interpreter.h"
-#include "script/malleability_status.h"
 #include "script/script_error.h"
 #include "sync.h"
 #include "task.h"
@@ -876,7 +875,6 @@ std::optional<bool> CheckInputScripts(
     const uint32_t flags,
     bool sigCacheStore,
     const PrecomputedTransactionData& txdata,
-    const std::shared_ptr<std::atomic<malleability::status>>& malleability,
     std::vector<CScriptCheck>* pvChecks);
 
 /**
@@ -990,7 +988,6 @@ class CScriptCheck
     ScriptError error = SCRIPT_ERR_UNKNOWN_ERROR;
     PrecomputedTransactionData txdata;
     verify_script_params params_;
-    std::shared_ptr<std::atomic<malleability::status>> malleability {nullptr};
 
 public:
     CScriptCheck(const verify_script_params&,
@@ -1000,8 +997,7 @@ public:
                  unsigned int nIn,
                  uint32_t flags,
                  bool cache,
-                 const PrecomputedTransactionData&,
-                 const std::shared_ptr<std::atomic<malleability::status>>&);
+                 const PrecomputedTransactionData&);
 
     std::optional<bool> operator()(const task::CCancellationToken& token);
 

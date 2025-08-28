@@ -223,7 +223,6 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     const CScript& scriptSig,
     const CScript& scriptPubKey,
     uint32_t flags,
-    const BaseSignatureChecker&,
-    std::atomic<malleability::status>&);
+    const BaseSignatureChecker&);
 
 #endif // BITCOIN_SCRIPT_INTERPRETER_H

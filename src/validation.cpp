@@ -2510,8 +2510,7 @@ CScriptCheck::CScriptCheck(
     unsigned int nInIn,
     uint32_t nFlagsIn,
     bool cacheIn,
-    const PrecomputedTransactionData& txdataIn,
-    const std::shared_ptr<std::atomic<malleability::status>>& malleabilityIn)
+    const PrecomputedTransactionData& txdataIn)
     : scriptPubKey{scriptPubKeyIn},
       amount{amountIn},
       ptxTo{&txToIn},
@@ -2519,8 +2518,7 @@ CScriptCheck::CScriptCheck(
       nFlags{nFlagsIn},
       cacheStore{cacheIn},
       txdata{txdataIn},
-      params_{params},
-      malleability{malleabilityIn}
+      params_{params}
 {
 }
 
@@ -2537,8 +2535,8 @@ std::optional<bool> CScriptCheck::operator()(const task::CCancellationToken& tok
                                                                    nIn,
                                                                    amount,
                                                                    cacheStore,
-                                                                   txdata),
-                                *malleability);
+                                                                   txdata));
+
     if(!o.has_value())
         return {};
 
@@ -2691,7 +2689,6 @@ std::optional<bool> CheckInputScripts(
     const uint32_t flags,
     bool sigCacheStore,
     const PrecomputedTransactionData& txdata,
-    const std::shared_ptr<std::atomic<malleability::status>>& malleability,
     std::vector<CScriptCheck>* pvChecks)
 {
     // What era are activated for this coin?
@@ -2711,16 +2708,12 @@ std::optional<bool> CheckInputScripts(
                        input,
                        flags | perInputScriptFlags,
                        sigCacheStore,
-                       txdata,
-                       malleability);
+                       txdata);
     if (pvChecks) 
     {
         pvChecks->push_back(std::move(check));
         return true;
     }
-
-    // Save current malleability status, we may need to re-use it in the case of failure
-    malleability::status initialMalleability { *malleability };
 
     // Verify signature
     if (auto res = check(token); !res.has_value())
@@ -2755,9 +2748,7 @@ std::optional<bool> CheckInputScripts(
                                 input,
                                 flags2Check,
                                 sigCacheStore,
-                                txdata,
-                                std::make_shared<std::atomic<malleability::status>>(
-                                    initialMalleability));
+                                txdata);
             if (auto res2 = check2(token); !res2.has_value())
             {
                 return {};
@@ -2788,9 +2779,7 @@ std::optional<bool> CheckInputScripts(
                                     input,
                                     flags3Check,
                                     sigCacheStore,
-                                    txdata,
-                                    std::make_shared<std::atomic<malleability::status>>(
-                                        initialMalleability));
+                                    txdata);
                 if (auto res3 = check3(token); !res3.has_value())
                 {
                     return {};
@@ -2814,9 +2803,7 @@ std::optional<bool> CheckInputScripts(
                                     input,
                                     flags3Check,
                                     sigCacheStore,
-                                    txdata,
-                                    std::make_shared<std::atomic<malleability::status>>(
-                                        initialMalleability));
+                                    txdata);
                 if (auto res3 = check3(token); !res3.has_value())
                 {
                     return {};
@@ -2912,10 +2899,6 @@ std::optional<bool> CheckInputs(
         return true;
     }
 
-    // A shared malleability status that outlives this scope is required in
-    // the event that the script checks are run by the validation thread pool.
-    const auto malleability { std::make_shared<std::atomic<malleability::status>>() };
-
     for (size_t i = 0; i < tx.vin.size(); i++) 
     {
         const COutPoint &prevout = tx.vin[i].prevout;
@@ -2931,7 +2914,7 @@ std::optional<bool> CheckInputs(
         const Amount amount = coin->GetTxOut().nValue;
 
         auto res = CheckInputScripts(token, config, consensus, scriptPubKey, amount, tx, state, i, coin->GetHeight(),
-            spendHeight, flags, sigCacheStore, txdata, malleability, pvChecks);
+            spendHeight, flags, sigCacheStore, txdata, pvChecks);
         if(!res.has_value())
         {
             return {};
