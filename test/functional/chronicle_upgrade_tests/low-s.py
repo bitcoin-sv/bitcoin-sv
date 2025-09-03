@@ -7,7 +7,7 @@ from test_framework.key import SECP256K1_ORDER_HALF
 
 """
 Test that High-S signatures are invalid before Chronicle but accepted afterwards
-provided they are appropriately signed.
+provided they contain an appropriate version number.
 """
 
 
@@ -15,8 +15,9 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
     NAME = "Test Low-S requirement removal"
     ARGS = ChronicleHeightTestsCase.ARGS + ['-whitelist=127.0.0.1']
     _UTXO_KEY = ChronicleHeightTestsCase.make_key()
+    _NUMBER_OF_UTXOS_PER_HEIGHT = 48
 
-    def new_transactions(self, utxos, sighashes):
+    def new_transactions(self, utxos, sighashes, version):
 
         def high_s_sig(hash):
             while True:
@@ -32,44 +33,47 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
 
         # Spend UTXO and create a txn with a low-s signature
         inputs_low = [self.Input(utxos.pop(), sighash) for sighash in sighashes]
-        tx_low = self.new_transaction(self._UTXO_KEY, inputs_low)
+        tx_low = self.new_transaction(self._UTXO_KEY, inputs_low, version)
 
         # Spend UTXO and create a txn with a high-s signature
         inputs_high = [self.Input(utxos.pop(), sighash) for sighash in sighashes]
-        tx_high = self.new_transaction(self._UTXO_KEY, inputs_high, sign_tx_high_s)
+        tx_high = self.new_transaction(self._UTXO_KEY, inputs_high, version, sign_tx_high_s)
 
         return tx_low, tx_high
 
     def get_transactions_for_test(self, tx_collection, coinbases):
-        SIGHASH_MALLEABLE = SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE
-        SIGHASH_NON_MALLEABLE = SIGHASH_ALL | SIGHASH_FORKID
+
+        SIGHASH_NTDA = SIGHASH_ALL | SIGHASH_FORKID
+        SIGHASH_OTDA = SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE
+        VERSION_NON_MALLEABLE = 1
+        VERSION_MALLEABLE = 2
 
         # Before Chronicle
         if tx_collection.label == "PRE_CHRONICLE":
             utxos, _ = self.utxos["PRE_CHRONICLE"]
 
-            # Signed malleable; Both are rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_MALLEABLE])
-            tx_collection.add_tx(tx_low,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
-                                 block_reject_reason=b'blk-bad-inputs')
-            tx_collection.add_tx(tx_high,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
-                                 block_reject_reason=b'blk-bad-inputs')
-
-            # Signed non-malleable; Low-S signature is accepted, High-S signature is rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NON_MALLEABLE])
+            # High and low S, 1 input, NTDA, non-malleable version
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NTDA], VERSION_NON_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
-
-            # Signed with mixed malleability flags; Both are rejected
-            tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_MALLEABLE,
-                SIGHASH_NON_MALLEABLE,
-                SIGHASH_MALLEABLE
-            ])
+            # High and low S, 1 input, NTDA, malleable version
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NTDA], VERSION_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, 1 input, OTDA, non-malleable version
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_OTDA], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, 1 input, OTDA, malleable version
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_OTDA], VERSION_MALLEABLE)
             tx_collection.add_tx(tx_low,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
@@ -77,12 +81,44 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # All signed with malleability allowed flags; Both are rejected
+            # High and low S, multi-sig, all NTDA, non-malleable version
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_MALLEABLE,
-                SIGHASH_MALLEABLE,
-                SIGHASH_MALLEABLE
-            ])
+                SIGHASH_NTDA,
+                SIGHASH_NTDA,
+                SIGHASH_NTDA
+            ], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, multi-sig, all NTDA, malleable version
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_NTDA,
+                SIGHASH_NTDA
+            ], VERSION_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, multi-sig, mixed NTDA & OTDA, non-malleable version
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_OTDA,
+                SIGHASH_NTDA
+            ], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, multi-sig, mixed NTDA & OTDA, malleable version
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_OTDA,
+                SIGHASH_NTDA
+            ], VERSION_MALLEABLE)
             tx_collection.add_tx(tx_low,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
@@ -94,28 +130,28 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_PRE_GRACE":
             utxos, _ = self.utxos["CHRONICLE_PRE_GRACE"]
 
-            # Signed malleable; Both are rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_MALLEABLE])
-            tx_collection.add_tx(tx_low,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
-                                 block_reject_reason=b'blk-bad-inputs')
-            tx_collection.add_tx(tx_high,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
-                                 block_reject_reason=b'blk-bad-inputs')
-
-            # Signed non-malleable; Low-S signature is accepted, High-S signature is rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NON_MALLEABLE])
+            # High and low S, 1 input, NTDA, non-malleable version
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NTDA], VERSION_NON_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
-
-            # Signed with mixed malleability flags; Both are rejected
-            tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_MALLEABLE,
-                SIGHASH_NON_MALLEABLE,
-                SIGHASH_MALLEABLE
-            ])
+            # High and low S, 1 input, NTDA, malleable version
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NTDA], VERSION_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, 1 input, OTDA, non-malleable version
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_OTDA], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, 1 input, OTDA, malleable version
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_OTDA], VERSION_MALLEABLE)
             tx_collection.add_tx(tx_low,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
@@ -123,12 +159,44 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # All signed with malleability allowed flags; Both are rejected
+            # High and low S, multi-sig, all NTDA, non-malleable version
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_MALLEABLE,
-                SIGHASH_MALLEABLE,
-                SIGHASH_MALLEABLE
-            ])
+                SIGHASH_NTDA,
+                SIGHASH_NTDA,
+                SIGHASH_NTDA
+            ], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, multi-sig, all NTDA, malleable version
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_NTDA,
+                SIGHASH_NTDA
+            ], VERSION_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, multi-sig, mixed NTDA & OTDA, non-malleable version
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_OTDA,
+                SIGHASH_NTDA
+            ], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, multi-sig, mixed NTDA & OTDA, malleable version
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_OTDA,
+                SIGHASH_NTDA
+            ], VERSION_MALLEABLE)
             tx_collection.add_tx(tx_low,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
@@ -140,8 +208,28 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_GRACE_BEGIN":
             utxos, _ = self.utxos["CHRONICLE_GRACE_BEGIN"]
 
-            # Signed malleable; Both are soft rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_MALLEABLE])
+            # High and low S, 1 input, NTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NTDA], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, 1 input, NTDA, malleable version - low S accepted, high S will be accepted after Chronicle
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NTDA], VERSION_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, 1 input, OTDA, non-malleable version - low S will be accepted after Chronicle, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_OTDA], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low,
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, 1 input, OTDA, malleable version - both will be accepted after Chronicle
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_OTDA], VERSION_MALLEABLE)
             tx_collection.add_tx(tx_low,
                                  p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
@@ -149,32 +237,44 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
                                  p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Signed non-malleable; Low-S signature is accepted, High-S signature is rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NON_MALLEABLE])
+            # High and low S, multi-sig, all NTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_NTDA,
+                SIGHASH_NTDA
+            ], VERSION_NON_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
-
-            # Signed with mixed malleability flags; Low-S signature is soft rejected, High-S signature is rejected
+            # High and low S, multi-sig, all NTDA, malleable version - low S accepted, high S will be accepted after Chronicle
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_MALLEABLE,
-                SIGHASH_NON_MALLEABLE,
-                SIGHASH_MALLEABLE
-            ])
+                SIGHASH_NTDA,
+                SIGHASH_NTDA,
+                SIGHASH_NTDA
+            ], VERSION_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, multi-sig, mixed NTDA & OTDA, non-malleable version - low S will be accepted after Chronicle, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_OTDA,
+                SIGHASH_NTDA
+            ], VERSION_NON_MALLEABLE)
             tx_collection.add_tx(tx_low,
                                  p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
-
-            # All signed with malleability allowed flags; Both are soft rejected
+            # High and low S, multi-sig, mixed NTDA & OTDA, malleable version - both will be accepted after Chronicle
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_MALLEABLE,
-                SIGHASH_MALLEABLE,
-                SIGHASH_MALLEABLE
-            ])
+                SIGHASH_NTDA,
+                SIGHASH_OTDA,
+                SIGHASH_NTDA
+            ], VERSION_MALLEABLE)
             tx_collection.add_tx(tx_low,
                                  p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
@@ -186,35 +286,61 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_PRE_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_PRE_ACTIVATION"]
 
-            # Signed malleable; Both are accepted for mining into the next block
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_MALLEABLE])
+            # High and low S, 1 input, NTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NTDA], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, 1 input, NTDA, malleable version - low S accepted, high S accepted for mining into next block
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NTDA], VERSION_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high)
+            # High and low S, 1 input, OTDA, non-malleable version - low S accepted for mining into next block, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_OTDA], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, 1 input, OTDA, malleable version - both accepted for mining into next block
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_OTDA], VERSION_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
 
-            # Signed non-malleable; Low-S signature is accepted, High-S signature is rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NON_MALLEABLE])
+            # High and low S, multi-sig, all NTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_NTDA,
+                SIGHASH_NTDA
+            ], VERSION_NON_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
-
-            # Signed with mixed malleability flags; Low-S signature is accepted, High-S signature is rejected
+            # High and low S, multi-sig, all NTDA, malleable version - low S accepted, high S accepted for mining into next block
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_MALLEABLE,
-                SIGHASH_NON_MALLEABLE,
-                SIGHASH_MALLEABLE
-            ])
+                SIGHASH_NTDA,
+                SIGHASH_NTDA,
+                SIGHASH_NTDA
+            ], VERSION_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high)
+            # High and low S, multi-sig, mixed NTDA & OTDA, non-malleable version - low S accepted for mining into next block, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_OTDA,
+                SIGHASH_NTDA
+            ], VERSION_NON_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
-
-            # All signed with malleability allowed flags; Both are accepted for mining into the next block
+            # High and low S, multi-sig, mixed NTDA & OTDA, malleable version - both accepted for mining into next block
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_MALLEABLE,
-                SIGHASH_MALLEABLE,
-                SIGHASH_MALLEABLE
-            ])
+                SIGHASH_NTDA,
+                SIGHASH_OTDA,
+                SIGHASH_NTDA
+            ], VERSION_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
 
@@ -222,35 +348,61 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_ACTIVATION"]
 
-            # Signed malleable; Both are accepted
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_MALLEABLE])
+            # High and low S, 1 input, NTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NTDA], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, 1 input, NTDA, malleable version - both accepted
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NTDA], VERSION_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high)
+            # High and low S, 1 input, OTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_OTDA], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, 1 input, OTDA, malleable version - both accepted
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_OTDA], VERSION_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
 
-            # Signed non-malleable; Low-S signature is accepted, High-S signature is rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NON_MALLEABLE])
+            # High and low S, multi-sig, all NTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_NTDA,
+                SIGHASH_NTDA
+            ], VERSION_NON_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
-
-            # Signed with mixed malleability flags; Low-S signature is accepted, High-S signature is rejected
+            # High and low S, multi-sig, all NTDA, malleable version - both accepted
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_MALLEABLE,
-                SIGHASH_NON_MALLEABLE,
-                SIGHASH_MALLEABLE
-            ])
+                SIGHASH_NTDA,
+                SIGHASH_NTDA,
+                SIGHASH_NTDA
+            ], VERSION_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high)
+            # High and low S, multi-sig, mixed NTDA & OTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_OTDA,
+                SIGHASH_NTDA
+            ], VERSION_NON_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
-
-            # All signed with malleability allowed flags; Both are accepted
+            # High and low S, multi-sig, mixed NTDA & OTDA, malleable version - both accepted
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_MALLEABLE,
-                SIGHASH_MALLEABLE,
-                SIGHASH_MALLEABLE
-            ])
+                SIGHASH_NTDA,
+                SIGHASH_OTDA,
+                SIGHASH_NTDA
+            ], VERSION_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
 
@@ -258,35 +410,61 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_POST_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_POST_ACTIVATION"]
 
-            # Signed malleable; Both are accepted
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_MALLEABLE])
+            # High and low S, 1 input, NTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NTDA], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, 1 input, NTDA, malleable version - both accepted
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NTDA], VERSION_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high)
+            # High and low S, 1 input, OTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_OTDA], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, 1 input, OTDA, malleable version - both accepted
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_OTDA], VERSION_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
 
-            # Signed non-malleable; Low-S signature is accepted, High-S signature is rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NON_MALLEABLE])
+            # High and low S, multi-sig, all NTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_NTDA,
+                SIGHASH_NTDA
+            ], VERSION_NON_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
-
-            # Signed with mixed malleability flags; Low-S signature is accepted, High-S signature is rejected
+            # High and low S, multi-sig, all NTDA, malleable version - both accepted
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_MALLEABLE,
-                SIGHASH_NON_MALLEABLE,
-                SIGHASH_MALLEABLE
-            ])
+                SIGHASH_NTDA,
+                SIGHASH_NTDA,
+                SIGHASH_NTDA
+            ], VERSION_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high)
+            # High and low S, multi-sig, mixed NTDA & OTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_OTDA,
+                SIGHASH_NTDA
+            ], VERSION_NON_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
-
-            # All signed with malleability allowed flags; Both are accepted
+            # High and low S, multi-sig, mixed NTDA & OTDA, malleable version - both accepted
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_MALLEABLE,
-                SIGHASH_MALLEABLE,
-                SIGHASH_MALLEABLE
-            ])
+                SIGHASH_NTDA,
+                SIGHASH_OTDA,
+                SIGHASH_NTDA
+            ], VERSION_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
 
@@ -294,35 +472,61 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_GRACE_END":
             utxos, _ = self.utxos["CHRONICLE_GRACE_END"]
 
-            # Signed malleable; Both are accepted
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_MALLEABLE])
+            # High and low S, 1 input, NTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NTDA], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, 1 input, NTDA, malleable version - both accepted
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NTDA], VERSION_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high)
+            # High and low S, 1 input, OTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_OTDA], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, 1 input, OTDA, malleable version - both accepted
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_OTDA], VERSION_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
 
-            # Signed non-malleable; Low-S signature is accepted, High-S signature is rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NON_MALLEABLE])
+            # High and low S, multi-sig, all NTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_NTDA,
+                SIGHASH_NTDA
+            ], VERSION_NON_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
-
-            # Signed with mixed malleability flags; Low-S signature is accepted, High-S signature is rejected
+            # High and low S, multi-sig, all NTDA, malleable version - both accepted
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_MALLEABLE,
-                SIGHASH_NON_MALLEABLE,
-                SIGHASH_MALLEABLE
-            ])
+                SIGHASH_NTDA,
+                SIGHASH_NTDA,
+                SIGHASH_NTDA
+            ], VERSION_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high)
+            # High and low S, multi-sig, mixed NTDA & OTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_OTDA,
+                SIGHASH_NTDA
+            ], VERSION_NON_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
-
-            # All signed with malleability allowed flags; Both are accepted
+            # High and low S, multi-sig, mixed NTDA & OTDA, malleable version - both accepted
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_MALLEABLE,
-                SIGHASH_MALLEABLE,
-                SIGHASH_MALLEABLE
-            ])
+                SIGHASH_NTDA,
+                SIGHASH_OTDA,
+                SIGHASH_NTDA
+            ], VERSION_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
 
@@ -330,34 +534,60 @@ class LowSRemovalTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "POST_CHRONICLE":
             utxos, _ = self.utxos["POST_CHRONICLE"]
 
-            # Signed malleable; Both are accepted
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_MALLEABLE])
+            # High and low S, 1 input, NTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NTDA], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, 1 input, NTDA, malleable version - both accepted
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NTDA], VERSION_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high)
+            # High and low S, 1 input, OTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_OTDA], VERSION_NON_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # High and low S, 1 input, OTDA, malleable version - both accepted
+            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_OTDA], VERSION_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
 
-            # Signed non-malleable; Low-S signature is accepted, High-S signature is rejected
-            tx_low, tx_high = self.new_transactions(utxos, [SIGHASH_NON_MALLEABLE])
+            # High and low S, multi-sig, all NTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_NTDA,
+                SIGHASH_NTDA
+            ], VERSION_NON_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
-
-            # Signed with mixed malleability flags; Low-S signature is accepted, High-S signature is rejected
+            # High and low S, multi-sig, all NTDA, malleable version - both accepted
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_MALLEABLE,
-                SIGHASH_NON_MALLEABLE,
-                SIGHASH_MALLEABLE
-            ])
+                SIGHASH_NTDA,
+                SIGHASH_NTDA,
+                SIGHASH_NTDA
+            ], VERSION_MALLEABLE)
+            tx_collection.add_tx(tx_low)
+            tx_collection.add_tx(tx_high)
+            # High and low S, multi-sig, mixed NTDA & OTDA, non-malleable version - low S accepted, high S rejected
+            tx_low, tx_high = self.new_transactions(utxos, [
+                SIGHASH_NTDA,
+                SIGHASH_OTDA,
+                SIGHASH_NTDA
+            ], VERSION_NON_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Non-canonical signature: S value is unnecessarily high)',
                                  block_reject_reason=b'blk-bad-inputs')
-
-            # All signed with malleability allowed flags; Both are accepted
+            # High and low S, multi-sig, mixed NTDA & OTDA, malleable version - both accepted
             tx_low, tx_high = self.new_transactions(utxos, [
-                SIGHASH_MALLEABLE,
-                SIGHASH_MALLEABLE,
-                SIGHASH_MALLEABLE
-            ])
+                SIGHASH_NTDA,
+                SIGHASH_OTDA,
+                SIGHASH_NTDA
+            ], VERSION_MALLEABLE)
             tx_collection.add_tx(tx_low)
             tx_collection.add_tx(tx_high)
