@@ -11,7 +11,6 @@ from test_framework.util import assert_equal, assert_raises_rpc_error, \
     get_datadir_path, get_rpc_proxy, rpc_port, rpc_url
 from test_framework.netutil import addr_to_hex, get_bind_addrs
 
-import os
 import socket
 import sys
 
@@ -59,9 +58,6 @@ class RPCBindTest(BitcoinTestFramework):
         self.stop_nodes()
 
     def run_test(self):
-        # Skip test if running in CI environment (IPv6 not properly detected)
-        if os.environ.get('RUNNING_IN_CI'):
-            raise SkipTest("Skipping rpcbind_test in CI environment due to IPv6 detection issues.")
         # due to OS-specific network stats queries, this test works only on Linux
         if not sys.platform.startswith('linux'):
             raise SkipTest("This test can only be run on linux.")

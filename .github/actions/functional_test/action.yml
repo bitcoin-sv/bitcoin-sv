@@ -14,10 +14,13 @@ runs:
   using: "composite"
   steps:
     - run: |
-        ./test/functional/test_runner.py --failfast --extended --jobs=5 --output-type=0
+        ./test/functional/test_runner.py --failfast \
+                                         --extended \
+                                         --jobs=5 \
+                                         --output-type=0 \
+                                         --exclude=rpcbind_test # IPv6 not detected reliably
+                                                                # on GitHub runners
       shell: bash
-      env:
-        RUNNING_IN_CI: 1
     - name: Artifact upload
       if: failure()
       uses: actions/upload-artifact@v4
