@@ -36,6 +36,6 @@ If you want to report a non-confidential issue with Bitcoin SV, please use the
 [GitHub issue system](https://github.com/bitcoin-sv/bitcoin-sv/issues).
 
 If you want to report a security vulnerability, please review the [Responsible Disclosure Policy](doc/rdp.md) and send
-e-mail to <security@bitcoinsv.io>.
+an e-mail to <security@bitcoinsv.io>.
 
-For any other questions or issues, please send e-mail to <support@bitcoinsv.io>.
+For any other questions or issues, please send an e-mail to <support@bitcoinsv.io>.
