@@ -14,6 +14,7 @@ class NullDummyTestCase(ChronicleHeightTestsCase):
     NAME = "Reject multisig txns without a null dummy value before Chronicle and accept after"
     ARGS = ChronicleHeightTestsCase.ARGS + ['-whitelist=127.0.0.1']
     _UTXO_KEY = ChronicleHeightTestsCase.make_key()
+    _NUMBER_OF_UTXOS_PER_HEIGHT = 72
 
     KEY1 = ChronicleHeightTestsCase.make_key(b'secret1')
     KEY2 = ChronicleHeightTestsCase.make_key(b'secret2')
@@ -33,8 +34,9 @@ class NullDummyTestCase(ChronicleHeightTestsCase):
             self.otherhashtype = otherhashtype
 
     # Create a transaction that spends a multisig output, and optionally other outputs
-    def new_spending_transaction(self, inputs):
+    def new_spending_transaction(self, inputs, version):
         tx = CTransaction()
+        tx.nVersion = version
         total_input = 0
 
         # Add inputs
@@ -93,7 +95,7 @@ class NullDummyTestCase(ChronicleHeightTestsCase):
         return tx
 
     # Create a MULTISIG txn and another that spends it
-    def create_transactions(self, utxos, multisigdetails, nulldummy, otherhashtype=None):
+    def create_transactions(self, utxos, multisigdetails, version, nulldummy, otherhashtype=None):
         # Create a transaction with a multisig output
         spend_tx = self.new_multisig_txn(utxos.pop())
 
@@ -101,13 +103,16 @@ class NullDummyTestCase(ChronicleHeightTestsCase):
         inputs = [self.Input((0, spend_tx), multisigdetails, nulldummy)]
         if otherhashtype:
             inputs += [self.Input(utxos.pop(), otherhashtype=otherhashtype)]
-        tx = self.new_spending_transaction(inputs)
+        tx = self.new_spending_transaction(inputs, version)
 
         return spend_tx, tx
 
     def get_transactions_for_test(self, tx_collection, coinbases):
-        SIGHASH_MALLEABLE = SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE
-        SIGHASH_NON_MALLEABLE = SIGHASH_ALL | SIGHASH_FORKID
+
+        SIGHASH_NTDA = SIGHASH_ALL | SIGHASH_FORKID
+        SIGHASH_OTDA = SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE
+        VERSION_NON_MALLEABLE = 1
+        VERSION_MALLEABLE = 2
         NULL_BYTE = b''
         NON_NULL_BYTE = b'1'
 
@@ -115,84 +120,225 @@ class NullDummyTestCase(ChronicleHeightTestsCase):
         if tx_collection.label == "PRE_CHRONICLE":
             utxos, _ = self.utxos["PRE_CHRONICLE"]
 
-            # Single multisig input, null dummy, signed non-malleable
+            # Null dummy, single multisig input, NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],   # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, null dummy, signed malleable
+            # Null dummy, single multisig input, NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, single multisig input, OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
-            # Single multisig input, null dummy, signed mixed-malleable
+            # Null dummy, single multisig input, OTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
-            # Single multisig input, non-null dummy, signed non-malleable
+
+            # Null dummy, multi-input, multisig all NTDA, other NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all NTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all NTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Null dummy, multi-input, multisig all NTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Null dummy, multi-input, multisig all OTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Null dummy, multi-input, multisig all OTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Null dummy, multi-input, multisig all OTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Null dummy, multi-input, multisig all OTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Non-null dummy, single multisig input, NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NON_NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
-            # Single multisig input, non-null dummy, signed malleable
+            # Non-null dummy, single multisig input, NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, single multisig input, OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NON_NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
-            # Single multisig input, non-null dummy, signed mixed-malleable
+            # Non-null dummy, single multisig input, OTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NON_NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Multi-input, multi-sig null dummy signed malleable, other input signed non-malleable
+            # Non-null dummy, multi-input, multisig all NTDA, other NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
-                NULL_BYTE,
-                SIGHASH_NON_MALLEABLE)
-            tx_collection.add_mempool_tx(spend_tx)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
-                                 block_reject_reason=b'blk-bad-inputs')
-            # Multi-input, multi-sig null dummy signed malleable, other input signed malleable
-            spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
-                NULL_BYTE,
-                SIGHASH_MALLEABLE)
-            tx_collection.add_mempool_tx(spend_tx)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
-                                 block_reject_reason=b'blk-bad-inputs')
-            # Multi-input, multi-sig non-null dummy signed malleable, other input signed non-malleable
-            spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NON_NULL_BYTE,
-                SIGHASH_NON_MALLEABLE)
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all NTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all NTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Non-null dummy, multi-input, multisig all NTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Non-null dummy, multi-input, multisig all OTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
-            # Multi-input, multi-sig non-null dummy signed malleable, other input signed malleable
+            # Non-null dummy, multi-input, multisig all OTDA, other NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NON_NULL_BYTE,
-                SIGHASH_MALLEABLE)
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Non-null dummy, multi-input, multisig all OTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Non-null dummy, multi-input, multisig all OTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
@@ -202,84 +348,225 @@ class NullDummyTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_PRE_GRACE":
             utxos, _ = self.utxos["CHRONICLE_PRE_GRACE"]
 
-            # Single multisig input, null dummy, signed non-malleable
+            # Null dummy, single multisig input, NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, null dummy, signed malleable
+            # Null dummy, single multisig input, NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, single multisig input, OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
-            # Single multisig input, null dummy, signed mixed-malleable
+            # Null dummy, single multisig input, OTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
-            # Single multisig input, non-null dummy, signed non-malleable
+
+            # Null dummy, multi-input, multisig all NTDA, other NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all NTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all NTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Null dummy, multi-input, multisig all NTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Null dummy, multi-input, multisig all OTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Null dummy, multi-input, multisig all OTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Null dummy, multi-input, multisig all OTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Null dummy, multi-input, multisig all OTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Non-null dummy, single multisig input, NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NON_NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
-            # Single multisig input, non-null dummy, signed malleable
+            # Non-null dummy, single multisig input, NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, single multisig input, OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NON_NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
-            # Single multisig input, non-null dummy, signed mixed-malleable
+            # Non-null dummy, single multisig input, OTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NON_NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Multi-input, multi-sig null dummy signed malleable, other input signed non-malleable
+            # Non-null dummy, multi-input, multisig all NTDA, other NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
-                NULL_BYTE,
-                SIGHASH_NON_MALLEABLE)
-            tx_collection.add_mempool_tx(spend_tx)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
-                                 block_reject_reason=b'blk-bad-inputs')
-            # Multi-input, multi-sig null dummy signed malleable, other input signed malleable
-            spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
-                NULL_BYTE,
-                SIGHASH_MALLEABLE)
-            tx_collection.add_mempool_tx(spend_tx)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
-                                 block_reject_reason=b'blk-bad-inputs')
-            # Multi-input, multi-sig non-null dummy signed malleable, other input signed non-malleable
-            spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NON_NULL_BYTE,
-                SIGHASH_NON_MALLEABLE)
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all NTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all NTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Non-null dummy, multi-input, multisig all NTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Non-null dummy, multi-input, multisig all OTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
-            # Multi-input, multi-sig non-null dummy signed malleable, other input signed malleable
+            # Non-null dummy, multi-input, multisig all OTDA, other NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NON_NULL_BYTE,
-                SIGHASH_MALLEABLE)
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Non-null dummy, multi-input, multisig all OTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Non-null dummy, multi-input, multisig all OTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
@@ -289,84 +576,226 @@ class NullDummyTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_GRACE_BEGIN":
             utxos, _ = self.utxos["CHRONICLE_GRACE_BEGIN"]
 
-            # Single multisig input, null dummy, signed non-malleable
+            # Null dummy, single multisig input, NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, null dummy, signed malleable
+            # Null dummy, single multisig input, NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, single multisig input, OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
-            # Single multisig input, null dummy, signed mixed-malleable
+            # Null dummy, single multisig input, OTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
-            # Single multisig input, non-null dummy, signed non-malleable
+
+            # Null dummy, multi-input, multisig all NTDA, other NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],     # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all NTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all NTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Null dummy, multi-input, multisig all NTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Null dummy, multi-input, multisig all OTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Null dummy, multi-input, multisig all OTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Null dummy, multi-input, multisig all OTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Null dummy, multi-input, multisig all OTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Non-null dummy, single multisig input, NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NON_NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
-            # Single multisig input, non-null dummy, signed malleable
+            # Non-null dummy, single multisig input, NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'flexible-non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+
+            # Non-null dummy, single multisig input, OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NON_NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
-            # Single multisig input, non-null dummy, signed mixed-malleable
+            # Non-null dummy, single multisig input, OTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NON_NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Multi-input, multi-sig null dummy signed malleable, other input signed non-malleable
+            # Non-null dummy, multi-input, multisig all NTDA, other NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
-                NULL_BYTE,
-                SIGHASH_NON_MALLEABLE)
-            tx_collection.add_mempool_tx(spend_tx)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
-                                 block_reject_reason=b'blk-bad-inputs')
-            # Multi-input, multi-sig null dummy signed malleable, other input signed malleable
-            spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
-                NULL_BYTE,
-                SIGHASH_MALLEABLE)
-            tx_collection.add_mempool_tx(spend_tx)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
-                                 block_reject_reason=b'blk-bad-inputs')
-            # Multi-input, multi-sig non-null dummy signed malleable, other input signed non-malleable
-            spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NON_NULL_BYTE,
-                SIGHASH_NON_MALLEABLE)
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all NTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'flexible-non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all NTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Non-null dummy, multi-input, multisig all NTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'flexible-non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Non-null dummy, multi-input, multisig all OTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
                                  block_reject_reason=b'blk-bad-inputs')
-            # Multi-input, multi-sig non-null dummy signed malleable, other input signed malleable
+            # Non-null dummy, multi-input, multisig all OTDA, other NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NON_NULL_BYTE,
-                SIGHASH_MALLEABLE)
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Non-null dummy, multi-input, multisig all OTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            # Non-null dummy, multi-input, multisig all OTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
@@ -376,72 +805,198 @@ class NullDummyTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_PRE_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_PRE_ACTIVATION"]
 
-            # Single multisig input, null dummy, signed non-malleable
+            # Null dummy, single multisig input, NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, null dummy, signed malleable
+            # Null dummy, single multisig input, NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, null dummy, signed mixed-malleable
+            # Null dummy, single multisig input, OTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, non-null dummy, signed non-malleable
+            # Null dummy, single multisig input, OTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE)
-            tx_collection.add_mempool_tx(spend_tx)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
-            # Single multisig input, non-null dummy, signed malleable
-            spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE)
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, non-null dummy, signed mixed-malleable
-            spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE)
-            tx_collection.add_mempool_tx(spend_tx)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
 
-            # Multi-input, multi-sig null dummy signed malleable, other input signed non-malleable
+            # Null dummy, multi-input, multisig all NTDA, other NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE,
-                SIGHASH_NON_MALLEABLE)
+                SIGHASH_NTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Multi-input, multi-sig null dummy signed malleable, other input signed malleable
+            # Null dummy, multi-input, multisig all NTDA, other NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NULL_BYTE,
-                SIGHASH_MALLEABLE)
+                SIGHASH_NTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Multi-input, multi-sig non-null dummy signed malleable, other input signed non-malleable
+            # Null dummy, multi-input, multisig all NTDA, other OTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE,
-                SIGHASH_NON_MALLEABLE)
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all NTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+
+            # Non-null dummy, single multisig input, NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
-            # Multi-input, multi-sig non-null dummy signed malleable, other input signed malleable
+            # Non-null dummy, single multisig input, NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+
+            # Non-null dummy, single multisig input, OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, single multisig input, OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+
+            # Non-null dummy, multi-input, multisig all NTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NON_NULL_BYTE,
-                SIGHASH_MALLEABLE)
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all NTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Non-null dummy, multi-input, multisig all NTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all NTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Non-null dummy, multi-input, multisig all OTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all OTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Non-null dummy, multi-input, multisig all OTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all OTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
 
@@ -449,72 +1004,198 @@ class NullDummyTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_ACTIVATION"]
 
-            # Single multisig input, null dummy, signed non-malleable
+            # Null dummy, single multisig input, NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, null dummy, signed malleable
+            # Null dummy, single multisig input, NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, null dummy, signed mixed-malleable
+            # Null dummy, single multisig input, OTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, non-null dummy, signed non-malleable
+            # Null dummy, single multisig input, OTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE)
-            tx_collection.add_mempool_tx(spend_tx)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
-            # Single multisig input, non-null dummy, signed malleable
-            spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE)
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, non-null dummy, signed mixed-malleable
-            spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE)
-            tx_collection.add_mempool_tx(spend_tx)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
 
-            # Multi-input, multi-sig null dummy signed malleable, other input signed non-malleable
+            # Null dummy, multi-input, multisig all NTDA, other NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE,
-                SIGHASH_NON_MALLEABLE)
+                SIGHASH_NTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Multi-input, multi-sig null dummy signed malleable, other input signed malleable
+            # Null dummy, multi-input, multisig all NTDA, other NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NULL_BYTE,
-                SIGHASH_MALLEABLE)
+                SIGHASH_NTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Multi-input, multi-sig non-null dummy signed malleable, other input signed non-malleable
+            # Null dummy, multi-input, multisig all NTDA, other OTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE,
-                SIGHASH_NON_MALLEABLE)
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all NTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+
+            # Non-null dummy, single multisig input, NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
-            # Multi-input, multi-sig non-null dummy signed malleable, other input signed malleable
+            # Non-null dummy, single multisig input, NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+
+            # Non-null dummy, single multisig input, OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, single multisig input, OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+
+            # Non-null dummy, multi-input, multisig all NTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NON_NULL_BYTE,
-                SIGHASH_MALLEABLE)
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all NTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Non-null dummy, multi-input, multisig all NTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all NTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Non-null dummy, multi-input, multisig all OTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all OTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Non-null dummy, multi-input, multisig all OTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all OTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
 
@@ -522,72 +1203,198 @@ class NullDummyTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_POST_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_POST_ACTIVATION"]
 
-            # Single multisig input, null dummy, signed non-malleable
+            # Null dummy, single multisig input, NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, null dummy, signed malleable
+            # Null dummy, single multisig input, NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, null dummy, signed mixed-malleable
+            # Null dummy, single multisig input, OTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, non-null dummy, signed non-malleable
+            # Null dummy, single multisig input, OTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE)
-            tx_collection.add_mempool_tx(spend_tx)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
-            # Single multisig input, non-null dummy, signed malleable
-            spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE)
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, non-null dummy, signed mixed-malleable
-            spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE)
-            tx_collection.add_mempool_tx(spend_tx)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
 
-            # Multi-input, multi-sig null dummy signed malleable, other input signed non-malleable
+            # Null dummy, multi-input, multisig all NTDA, other NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE,
-                SIGHASH_NON_MALLEABLE)
+                SIGHASH_NTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Multi-input, multi-sig null dummy signed malleable, other input signed malleable
+            # Null dummy, multi-input, multisig all NTDA, other NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NULL_BYTE,
-                SIGHASH_MALLEABLE)
+                SIGHASH_NTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Multi-input, multi-sig non-null dummy signed malleable, other input signed non-malleable
+            # Null dummy, multi-input, multisig all NTDA, other OTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE,
-                SIGHASH_NON_MALLEABLE)
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all NTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+
+            # Non-null dummy, single multisig input, NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
-            # Multi-input, multi-sig non-null dummy signed malleable, other input signed malleable
+            # Non-null dummy, single multisig input, NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+
+            # Non-null dummy, single multisig input, OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, single multisig input, OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+
+            # Non-null dummy, multi-input, multisig all NTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NON_NULL_BYTE,
-                SIGHASH_MALLEABLE)
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all NTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Non-null dummy, multi-input, multisig all NTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all NTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Non-null dummy, multi-input, multisig all OTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all OTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Non-null dummy, multi-input, multisig all OTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all OTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
 
@@ -595,72 +1402,198 @@ class NullDummyTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_GRACE_END":
             utxos, _ = self.utxos["CHRONICLE_GRACE_END"]
 
-            # Single multisig input, null dummy, signed non-malleable
+            # Null dummy, single multisig input, NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, null dummy, signed malleable
+            # Null dummy, single multisig input, NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, null dummy, signed mixed-malleable
+            # Null dummy, single multisig input, OTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, non-null dummy, signed non-malleable
+            # Null dummy, single multisig input, OTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE)
-            tx_collection.add_mempool_tx(spend_tx)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
-            # Single multisig input, non-null dummy, signed malleable
-            spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE)
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, non-null dummy, signed mixed-malleable
-            spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE)
-            tx_collection.add_mempool_tx(spend_tx)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
 
-            # Multi-input, multi-sig null dummy signed malleable, other input signed non-malleable
+            # Null dummy, multi-input, multisig all NTDA, other NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE,
-                SIGHASH_NON_MALLEABLE)
+                SIGHASH_NTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Multi-input, multi-sig null dummy signed malleable, other input signed malleable
+            # Null dummy, multi-input, multisig all NTDA, other NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NULL_BYTE,
-                SIGHASH_MALLEABLE)
+                SIGHASH_NTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Multi-input, multi-sig non-null dummy signed malleable, other input signed non-malleable
+            # Null dummy, multi-input, multisig all NTDA, other OTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE,
-                SIGHASH_NON_MALLEABLE)
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all NTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+
+            # Non-null dummy, single multisig input, NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
-            # Multi-input, multi-sig non-null dummy signed malleable, other input signed malleable
+            # Non-null dummy, single multisig input, NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+
+            # Non-null dummy, single multisig input, OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, single multisig input, OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+
+            # Non-null dummy, multi-input, multisig all NTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NON_NULL_BYTE,
-                SIGHASH_MALLEABLE)
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all NTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Non-null dummy, multi-input, multisig all NTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all NTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Non-null dummy, multi-input, multisig all OTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all OTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Non-null dummy, multi-input, multisig all OTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all OTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
 
@@ -668,71 +1601,197 @@ class NullDummyTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "POST_CHRONICLE":
             utxos, _ = self.utxos["POST_CHRONICLE"]
 
-            # Single multisig input, null dummy, signed non-malleable
+            # Null dummy, single multisig input, NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, null dummy, signed malleable
+            # Null dummy, single multisig input, NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, null dummy, signed mixed-malleable
+            # Null dummy, single multisig input, OTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, non-null dummy, signed non-malleable
+            # Null dummy, single multisig input, OTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_NON_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE)
-            tx_collection.add_mempool_tx(spend_tx)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
-            # Single multisig input, non-null dummy, signed malleable
-            spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE)
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Single multisig input, non-null dummy, signed mixed-malleable
-            spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_NON_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE)
-            tx_collection.add_mempool_tx(spend_tx)
-            tx_collection.add_tx(tx,
-                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
 
-            # Multi-input, multi-sig null dummy signed malleable, other input signed non-malleable
+            # Null dummy, multi-input, multisig all NTDA, other NTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NULL_BYTE,
-                SIGHASH_NON_MALLEABLE)
+                SIGHASH_NTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Multi-input, multi-sig null dummy signed malleable, other input signed malleable
+            # Null dummy, multi-input, multisig all NTDA, other NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],  # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
                 NULL_BYTE,
-                SIGHASH_MALLEABLE)
+                SIGHASH_NTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
-            # Multi-input, multi-sig non-null dummy signed malleable, other input signed non-malleable
+            # Null dummy, multi-input, multisig all NTDA, other OTDA, non-malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
-                NON_NULL_BYTE,
-                SIGHASH_NON_MALLEABLE)
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all NTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Null dummy, multi-input, multisig all OTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+
+            # Non-null dummy, single multisig input, NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
-            # Multi-input, multi-sig non-null dummy signed malleable, other input signed malleable
+            # Non-null dummy, single multisig input, NTDA, malleable version
             spend_tx, tx = self.create_transactions(utxos,
-                [ (self.KEY1, SIGHASH_MALLEABLE), (self.KEY2, SIGHASH_MALLEABLE) ],     # noqa
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+
+            # Non-null dummy, single multisig input, OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, single multisig input, OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+
+            # Non-null dummy, multi-input, multisig all NTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
                 NON_NULL_BYTE,
-                SIGHASH_MALLEABLE)
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all NTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Non-null dummy, multi-input, multisig all NTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all NTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_NTDA), (self.KEY2, SIGHASH_NTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Non-null dummy, multi-input, multisig all OTDA, other NTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all OTDA, other NTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_NTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx)
+            # Non-null dummy, multi-input, multisig all OTDA, other OTDA, non-malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_NON_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
+            tx_collection.add_mempool_tx(spend_tx)
+            tx_collection.add_tx(tx,
+                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Dummy CHECKMULTISIG argument must be zero)')
+            # Non-null dummy, multi-input, multisig all OTDA, other OTDA, malleable version
+            spend_tx, tx = self.create_transactions(utxos,
+                [ (self.KEY1, SIGHASH_OTDA), (self.KEY2, SIGHASH_OTDA) ],   # noqa
+                VERSION_MALLEABLE,
+                NON_NULL_BYTE,
+                SIGHASH_OTDA)
             tx_collection.add_mempool_tx(spend_tx)
             tx_collection.add_tx(tx)
