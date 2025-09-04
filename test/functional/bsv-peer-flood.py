@@ -70,22 +70,29 @@ class PeerFlood(BitcoinTestFramework):
 
         # Send message flood to node in another thread
         bad_msg = msg_badblocktxn()
-        continue_sending = True
+        stop_sending = threading.Event()
 
         def send_msg():
-            while continue_sending:
+            while not stop_sending.is_set():
                 test_node.send_message(bad_msg)
+
         send_thread = threading.Thread(target=send_msg)
         send_thread.start()
 
         # Node will eventually fill both send and recv buffers
         wait_until(lambda: check_for_log_msg(self, "Dropping reject message because we're paused for send and receive", "/node0"))
-        continue_sending = False
+        stop_sending.set()
         send_thread.join()
 
         # Once we stop flooding and if we re-start reading, node will clear its backlog
         connection.set_do_reading(True)
-        wait_until(lambda: self.nodes[0].getpeerinfo()[0]['sendsize'] == 0 and self.nodes[0].getpeerinfo()[0]['recvsize'] == 0)
+
+        def send_recv_done():
+            pi0 = self.nodes[0].getpeerinfo()[0]
+            sendsize = pi0['sendsize']
+            recvsize = pi0['recvsize']
+            return sendsize == 0 and recvsize == 0
+        wait_until(send_recv_done, timeout=120)
 
 
 if __name__ == '__main__':
