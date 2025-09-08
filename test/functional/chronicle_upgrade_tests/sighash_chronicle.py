@@ -166,13 +166,11 @@ class ForkIDTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_PRE_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_PRE_ACTIVATION"]
 
-            # Can now accept txn signed without ForkID for mining into the next block
             tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL)])
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
                                  block_reject_reason=b'blk-bad-inputs')
 
-            # Can now accept txn signed with Chronicle for mining into the next block
             tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_CHRONICLE)])
             tx_collection.add_tx(tx,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
@@ -181,7 +179,7 @@ class ForkIDTestCase(ChronicleHeightTestsCase):
             tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID)])
             tx_collection.add_tx(tx)
 
-            # Can now accept txn signed with Chronicle for mining into the next block
+            # Can now accept txn signed with ForkID & Chronicle for mining into the next block
             tx = self.new_transaction(self._UTXO_KEY, [self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE)])
             tx_collection.add_tx(tx)
 
@@ -192,7 +190,6 @@ class ForkIDTestCase(ChronicleHeightTestsCase):
             ])
             tx_collection.add_tx(tx)
 
-            # Can now accept txn signed without ForkID (or with Chronicle) for mining into the next block
             tx = self.new_transaction(self._UTXO_KEY, [
                 self.Input(utxos.pop(), SIGHASH_ALL),
                 self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID),
@@ -202,6 +199,7 @@ class ForkIDTestCase(ChronicleHeightTestsCase):
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
                                  block_reject_reason=b'blk-bad-inputs')
 
+            # Can now accept txn signed with ForkID & Chronicle for mining into the next block
             tx = self.new_transaction(self._UTXO_KEY, [
                 self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE),
                 self.Input(utxos.pop(), SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE),
