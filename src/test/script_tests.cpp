@@ -661,6 +661,15 @@ std::string JSONPrettyPrint(const UniValue &univalue) {
 
     return ret;
 }
+
+struct versioned_sig_checker : BaseSignatureChecker
+{
+    int32_t version {1};
+    versioned_sig_checker(int32_t ver) : version{ver} {}
+
+    int32_t Version() const override { return version; }
+};
+
 } // namespace
 
 BOOST_AUTO_TEST_CASE(script_build) {
@@ -4490,8 +4499,10 @@ BOOST_AUTO_TEST_CASE(VerifyScript_lows)
 {
     using namespace std;
 
-    struct always_true_sig_checker : BaseSignatureChecker
+    struct always_true_sig_checker : versioned_sig_checker
     {
+        always_true_sig_checker(int32_t ver) : versioned_sig_checker{ver} {}
+
         bool CheckSig(const std::vector<uint8_t> &,
                       const std::vector<uint8_t> &,
                       const CScript&,
@@ -4504,6 +4515,7 @@ BOOST_AUTO_TEST_CASE(VerifyScript_lows)
     using test_args = tuple<uint32_t,               // flags
                             vector<uint8_t>,        // unlocking script
                             uint8_t,                // sighash
+                            int32_t,                // txn version
                             ScriptError>;           // expect error
     const vector<test_args> test_data
     {
@@ -4511,30 +4523,65 @@ BOOST_AUTO_TEST_CASE(VerifyScript_lows)
         {SCRIPT_ENABLE_SIGHASH_FORKID,
          high_s_min(),
          SIGHASH_ALL | SIGHASH_FORKID,
+         1,
+         {}},
+
+        {SCRIPT_ENABLE_SIGHASH_FORKID,
+         high_s_min(),
+         SIGHASH_ALL | SIGHASH_FORKID,
+         2,
          {}},
 
         {SCRIPT_VERIFY_LOW_S | SCRIPT_ENABLE_SIGHASH_FORKID,
          high_s_min(),
          SIGHASH_ALL,
+         1,
+         SCRIPT_ERR_SIG_HIGH_S},
+
+        {SCRIPT_VERIFY_LOW_S | SCRIPT_ENABLE_SIGHASH_FORKID,
+         high_s_min(),
+         SIGHASH_ALL,
+         2,
          SCRIPT_ERR_SIG_HIGH_S},
 
         {SCRIPT_VERIFY_LOW_S | SCRIPT_ENABLE_SIGHASH_FORKID,
          high_s_min(),
          SIGHASH_ALL | SIGHASH_FORKID,
+         1,
+         SCRIPT_ERR_SIG_HIGH_S},
+
+        {SCRIPT_VERIFY_LOW_S | SCRIPT_ENABLE_SIGHASH_FORKID,
+         high_s_min(),
+         SIGHASH_ALL | SIGHASH_FORKID,
+         2,
          SCRIPT_ERR_SIG_HIGH_S},
 
         // Post Chronicle
         {SCRIPT_VERIFY_LOW_S | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          high_s_min(),
          SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
+         1,
+         {SCRIPT_ERR_SIG_HIGH_S}},
+
+        {SCRIPT_VERIFY_LOW_S | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
+         high_s_min(),
+         SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
+         2,
          {}},
 
         {SCRIPT_VERIFY_LOW_S | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          high_s_min(),
          SIGHASH_ALL | SIGHASH_FORKID,
-         SCRIPT_ERR_SIG_HIGH_S}
+         1,
+         {SCRIPT_ERR_SIG_HIGH_S}},
+
+        {SCRIPT_VERIFY_LOW_S | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
+         high_s_min(),
+         SIGHASH_ALL | SIGHASH_FORKID,
+         2,
+         {}}
     };
-    for(const auto& [flags, s, sig_hash, exp_error] : test_data)
+    for(const auto& [flags, s, sig_hash, version, exp_error] : test_data)
     {
         const Config& config = GlobalConfig::GetConfig();
         const auto params{make_verify_script_params(config, flags, false)};
@@ -4548,7 +4595,7 @@ BOOST_AUTO_TEST_CASE(VerifyScript_lows)
                                          CScript{scriptSig.begin(), scriptSig.end()},
                                          CScript{scriptPubKey.begin(), scriptPubKey.end()},
                                          flags,
-                                         always_true_sig_checker{});
+                                         always_true_sig_checker{version});
         assert(status);
         BOOST_CHECK_EQUAL(exp_error == SCRIPT_ERR_OK, status->first);
         BOOST_CHECK_EQUAL(exp_error, status->second);
@@ -4574,7 +4621,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid_chronicle)
          {},
          malleability::non_malleable},
         {0,
-         SIGHASH_ALL | SIGHASH_FORKID,
+         SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
          {},
          malleability::non_malleable},
 
@@ -4640,32 +4687,29 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checksig_forkid_chronicle)
          SIGHASH_ALL,
          SCRIPT_ERR_MUST_USE_FORKID,
          {}},
-        {SCRIPT_VERIFY_STRICTENC
-         | SCRIPT_ENABLE_SIGHASH_FORKID
-         | SCRIPT_CHRONICLE,
-          SIGHASH_ALL | SIGHASH_FORKID,
-          {},
-          malleability::disallowed },
-         {SCRIPT_VERIFY_STRICTENC
-          | SCRIPT_ENABLE_SIGHASH_FORKID,
-          SIGHASH_ALL | SIGHASH_FORKID,
-          {},
-          malleability::disallowed},
-       {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
-        SIGHASH_ALL | SIGHASH_FORKID,
-        {},
-        malleability::disallowed},
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {},
+         malleability::non_malleable},
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {},
+         malleability::non_malleable},
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
+         SIGHASH_ALL | SIGHASH_FORKID,
+         {},
+         malleability::non_malleable},
        
         // Pre-Chronicle
-       {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
-        SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
-        SCRIPT_ERR_ILLEGAL_CHRONICLE,
-        {}},
-       // Post-Chronicle
-       {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
-        SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
-        {},
-        malleability::non_malleable},
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
+         SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
+         SCRIPT_ERR_ILLEGAL_CHRONICLE,
+         {}},
+        // Post-Chronicle
+        {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
+         SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
+         {},
+         malleability::non_malleable},
     };
     for(const auto& [flags, sighash, exp_error, exp_mall] : test_data)
     {
@@ -4720,7 +4764,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid_chronicle)
          {},
          malleability::non_malleable},
         {0,
-         SIGHASH_ALL | SIGHASH_FORKID,
+         SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
          {},
          malleability::non_malleable},
 
@@ -4793,11 +4837,11 @@ BOOST_AUTO_TEST_CASE(EvalScript_op_checkmultisig_forkid_chronicle)
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         malleability::disallowed},
+         malleability::non_malleable},
         {SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
          SIGHASH_ALL | SIGHASH_FORKID,
          {},
-         malleability::disallowed},
+         malleability::non_malleable},
         
         // chronicle flag
         // Pre-Chronicle
@@ -4859,10 +4903,10 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checksig_forkid_chronicle)
     {
         {{SIGHASH_ALL | SIGHASH_FORKID,
           SIGHASH_ALL | SIGHASH_FORKID},
-          malleability::disallowed},
+          malleability::non_malleable},
         {{SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
           SIGHASH_ALL | SIGHASH_FORKID},
-          malleability::disallowed},
+          malleability::non_malleable},
         {{SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
           SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE},
          {}}
@@ -4897,7 +4941,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checksig_forkid_chronicle)
     }
 }
 
-BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checkmultisig_forkid_relax)
+BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checkmultisig_forkid_chronicle)
 {
     using namespace std;
 
@@ -4911,10 +4955,10 @@ BOOST_AUTO_TEST_CASE(EvalScript_multiple_op_checkmultisig_forkid_relax)
     {
         {{SIGHASH_ALL | SIGHASH_FORKID,
           SIGHASH_ALL | SIGHASH_FORKID},
-          malleability::disallowed},
+          malleability::non_malleable},
         {{SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
           SIGHASH_ALL | SIGHASH_FORKID},
-          malleability::disallowed},
+          malleability::non_malleable},
         {{SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE,
           SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_CHRONICLE},
          {}}
@@ -4966,7 +5010,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_minimal_encoding)
          | SCRIPT_ENABLE_SIGHASH_FORKID,
          {OP_PUSHDATA1, 0}, // Non-minimal encoding - could have used OP_0
          SIGHASH_ALL | SIGHASH_FORKID,
-         {}, malleability::disallowed},
+         {}, malleability::non_malleable},
 
         {SCRIPT_VERIFY_STRICTENC
          | SCRIPT_ENABLE_SIGHASH_FORKID
@@ -4987,7 +5031,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_minimal_encoding)
          | SCRIPT_VERIFY_MINIMALDATA,
          {2, 0, 0 }, // Non-minimal encoded (2 bytes of raw data)
          SIGHASH_ALL | SIGHASH_FORKID,
-         {}, malleability::disallowed},
+         {}, malleability::non_malleable},
         
         {SCRIPT_VERIFY_STRICTENC
          | SCRIPT_ENABLE_SIGHASH_FORKID
@@ -5011,7 +5055,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_minimal_encoding)
          | SCRIPT_CHRONICLE,
          {OP_PUSHDATA1, 0, OP_1ADD},
          SIGHASH_ALL | SIGHASH_FORKID,
-         {}, malleability::non_minimal_push | malleability::disallowed},
+         {}, malleability::non_minimal_push},
 
         {SCRIPT_VERIFY_STRICTENC
          | SCRIPT_ENABLE_SIGHASH_FORKID
@@ -5035,7 +5079,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_minimal_encoding)
          | SCRIPT_CHRONICLE,
          {2, 0, 0, OP_1ADD},
          SIGHASH_ALL | SIGHASH_FORKID,
-         {}, malleability::disallowed | malleability::non_minimal_scriptnum},
+         {}, malleability::non_minimal_scriptnum},
     };
     for(const auto& [flags, s, sig_hash, exp_error, exp_mall] : test_data)
     {
@@ -5200,7 +5244,7 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checksig_nullfail)
 
         {SCRIPT_VERIFY_NULLFAIL | SCRIPT_CHRONICLE,
          chronicle_sig,
-         malleability::null_fail},
+         SCRIPT_ERR_SIG_NULLFAIL},
         
         {SCRIPT_VERIFY_NULLFAIL | SCRIPT_CHRONICLE,
          empty_sig,
@@ -5249,45 +5293,55 @@ BOOST_AUTO_TEST_CASE(verify_script_op_checksig_nullfail)
     const auto chronicle_sig{make_signature(low_s_max(), chronicle_sighash)};
 
     using test_args = tuple<uint32_t,              // flags
-                            malleability::status,
+                            int32_t,               // txn version
                             ScriptError>;          // expected error
     const vector<test_args> test_data
     {
         // Pre-Chronicle
         {{},
-         {},
+         1,
+         SCRIPT_ERR_OK},
+        {{},
+         2,
          SCRIPT_ERR_OK},
 
         {SCRIPT_VERIFY_NULLFAIL,
-         {},
+         1,
+         SCRIPT_ERR_SIG_NULLFAIL},
+        {SCRIPT_VERIFY_NULLFAIL,
+         2,
          SCRIPT_ERR_SIG_NULLFAIL},
         
         {{},
-         malleability::disallowed,
+         1,
+         SCRIPT_ERR_OK},
+        {{},
+         2,
          SCRIPT_ERR_OK},
 
         {SCRIPT_VERIFY_NULLFAIL,
-         malleability::disallowed,
+         1,
+         SCRIPT_ERR_SIG_NULLFAIL},
+        {SCRIPT_VERIFY_NULLFAIL,
+         2,
          SCRIPT_ERR_SIG_NULLFAIL},
        
         // Post-Chronicle
         {SCRIPT_CHRONICLE,
-         {},
+         1,
          SCRIPT_ERR_OK},
-
-        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLFAIL,
-         {},
-         SCRIPT_ERR_OK},
-
         {SCRIPT_CHRONICLE,
-         malleability::disallowed,
+         2,
          SCRIPT_ERR_OK},
 
         {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLFAIL,
-         malleability::disallowed,
+         1,
          SCRIPT_ERR_SIG_NULLFAIL},
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLFAIL,
+         2,
+         SCRIPT_ERR_OK},
     };
-    for(const auto& [flags, ms, exp_error] : test_data)
+    for(const auto& [flags, version, exp_error] : test_data)
     {
         const auto params{make_verify_script_params(GlobalConfig::GetConfig(), flags, false)};
         auto source = task::CCancellationSource::Make();
@@ -5301,7 +5355,7 @@ BOOST_AUTO_TEST_CASE(verify_script_op_checksig_nullfail)
                                          CScript{scriptPubKey.begin(),
                                                  scriptPubKey.end()},
                                          flags,
-                                         BaseSignatureChecker{});
+                                         versioned_sig_checker{version});
         assert(status);
         BOOST_CHECK_EQUAL(exp_error == SCRIPT_ERR_OK, status->first);
         BOOST_CHECK_EQUAL(exp_error, status->second);
@@ -5323,6 +5377,7 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nullfail)
     const auto pub_key{make_pub_key()};
 
     using test_args = tuple<uint32_t,                                   // flags
+                            int32_t,                                    // txn version
                             vector<vector<uint8_t>>,                    // signatures
                             vector<vector<uint8_t>>,                    // public keys
                             variant<ScriptError, malleability::status>, // expected result
@@ -5331,36 +5386,78 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nullfail)
     {
         // Pre-Chronicle
         {{},
+         2,
+         {non_chronicle_sig, non_chronicle_sig},
+         {pub_key},
+         SCRIPT_ERR_SIG_COUNT,
+         {null_dummy, non_chronicle_sig, non_chronicle_sig, {2}, pub_key, {1}}},
+        {{},
+         2,
          {non_chronicle_sig, non_chronicle_sig},
          {pub_key},
          SCRIPT_ERR_SIG_COUNT,
          {null_dummy, non_chronicle_sig, non_chronicle_sig, {2}, pub_key, {1}}},
         
         {{},
+         2,
+         {null_sig},
+         {pub_key},
+         malleability::non_malleable,
+         {{}}},
+        {{},
+         2,
          {null_sig},
          {pub_key},
          malleability::non_malleable,
          {{}}},
 
         {{},
+         1,
+         {non_chronicle_sig},
+         {pub_key},
+         malleability::non_malleable,
+         {{}}},
+        {{},
+         2,
          {non_chronicle_sig},
          {pub_key},
          malleability::non_malleable,
          {{}}},
                
         {SCRIPT_VERIFY_NULLFAIL,
+         1,
+         {null_sig},
+         {pub_key},
+         malleability::non_malleable,
+         {{}}},
+        {SCRIPT_VERIFY_NULLFAIL,
+         2,
          {null_sig},
          {pub_key},
          malleability::non_malleable,
          {{}}},
         
         {SCRIPT_VERIFY_NULLFAIL,
+         1,
+         {non_chronicle_sig, null_sig},
+         {pub_key, pub_key},
+         SCRIPT_ERR_SIG_NULLFAIL,
+         {null_dummy, non_chronicle_sig}},
+        {SCRIPT_VERIFY_NULLFAIL,
+         2,
          {non_chronicle_sig, null_sig},
          {pub_key, pub_key},
          SCRIPT_ERR_SIG_NULLFAIL,
          {null_dummy, non_chronicle_sig}},
         
         {SCRIPT_VERIFY_NULLFAIL,
+         1,
+         {null_sig, non_chronicle_sig},
+         {pub_key, pub_key},
+         SCRIPT_ERR_SIG_NULLFAIL,
+         {null_dummy, null_sig, non_chronicle_sig}},
+        {SCRIPT_VERIFY_NULLFAIL,
+         2,
          {null_sig, non_chronicle_sig},
          {pub_key, pub_key},
          SCRIPT_ERR_SIG_NULLFAIL,
@@ -5368,36 +5465,78 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nullfail)
         
         // Post-Chronicle
         {{},
+         1,
+         {chronicle_sig, chronicle_sig},
+         {pub_key},
+         SCRIPT_ERR_SIG_COUNT,
+         {null_dummy, chronicle_sig, chronicle_sig, {2}, pub_key, {1}}},
+        {{},
+         2,
          {chronicle_sig, chronicle_sig},
          {pub_key},
          SCRIPT_ERR_SIG_COUNT,
          {null_dummy, chronicle_sig, chronicle_sig, {2}, pub_key, {1}}},
         
         {{},
+         1,
+         {null_sig},
+         {pub_key},
+         malleability::non_malleable,
+         {{}}},
+        {{},
+         2,
          {null_sig},
          {pub_key},
          malleability::non_malleable,
          {{}}},
 
         {{},
+         1,
+         {chronicle_sig},
+         {pub_key},
+         malleability::non_malleable,
+         {{}}},
+        {{},
+         2,
          {chronicle_sig},
          {pub_key},
          malleability::non_malleable,
          {{}}},
                
         {SCRIPT_VERIFY_NULLFAIL | SCRIPT_CHRONICLE,
+         1,
+         {null_sig},
+         {pub_key},
+         malleability::non_malleable,
+         {{}}},
+        {SCRIPT_VERIFY_NULLFAIL | SCRIPT_CHRONICLE,
+         2,
          {null_sig},
          {pub_key},
          malleability::non_malleable,
          {{}}},
         
         {SCRIPT_VERIFY_NULLFAIL | SCRIPT_CHRONICLE,
+         1,
+         {chronicle_sig, null_sig},
+         {pub_key, pub_key},
+         SCRIPT_ERR_SIG_NULLFAIL,
+         {null_dummy, chronicle_sig}},
+        {SCRIPT_VERIFY_NULLFAIL | SCRIPT_CHRONICLE,
+         2,
          {chronicle_sig, null_sig},
          {pub_key, pub_key},
          malleability::null_fail,
          {{}}},
         
         {SCRIPT_VERIFY_NULLFAIL | SCRIPT_CHRONICLE,
+         1,
+         {null_sig, chronicle_sig},
+         {pub_key, pub_key},
+         SCRIPT_ERR_SIG_NULLFAIL,
+         {{null_dummy, null_sig, chronicle_sig}}},
+        {SCRIPT_VERIFY_NULLFAIL | SCRIPT_CHRONICLE,
+         2,
          {null_sig, chronicle_sig},
          {pub_key, pub_key},
          malleability::null_fail,
@@ -5405,18 +5544,33 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nullfail)
         
         // Pre/Post-Chronicle mixed
         {SCRIPT_VERIFY_NULLFAIL | SCRIPT_CHRONICLE,
+         1,
          {non_chronicle_sig, chronicle_sig},
          {pub_key, pub_key},
          SCRIPT_ERR_SIG_NULLFAIL,
-         {null_dummy, non_chronicle_sig}},
+         {null_dummy, non_chronicle_sig, chronicle_sig}},
+        {SCRIPT_VERIFY_NULLFAIL | SCRIPT_CHRONICLE,
+         2,
+         {non_chronicle_sig, chronicle_sig},
+         {pub_key, pub_key},
+         malleability::null_fail,
+         {{}}},
         
         {SCRIPT_VERIFY_NULLFAIL | SCRIPT_CHRONICLE,
+         1,
          {chronicle_sig, non_chronicle_sig},
          {pub_key, pub_key},
          SCRIPT_ERR_SIG_NULLFAIL,
          {null_dummy, chronicle_sig, non_chronicle_sig}},
+        {SCRIPT_VERIFY_NULLFAIL | SCRIPT_CHRONICLE,
+         2,
+         {chronicle_sig, non_chronicle_sig},
+         {pub_key, pub_key},
+         malleability::null_fail,
+         {{}}},
     };
     for(const auto& [flags,
+                     version,
                      sigs,
                      pks,
                      expected,
@@ -5433,7 +5587,7 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nullfail)
                                        CScript{op_checksig_script.begin(),
                                                op_checksig_script.end()},
                                        flags,
-                                       BaseSignatureChecker{});
+                                       versioned_sig_checker{version});
         assert(status);
         std::visit(overload([&expected,
                              &stack,
@@ -5482,6 +5636,7 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nulldummy)
     const vector<uint8_t> script_false{};
 
     using test_args = tuple<uint32_t,                                   // flags
+                            int32_t,                                    // txn version
                             uint8_t,                                    // dummy
                             vector<vector<uint8_t>>,                    // signatures
                             vector<vector<uint8_t>>,                    // public keys
@@ -5491,6 +5646,14 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nulldummy)
     {
         // Pre-Chronicle
         {{},
+         1,
+         OP_0,
+         {sig},
+         {pub_key},
+         malleability::non_malleable,
+         {script_false}},
+        {{},
+         2,
          OP_0,
          {sig},
          {pub_key},
@@ -5498,6 +5661,14 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nulldummy)
          {script_false}},
         
         {{},
+         1,
+         OP_1,
+         {sig},
+         {pub_key},
+         malleability::non_malleable,
+         {script_false}},
+        {{},
+         2,
          OP_1,
          {sig},
          {pub_key},
@@ -5505,6 +5676,14 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nulldummy)
          {script_false}},
        
         {SCRIPT_VERIFY_NULLDUMMY,
+         1,
+         OP_0,
+         {sig},
+         {pub_key},
+         malleability::non_malleable,
+         {script_false}},
+        {SCRIPT_VERIFY_NULLDUMMY,
+         2,
          OP_0,
          {sig},
          {pub_key},
@@ -5512,6 +5691,14 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nulldummy)
          {script_false}},
         
         {SCRIPT_VERIFY_NULLDUMMY,
+         1,
+         OP_1,
+         {sig},
+         {pub_key},
+         SCRIPT_ERR_SIG_NULLDUMMY,
+         {{1}}},
+        {SCRIPT_VERIFY_NULLDUMMY,
+         2,
          OP_1,
          {sig},
          {pub_key},
@@ -5520,6 +5707,14 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nulldummy)
        
         // Post-Chronicle
         {SCRIPT_CHRONICLE,
+         1,
+         OP_0,
+         {sig},
+         {pub_key},
+         malleability::non_malleable,
+         {script_false}},
+        {SCRIPT_CHRONICLE,
+         2,
          OP_0,
          {sig},
          {pub_key},
@@ -5527,6 +5722,14 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nulldummy)
          {script_false}},
         
         {SCRIPT_CHRONICLE,
+         1,
+         OP_1,
+         {sig},
+         {pub_key},
+         malleability::non_malleable,
+         {script_false}},
+        {SCRIPT_CHRONICLE,
+         2,
          OP_1,
          {sig},
          {pub_key},
@@ -5534,6 +5737,14 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nulldummy)
          {script_false}},
        
         {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLDUMMY,
+         1,
+         OP_0,
+         {sig},
+         {pub_key},
+         malleability::non_malleable,
+         {script_false}},
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLDUMMY,
+         2,
          OP_0,
          {sig},
          {pub_key},
@@ -5541,6 +5752,14 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nulldummy)
          {script_false}},
         
         {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLDUMMY,
+         1,
+         OP_1,
+         {sig},
+         {pub_key},
+         SCRIPT_ERR_SIG_NULLDUMMY,
+         {{1}}},
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLDUMMY,
+         2,
          OP_1,
          {sig},
          {pub_key},
@@ -5548,6 +5767,7 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nulldummy)
          {script_false}},
     };
     for(const auto& [flags,
+                     version,
                      dummy,
                      sigs,
                      pks,
@@ -5565,7 +5785,7 @@ BOOST_AUTO_TEST_CASE(eval_script_op_checkmultisig_nulldummy)
                                        CScript{op_checksig_script.begin(),
                                                op_checksig_script.end()},
                                        flags,
-                                       BaseSignatureChecker{});
+                                       versioned_sig_checker{version});
         assert(status);
         std::visit(overload([&expected,
                              &stack,
@@ -5611,98 +5831,86 @@ BOOST_AUTO_TEST_CASE(verify_script_op_checksig_nulldummy)
     const auto sig{make_signature(low_s_max(), sighash)};
 
     using test_args = tuple<uint32_t,              // flags
+                            int32_t,               // txn version
                             uint8_t,               // dummy
-                            malleability::status,
                             ScriptError>;          // expected error
     const vector<test_args> test_data
     {
         // Pre-Chronicle
-        // malleability allowed
         {{},
+         1,
          OP_0,
-         {},
+         SCRIPT_ERR_OK},
+        {{},
+         2,
+         OP_0,
          SCRIPT_ERR_OK},
 
         {{},
+         1,
          OP_1,
-         {},
+         SCRIPT_ERR_OK},
+        {{},
+         2,
+         OP_1,
          SCRIPT_ERR_OK},
 
         {SCRIPT_VERIFY_NULLDUMMY,
+         1,
          OP_0,
-         {},
+         SCRIPT_ERR_OK},
+        {SCRIPT_VERIFY_NULLDUMMY,
+         2,
+         OP_0,
          SCRIPT_ERR_OK},
 
         {SCRIPT_VERIFY_NULLDUMMY,
+         1,
          OP_1,
-         {},
          SCRIPT_ERR_SIG_NULLDUMMY},
-
-        // malleability disallowed
-        {{},
-         OP_0,
-         malleability::disallowed,
-         SCRIPT_ERR_OK},
-
-        {{},
-         OP_1,
-         malleability::disallowed,
-         SCRIPT_ERR_OK},
-
         {SCRIPT_VERIFY_NULLDUMMY,
-         OP_0,
-         malleability::disallowed,
-         SCRIPT_ERR_OK},
-
-        {SCRIPT_VERIFY_NULLDUMMY,
+         2,
          OP_1,
-         malleability::disallowed,
          SCRIPT_ERR_SIG_NULLDUMMY},
 
         // Post-Chronicle
-        // malleability allowed
         {SCRIPT_CHRONICLE,
+         1,
          OP_0,
-         {},
          SCRIPT_ERR_OK},
-
         {SCRIPT_CHRONICLE,
-         OP_1,
-         {},
-         SCRIPT_ERR_OK},
-
-        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLDUMMY,
+         2,
          OP_0,
-         {},
-         SCRIPT_ERR_OK},
-
-        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLDUMMY,
-         OP_1,
-         {},
-         SCRIPT_ERR_OK},
-
-        // malleability disallowed
-        {SCRIPT_CHRONICLE,
-         OP_0,
-         malleability::disallowed,
          SCRIPT_ERR_OK},
 
         {SCRIPT_CHRONICLE,
+         1,
          OP_1,
-         malleability::disallowed,
+         SCRIPT_ERR_OK},
+        {SCRIPT_CHRONICLE,
+         2,
+         OP_1,
          SCRIPT_ERR_OK},
 
         {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLDUMMY,
+         1,
          OP_0,
-         malleability::disallowed,
+         SCRIPT_ERR_OK},
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLDUMMY,
+         2,
+         OP_0,
          SCRIPT_ERR_OK},
 
         {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLDUMMY,
+         1,
          OP_1,
-         malleability::disallowed,
          SCRIPT_ERR_SIG_NULLDUMMY},
+        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_NULLDUMMY,
+         2,
+         OP_1,
+         SCRIPT_ERR_OK},
     };
-    for(const auto& [flags, dummy, ms, exp_error] : test_data)
+    for(const auto& [flags, version, dummy, exp_error] : test_data)
     {
         const auto params{make_verify_script_params(GlobalConfig::GetConfig(), flags, false)};
         auto source = task::CCancellationSource::Make();
@@ -5717,7 +5925,7 @@ BOOST_AUTO_TEST_CASE(verify_script_op_checksig_nulldummy)
                                          CScript{scriptPubKey.begin(),
                                                  scriptPubKey.end()},
                                          flags,
-                                         BaseSignatureChecker{});
+                                         versioned_sig_checker{version});
         assert(status);
         BOOST_CHECK_EQUAL(exp_error == SCRIPT_ERR_OK, status->first);
         BOOST_CHECK_EQUAL(exp_error, status->second);
@@ -5955,58 +6163,59 @@ BOOST_AUTO_TEST_CASE(verify_script_minimal_if)
     const auto sig{make_signature(low_s_max(), sighash)};
 
     using test_args = tuple<uint32_t,              // flags
+                            int32_t,               // txn version
                             vector<uint8_t>,       // script
-                            malleability::status,
                             ScriptError>;          // expected error
     const vector<test_args> test_data
     {
         // Pre-Chronicle
-        // malleability allowed
         {{},
+         1,
          {OP_2, OP_IF, OP_1, OP_ENDIF},
-         {},
+         SCRIPT_ERR_OK},
+        {{},
+         2,
+         {OP_2, OP_IF, OP_1, OP_ENDIF},
          SCRIPT_ERR_OK},
 
-        {SCRIPT_VERIFY_MINIMALIF,
+        {{SCRIPT_ENABLE_SIGHASH_FORKID},
+         1,
          {OP_2, OP_IF, OP_1, OP_ENDIF},
-         {},
+         SCRIPT_ERR_OK},
+        {{SCRIPT_ENABLE_SIGHASH_FORKID},
+         2,
+         {OP_2, OP_IF, OP_1, OP_ENDIF},
+         SCRIPT_ERR_OK},
+
+        {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_VERIFY_MINIMALIF,
+         1,
+         {OP_2, OP_IF, OP_1, OP_ENDIF},
          SCRIPT_ERR_MINIMALIF},
-
-        // malleability disallowed
-        {{},
+        {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_VERIFY_MINIMALIF,
+         2,
          {OP_2, OP_IF, OP_1, OP_ENDIF},
-         malleability::disallowed,
-         SCRIPT_ERR_OK},
-
-        {SCRIPT_VERIFY_MINIMALIF,
-         {OP_2, OP_IF, OP_1, OP_ENDIF},
-         malleability::disallowed,
          SCRIPT_ERR_MINIMALIF},
 
         // Post-Chronicle
-        // malleability allowed
-        {SCRIPT_CHRONICLE,
+        {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
+         1,
          {OP_2, OP_IF, OP_1, OP_ENDIF},
-         {},
+         SCRIPT_ERR_OK},
+        {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE,
+         2,
+         {OP_2, OP_IF, OP_1, OP_ENDIF},
          SCRIPT_ERR_OK},
 
-        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_MINIMALIF,
+        {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE | SCRIPT_VERIFY_MINIMALIF,
+         1,
          {OP_2, OP_IF, OP_1, OP_ENDIF},
-         {},
-         SCRIPT_ERR_OK},
-
-        // malleability disallowed
-        {SCRIPT_CHRONICLE,
-         {OP_2, OP_IF, OP_1, OP_ENDIF},
-         malleability::disallowed,
-         SCRIPT_ERR_OK},
-
-        {SCRIPT_CHRONICLE | SCRIPT_VERIFY_MINIMALIF,
-         {OP_2, OP_IF, OP_1, OP_ENDIF},
-         malleability::disallowed,
          SCRIPT_ERR_MINIMALIF},
+        {SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_CHRONICLE | SCRIPT_VERIFY_MINIMALIF,
+         2,
+         {OP_2, OP_IF, OP_1, OP_ENDIF},
+         SCRIPT_ERR_OK},
     };
-    for(const auto& [flags, script, ms, exp_error] : test_data)
+    for(const auto& [flags, version, script, exp_error] : test_data)
     {
         const auto params{make_verify_script_params(GlobalConfig::GetConfig(), flags, false)};
         auto source = task::CCancellationSource::Make();
@@ -6017,7 +6226,7 @@ BOOST_AUTO_TEST_CASE(verify_script_minimal_if)
                                          CScript{script.begin(),
                                                  script.end()},
                                          flags,
-                                         BaseSignatureChecker{});
+                                         versioned_sig_checker{version});
         assert(status);
         BOOST_CHECK_EQUAL(exp_error == SCRIPT_ERR_OK, status->first);
         BOOST_CHECK_EQUAL(exp_error, status->second);
