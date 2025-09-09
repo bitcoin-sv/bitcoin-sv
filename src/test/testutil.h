@@ -74,4 +74,10 @@ class MakeGlobalMinerIdDb
     MakeGlobalMinerIdDb& operator=(MakeGlobalMinerIdDb&&) = delete;
 };
 
+inline std::vector<uint8_t> Serialize(const CScript& s)
+{
+    std::vector<uint8_t> sSerialized(s.begin(), s.end());
+    return sSerialized;
+}
+
 #endif // BITCOIN_TEST_TESTUTIL_H

@@ -3,7 +3,6 @@
 // Distributed under the Open BSV software license, see the accompanying file
 // LICENSE.
 
-#include "chainparams.h"
 #include "config.h"
 #include "core_io.h"
 #include "key.h"
@@ -16,6 +15,7 @@
 #include "script/sign.h"
 #include "taskcancellation.h"
 #include "test/test_bitcoin.h"
+#include "test/testutil.h"
 #include "validation.h"
 
 #include <cstdint>
@@ -24,11 +24,6 @@
 #include <boost/test/unit_test.hpp>
 
 // Helpers:
-static std::vector<uint8_t> Serialize(const CScript &s) {
-    std::vector<uint8_t> sSerialized(s.begin(), s.end());
-    return sSerialized;
-}
-
 static bool Verify(const CScript& scriptSig,
                    const CScript& scriptPubKey,
                    bool fStrict,

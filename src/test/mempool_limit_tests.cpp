@@ -2,6 +2,7 @@
 // Distributed under the Open BSV software license, see the accompanying file
 // LICENSE.
 
+#include "testutil.h"
 #include "validation.h"
 
 #include "mempool_test_access.h"

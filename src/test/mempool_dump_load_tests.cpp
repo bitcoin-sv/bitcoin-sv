@@ -3,12 +3,12 @@
 // LICENSE.
 
 #include "config.h"
-#include "mempooltxdb.h"
 #include "mining/journal_change_set.h"
 
 #include "mempool_test_access.h"
 
 #include "test/test_bitcoin.h"
+#include "test/testutil.h"
 
 #include <boost/test/unit_test.hpp>
 

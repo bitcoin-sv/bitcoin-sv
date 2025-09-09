@@ -16,6 +16,7 @@
 #include "policy/policy.h"
 #include "pow.h"
 #include "script/standard.h"
+#include "testutil.h"
 #include "txmempool.h"
 #include "uint256.h"
 #include "util.h"

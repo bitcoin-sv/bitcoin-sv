@@ -12,11 +12,11 @@
 #include "pow.h"
 #include "protocol_era.h"
 #include "script/sign.h"
-#include "serialize.h"
-#include "txn_validator.h"
 #include "util.h"
 #include "validation.h"
+
 #include "test/test_bitcoin.h"
+#include "test/testutil.h"
 
 #include <cstdint>
 

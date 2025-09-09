@@ -14,6 +14,7 @@
 #include "txn_validator.h"
 
 #include "test/test_bitcoin.h"
+#include "test/testutil.h"
 
 #include <array>
 #include <boost/test/unit_test.hpp>

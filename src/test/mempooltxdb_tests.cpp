@@ -4,6 +4,7 @@
 #include "mempool_test_access.h"
 
 #include "test/test_bitcoin.h"
+#include "testutil.h"
 
 #include <boost/random.hpp>
 #include <boost/test/unit_test.hpp>

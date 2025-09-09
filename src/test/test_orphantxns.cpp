@@ -6,6 +6,7 @@
 #include "net/net_processing.h"
 #include "orphan_txns.h"
 #include "test/test_bitcoin.h"
+#include "test/testutil.h"
 
 #include <random>
 #include <boost/test/unit_test.hpp>

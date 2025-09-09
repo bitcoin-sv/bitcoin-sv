@@ -17,6 +17,7 @@
 #include "script/standard.h"
 #include "taskcancellation.h"
 #include "test/test_bitcoin.h"
+#include "testutil.h"
 #include "uint256.h"
 
 #include <limits>
@@ -24,16 +25,6 @@
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
-
-namespace
-{
-    // Helpers:
-    std::vector<uint8_t> Serialize(const CScript &s)
-    {
-        std::vector<uint8_t> sSerialized(s.begin(), s.end());
-        return sSerialized;
-    }
-}
 
 BOOST_FIXTURE_TEST_SUITE(sigopcount_tests, BasicTestingSetup)
 
