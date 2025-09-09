@@ -119,6 +119,11 @@ constexpr bool IsChronicle(uint32_t flags)
     return (flags & SCRIPT_CHRONICLE) != 0;
 }
 
+constexpr bool IsDiscourageUpgradableNops(uint32_t flags)
+{
+    return (flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0;
+}
+
 constexpr bool IsUtxoAfterGenesis(uint32_t flags)
 {
     return (flags & SCRIPT_UTXO_AFTER_GENESIS) != 0;

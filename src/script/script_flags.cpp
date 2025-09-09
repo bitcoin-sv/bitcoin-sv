@@ -7,6 +7,9 @@
 static_assert(!IsChronicle(0));
 static_assert(IsChronicle(SCRIPT_CHRONICLE));
 
+static_assert(!IsDiscourageUpgradableNops(0));
+static_assert(IsDiscourageUpgradableNops(SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS));
+
 static_assert(!IsUtxoAfterGenesis(0));
 static_assert(IsUtxoAfterGenesis(SCRIPT_UTXO_AFTER_GENESIS));
 
