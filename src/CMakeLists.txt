@@ -407,6 +407,7 @@ add_library(common
 	script/script_flags.cpp
 	script/script_flags.h
 	script/script_num.h
+	script/shiftnum.h
 	script/sighashtype.h
 	script/sign.cpp
 	script/sign.h
@@ -469,6 +470,7 @@ add_library(bitcoinconsensus
 	script/limitedstack.cpp
     script/malleability_status.cpp
 	script/opcodes.cpp
+	script/shiftnum.cpp
 	script/script.cpp
 	script/script_error.cpp
 	script/script_num.cpp

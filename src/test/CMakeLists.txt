@@ -130,6 +130,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	limitedmap_tests.cpp
 	limitedstack_tests.cpp
 	locked_ref_tests.cpp
+	lrshiftnum_tests.cpp
 	m_candidates_tests.cpp
 	main_tests.cpp
 	mempool_dump_load_tests.cpp

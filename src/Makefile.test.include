@@ -105,6 +105,7 @@ BITCOIN_TESTS =\
   test/limitedmap_tests.cpp \
   test/limitedstack_tests.cpp \
   test/locked_ref_tests.cpp \
+  test/lrshiftnum_tests.cpp \
   test/m_candidates_tests.cpp \
   test/main_tests.cpp \
   test/mempool_test_access.h \

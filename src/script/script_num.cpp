@@ -242,6 +242,28 @@ int CScriptNum::getint() const
                       m_value);
 }
 
+// Extract int64_t with saturation: values exceeding int64_t range are clamped to INT64_MIN/MAX
+int64_t CScriptNum::getint64() const
+{
+    static_assert(variant_size_v<CScriptNum::value_type> == 2);
+
+    return std::visit(overload{[](const bsv::bint& n) -> int64_t {
+                                   static const bint bn_int64_min{
+                                       std::numeric_limits<int64_t>::min()};
+                                   static const bint bn_int64_max{
+                                       std::numeric_limits<int64_t>::max()};
+
+                                   if(n > bn_int64_max)
+                                       return std::numeric_limits<int64_t>::max();
+                                   else if(n < bn_int64_min)
+                                       return std::numeric_limits<int64_t>::min();
+                                   else
+                                       return static_cast<int64_t>(bsv::to_long(n));
+                               },
+                               [](const int64_t n) { return n; }},
+                      m_value);
+}
+
 size_t CScriptNum::to_size_t_limited() const
 {
     static_assert(variant_size_v<CScriptNum::value_type> == 2);

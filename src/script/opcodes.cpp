@@ -306,7 +306,7 @@ const char* GetOpName(opcodetype opcode)
     case OP_RIGHT:
         return "OP_RIGHT";
     case OP_NOP7:
-        return "OP_NOP7";
+        return "OP_LSHIFTNUM";
     case OP_NOP8:
         return "OP_NOP8";
     case OP_NOP9:

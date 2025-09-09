@@ -528,6 +528,8 @@ libbitcoin_consensus_a_SOURCES = \
   script/script_num.h \
   script/script_error.cpp \
   script/script_error.h \
+  script/shiftnum.cpp \
+  script/shiftnum.h \
   serialize.h \
   taskcancellation.h \
   taskcancellation.cpp \

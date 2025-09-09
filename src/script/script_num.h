@@ -96,6 +96,7 @@ public:
     friend std::ostream& operator<<(std::ostream&, const CScriptNum&);
 
     int getint() const;
+    int64_t getint64() const;
     std::vector<uint8_t> getvch() const;
 
     // Precondition: n <= numeric_limit<int32_t>::max() and n>=0

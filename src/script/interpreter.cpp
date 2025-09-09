@@ -5,33 +5,34 @@
 
 #include "interpreter.h"
 
-#include "protocol_era.h"
-#include "script/malleability_status.h"
-#include "script_flags.h"
+#include "big_int.h"
+#include "config.h"
 #include "crypto/ripemd160.h"
 #include "crypto/sha1.h"
 #include "crypto/sha256.h"
 #include "hash.h"
 #include "primitives/transaction.h"
+#include "protocol_era.h"
 #include "pubkey.h"
+#include "script/malleability_status.h"
 #include "script/opcodes.h"
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/script_num.h"
+#include "script/shiftnum.h"
+#include "script_flags.h"
 #include "taskcancellation.h"
 #include "uint256.h"
-#include "config.h"
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <utility>
 #include <variant>
 
 namespace
 {
-    constexpr auto bits_per_byte{8};
-
     inline constexpr bool TxnVersionIsMalleable(const int32_t version)
     {
         // Post-Chronicle, malleability is permitted if txn version > 1
@@ -703,8 +704,43 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         stack.pop_back();
                         break;
                     }
+                    case OP_LSHIFTNUM:
+                    {
+                        if(!utxo_after_chronicle)
+                        {
+                            if(IsDiscourageUpgradableNops(flags))
+                                return SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS;
+                            else
+                                break;
+                        }
+
+                        // (x n -- out)
+                        if(stack.size() < 2)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
+                        const LimitedVector a = stack.stacktop(-2);
+                        const auto& s0{stack.stacktop(-1).GetElement()};
+                        CScriptNum n{s0,
+                                     min_encode_check,
+                                     ms,
+                                     params.MaxScriptNumLength(),
+                                     utxo_after_genesis};
+                        if(n < 0)
+                            return SCRIPT_ERR_INVALID_NUMBER_RANGE;
+
+                        stack.pop_back();
+                        stack.pop_back();
+                        auto values{a.GetElement()};
+
+                        const auto cancelled{lshiftnum(token, n, values, values)};
+                        if(cancelled)
+                            return {};
+
+                        stack.push_back(std::move(values));
+                        break;
+                    }
+
                     case OP_NOP1:
-                    case OP_NOP7:
                     case OP_NOP8:
                     case OP_NOP9:
                     case OP_NOP10: {
