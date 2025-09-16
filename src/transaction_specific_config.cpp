@@ -102,7 +102,7 @@ uint64_t TransactionSpecificConfig::GetMaxScriptNumLength(ProtocolEra era, bool 
     return tmp.GetMaxScriptNumLength(era, isConsensus);
 };
 
-bool TransactionSpecificConfig::SetTransactionSpecificMaxStackMemoryUsage(ProtocolEra era, int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err)
+bool TransactionSpecificConfig::SetTransactionSpecificMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err)
 {
     // To avoid duplicating code from GlobalConfig we create temporary GlobalConfig object and call getter and setter
     // for specific policy setting.
@@ -112,7 +112,7 @@ bool TransactionSpecificConfig::SetTransactionSpecificMaxStackMemoryUsage(Protoc
         return false;
     }
 
-    mMaxStackMemoryUsageConsensus = tmp.GetMaxScriptNumLength(era, true);
+    mMaxStackMemoryUsageConsensus = tmp.GetMaxStackMemoryUsage(true, true);
     mMaxStackMemoryUsagePolicy = tmp.GetMaxStackMemoryUsage(true, false);
 
     return true;

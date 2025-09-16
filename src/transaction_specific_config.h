@@ -29,7 +29,7 @@ public:
     bool SetTransactionSpecificMaxScriptNumLengthPolicy(ProtocolEra era, int64_t maxScriptNumLengthIn, std::string* err = nullptr);
     uint64_t GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const override;
 
-    bool SetTransactionSpecificMaxStackMemoryUsage(ProtocolEra era, int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr);
+    bool SetTransactionSpecificMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr);
     uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const override;
     
     bool SetTransactionSpecificLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr);
