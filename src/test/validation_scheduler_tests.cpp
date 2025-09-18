@@ -109,7 +109,7 @@ namespace{
 
         // Check that transactions were validated in correct order.
         for (const auto& tx : txsToValidate) {
-            const auto& txPos = std::find(executedTxs.cbegin(), executedTxs.cend(), tx.GetId());
+            const auto txPos = std::find(executedTxs.cbegin(), executedTxs.cend(), tx.GetId());
             for (const auto& input : tx.vin) {
                 const auto& inputPos = std::find(executedTxs.cbegin(), executedTxs.cend(), input.prevout.GetTxId());
                 if (inputPos != executedTxs.cend()) {
