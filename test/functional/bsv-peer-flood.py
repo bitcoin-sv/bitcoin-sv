@@ -37,13 +37,17 @@ class TestConn(NodeConn):
 
     def drain_buffer(self):
         with mininode_lock:
-            try:
-                while True:
-                    _ = self.recv(READ_BUFFER_SIZE)
-            except Exception:
-                pass
+            t = self.recv(READ_BUFFER_SIZE)
+            if len(t) > 0:
+                self.recvbuf += t
 
-            self.do_reading = True
+        while True:
+            msg = self.got_data()
+            if msg is None:
+                break
+
+        self.do_reading = True
+        super().handle_read()
 
     # Override read method so we can ignore incoming responses
     def handle_read(self):
