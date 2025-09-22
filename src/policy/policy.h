@@ -10,7 +10,6 @@
 #include "protocol_era.h"
 #include "script/interpreter.h"
 #include "script/standard.h"
-#include "util.h"
 
 #include <optional>
 #include <string>
@@ -270,6 +269,12 @@ inline uint32_t StandardNotMandatoryScriptVerifyFlags(ProtocolEra era)
         return static_cast<uint32_t>(ScriptVerifyFlags::PRE_CHRONICLE_STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
     }
 }
+
+template <typename T>
+struct AnnotatedType {
+    T value = T{};
+    std::optional<std::string> hint = std::nullopt;
+};
 
 /** Consolidation transactions are free */
 bool IsDustReturnTxn (const CTransaction &tx);
