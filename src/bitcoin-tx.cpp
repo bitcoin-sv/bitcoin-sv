@@ -51,7 +51,7 @@ static int AppInitRawTx(int argc, char *argv[]) {
     // Check for -testnet or -regtest parameter (Params() calls are only valid
     // after this clause)
     try {
-        SelectParams(ChainNameFromCommandLine());
+        SelectParams(ChainNameFromCommandLine(), MagicBytesFromCommandLine());
     } catch (const std::exception &e) {
         std::cerr << "Error: " << e.what() << '\n';
         return EXIT_FAILURE;

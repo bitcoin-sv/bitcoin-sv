@@ -126,7 +126,7 @@ bool AppInit(int argc, char *argv[]) {
         // valid after this clause)
         try
         {
-            SelectParams(ChainNameFromCommandLine());
+            SelectParams(ChainNameFromCommandLine(), MagicBytesFromCommandLine());
         }
         catch(const std::exception& e)
         {

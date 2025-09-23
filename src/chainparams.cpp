@@ -9,8 +9,8 @@
 #include "policy/policy.h"
 #include "script/script_num.h"
 
+#include "logging.h"
 #include "tinyformat.h"
-#include "util.h"
 #include "utilstrencodings.h"
 
 #include <cassert>
@@ -657,15 +657,13 @@ std::unique_ptr<CChainParams> CreateChainParams(const std::string &chain) {
         strprintf("%s: Unknown chain %s.", __func__, chain));
 }
 
-void SelectParams(const std::string &network) {
+void SelectParams(const std::string &network, const std::optional<std::string>& magicBytes) {
     SelectBaseParams(network);
     globalChainParams = CreateChainParams(network);
 
     // If not mainnet, allow to set the parameter magicbytes (for testing propose)
-    const bool isMagicBytesSet = gArgs.IsArgSet("-magicbytes");
-    if(network != CBaseChainParams::MAIN && isMagicBytesSet){
-        const std::string magicbytesStr = gArgs.GetArg("-magicbytes", "0f0f0f0f");
-        LogPrintf("Manually set magicbytes [%s].\n",magicbytesStr);
-        ResetNetMagic(*globalChainParams,magicbytesStr);
+    if (network != CBaseChainParams::MAIN && magicBytes.has_value()) {
+        LogPrintf("Manually set magicbytes [%s].\n", magicBytes->c_str());
+        ResetNetMagic(*globalChainParams, *magicBytes);
     }
 }

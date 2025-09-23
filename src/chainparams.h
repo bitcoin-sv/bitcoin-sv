@@ -13,6 +13,8 @@
 
 #include <memory>
 #include <vector>
+#include <optional>
+#include <string>
 
 struct CDNSSeedData {
     std::string name, host;
@@ -153,6 +155,6 @@ const CChainParams &Params();
  * Sets the params returned by Params() to those for the given BIP70 chain name.
  * @throws std::runtime_error when the chain is not supported.
  */
-void SelectParams(const std::string &chain);
+void SelectParams(const std::string &chain, const std::optional<std::string>& magicBytes = std::nullopt);
 
 #endif // BITCOIN_CHAINPARAMS_H

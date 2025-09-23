@@ -251,6 +251,26 @@ std::string HelpMessageGroup(const std::string &message);
 std::string HelpMessageOpt(const std::string &option,
                            const std::string &message);
 
+
+
+/**
+ * Append the help messages for the chainparams options to the
+ * parameter string.
+ */
+void AppendParamsHelpMessages(std::string& strUsage);
+
+/**
+ * Looks for -regtest, -testnet and returns the appropriate BIP70 chain name.
+ * @return CBaseChainParams::MAX_NETWORK_TYPES if an invalid combination is
+ * given. CBaseChainParams::MAIN by default.
+ */
+std::string ChainNameFromCommandLine();
+
+/**
+ * Looks for -magicbytes if this is set
+ */
+std::optional<std::string> MagicBytesFromCommandLine();
+
 /**
  * Return the number of physical cores available on the current system.
  * @note This does not count virtual cores, such as those provided by

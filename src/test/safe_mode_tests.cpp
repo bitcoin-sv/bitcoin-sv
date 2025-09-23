@@ -17,7 +17,7 @@ BOOST_AUTO_TEST_SUITE(safe_mode_tests)
 
 BOOST_FIXTURE_TEST_CASE(get_min_relevant_block_height, chain_guard)
 {
-    SelectParams(CBaseChainParams::REGTEST);
+    SelectParams(CBaseChainParams::REGTEST, MagicBytesFromCommandLine());
     const auto& config{GlobalConfig::GetConfig()};
 
     const std::vector<std::pair<int64_t, int64_t>> test_data{{-1, 0}, {0, 0}, {1, 1}};
@@ -53,7 +53,7 @@ BOOST_FIXTURE_TEST_CASE(exclude_ignored_blocks_nullptr, chain_guard)
 
 BOOST_FIXTURE_TEST_CASE(exclude_ignored_blocks, chain_guard)
 {
-    SelectParams(CBaseChainParams::REGTEST);
+    SelectParams(CBaseChainParams::REGTEST, MagicBytesFromCommandLine());
 
     CBlockHeader hdr;
     uint256 prev_hash;

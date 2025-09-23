@@ -37,7 +37,7 @@ static void addCoin(const Amount& nValue,
 // either for measurements."
 // (https://github.com/bitcoin/bitcoin/issues/7883#issuecomment-224807484)
 static void CoinSelection(benchmark::State &state) {
-    SelectParams(CBaseChainParams::TESTNET);
+    SelectParams(CBaseChainParams::TESTNET, MagicBytesFromCommandLine());
     GlobalConfig::GetModifiableGlobalConfig().SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
     const CWallet wallet(Params());
     std::vector<COutput> vCoins;
