@@ -12,8 +12,8 @@
 #include "overload.h"
 #include "protocol_era.h"
 #include "rpc/server.h"
-#include "script/opcodes.h"
 #include "script/interpreter.h"
+#include "script/opcodes.h"
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/script_flags.h"
@@ -415,7 +415,7 @@ private:
     }
 
     std::vector<uint8_t> MakeSig(
-        CScript& script,
+        const CScript& script,
         const CKey& key,
         SigHashType sigHashType = SigHashType().withForkId(),
         unsigned int lenR = 32,
@@ -522,17 +522,56 @@ public:
         return *this;
     }
 
+    TestBuilder& PushChronicleScriptSigSig(
+        const CKey& key,
+        const CScript& scriptSig,
+        SigHashType sigHashType = SigHashType().withForkId(),
+        unsigned int lenR = 32,
+        unsigned int lenS = 32,
+        const Amount& amount = Amount(0),
+        const std::optional<TxDigestAlgorithm>& forceTDA = std::nullopt)
+    {
+        // Push signature over scriptSig + scriptPubKey
+        CScript scriptToSign = scriptSig;
+        scriptToSign += script_;
+        DoPush(MakeSig(scriptToSign, key, sigHashType, lenR, lenS, amount, forceTDA));
+        DoPush();
+        return *this;
+    }
+
+    TestBuilder& PushSignedScript(
+        const CKey& key,
+        const CScript& scriptSig,
+        SigHashType sigHashType = SigHashType().withForkId(),
+        bool justSign = false,
+        unsigned int lenR = 32,
+        unsigned int lenS = 32,
+        const Amount& amount = Amount(0),
+        const std::optional<TxDigestAlgorithm>& forceTDA = std::nullopt)
+    {
+        DoPush(MakeSig(scriptSig, key, sigHashType, lenR, lenS, amount, forceTDA));
+        DoPush();
+        if(!justSign)
+        {
+            // Push remainder of the scriptSig with OCS
+            CScript tmp = CScript() << OP_CODESEPARATOR;
+            tmp += scriptSig;
+            PushScript(tmp);
+        }
+        return *this;
+    }
+
     // Signing tranaction that spends this kind of the scriptPubKey:
     // <PubKey1> OP_CHECKSIGVERIFY OP_CODESEPARATOR <PubKey2> OP_CHECKSIGVERIFY OP_CODESEPARATOR .... <PubKeyN> OP_CHECKSIG
     // Using vector of keys:  keyN ... key2, key1
     TestBuilder& PushSeparatorSigs(
-        std::vector<const CKey*> keys,
+        const std::vector<const CKey*>& keys,
         SigHashType sigHashType = SigHashType().withForkId(),
         unsigned int lenR = 32,
         unsigned int lenS = 32,
-        const Amount& amount = Amount(0))
+        const Amount& amount = Amount(0),
+        const std::optional<TxDigestAlgorithm>& forceTDA = std::nullopt)
     {
-
         // splitting script of the form: 
         // <script1> OP_CODESEPARATOR <script2> OP_CODESEPARATOR ... <scriptN-1> OP_CODESEPARATOR <scriptN>
         //
@@ -551,7 +590,7 @@ public:
         std::vector<uint8_t> data;
         
         while (pc < script_.end()) {
-            opcodetype opcode; // NOLINT(cppcoreguidelines-init-variables)
+            opcodetype opcode {};
             if (!script_.GetOp(pc, opcode, data)){
                 break;
             }
@@ -572,8 +611,9 @@ public:
 
         for(auto& s : separatedScripts)
         {
-            if(*keysIterator != nullptr){
-                auto sig = MakeSig(s, **keysIterator, sigHashType, lenR, lenS, amount);
+            if(*keysIterator != nullptr)
+            {
+                auto sig = MakeSig(s, **keysIterator, sigHashType, lenR, lenS, amount, forceTDA);
                 DoPush(sig);
             }
             keysIterator++;
@@ -1487,6 +1527,200 @@ BOOST_AUTO_TEST_CASE(script_json_test) {
             BOOST_TEST_MESSAGE("Exception: " << e.what());
             throw;
         }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(chronicle_scriptsig_checksig)
+{
+    const KeyData keys;
+
+    std::vector<TestBuilder> tests;
+
+    auto preGenesisFlags { StandardScriptVerifyFlags(ProtocolEra::PreGenesis) | InputScriptVerifyFlags(ProtocolEra::PreGenesis, ProtocolEra::PreGenesis) };
+    auto preChronicleFlags { StandardScriptVerifyFlags(ProtocolEra::PostGenesis) | InputScriptVerifyFlags(ProtocolEra::PostGenesis, ProtocolEra::PostGenesis) };
+    auto postChronicleFlags { StandardScriptVerifyFlags(ProtocolEra::PostChronicle) | InputScriptVerifyFlags(ProtocolEra::PostChronicle, ProtocolEra::PostChronicle) };
+
+    constexpr int32_t Malleable {0x2};
+    CScript scriptSigWithChecksig = CScript() << ToByteVector(keys.pubkey1) << OP_CHECKSIGVERIFY;
+
+    /***********************/
+    /* Pre-Chronicle Tests */
+    /***********************/
+
+    // Pre-Chronicle: CHECKSIG in scriptSig should fail (SIG_PUSHONLY rule)
+    // Sig0, Sig1, OCS, PK1, CHECKSIG | PK0, CHECKSIG
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "PreChronicle, scriptSig contains CHECKSIG", preChronicleFlags,
+                    false, Amount{0}, Malleable)
+            .PushSig(keys.key0, SigHashType().withForkId())
+            .PushSignedScript(keys.key1, scriptSigWithChecksig, SigHashType().withForkId())
+            .ScriptError(SCRIPT_ERR_SIG_PUSHONLY));
+
+    // Pre-Genesis: CHECKSIG in scriptSig can pass if signed with Pre-Chronicle rules
+    // Sig0, Sig1, OCS, PK1, CHECKSIG | PK0, CHECKSIG
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "PreGenesis, scriptSig contains CHECKSIG", preGenesisFlags,
+                    false, Amount{0}, Malleable)
+            .PushSig(keys.key0, SigHashType().withForkId())
+            .PushSignedScript(keys.key1, scriptSigWithChecksig, SigHashType().withForkId())
+            .ScriptError(SCRIPT_ERR_OK));
+
+    // Pre-Genesis: CHECKSIG in scriptSig signed with Chronicle rules should fail
+    // Sig0, Sig1, OCS, PK1, CHECKSIG | PK0, CHECKSIG
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "PreGenesis, scriptSig contains CHECKSIG", preGenesisFlags,
+                    false, Amount{0}, Malleable)
+            .PushSig(keys.key0, SigHashType().withForkId())
+            .PushChronicleScriptSigSig(keys.key1, scriptSigWithChecksig, SigHashType().withForkId())
+            .PushScript((CScript() << OP_CODESEPARATOR) + scriptSigWithChecksig)
+            .ScriptError(SCRIPT_ERR_SIG_NULLFAIL));
+
+    /************************/
+    /* Post-Chronicle Tests */
+    /************************/
+
+    // Post-Chronicle: CHECKSIG in scriptSig signed with Chronicle rules should pass
+    // Sig0, Sig1, OCS, PK1, CHECKSIG | PK0, CHECKSIG
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "PostChronicle, scriptSig contains CHECKSIG", postChronicleFlags,
+                    false, Amount{0}, Malleable)
+            .PushSig(keys.key0, SigHashType().withForkId())
+            .PushChronicleScriptSigSig(keys.key1, scriptSigWithChecksig, SigHashType().withForkId())
+            .PushScript((CScript() << OP_CODESEPARATOR) + scriptSigWithChecksig)
+            .ScriptError(SCRIPT_ERR_OK));
+
+    // Post-Chronicle: Multiple CHECKSIG operations in scriptSig
+    // Sig0, Sig1, Sig2, OCS, PK2, CHECKSIG, OCS, PK1, CHECKSIG | PK0, CHECKSIG
+    CScript scriptSigMultiChecksig = (CScript() << ToByteVector(keys.pubkey2) << OP_CHECKSIGVERIFY << OP_CODESEPARATOR) + scriptSigWithChecksig;
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "PostChronicle, scriptSig contains multiple CHECKSIG operations", postChronicleFlags,
+                    false, Amount{0}, Malleable)
+            .PushSig(keys.key0, SigHashType().withForkId())
+            .PushChronicleScriptSigSig(keys.key1, scriptSigWithChecksig, SigHashType().withForkId())
+            .PushChronicleScriptSigSig(keys.key2, scriptSigMultiChecksig, SigHashType().withForkId())
+            .PushScript((CScript() << OP_CODESEPARATOR) + scriptSigMultiChecksig)
+            .ScriptError(SCRIPT_ERR_OK));
+
+    // Post-Chronicle: Multiple CHECKSIG operations in scriptPubKey
+    // Sig0, Sig2, Sig1, OCS, PK1, CHECKSIG | PK2, CHECKSIG, OCS, PK0, CHECKSIG
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey2) << OP_CHECKSIGVERIFY << OP_CODESEPARATOR
+                              << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "PostChronicle, scriptPubKey contains multiple CHECKSIG operations", postChronicleFlags,
+                    false, Amount{0}, Malleable)
+            .PushSignedScript(keys.key0, CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG, SigHashType().withForkId(), true)
+            .PushSig(keys.key2, SigHashType().withForkId())
+            .PushChronicleScriptSigSig(keys.key1, scriptSigWithChecksig, SigHashType().withForkId())
+            .PushScript((CScript() << OP_CODESEPARATOR) + scriptSigWithChecksig)
+            .ScriptError(SCRIPT_ERR_OK));
+
+    /******************/
+    /* Multisig Tests */
+    /******************/
+
+    // Post-Chronicle: CHECKMULTISIG in scriptSig
+    // Sig0, 0, Sig1, Sig2, OCS, 2, PK0, PK1, PK2, 3, CHECKMULTISIG | PK0, CHECKSIG
+    CScript scriptSigWithMultisig = CScript() << OP_2
+                                              << ToByteVector(keys.pubkey0) << ToByteVector(keys.pubkey1) << ToByteVector(keys.pubkey2)
+                                              << OP_3 << OP_CHECKMULTISIGVERIFY;
+    CScript combinedScriptsWithMultisig = scriptSigWithMultisig + CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG;
+
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "PostChronicle, scriptSig contains CHECKMULTISIG", postChronicleFlags,
+                    false, Amount{0}, Malleable)
+            .PushSig(keys.key0, SigHashType().withForkId())
+            .Num(0)
+            .PushSignedScript(keys.key1, combinedScriptsWithMultisig, SigHashType().withForkId(), true)
+            .PushSignedScript(keys.key2, combinedScriptsWithMultisig, SigHashType().withForkId(), true)
+            .PushScript((CScript() << OP_CODESEPARATOR) + scriptSigWithMultisig)
+            .ScriptError(SCRIPT_ERR_OK));
+
+    // Pre-Chronicle: CHECKMULTISIG in scriptSig should fail
+    // Sig0, 0, Sig1, Sig2, OCS, 2, PK0, PK1, PK2, 3, CHECKMULTISIG | PK0, CHECKSIG
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "PreChronicle, scriptSig contains CHECKMULTISIG", preChronicleFlags,
+                    false, Amount{0}, Malleable)
+            .PushSig(keys.key0, SigHashType().withForkId())
+            .Num(0)
+            .PushSignedScript(keys.key1, combinedScriptsWithMultisig, SigHashType().withForkId(), true)
+            .PushSignedScript(keys.key2, combinedScriptsWithMultisig, SigHashType().withForkId(), true)
+            .PushScript((CScript() << OP_CODESEPARATOR) + scriptSigWithMultisig)
+            .ScriptError(SCRIPT_ERR_SIG_PUSHONLY));
+
+    /*****************/
+    /* Failure Cases */
+    /*****************/
+
+    CKey badKey {};
+    badKey.MakeNewKey(true);
+
+    // Post-Chronicle: Wrong public key / bad signature in scriptSig CHECKSIG
+    // Sig0, Sig1, OCS, BadPK, CHECKSIG | PK0, CHECKSIG
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "PostChronicle, scriptSig CHECKSIG with wrong key", postChronicleFlags,
+                    false, Amount{0}, Malleable)
+            .PushSig(keys.key0, SigHashType().withForkId())
+            .PushChronicleScriptSigSig(keys.key1, scriptSigWithChecksig, SigHashType().withForkId())
+            .PushScript(CScript() << OP_CODESEPARATOR << ToByteVector(badKey.GetPubKey()) << OP_CHECKSIGVERIFY)
+            .ScriptError(SCRIPT_ERR_CHECKSIGVERIFY));
+
+    // Post-Chronicle: Wrong public key / bad signature in scriptSig CHECKMULTISIG
+    // Sig0, 0, Sig1, Sig2, OCS, 2, PK0, PK1, BadPK, 3, CHECKMULTISIG | PK0, CHECKSIG
+    CScript scriptSigWrongKeyWithMultisig = CScript() << OP_2
+                                                      << ToByteVector(keys.pubkey0) << ToByteVector(keys.pubkey1) << ToByteVector(badKey.GetPubKey())
+                                                      << OP_3 << OP_CHECKMULTISIGVERIFY;
+    CScript combinedScriptsWrongKeyWithMultisig = scriptSigWrongKeyWithMultisig + CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG;
+
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "PostChronicle, scriptSig CHECKMULTISIG with wrong key", postChronicleFlags,
+                    false, Amount{0}, Malleable)
+            .PushSig(keys.key0, SigHashType().withForkId())
+            .Num(0)
+            .PushSignedScript(keys.key1, combinedScriptsWrongKeyWithMultisig, SigHashType().withForkId(), true)
+            .PushSignedScript(keys.key2, combinedScriptsWrongKeyWithMultisig, SigHashType().withForkId(), true)
+            .PushScript((CScript() << OP_CODESEPARATOR) + scriptSigWrongKeyWithMultisig)
+            .ScriptError(SCRIPT_ERR_CHECKMULTISIGVERIFY));
+
+    /**************/
+    /* Edge Cases */
+    /**************/
+
+    // Post-Chronicle: Empty signature in scriptSig CHECKSIG
+    // Sig0, 0, OCS, PK1, CHECKSIG | PK0, CHECKSIG
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "PostChronicle, scriptSig CHECKSIG with empty signature, malleable", postChronicleFlags,
+                    false, Amount{0}, Malleable)
+            .PushSig(keys.key0, SigHashType().withForkId())
+            .Num(0)
+            .PushScript((CScript() << OP_CODESEPARATOR) + scriptSigWithChecksig)
+            .ScriptError(SCRIPT_ERR_CHECKSIGVERIFY));
+
+    // Post-Chronicle: Complex scriptSig with mixed operations and CHECKSIG
+    // Sig0, Sig1, DUP, HASH160, DROP, OCS, PK1, CHECKSIG, DUP, DROP | PK0, CHECKSIG
+    CScript scriptSigComplex = CScript() << OP_DUP << OP_HASH160 << OP_DROP << OP_CODESEPARATOR
+                                         << ToByteVector(keys.pubkey1) << OP_CHECKSIGVERIFY << OP_DUP << OP_DROP;
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
+                    "PostChronicle, complex scriptSig with mixed operations and CHECKSIG", postChronicleFlags,
+                    false, Amount{0}, Malleable)
+            .PushSig(keys.key0, SigHashType().withForkId())
+            .PushChronicleScriptSigSig(keys.key1, CScript() << ToByteVector(keys.pubkey1) << OP_CHECKSIGVERIFY << OP_DUP << OP_DROP, SigHashType().withForkId())
+            .PushScript(scriptSigComplex)
+            .ScriptError(SCRIPT_ERR_OK));
+
+    for (TestBuilder& test : tests)
+    {
+        test.Test();
     }
 }
 
