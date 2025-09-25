@@ -11,6 +11,8 @@
 
 #include <event2/buffer.h>
 
+static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
+
 namespace
 {
     // Callback for HTTP error

@@ -5,8 +5,6 @@
 #ifndef BITCOIN_CONFIG_H
 #define BITCOIN_CONFIG_H
 
-static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
-
 #include "amount.h"
 #include "mining/factory.h"
 #include "net/net.h"
