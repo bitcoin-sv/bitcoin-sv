@@ -387,6 +387,7 @@ std::optional<ScriptError> EvalScript(
     const task::CCancellationToken& token,
     LimitedStack& stack,
     const CScript& script,
+    const CScript* checksigData,
     uint32_t flags,
     const BaseSignatureChecker& checker,
     LimitedStack& altstack,
@@ -1435,10 +1436,18 @@ std::optional<ScriptError> EvalScript(
                         {
                             return error;
                         }
-                            
-                        // Subset of script starting at the most recent
-                        // codeseparator
-                        CScript scriptCode(pbegincodehash, pend);
+
+                        // Subset of script starting at the most recent codeseparator
+                        // to the end of the current script
+                        CScript scriptCode {pbegincodehash, pend};
+                        // checksigData contains scriptPubKey if we are executing within a scriptSig
+                        if(checksigData && IsChronicle(flags))
+                        {
+                            // Post-Chronicle, a CHECKSIG in the scriptSig signs everything
+                            // from the most recent codeseparator to the end of this
+                            // scriptSig + scriptPubKey
+                            scriptCode += *checksigData;
+                        }
 
                         // Remove signature for pre-fork scripts
                         CleanupScriptCode(scriptCode, vchSig.GetElement(), flags);
@@ -1522,9 +1531,17 @@ std::optional<ScriptError> EvalScript(
                         if (stack.size() < i)
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
-                        // Subset of script starting at the most recent
-                        // codeseparator
-                        CScript scriptCode(pbegincodehash, pend);
+                        // Subset of script starting at the most recent codeseparator
+                        // to the end of the current script
+                        CScript scriptCode {pbegincodehash, pend};
+                        // checksigData contains scriptPubKey if we are executing within a scriptSig
+                        if(checksigData && IsChronicle(flags))
+                        {
+                            // Post-Chronicle, a CHECKMULTISIG in the scriptSig signs
+                            // everything from the most recent codeseparator to the end
+                            // of this scriptSig + scriptPubKey
+                            scriptCode += *checksigData;
+                        }
 
                         // Remove signature for pre-fork scripts
                         for (uint64_t k = 0; k < nSigsCount; k++) {
@@ -1776,29 +1793,6 @@ std::optional<ScriptError> EvalScript(
     return SCRIPT_ERR_OK;
 }
 
-std::optional<ScriptError> EvalScript(
-    const eval_script_params& params,
-    const task::CCancellationToken& token,
-    LimitedStack& stack,
-    const CScript& script,
-    uint32_t flags,
-    const BaseSignatureChecker& checker)
-{
-    LimitedStack altstack {stack.makeChildStack()};
-    long ipc{0};
-    std::vector<bool> vfExec, vfElse;
-    return EvalScript(params,
-                      token,
-                      stack,
-                      script,
-                      flags,
-                      checker,
-                      altstack,
-                      ipc,
-                      vfExec,
-                      vfElse);
-}
-
 namespace {
 
 /**
@@ -1938,7 +1932,49 @@ uint256 GetOutputsHash(const CTransaction &txTo) {
     return ss.GetHash();
 }
 
+std::optional<ScriptError> EvalScript(
+    const eval_script_params& params,
+    const task::CCancellationToken& token,
+    LimitedStack& stack,
+    const CScript& script,
+    const CScript* scriptPubKey,
+    uint32_t flags,
+    const BaseSignatureChecker& checker)
+{
+    LimitedStack altstack {stack.makeChildStack()};
+    long ipc{0};
+    std::vector<bool> vfExec, vfElse;
+    return EvalScript(params,
+                      token,
+                      stack,
+                      script,
+                      scriptPubKey,
+                      flags,
+                      checker,
+                      altstack,
+                      ipc,
+                      vfExec,
+                      vfElse);
+}
+
 } // namespace
+
+std::optional<ScriptError> EvalScript(
+    const eval_script_params& params,
+    const task::CCancellationToken& token,
+    LimitedStack& stack,
+    const CScript& script,
+    uint32_t flags,
+    const BaseSignatureChecker& checker)
+{
+    return EvalScript(params,
+                      token,
+                      stack,
+                      script,
+                      nullptr,
+                      flags,
+                      checker);
+}
 
 PrecomputedTransactionData::PrecomputedTransactionData(
     const CTransaction &txTo) {
@@ -2254,6 +2290,7 @@ std::optional<ScriptError> VerifyScript(
                                  token,
                                  stack,
                                  scriptSig,
+                                 &scriptPubKey,
                                  flags,
                                  checker);
        !o.has_value())
@@ -2273,6 +2310,7 @@ std::optional<ScriptError> VerifyScript(
                                  token,
                                  stack,
                                  scriptPubKey,
+                                 nullptr,
                                  flags,
                                  checker);
        !o.has_value())
@@ -2316,6 +2354,7 @@ std::optional<ScriptError> VerifyScript(
                                      token,
                                      stack,
                                      pubKey2,
+                                     nullptr,
                                      flags,
                                      checker);
            !o.has_value())

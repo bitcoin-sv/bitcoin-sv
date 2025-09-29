@@ -201,6 +201,7 @@ std::optional<ScriptError> EvalScript(
     const task::CCancellationToken& token,
     LimitedStack& stack,
     const CScript& script,
+    const CScript* checksigData,
     uint32_t flags,
     const BaseSignatureChecker& checker,
     LimitedStack& altstack,
