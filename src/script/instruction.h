@@ -53,8 +53,11 @@ namespace bsv
 
     inline std::ostream& operator<<(std::ostream& os, const instruction& inst)
     {
-        os << inst.opcode() << ' ' << (void*)inst.operand().data() << ' '
-           << inst.operand().size();
+        os << inst.opcode();
+        if(inst.operand().size() > 0)
+        {
+            os << ' ' << (void*)inst.operand().data() << ' ' << inst.operand().size();
+        }
         return os;
     }
 }
