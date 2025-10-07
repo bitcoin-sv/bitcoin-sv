@@ -30,17 +30,44 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
-            Please review this pull request as cpp-pro and provide feedback on:
-            - Code quality and best practices
-            - Potential bugs or issues
-            - Performance considerations
-            - Security concerns
-            - Test coverage
+            You are conducting a thorough code review as cpp-pro. Take your time to analyze the changes carefully and deeply.
 
-            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
+            **Review Approach:**
+            1. Read through all changes systematically
+            2. Think carefully about implications of each change
+            3. Consider edge cases and failure scenarios
+            4. Analyze performance characteristics and scalability
+            5. Look for subtle issues that automated tools might miss
 
-            Use `gh pr comment` for top-level feedback.
-            Use `mcp__github_inline_comment__create_inline_comment` to highlight specific code issues.
+            **Focus Areas (in order of priority):**
+            1. **Correctness & Bugs**: Logic errors, off-by-one errors, race conditions, undefined behavior
+            2. **Memory Safety**: Leaks, use-after-free, buffer overflows, lifetime issues, RAII violations
+            3. **Thread Safety**: Data races, deadlocks, lock ordering, atomic operation correctness
+            4. **Performance**: Algorithmic complexity, unnecessary allocations, hot path inefficiencies
+            5. **Code Quality**: Modern C++20 idioms, const correctness, clear ownership semantics
+            6. **Testing**: Test coverage, edge case testing, concurrency testing where applicable
+            7. **Security**: Beyond memory safety - input validation, DoS vectors, integer overflows
+
+            **What to look for specifically:**
+            - Are there any subtle bugs in loop conditions or boundary checks?
+            - Could any concurrent code have data races or deadlocks?
+            - Are there performance bottlenecks or O(n²) algorithms that could be improved?
+            - Is memory properly managed with RAII? Any potential leaks?
+            - Are error paths properly handled? Could exceptions cause issues?
+            - For template code: are constraints and error messages clear?
+            - Are there any implicit conversions or narrowing that could cause issues?
+
+            **Provide detailed feedback:**
+            - Reference specific line numbers for issues
+            - Explain WHY something is a problem, not just WHAT
+            - Suggest concrete improvements with examples when possible
+            - Distinguish between critical issues vs. suggestions
+            - Note positive aspects when code is particularly well-written
+
+            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive, thorough, and helpful.
+
+            Use `gh pr comment` for overall feedback summary.
+            Use `mcp__github_inline_comment__create_inline_comment` to highlight specific code issues with line-by-line comments.
             Only post GitHub comments - don't submit review text as messages.
 
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
