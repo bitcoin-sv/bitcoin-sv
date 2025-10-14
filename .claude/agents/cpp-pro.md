@@ -193,8 +193,174 @@ This project uses concurrent validation - be vigilant about:
 - Exceptions are used (ensure exception safety)
 - noexcept on moves and destructors critical
 - RAII ensures cleanup on exception paths
-- Assertions for programming errors
+- Assertions for programming errors (see detailed section below)
 - Runtime checks for input validation
+
+## CRITICAL: Assertions Always Enabled in Production
+
+**This project keeps assertions enabled in production:** Runtime assertions (`assert()`) are ALWAYS enabled, including in production release builds. This fundamentally changes how you must review assertion usage.
+
+### Build Configuration
+
+1. **Mandatory Assertions** - Code will NOT compile with `NDEBUG` defined:
+   ```cpp
+   // validation.cpp:78, net/net_processing.cpp:65
+   #if defined(NDEBUG)
+   #error "Bitcoin cannot be compiled without assertions."
+   #endif
+   ```
+
+2. **Build System Enforcement**:
+   - CMake (`CMakeLists.txt:13-24`, `src/CMakeLists.txt:133-149`) actively removes `NDEBUG` from all build types
+   - Release, RelWithDebInfo, and MinSizeRel builds all keep assertions enabled
+   - Production builds = Debug builds for assertion behavior
+
+3. **Extensive Usage**: 1,157+ `assert()` calls across 209+ files act as permanent runtime invariant checks
+
+### Assertion Macros in This Codebase
+
+**Primary: Standard C++ `assert()`**
+- Most common pattern throughout the codebase
+- Always active, never stripped
+- Aborts program on failure
+
+**Custom Macros:**
+- `AssertLockHeld(cs)` - Lock ordering validation (active when `DEBUG_LOCKORDER` defined)
+- `ASSERT_OR_FAIL()` / `ASSERT_OR_FAIL_TX()` - Soft-fail mode in mempool (`txmempool.cpp:1623-1637`)
+
+### Code Review Implications
+
+When reviewing assertion usage, you MUST consider:
+
+#### ✓ DO Review For:
+
+1. **Performance Impact** - Assertions run in production:
+   ```cpp
+   // PROBLEM: Expensive assertion in hot path
+   for (const auto& tx : block.vtx) {
+       assert(ValidateTransactionFull(tx)); // Full validation on every iteration!
+       // Process tx...
+   }
+
+   // BETTER: Lighter assertion or move to test
+   for (const auto& tx : block.vtx) {
+       assert(!tx.vin.empty()); // Quick invariant check only
+       // Process tx...
+   }
+   ```
+
+2. **Appropriate Invariant Checking** - Assertions should verify programming errors, not handle runtime conditions:
+   ```cpp
+   // GOOD: Programming invariant
+   assert(!coins.empty()); // We should never call this with empty coins
+
+   // BAD: Runtime condition (use exception or error return instead)
+   assert(user_input < MAX_SIZE); // User input is NOT a programming invariant!
+   ```
+
+3. **Side-Effect Free** - Assertions should NEVER have side effects:
+   ```cpp
+   // CRITICAL BUG: Side effect in assertion!
+   assert(mutex.try_lock()); // If assertions were disabled, lock wouldn't happen
+
+   // CORRECT: Separate action from assertion
+   bool locked = mutex.try_lock();
+   assert(locked);
+   ```
+
+4. **Production Crash Tolerance** - Will aborting be acceptable if this fails?
+   ```cpp
+   // GOOD: Critical invariant - crash is better than corruption
+   assert(height == chainActive.Height()); // Data consistency check
+
+   // CONSIDER: Should this be soft-fail instead?
+   assert(peer.nVersion >= MIN_PEER_PROTO_VERSION); // Could disconnect instead
+   ```
+
+5. **Assertion Complexity** - Complex checks have runtime cost:
+   ```cpp
+   // PROBLEMATIC: O(n) assertion in O(1) function
+   void AddToPool(const CTransaction& tx) {
+       mapTx.insert(tx);
+       assert(CheckPoolConsistency()); // Iterates entire pool!
+   }
+
+   // BETTER: Only assert specific invariant
+   void AddToPool(const CTransaction& tx) {
+       mapTx.insert(tx);
+       assert(mapTx.count(tx.GetHash()) == 1); // Quick check
+   }
+   ```
+
+#### ✗ DO NOT Suggest:
+
+- **Removing assertions for "optimization"** - This is not standard C++; assertions are intentional
+- **Converting all assertions to runtime checks** - Assertions document programming invariants
+- **Assuming assertions will be stripped** - They won't; review as production code
+
+#### Areas With Heavy Assertion Usage
+
+Be especially careful reviewing assertions in these high-traffic areas:
+- **validation.cpp** (74 assertions) - Block validation hot path
+- **txmempool.cpp** (51 assertions) - Transaction pool operations
+- **net/net_processing.cpp** (44 assertions) - P2P message handling
+- **coins.cpp** (27 assertions) - UTXO set operations
+
+### Review Checklist for Assertions
+
+When you see `assert()` in code, verify:
+
+- [ ] Assertion checks programming invariant, not runtime condition
+- [ ] No side effects in assertion expression
+- [ ] Performance acceptable for this code path (not in tight loop with expensive check)
+- [ ] Aborting program is appropriate response to failure
+- [ ] Could use soft-fail alternative (like `ASSERT_OR_FAIL`) if graceful degradation is better
+- [ ] Assertion makes code more maintainable (documents assumption clearly)
+
+### Good vs. Problematic Patterns
+
+```cpp
+// ✓ GOOD: Quick invariant checks
+assert(!tx.IsCoinBase());                    // Boolean check
+assert(coin.has_value());                     // Optional validation
+assert(it != mapTx.end());                    // Iterator validity
+assert(nHeight > 0);                          // Range check
+
+// ✓ GOOD: State validation
+assert(pindex->pprev != nullptr || pindex->nHeight == 0); // Chain structure
+assert(cs_main.try_lock() == false);          // Lock state (no side effect!)
+
+// ⚠ REVIEW CAREFULLY: Performance concerns
+assert(std::is_sorted(vHashes.begin(), vHashes.end())); // O(n) check
+assert(ValidateFull(tx));                     // Complex validation
+
+// ✗ PROBLEMATIC: Runtime conditions (use exceptions/error codes instead)
+assert(file.is_open());                       // External resource
+assert(mempool.size() < MAX_MEMPOOL_SIZE);   // Runtime limit
+assert(user_provided_value >= 0);             // User input validation
+
+// ✗ CRITICAL BUG: Side effects
+assert(counter++ < MAX);                      // Modifies state!
+assert(TryAcquireLock());                     // Action with result
+```
+
+### When to Suggest Alternatives
+
+**Suggest runtime checks when:**
+- Checking external input, user data, or network data
+- Validating resource availability (files, memory, network)
+- Enforcing configurable limits or quotas
+- Graceful degradation is better than abort
+
+**Keep assertions when:**
+- Documenting internal API contracts
+- Validating data structure invariants
+- Checking programming logic assumptions
+- Catching developer errors during development and production
+
+### Summary
+
+Treat every `assert()` as permanent production code that will execute at runtime. Review for correctness, performance, and appropriateness. This project's assertion-always-on policy means assertions are a powerful debugging and invariant documentation tool, but they must be used judiciously.
 
 ## Communication Style
 
