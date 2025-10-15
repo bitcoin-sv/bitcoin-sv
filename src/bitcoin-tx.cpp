@@ -721,7 +721,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
                                       MutableTransactionSignatureChecker(&mergedTx,
                                                                          i,
                                                                          amount));
-        if(!res.has_value() || !res->first)
+        if(res != SCRIPT_ERR_OK)
         {
             fComplete = false;
         }

@@ -200,7 +200,7 @@ bool SignAndVerify(const Config& config,
                                 flags,
                                 creator.Checker());
 
-    return (o.has_value() && o->first);
+    return (o == SCRIPT_ERR_OK);
 }
 
 SignatureData DataFromTransaction(const CMutableTransaction &tx,

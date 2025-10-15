@@ -32,9 +32,11 @@ public:
 // core_read.cpp
 CScript ParseScript(const std::string &s);
 std::string ScriptToAsmStr(const CScript &script,
+                           const int32_t txnVersion = 1,    // default assumes non-malleable (ver 1) transaction
                            const bool fAttemptSighashDecode = false);
 void ScriptToAsmStr(const CScript& script,
                     CTextWriter& textWriter, 
+                    const int32_t txnVersion = 1,
                     const bool fAttemptSighashDecode = false);
 bool DecodeHexTx(CMutableTransaction &tx, const std::string &strHexTx);
 bool DecodeHexBlk(CBlock &, const std::string &strHexBlk);

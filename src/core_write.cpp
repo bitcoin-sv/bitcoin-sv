@@ -6,7 +6,6 @@
 
 #include "dstencode.h"
 #include "primitives/transaction.h"
-#include "script/malleability_status.h"
 #include "script/script.h"
 #include "script/script_num.h"
 #include "script/standard.h"
@@ -88,15 +87,17 @@ const std::map<uint8_t, std::string> mapSigHashTypes = {
  * false, or omit the this argument (defaults to false), for scriptPubKeys.
  */
 std::string ScriptToAsmStr(const CScript& script,
+                           const int32_t txnVersion,
                            const bool fAttemptSighashDecode)
 {
     CStringWriter stringWriter;
-    ScriptToAsmStr(script, stringWriter, fAttemptSighashDecode);
+    ScriptToAsmStr(script, stringWriter, txnVersion, fAttemptSighashDecode);
     return stringWriter.MoveOutString();
 }
 
 void ScriptToAsmStr(const CScript& script,
                     CTextWriter& textWriter,
+                    const int32_t txnVersion,
                     const bool fAttemptSighashDecode)
 {
     opcodetype opcode;
@@ -119,10 +120,9 @@ void ScriptToAsmStr(const CScript& script,
         {
             if (vch.size() <= static_cast<std::vector<uint8_t>::size_type>(4))
             {
-                malleability::status ms{};
                 textWriter.Write(
                     strprintf("%d",
-                              CScriptNum(vch, min_encoding_check::no, ms).getint()));
+                              CScriptNum(vch, min_encoding_check::no).getint()));
             }
             else
             {
@@ -146,16 +146,12 @@ void ScriptToAsmStr(const CScript& script,
                         flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
                     }
                     
-                    const auto v = CheckSignatureEncoding(vch, flags); 
-                    if(std::holds_alternative<malleability::status>(v))
+                    if(CheckSignatureEncoding(vch, flags, txnVersion) == SCRIPT_ERR_OK)
                     {
                         const uint8_t chSigHashType = vch.back();
-                        if (mapSigHashTypes.count(chSigHashType))
+                        if(auto it = mapSigHashTypes.find(chSigHashType); it != mapSigHashTypes.end())
                         {
-                            strSigHashDecode =
-                                "[" +
-                                mapSigHashTypes.find(chSigHashType)->second +
-                                "]";
+                            strSigHashDecode = "[" + it->second + "]";
                             // remove the sighash type byte. it will be replaced
                             // by the decode.
                             vch.pop_back();
@@ -270,7 +266,7 @@ void TxToJSON(const CTransaction& tx,
 
             entry.pushK("asm");
             entry.pushQuote();
-            ScriptToAsmStr(txin.scriptSig, entry.getWriter(), true);
+            ScriptToAsmStr(txin.scriptSig, entry.getWriter(), tx.nVersion, true);
             entry.pushQuote();
 
             entry.pushK("hex");

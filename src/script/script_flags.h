@@ -119,9 +119,14 @@ constexpr bool IsChronicle(uint32_t flags)
     return (flags & SCRIPT_CHRONICLE) != 0;
 }
 
-constexpr bool IsDiscourageUpgradableNops(uint32_t flags)
+constexpr bool IsGenesis(uint32_t flags)
 {
-    return (flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0;
+    return (flags & SCRIPT_GENESIS) != 0;
+}
+
+constexpr bool IsUtxoAfterChronicle(uint32_t flags)
+{
+    return (flags & SCRIPT_UTXO_AFTER_CHRONICLE) != 0;
 }
 
 constexpr bool IsUtxoAfterGenesis(uint32_t flags)
@@ -129,9 +134,9 @@ constexpr bool IsUtxoAfterGenesis(uint32_t flags)
     return (flags & SCRIPT_UTXO_AFTER_GENESIS) != 0;
 }
 
-constexpr bool IsUtxoAfterChronicle(uint32_t flags)
+constexpr bool IsDiscourageUpgradableNops(uint32_t flags)
 {
-    return (flags & SCRIPT_UTXO_AFTER_CHRONICLE) != 0;
+    return (flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0;
 }
 
 constexpr bool VerifyMinimalIf(uint32_t flags)
@@ -147,6 +152,21 @@ constexpr bool VerifyNullDummy(uint32_t flags)
 constexpr bool VerifyNullFail(uint32_t flags)
 {
     return (flags & SCRIPT_VERIFY_NULLFAIL) != 0;
+}
+
+constexpr bool VerifyMinimalData(uint32_t flags)
+{
+    return (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
+}
+
+constexpr bool VerifyCleanStack(uint32_t flags)
+{
+    return (flags & SCRIPT_VERIFY_CLEANSTACK) != 0;
+}
+
+constexpr bool VerifySigPushOnly(uint32_t flags)
+{
+    return (flags & SCRIPT_VERIFY_SIGPUSHONLY) != 0;
 }
 
 #endif // BITCOIN_SCRIPT_SCRIPTFLAGS_H

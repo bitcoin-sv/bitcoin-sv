@@ -105,7 +105,7 @@ static int verify_script(const Config& config,
                                flags,
                                TransactionSignatureChecker(&tx, nIn, amount, txdata));
 
-        return (res.has_value() && res->first);
+        return (res == SCRIPT_ERR_OK);
     }
     catch (const std::exception &) {
         // Error deserializing

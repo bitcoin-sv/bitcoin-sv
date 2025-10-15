@@ -9,7 +9,6 @@
 #include "consensus/consensus.h"
 #include "instruction_iterator.h"
 #include "int_serialization.h"
-#include "script/malleability_status.h"
 #include "script_num.h"
 
 #include <algorithm>
@@ -103,11 +102,7 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, ProtocolEra era, bool& sigOpCoun
                         return 0;
                     }
 
-                    malleability::status ms{};
-                    const int numSigs = CScriptNum(last_instruction.operand(),
-                                                   min_encoding_check::hard,
-                                                   ms)
-                                            .getint();
+                    const int numSigs = CScriptNum(last_instruction.operand(), min_encoding_check::yes).getint();
                     if(numSigs < 0)
                     {
                         sigOpCountError = true;

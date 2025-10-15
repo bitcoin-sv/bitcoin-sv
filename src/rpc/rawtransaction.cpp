@@ -1206,11 +1206,11 @@ static UniValue signrawtransaction(const Config &config,
         {
             TxInErrorToJSON(txin, vErrors, "Validation timeout");
         }
-        else if(!res->first)
+        else if(res.value() != SCRIPT_ERR_OK)
         {
             TxInErrorToJSON(txin,
                             vErrors,
-                            ScriptErrorString(res->second));
+                            ScriptErrorString(res.value()));
         }
     }
 

@@ -4,7 +4,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "script/standard.h"
-#include "script/malleability_status.h"
 #include "script/script_num.h"
 #include "pubkey.h"
 #include "script/script.h"
@@ -130,9 +129,8 @@ bool Solver(
                         return false;
                     }
                     // Additional checks for TX_MULTISIG:
-                    malleability::status ms{};
-                    int m = CScriptNum(vSolutionsRet.front(), min_encoding_check::no, ms).getint();
-                    int n = CScriptNum(vSolutionsRet.back(), min_encoding_check::no, ms).getint();
+                    int m = CScriptNum(vSolutionsRet.front(), min_encoding_check::no).getint();
+                    int n = CScriptNum(vSolutionsRet.back(), min_encoding_check::no).getint();
                     if (m < 1 || n < 1 || m > n || vSolutionsRet.size() < 2 ||
                         vSolutionsRet.size() - 2 != static_cast<uint64_t>(n)) {
                         return false;

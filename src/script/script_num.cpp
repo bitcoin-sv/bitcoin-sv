@@ -13,7 +13,6 @@
 #include <limits>
 
 #include "int_serialization.h"
-#include "script/malleability_status.h"
 #include "overload.h"
 
 using bsv::bint;
@@ -21,7 +20,6 @@ using namespace std;
 
 CScriptNum::CScriptNum(span<const uint8_t> span,
                        const min_encoding_check min_encode_check,
-                       malleability::status& ms,
                        const size_t nMaxNumSize,
                        const bool big_int)
 {
@@ -33,13 +31,9 @@ CScriptNum::CScriptNum(span<const uint8_t> span,
         throw scriptnum_overflow_error("script number overflow");
     }
 
-    if(require_min_encoding(min_encode_check)
-       && !bsv::IsMinimallyEncoded(span, nMaxNumSize))
+    if(min_encode_check == min_encoding_check::yes && !bsv::IsMinimallyEncoded(span, nMaxNumSize))
     {
-        if(min_encode_check == min_encoding_check::soft)
-            ms |= malleability::non_minimal_scriptnum;
-        else
-            throw scriptnum_minencode_error("non-minimally encoded script number");
+        throw scriptnum_minencode_error("non-minimally encoded script number");
     }
 
     if(span.empty())
@@ -303,19 +297,3 @@ vector<uint8_t> CScriptNum::getvch() const
     // clang-format on
 }
 
-std::ostream& operator<<(std::ostream& os, const min_encoding_check& check)
-{
-    switch(check)
-    {
-        case min_encoding_check::no:
-            os << "no";
-            break;
-        case min_encoding_check::soft:
-            os << "soft";
-            break;
-        case min_encoding_check::hard:
-            os << "hard";
-            break;
-    }
-    return os;
-}

@@ -14,7 +14,6 @@
 #include <vector>
 
 #include "big_int.h"
-#include "script/malleability_status.h"
 
 class scriptnum_overflow_error : public std::overflow_error
 {
@@ -37,16 +36,8 @@ public:
 enum class min_encoding_check
 {
     no,
-    soft,
-    hard
+    yes
 };
-
-std::ostream& operator<<(std::ostream&, const min_encoding_check&);
-
-constexpr bool require_min_encoding(const min_encoding_check v)
-{ 
-    return v != min_encoding_check::no;
-}
 
 class CScriptNum
 {
@@ -67,8 +58,7 @@ public:
     explicit CScriptNum(const bsv::bint& n) : m_value(n) {}
     explicit CScriptNum(std::span<const uint8_t>,
                         min_encoding_check,
-                        malleability::status&,
-                        const size_t nMaxNumSize = MAXIMUM_ELEMENT_SIZE,
+                        size_t nMaxNumSize = MAXIMUM_ELEMENT_SIZE,
                         bool big_int = false);
 
     CScriptNum& operator=(int64_t rhs)

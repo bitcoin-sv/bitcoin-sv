@@ -3,7 +3,7 @@
 // Copyright (c) 2018-2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include "interpreter.h"
+#include "script/interpreter.h"
 
 #include "big_int.h"
 #include "config.h"
@@ -14,13 +14,12 @@
 #include "primitives/transaction.h"
 #include "protocol_era.h"
 #include "pubkey.h"
-#include "script/malleability_status.h"
 #include "script/opcodes.h"
 #include "script/script.h"
 #include "script/script_error.h"
+#include "script/script_flags.h"
 #include "script/script_num.h"
 #include "script/shiftnum.h"
-#include "script_flags.h"
 #include "taskcancellation.h"
 #include "uint256.h"
 
@@ -29,15 +28,25 @@
 #include <limits>
 #include <optional>
 #include <utility>
-#include <variant>
 
 namespace
 {
-    inline constexpr bool TxnVersionIsMalleable(const int32_t version)
+    inline constexpr bool IsMalleableTxnVersion(const int32_t version)
     {
         // Post-Chronicle, malleability is permitted if txn version > 1
         return (version > 1);
     }
+
+    inline constexpr bool EnforceNonMalleability(const uint32_t flags, const int32_t txnVersion)
+    {
+        // Enforce strict validation unless Chronicle allows malleability for this txn version
+        return !(IsChronicle(flags) && IsMalleableTxnVersion(txnVersion));
+    }
+
+    static_assert(EnforceNonMalleability(0, 1));
+    static_assert(EnforceNonMalleability(0, 2));
+    static_assert(EnforceNonMalleability(SCRIPT_CHRONICLE, 1));
+    static_assert(!EnforceNonMalleability(SCRIPT_CHRONICLE, 2));
 } // namespace
 
 inline uint8_t make_rshift_mask(size_t n) {
@@ -250,14 +259,15 @@ static void CleanupScriptCode(CScript &scriptCode,
     }
 }
 
-std::variant<ScriptError, malleability::status> CheckSignatureEncoding(
+ScriptError CheckSignatureEncoding(
     const std::vector<uint8_t>& vchSig,
-    uint32_t flags)
+    uint32_t flags,
+    int32_t txnVersion)
 {
     // Empty signature. Not strictly DER encoded, but allowed to provide a
     // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
     if(vchSig.empty())
-        return malleability::status{};
+        return SCRIPT_ERR_OK;
     
     if((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S |
                  SCRIPT_VERIFY_STRICTENC)) != 0 &&
@@ -266,14 +276,13 @@ std::variant<ScriptError, malleability::status> CheckSignatureEncoding(
         return SCRIPT_ERR_SIG_DER;
     }
     
-    malleability::status ms {};
     if((flags & SCRIPT_VERIFY_LOW_S) != 0 &&
        !CPubKey::CheckLowS({vchSig.data(), vchSig.size() - 1}))
     {
-        if(flags & SCRIPT_CHRONICLE)
-            ms |= malleability::high_s;
-        else
+        if(EnforceNonMalleability(flags, txnVersion))
+        {
             return SCRIPT_ERR_SIG_HIGH_S;
+        }
     }
     
     if((flags & SCRIPT_VERIFY_STRICTENC) != 0)
@@ -294,7 +303,7 @@ std::variant<ScriptError, malleability::status> CheckSignatureEncoding(
             return SCRIPT_ERR_MUST_USE_FORKID;
     }
 
-    return ms;
+    return SCRIPT_ERR_OK;
 }
 
 static ScriptError CheckPubKeyEncoding(const valtype& vchPubKey, uint32_t flags)
@@ -373,7 +382,7 @@ static void to_le(const int32_t n, uint8_t* o)
     memcpy(o, &le_n, sizeof(le_n));
 }
 
-std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
+std::optional<ScriptError> EvalScript(
     const eval_script_params& params,
     const task::CCancellationToken& token,
     LimitedStack& stack,
@@ -418,16 +427,13 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
         return SCRIPT_ERR_SCRIPT_SIZE;
 
     uint64_t nOpCount = 0;
-    const min_encoding_check min_encode_check{flags & SCRIPT_VERIFY_MINIMALDATA
-                                                  ? flags & SCRIPT_CHRONICLE
-                                                        ? min_encoding_check::soft
-                                                        : min_encoding_check::hard
-                                                  : min_encoding_check::no};
+    const auto requireMinimal { VerifyMinimalData(flags) && EnforceNonMalleability(flags, checker.Version()) ?
+        min_encoding_check::yes : min_encoding_check::no };
+
     // if OP_RETURN is found in executed branches after genesis is activated,
     // we still have to check if the rest of the script is valid
     bool nonTopLevelReturnAfterGenesis = false;
 
-    malleability::status ms {};
     try {
         while (pc < pend) {
             if (token.IsCanceled())
@@ -463,13 +469,9 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
             if(fExec && 0 <= opcode && opcode <= OP_PUSHDATA4)
             {
-                if(require_min_encoding(min_encode_check)
-                   && !CheckMinimalPush(vchPushValue, opcode))
+                if((requireMinimal == min_encoding_check::yes) && !CheckMinimalPush(vchPushValue, opcode))
                 {
-                    if(min_encode_check == min_encoding_check::soft)
-                        ms |= malleability::non_minimal_push;
-                    else
-                        return SCRIPT_ERR_MINIMALDATA;
+                    return SCRIPT_ERR_MINIMALDATA;
                 }
 
                 stack.push_back(std::move(vchPushValue));
@@ -538,10 +540,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         // up to 5-byte bignums, which are good until 2**39-1,
                         // well beyond the 2**32-1 limit of the nLockTime field
                         // itself.
-                        const CScriptNum nLockTime(stack.stacktop(-1).GetElement(),
-                                                   min_encode_check,
-                                                   ms,
-                                                   5);
+                        const CScriptNum nLockTime(stack.stacktop(-1).GetElement(), requireMinimal, 5);
 
                         // In the rare event that the argument may be < 0 due to
                         // some arithmetic being done first, you can always use
@@ -572,10 +571,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         // nSequence, like nLockTime, is a 32-bit unsigned
                         // integer field. See the comment in CHECKLOCKTIMEVERIFY
                         // regarding 5-byte numeric operands.
-                        const CScriptNum nSequence(stack.stacktop(-1).GetElement(),
-                                                   min_encode_check,
-                                                   ms,
-                                                   5);
+                        const CScriptNum nSequence(stack.stacktop(-1).GetElement(), requireMinimal, 5);
 
                         // In the rare event that the argument may be < 0 due to
                         // some arithmetic being done first, you can always use
@@ -586,8 +582,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         // To provide for future soft-fork extensibility, if the
                         // operand has the disabled lock-time flag set,
                         // CHECKSEQUENCEVERIFY behaves as a NOP.
-                        if ((nSequence &
-                             CTxIn::SEQUENCE_LOCKTIME_DISABLE_FLAG) != bnZero) {
+                        if ((nSequence & CTxIn::SEQUENCE_LOCKTIME_DISABLE_FLAG) != bnZero) {
                             break;
                         }
 
@@ -621,21 +616,15 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         if(stack.size() < 3)
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
-                        const CScriptNum bn_len{stack.stacktop(-1).GetElement(),
-                                                min_encode_check,
-                                                ms,
-                                                params.MaxScriptNumLength()};
+                        const CScriptNum bn_len{stack.stacktop(-1).GetElement(), requireMinimal, params.MaxScriptNumLength()};
                         const auto len{bn_len.getint()};
 
-                        const CScriptNum bn_begin{stack.stacktop(-2).GetElement(),
-                                                  min_encode_check,
-                                                  ms,
-                                                  params.MaxScriptNumLength()};
+                        const CScriptNum bn_begin{stack.stacktop(-2).GetElement(), requireMinimal, params.MaxScriptNumLength()};
                         const auto offset{bn_begin.getint()};
                         
                         auto& data{stack.stacktop(-3)};
                         const auto size{std::ssize(data)};
-                        if(offset < 0 || 
+                        if(offset < 0 ||
                            offset >= size ||
                            len < 0 ||
                            len > size - offset)
@@ -661,10 +650,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         if(stack.size() < 2)
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
-                        const CScriptNum bn_len{stack.stacktop(-1).GetElement(),
-                                                min_encode_check,
-                                                ms,
-                                                params.MaxScriptNumLength()};
+                        const CScriptNum bn_len{stack.stacktop(-1).GetElement(), requireMinimal, params.MaxScriptNumLength()};
                         const auto len{bn_len.getint()};
 
                         auto& data{stack.stacktop(-2)};
@@ -689,10 +675,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         if(stack.size() < 2)
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
-                        const CScriptNum bn_len{stack.stacktop(-1).GetElement(),
-                                                min_encode_check,
-                                                ms,
-                                                params.MaxScriptNumLength()};
+                        const CScriptNum bn_len{stack.stacktop(-1).GetElement(), requireMinimal, params.MaxScriptNumLength()};
                         const auto len{bn_len.getint()};
 
                         auto& data{stack.stacktop(-2)};
@@ -720,11 +703,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
                         const LimitedVector a = stack.stacktop(-2);
                         const auto& s0{stack.stacktop(-1).GetElement()};
-                        CScriptNum n{s0,
-                                     min_encode_check,
-                                     ms,
-                                     params.MaxScriptNumLength(),
-                                     utxo_after_genesis};
+                        CScriptNum n{s0, requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis};
                         if(n < 0)
                             return SCRIPT_ERR_INVALID_NUMBER_RANGE;
 
@@ -746,13 +725,13 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                     case OP_NOP10: {
                         if (flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)
                             return SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS;
-                        
+
                     } break;
 
                     case OP_VERIF:
                     case OP_VERNOTIF:
-                        if(!utxo_after_chronicle) 
-                        {   
+                        if(!utxo_after_chronicle)
+                        {
                             if(utxo_after_genesis && !fExec)
                                 break;
                             else
@@ -776,10 +755,8 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                             {
                                 if(vch.size() > 1
                                    || (vch.size() == 1 && vch[0] != 1))
-                                {   
-                                    if(IsChronicle(flags))
-                                        ms |= malleability::minimal_if;
-                                    else
+                                {
+                                    if(EnforceNonMalleability(flags, checker.Version()))
                                         return SCRIPT_ERR_MINIMALIF;
                                 }
                             }
@@ -842,12 +819,12 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                             if (vfExec.empty()) {
                                 // Terminate the execution as successful. The remaining of the script does not affect the validity (even in
                                 // presence of unbalanced IFs, invalid opcodes etc)
-                                return malleability::status{};
+                                return SCRIPT_ERR_OK;
                             }
 
                             // op_return encountered inside if statement after genesis --> check for invalid grammar
                             nonTopLevelReturnAfterGenesis = true;
-                        } 
+                        }
                         else
                             // Pre-Genesis OP_RETURN marks script as invalid
                             return SCRIPT_ERR_OP_RETURN;
@@ -996,11 +973,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
 
                         const auto& top{stack.stacktop(-1).GetElement()};
-                        const CScriptNum sn{top,
-                                            min_encode_check,
-                                            ms,
-                                            params.MaxScriptNumLength(),
-                                            utxo_after_genesis};
+                        const CScriptNum sn{top, requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis};
                         stack.pop_back();
                         if(sn < 0 || sn >= stack.size())
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
@@ -1046,7 +1019,6 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         // (in -- in size)
                         if (stack.size() < 1)
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
- 
 
                         CScriptNum bn(bsv::bint{stack.stacktop(-1).size()});
                         stack.push_back(bn.getvch());
@@ -1061,14 +1033,13 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         // (x1 x2 - out)
                         if (stack.size() < 2)
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
- 
+
                         LimitedVector &vch1 = stack.stacktop(-2);
                         LimitedVector &vch2 = stack.stacktop(-1);
 
                         // Inputs must be the same size
                         if (vch1.size() != vch2.size())
                             return SCRIPT_ERR_INVALID_OPERAND_SIZE;
-
 
                         // To avoid allocating, we modify vch1 in place.
                         switch (opcode) {
@@ -1116,11 +1087,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
                         const LimitedVector vch1 = stack.stacktop(-2);
                         const auto& top{stack.stacktop(-1).GetElement()};
-                        CScriptNum n{top,
-                                     min_encode_check,
-                                     ms,
-                                     params.MaxScriptNumLength(),
-                                     utxo_after_genesis};
+                        CScriptNum n{top, requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis};
                         if(n < 0)
                             return SCRIPT_ERR_INVALID_NUMBER_RANGE;
 
@@ -1154,11 +1121,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
                         const LimitedVector vch1 = stack.stacktop(-2);
                         const auto& top{stack.stacktop(-1).GetElement()};
-                        CScriptNum n{top,
-                                     min_encode_check,
-                                     ms,
-                                     params.MaxScriptNumLength(),
-                                     utxo_after_genesis};
+                        CScriptNum n{top, requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis};
                         if(n < 0)
                             return SCRIPT_ERR_INVALID_NUMBER_RANGE;
 
@@ -1210,7 +1173,6 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                                     stack.pop_back();
                                 else
                                     return SCRIPT_ERR_EQUALVERIFY;
-                                
                             }
                         }
                         break;
@@ -1231,11 +1193,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         const auto &top{stack.stacktop(-1).GetElement()};
-                        CScriptNum bn{top,
-                                      min_encode_check,
-                                      ms,
-                                      params.MaxScriptNumLength(),
-                                      utxo_after_genesis};
+                        CScriptNum bn{top, requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis};
                         switch (opcode) {
                             case OP_1ADD:
                                 bn += utxo_after_genesis
@@ -1300,16 +1258,8 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         const auto& arg_2 = stack.stacktop(-2);                        
                         const auto& arg_1 = stack.stacktop(-1);
 
-                        const CScriptNum bn1(arg_2.GetElement(),
-                                             min_encode_check,
-                                             ms,
-                                             params.MaxScriptNumLength(),
-                                             utxo_after_genesis);
-                        const CScriptNum bn2(arg_1.GetElement(),
-                                             min_encode_check,
-                                             ms,
-                                             params.MaxScriptNumLength(),
-                                             utxo_after_genesis);
+                        const CScriptNum bn1(arg_2.GetElement(), requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis);
+                        const CScriptNum bn2(arg_1.GetElement(), requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis);
                         CScriptNum bn;
                         switch (opcode) {
                             case OP_ADD:
@@ -1397,23 +1347,11 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
 
                         const auto& top_3{stack.stacktop(-3).GetElement()};
-                        const CScriptNum bn1{top_3,
-                                             min_encode_check,
-                                             ms,
-                                             params.MaxScriptNumLength(),
-                                             utxo_after_genesis};
+                        const CScriptNum bn1{top_3, requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis};
                         const auto& top_2{stack.stacktop(-2).GetElement()};
-                        const CScriptNum bn2{top_2,
-                                             min_encode_check,
-                                             ms,
-                                             params.MaxScriptNumLength(),
-                                             utxo_after_genesis};
+                        const CScriptNum bn2{top_2, requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis};
                         const auto& top_1{stack.stacktop(-1).GetElement()};
-                        const CScriptNum bn3{top_1,
-                                             min_encode_check,
-                                             ms,
-                                             params.MaxScriptNumLength(),
-                                             utxo_after_genesis};
+                        const CScriptNum bn3{top_1, requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis};
                         const bool fValue = (bn2 <= bn1 && bn1 < bn3);
                         stack.pop_back();
                         stack.pop_back();
@@ -1482,14 +1420,13 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         LimitedVector &vchSig = stack.stacktop(-2);
                         LimitedVector &vchPubKey = stack.stacktop(-1);
 
-                        const auto v{CheckSignatureEncoding(vchSig.GetElement(), flags)};
-                        if(std::holds_alternative<ScriptError>(v))
-                            return v;
-                        else
-                            ms |= std::get<malleability::status>(v);
+                        if(const ScriptError error{CheckSignatureEncoding(vchSig.GetElement(), flags, checker.Version())};
+                            error != SCRIPT_ERR_OK)
+                        {
+                            return error;
+                        }
 
-                        if(const ScriptError error{
-                               CheckPubKeyEncoding(vchPubKey.GetElement(), flags)};
+                        if(const ScriptError error{CheckPubKeyEncoding(vchPubKey.GetElement(), flags)};
                            error != SCRIPT_ERR_OK)
                         {
                             return error;
@@ -1509,11 +1446,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         // we require that the signature must be empty vector.
                         if(!fSuccess && VerifyNullFail(flags) && !vchSig.empty())
                         {
-                            if(IsChronicle(flags) && TxnVersionIsMalleable(checker.Version()))
-                            {
-                                ms |= malleability::null_fail;
-                            }
-                            else
+                            if(EnforceNonMalleability(flags, checker.Version()))
                             {
                                 return SCRIPT_ERR_SIG_NULLFAIL;
                             }
@@ -1539,14 +1472,12 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                         if (stack.size() < i)
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
-                        // initialize to max size of CScriptNum::MAXIMUM_ELEMENT_SIZE (4 bytes) 
+                        // initialize to max size of CScriptNum::MAXIMUM_ELEMENT_SIZE (4 bytes)
                         // because only 4 byte integers are supported by  OP_CHECKMULTISIG / OP_CHECKMULTISIGVERIFY
                         const int64_t
                             nKeysCountSigned = CScriptNum(stack.stacktop(-i).GetElement(),
-                                                          min_encode_check,
-                                                          ms,
-                                                          CScriptNum::
-                                                              MAXIMUM_ELEMENT_SIZE)
+                                                          requireMinimal,
+                                                          CScriptNum::MAXIMUM_ELEMENT_SIZE)
                                                    .getint();
                         if (nKeysCountSigned < 0)
                             return SCRIPT_ERR_PUBKEY_COUNT;
@@ -1571,10 +1502,8 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
                         const int64_t
                             nSigsCountSigned = CScriptNum(stack.stacktop(-i).GetElement(),
-                                                          min_encode_check,
-                                                          ms,
-                                                          CScriptNum::
-                                                              MAXIMUM_ELEMENT_SIZE)
+                                                          requireMinimal,
+                                                          CScriptNum::MAXIMUM_ELEMENT_SIZE)
                                                    .getint();
 
                         if (nSigsCountSigned < 0)
@@ -1614,14 +1543,14 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                             // CHECKMULTISIG NOT if the STRICTENC flag is set.
                             // See the script_(in)valid tests for details.
 
-                            const auto v = CheckSignatureEncoding(vchSig.GetElement(), flags);
-                            if(std::holds_alternative<ScriptError>(v))
-                                return v;
-                            else
-                                ms |= std::get<malleability::status>(v);
 
-                            if(const auto error{
-                                   CheckPubKeyEncoding(vchPubKey.GetElement(), flags)};
+                            if(const ScriptError error{CheckSignatureEncoding(vchSig.GetElement(), flags, checker.Version())};
+                                error != SCRIPT_ERR_OK)
+                            {
+                                return error;
+                            }
+
+                            if(const ScriptError error{CheckPubKeyEncoding(vchPubKey.GetElement(), flags)};
                                error != SCRIPT_ERR_OK)
                             {
                                 return error;
@@ -1653,16 +1582,12 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                             const auto& vchSig { stack.stacktop(-1) };
                             if (!fSuccess && VerifyNullFail(flags) && !ikey2 && !vchSig.empty())
                             {
-                                if(IsChronicle(flags) && TxnVersionIsMalleable(checker.Version()))
-                                {
-                                    ms |= malleability::null_fail;
-                                }
-                                else
+                                if(EnforceNonMalleability(flags, checker.Version()))
                                 {
                                     return SCRIPT_ERR_SIG_NULLFAIL;
                                 }
                             }
- 
+
                             if (ikey2 > 0) {
                                 ikey2--;
                             }
@@ -1680,11 +1605,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
  
                         if(VerifyNullDummy(flags) && !stack.stacktop(-1).empty())
                         {
-                            if(IsChronicle(flags) && TxnVersionIsMalleable(checker.Version()))
-                            {
-                                ms |= malleability::null_dummy;
-                            }
-                            else
+                            if(EnforceNonMalleability(flags, checker.Version()))
                             {
                                 return SCRIPT_ERR_SIG_NULLDUMMY;
                             }
@@ -1735,11 +1656,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
 
                         // Make sure the split point is apropriate.
                         const auto& top{stack.stacktop(-1).GetElement()};
-                        const CScriptNum n{top,
-                                           min_encode_check,
-                                           ms,
-                                           params.MaxScriptNumLength(),
-                                           utxo_after_genesis};
+                        const CScriptNum n{top, requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis};
                         if(n < 0 || n > data.size())
                             return SCRIPT_ERR_INVALID_SPLIT_RANGE;
 
@@ -1767,11 +1684,7 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         const auto& arg_1 = stack.stacktop(-1).GetElement();
-                        const CScriptNum n{arg_1,
-                                           min_encode_check,
-                                           ms,
-                                           params.MaxScriptNumLength(),
-                                           utxo_after_genesis};
+                        const CScriptNum n{arg_1, requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis};
                         if(n < 0 || n > std::numeric_limits<int32_t>::max())
                             return SCRIPT_ERR_PUSH_SIZE;
 
@@ -1856,10 +1769,10 @@ std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
         return SCRIPT_ERR_UNBALANCED_CONDITIONAL;
     }
 
-    return ms;
+    return SCRIPT_ERR_OK;
 }
 
-std::optional<std::variant<ScriptError, malleability::status>> EvalScript(
+std::optional<ScriptError> EvalScript(
     const eval_script_params& params,
     const task::CCancellationToken& token,
     LimitedStack& stack,
@@ -2299,7 +2212,7 @@ verify_script_params make_verify_script_params(const Config& config,
                                 config.GetMaxStackMemoryUsage(utxo_after_genesis, consensus)};
 }
 
-std::optional<std::pair<bool, ScriptError>> VerifyScript(
+std::optional<ScriptError> VerifyScript(
     const verify_script_params& params,
     const task::CCancellationToken& token,
     const CScript& scriptSig,
@@ -2308,36 +2221,29 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     const BaseSignatureChecker& checker)
 {
     if(!valid_flags(flags))
-        return std::make_pair(false, SCRIPT_ERR_INVALID_FLAGS);
-
-    // Track malleability for just this execution of VerifyScript
-    malleability::status malleability {};
+        return SCRIPT_ERR_INVALID_FLAGS;
 
     if (flags & SCRIPT_ENABLE_SIGHASH_FORKID)
     {
         // If FORKID is enabled, we also ensure strict encoding.
         flags |= SCRIPT_VERIFY_STRICTENC;
+    }
 
-        if(flags & SCRIPT_CHRONICLE)
+    if(VerifySigPushOnly(flags))
+    {
+        // Check for push-only scriptSig if:
+        // - we are post-Genesis but pre-Chronicle, or
+        // - we are post-Chronicle and the txn is non-malleable
+        if((IsGenesis(flags) && !IsChronicle(flags)) ||
+           (IsChronicle(flags) && !IsMalleableTxnVersion(checker.Version())))
         {
-            // Post-Chronicle, strict malleability rules enforced if txn version <= 1
-            if(!TxnVersionIsMalleable(checker.Version()))
+            if(!scriptSig.IsPushOnly())
             {
-                malleability |= malleability::disallowed;
+                return SCRIPT_ERR_SIG_PUSHONLY;
             }
         }
-        else
-        {
-            // Pre-Chronicle (but post-FORKID) enforce strict malleability rules
-            malleability |= malleability::disallowed;
-        }
     }
 
-    if(!scriptSig.IsPushOnly())
-    {
-        malleability |= malleability::non_push_data;
-    }
-    
     LimitedStack stack{params.MaxStackMemoryUsage()};
     LimitedStack stackCopy{params.MaxStackMemoryUsage()};
     if(const auto o = EvalScript(params.EvalScriptParams(),
@@ -2350,13 +2256,9 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     {
         return {};
     }
-    else
+    else if(o.value() != SCRIPT_ERR_OK)
     {
-        const auto v{o.value()};
-        if(std::holds_alternative<ScriptError>(v))
-            return std::make_pair(false, std::get<ScriptError>(v));
-        else
-            malleability |= std::get<malleability::status>(v);
+        return o;
     }
 
     if ((flags & SCRIPT_VERIFY_P2SH)  && !(flags & SCRIPT_UTXO_AFTER_GENESIS)) {
@@ -2373,20 +2275,16 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     {
         return {};
     }
-    else
+    else if(o.value() != SCRIPT_ERR_OK)
     {
-        const auto v{o.value()};
-        if(std::holds_alternative<ScriptError>(v))
-            return std::make_pair(false, std::get<ScriptError>(v));
-        else
-            malleability |= std::get<malleability::status>(v);
+        return o;
     }
 
     if(stack.empty())
-        return std::make_pair(false, SCRIPT_ERR_EVAL_FALSE);
+        return SCRIPT_ERR_EVAL_FALSE;
 
     if(CastToBool(stack.back().GetElement()) == false)
-        return std::make_pair(false, SCRIPT_ERR_EVAL_FALSE);
+        return SCRIPT_ERR_EVAL_FALSE;
 
     // Additional validation for spend-to-script-hash transactions:
     // But only if if the utxo is before genesis
@@ -2396,7 +2294,7 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
     {
         // scriptSig must be literals-only or validation fails
         if(!scriptSig.IsPushOnly())
-            return std::make_pair(false, SCRIPT_ERR_SIG_PUSHONLY);
+            return SCRIPT_ERR_SIG_PUSHONLY;
 
         // Restore stack.
         stack = std::move(stackCopy);
@@ -2420,110 +2318,43 @@ std::optional<std::pair<bool, ScriptError>> VerifyScript(
         {
             return {};
         }
-        else
+        else if(o.value() != SCRIPT_ERR_OK)
         {
-            const auto v{o.value()};
-            if(std::holds_alternative<ScriptError>(v))
-                return std::make_pair(false, std::get<ScriptError>(v));
-            else
-                malleability |= std::get<malleability::status>(v);
+            return o;
         }
 
         if(stack.empty())
-            return std::make_pair(false, SCRIPT_ERR_EVAL_FALSE);
+            return SCRIPT_ERR_EVAL_FALSE;
 
         if(!CastToBool(stack.back().GetElement()))
-            return std::make_pair(false, SCRIPT_ERR_EVAL_FALSE);
+            return SCRIPT_ERR_EVAL_FALSE;
 
     }
-
-    // Set unclean stack bit in malleability status
-    if(stack.size() != 1)
-        malleability |= malleability::unclean_stack;
 
     // The CLEANSTACK check is only performed after potential P2SH evaluation,
     // as the non-P2SH evaluation of a P2SH script will obviously not result in
     // a clean stack (the P2SH inputs remain). The same holds for witness
     // evaluation.
-    if (flags & SCRIPT_VERIFY_CLEANSTACK)
+    if (VerifyCleanStack(flags))
     {
         // Disallow CLEANSTACK without P2SH, as otherwise a switch
         // CLEANSTACK->P2SH+CLEANSTACK would be possible, which is not a
         // softfork (and P2SH should be one).
         if(!(flags & SCRIPT_VERIFY_P2SH))
-            return std::make_pair(false, SCRIPT_ERR_INVALID_FLAGS);
+            return SCRIPT_ERR_INVALID_FLAGS;
 
         // If Chronicle is activated then apply clean stack check depending on txn version.
         // (Since clean stack rule was only ever a policy rule (not consensus) it doesn't
         // make sense to make it dependent on UTXO age).
-        bool checkCleanStack { (flags & SCRIPT_CHRONICLE)? is_disallowed(malleability) : true };
-
-        if(checkCleanStack && is_unclean_stack(malleability))
+        if(EnforceNonMalleability(flags, checker.Version()))
         {
-            return std::make_pair(false, SCRIPT_ERR_CLEANSTACK);
-        }
-    }
-
-    // Checks for non-push-only scriptSig
-    if(flags & SCRIPT_VERIFY_SIGPUSHONLY)
-    {
-        bool checkSigPushOnly {false};
-        if((flags & SCRIPT_GENESIS) && !(flags & SCRIPT_CHRONICLE))
-        {
-            // Apply Genesis push only consensus rules
-            checkSigPushOnly = true;
-        }
-        else if(flags & SCRIPT_CHRONICLE)
-        {
-            // After Chronicle apply push only checks depending on txn version
-            checkSigPushOnly = is_disallowed(malleability);
-        }
-
-        if(checkSigPushOnly && has_non_push_data(malleability))
-        {
-            return std::make_pair(false, SCRIPT_ERR_SIG_PUSHONLY);
-        }
-    }
-
-    if(flags & SCRIPT_CHRONICLE)
-    {
-        if(is_disallowed(malleability))
-        {
-            if(flags & SCRIPT_VERIFY_LOW_S)
+            if(stack.size() != 1)
             {
-                if(is_high_s(malleability))
-                    return std::make_pair(false, SCRIPT_ERR_SIG_HIGH_S);
-            }
-
-            if(flags & SCRIPT_VERIFY_MINIMALDATA)
-            {
-                if(is_non_minimal_push(malleability))
-                    return std::make_pair(false, SCRIPT_ERR_MINIMALDATA);
-
-                if(is_non_minimal_scriptnum(malleability))
-                    return std::make_pair(false, SCRIPT_ERR_SCRIPTNUM_MINENCODE);
-            }
-
-            if(flags & SCRIPT_VERIFY_NULLFAIL)
-            {
-                if(is_null_fail(malleability))
-                    return std::make_pair(false, SCRIPT_ERR_SIG_NULLFAIL);
-            }
-
-            if(flags & SCRIPT_VERIFY_NULLDUMMY)
-            {
-                if(is_null_dummy(malleability))
-                    return std::make_pair(false, SCRIPT_ERR_SIG_NULLDUMMY);
-            }
-
-            if(flags & SCRIPT_VERIFY_MINIMALIF)
-            {
-                if(is_minimal_if(malleability))
-                    return std::make_pair(false, SCRIPT_ERR_MINIMALIF);
+                return SCRIPT_ERR_CLEANSTACK;
             }
         }
     }
 
-    return std::make_pair(true, SCRIPT_ERR_OK);
+    return SCRIPT_ERR_OK;
 }
 

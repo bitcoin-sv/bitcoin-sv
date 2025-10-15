@@ -35,7 +35,7 @@ static void op_dup(benchmark::State& state)
                                        flags,
                                        BaseSignatureChecker{});
         assert(status);
-        assert(status->index() == 1);
+        assert(status->first);
     }
 }
 BENCHMARK(op_dup);
@@ -63,7 +63,7 @@ static void op_2rot(benchmark::State& state)
                                        flags,
                                        BaseSignatureChecker{});
         assert(status);
-        assert(status->index() == 1);
+        assert(status->first);
     }
 }
 BENCHMARK(op_2rot);
@@ -93,7 +93,7 @@ static void op_split(benchmark::State& state)
                                        flags,
                                        BaseSignatureChecker{});
         assert(status);
-        assert(status->index() == 1);
+        assert(status->first);
     }
 }
 BENCHMARK(op_split);
@@ -121,7 +121,7 @@ static void op_roll(benchmark::State& state)
                                        flags,
                                        BaseSignatureChecker{});
         assert(status);
-        assert(status->index() == 1);
+        assert(status->first);
     }
 }
 BENCHMARK(op_roll);
@@ -149,7 +149,7 @@ static void op_pick(benchmark::State& state)
                                        flags,
                                        BaseSignatureChecker{});
         assert(status);
-        assert(status->index() == 1);
+        assert(status->first);
     }
 }
 BENCHMARK(op_pick);

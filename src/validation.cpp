@@ -2540,8 +2540,8 @@ std::optional<bool> CScriptCheck::operator()(const task::CCancellationToken& tok
     if(!o.has_value())
         return {};
 
-    error = o->second;
-    return o->first;
+    error = o.value();
+    return error == SCRIPT_ERR_OK;
 }
 
 std::pair<int32_t,int> GetSpendHeightAndMTP(const ICoinsViewCache& inputs)
