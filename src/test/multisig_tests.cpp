@@ -98,7 +98,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
                      a_and_b,
                      flags,
                      MutableTransactionSignatureChecker(&txTo[0], 0, amount));
-    BOOST_CHECK(res.has_value() && res->first);
+    BOOST_CHECK(res.has_value() && res.value() == SCRIPT_ERR_OK);
 
     for (int i = 0; i < 4; i++) {
         keys.assign(1, key[i]);
@@ -111,8 +111,8 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
                          flags,
                          MutableTransactionSignatureChecker(&txTo[0], 0, amount));
         BOOST_CHECK(res.has_value());
-        BOOST_CHECK_MESSAGE(!res->first, strprintf("a&b 1: %d", i));
-        err = res->second;
+        BOOST_CHECK_MESSAGE(res.value() != SCRIPT_ERR_OK, strprintf("a&b 1: %d", i));
+        err = res.value();
         BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_INVALID_STACK_OPERATION,
                             ScriptErrorString(err));
 
@@ -127,8 +127,8 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
                          flags,
                          MutableTransactionSignatureChecker(&txTo[0], 0, amount));
         BOOST_CHECK(res.has_value());
-        BOOST_CHECK_MESSAGE(!res->first, strprintf("a&b 2: %d", i));
-        err = res->second;
+        BOOST_CHECK_MESSAGE(res.value() != SCRIPT_ERR_OK, strprintf("a&b 2: %d", i));
+        err = res.value();
         BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE,
                             ScriptErrorString(err));
     }
@@ -146,7 +146,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
                              flags,
                              MutableTransactionSignatureChecker(&txTo[1], 0, amount));
             BOOST_CHECK(res.has_value());
-            BOOST_CHECK_MESSAGE(res->first, strprintf("a|b: %d", i));
+            BOOST_CHECK_MESSAGE(res.value() == SCRIPT_ERR_OK, strprintf("a|b: %d", i));
         } else {
             res =
                 VerifyScript(params,
@@ -156,8 +156,8 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
                              flags,
                              MutableTransactionSignatureChecker(&txTo[1], 0, amount));
             BOOST_CHECK(res.has_value());
-            BOOST_CHECK_MESSAGE(!res->first, strprintf("a|b: %d", i));
-            err = res->second;
+            BOOST_CHECK_MESSAGE(res.value() != SCRIPT_ERR_OK, strprintf("a|b: %d", i));
+            err = res.value();
             BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE,
                                 ScriptErrorString(err));
         }
@@ -172,8 +172,8 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
                      flags,
                      MutableTransactionSignatureChecker(&txTo[1], 0, amount));
     BOOST_CHECK(res.has_value());
-    BOOST_CHECK(!res->first);
-    err = res->second;
+    BOOST_CHECK(res.value() != SCRIPT_ERR_OK);
+    err = res.value();
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_SIG_DER, ScriptErrorString(err));
 
     for (int i = 0; i < 4; i++)
@@ -190,7 +190,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
                                  flags,
                                  MutableTransactionSignatureChecker(&txTo[2], 0, amount));
                 BOOST_CHECK(res.has_value());
-                BOOST_CHECK_MESSAGE(res->first, strprintf("escrow 1: %d %d", i, j));
+                BOOST_CHECK_MESSAGE(res.value() == SCRIPT_ERR_OK, strprintf("escrow 1: %d %d", i, j));
             } else {
                 res =
                     VerifyScript(params,
@@ -200,8 +200,8 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
                                  flags,
                                  MutableTransactionSignatureChecker(&txTo[2], 0, amount));
                 BOOST_CHECK(res.has_value());
-                BOOST_CHECK_MESSAGE(!res->first, strprintf("escrow 2: %d %d", i, j));
-                err = res->second;
+                BOOST_CHECK_MESSAGE(res.value() != SCRIPT_ERR_OK, strprintf("escrow 2: %d %d", i, j));
+                err = res.value();
                 BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE,
                                     ScriptErrorString(err));
             }

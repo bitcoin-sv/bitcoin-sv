@@ -6,7 +6,6 @@
 
 #include <cstdint>
 #include <limits>
-#include <variant>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
@@ -107,8 +106,8 @@ BOOST_AUTO_TEST_CASE(bint_unary_ops)
                                        script,
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+        BOOST_REQUIRE(status);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
         BOOST_CHECK_EQUAL(1U, stack.size());
         const auto frame = stack.front();
         const auto actual =
@@ -222,8 +221,8 @@ BOOST_AUTO_TEST_CASE(bint_binary_ops)
                                        script,
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+        BOOST_REQUIRE(status);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
         BOOST_CHECK_EQUAL(1U, stack.size());
         const auto frame = stack.front();
         const auto actual =
@@ -302,8 +301,8 @@ BOOST_AUTO_TEST_CASE(bint_ternary_ops)
                                        script,
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+        BOOST_REQUIRE(status);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
         BOOST_CHECK_EQUAL(1U, stack.size());
         const auto frame = stack.front();
         const auto actual =
@@ -362,15 +361,14 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
                                        script,
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        if(std::holds_alternative<malleability::status>(*status))
+        BOOST_REQUIRE(status);
+        if(status.value() == SCRIPT_ERR_OK)
         {
             BOOST_CHECK(stack.empty());
         }
         else
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(*status));
-            BOOST_CHECK_EQUAL(SCRIPT_ERR_NUMEQUALVERIFY, std::get<ScriptError>(*status));
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_NUMEQUALVERIFY, status.value());
             BOOST_CHECK_EQUAL(1U, stack.size());
             const auto& frame = stack.front();
             auto actual =
@@ -479,16 +477,15 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
                                        script,
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
+        BOOST_REQUIRE(status);
         if(exp_script_error == SCRIPT_ERR_OK)
         {
-            BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
             BOOST_CHECK_EQUAL(1U, stack.size());
         }
         else
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(*status));
-            BOOST_CHECK_EQUAL(exp_script_error, std::get<ScriptError>(*status));
+            BOOST_CHECK_EQUAL(exp_script_error, status.value());
             BOOST_CHECK_EQUAL(2U, stack.size());
         }
     }
@@ -534,8 +531,8 @@ BOOST_AUTO_TEST_CASE(op_bin2num)
                                        script,
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+        BOOST_REQUIRE(status);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
         BOOST_CHECK_EQUAL(1U, stack.size());
         BOOST_CHECK_EQUAL(op.size(), stack.front().size());
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()), begin(op),
@@ -609,15 +606,14 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
                                        script,
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
+        BOOST_REQUIRE(status);
         if(exp_error == SCRIPT_ERR_OK)
         {
-            BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
         }
         else
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(*status));
-            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(*status));
+            BOOST_CHECK_EQUAL(exp_error, status.value());
         }
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()),
                                       begin(op), end(op));
@@ -648,8 +644,8 @@ BOOST_AUTO_TEST_CASE(op_depth)
                                        script,
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+        BOOST_REQUIRE(status);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
         BOOST_CHECK_EQUAL(i + 1, stack.size());
         vector<uint8_t> op;
         bsv::serialize(i, back_inserter(op));
@@ -696,8 +692,8 @@ BOOST_AUTO_TEST_CASE(op_size)
                                        script,
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+        BOOST_REQUIRE(status);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
         BOOST_CHECK_EQUAL(2U, stack.size());
         const auto expected{stack.front().size()};
         const auto actual{bsv::deserialize(begin(stack.at(1)), end(stack.at(1)))};
@@ -738,8 +734,8 @@ BOOST_AUTO_TEST_CASE(op_pick)
                                        script,
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+        BOOST_REQUIRE(status);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
         BOOST_CHECK_EQUAL(4U, stack.size());
         if(op_code == OP_2)
             BOOST_CHECK(stack.at(3).empty());
@@ -780,8 +776,8 @@ BOOST_AUTO_TEST_CASE(op_roll)
                                        script,
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+        BOOST_REQUIRE(status);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
         BOOST_CHECK_EQUAL(3U, stack.size());
 
         if(op_code == OP_0)
@@ -844,8 +840,8 @@ BOOST_AUTO_TEST_CASE(op_split)
                                        script,
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+        BOOST_REQUIRE(status);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
         BOOST_CHECK_EQUAL(2U, stack.size());
         BOOST_CHECK_EQUAL(2 - i, stack.at(1).size());
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.at(1)), end(stack.at(1)),
@@ -898,8 +894,8 @@ BOOST_AUTO_TEST_CASE(op_lshift)
                                        script,
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+        BOOST_REQUIRE(status);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
         BOOST_CHECK_EQUAL(1U, stack.size());
         BOOST_CHECK_EQUAL(2U, stack.front().size());
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()),
@@ -950,8 +946,8 @@ BOOST_AUTO_TEST_CASE(op_rshift)
                                        script,
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+        BOOST_REQUIRE(status);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
         BOOST_CHECK_EQUAL(1U, stack.size());
         BOOST_CHECK_EQUAL(2U, stack.front().size());
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()),
@@ -976,7 +972,7 @@ BOOST_AUTO_TEST_CASE(op_rshift_far)
                               flags,
                               BaseSignatureChecker{});
     assert(r);
-    BOOST_CHECK(std::holds_alternative<malleability::status>(*r));
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, r.value());
     const auto& top = stack.front();
     const auto& values = top.GetElement();
     const auto it{find_if(begin(values), end(values),
@@ -1002,7 +998,7 @@ BOOST_AUTO_TEST_CASE(op_lshift_far)
                               flags,
                               BaseSignatureChecker{});
     assert(r);
-    BOOST_CHECK(std::holds_alternative<malleability::status>(*r));
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, r.value());
     const auto& top = stack.front();
     const auto& values = top.GetElement();
     const auto it{find_if(begin(values), end(values),
@@ -1067,8 +1063,8 @@ BOOST_AUTO_TEST_CASE(op_checksig)
                                        script,
                                        flags,
                                        checker);
-        assert(status);
-        BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+        BOOST_REQUIRE(status);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
         BOOST_CHECK_EQUAL(1U, stack.size());
         const auto stack_0{stack.at(0)};
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack_0), end(stack_0),
@@ -1143,16 +1139,15 @@ BOOST_AUTO_TEST_CASE(op_checkmultisig)
                                        script,
                                        flags,
                                        checker);
-        assert(status);
+        BOOST_REQUIRE(status);
         if(exp_error == SCRIPT_ERR_OK)
         {
-            BOOST_CHECK(std::holds_alternative<malleability::status>(*status));
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
             BOOST_CHECK_EQUAL(1, stack.size());
         }
         else
         {
-            BOOST_CHECK(std::holds_alternative<ScriptError>(*status));
-            BOOST_CHECK_EQUAL(exp_error, std::get<ScriptError>(*status));
+            BOOST_CHECK_EQUAL(exp_error, status.value());
             BOOST_CHECK_EQUAL(signatures.size() + public_keys.size() + 3,
                               stack.size());
         }

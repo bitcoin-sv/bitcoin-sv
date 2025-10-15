@@ -5,6 +5,7 @@
 #include "test/scriptflags.h"
 
 #include "script/interpreter.h"
+#include "script/script_flags.h"
 
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>

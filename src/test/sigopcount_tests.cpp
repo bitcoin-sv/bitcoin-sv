@@ -9,7 +9,6 @@
 #include "key.h"
 #include "protocol_era.h"
 #include "pubkey.h"
-#include "script/malleability_status.h"
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/script_num.h"
@@ -31,10 +30,8 @@ BOOST_FIXTURE_TEST_SUITE(sigopcount_tests, BasicTestingSetup)
 BOOST_AUTO_TEST_CASE(GetSigOpCount_WithReturn)
 {
     // Tests for GitHub #296 & SVN-2388
-    malleability::status ms{};
     const CScriptNum BigNum{std::vector<uint8_t>{1, 2, 3, 4, 5},
                             min_encoding_check::no,
-                            ms,
                             6,
                             true};
     using TestParams = std::tuple<CScript, bool, uint64_t>; // <Script, triggers error, sig op count>
@@ -217,9 +214,9 @@ ScriptError VerifyWithFlag(const CTransaction& output,
                      output.vout[0].scriptPubKey,
                      flags,
                      TransactionSignatureChecker(&inputi, 0, output.vout[0].nValue));
-    assert(ret.has_value());
-    BOOST_CHECK(!ret->first);
-    return ret->second;
+    BOOST_REQUIRE(ret);
+    BOOST_CHECK_NE(SCRIPT_ERR_OK, ret.value());
+    return ret.value();
 }
 
 /**

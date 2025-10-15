@@ -16,7 +16,6 @@
 #include "policy/policy.h"
 #include "protocol_era.h"
 #include "script/interpreter.h"
-#include "script/malleability_status.h"
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/script_flags.h"
@@ -158,16 +157,8 @@ void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
                                      verify_flags,
                                      TransactionSignatureChecker(&tx, i, amount, txdata));
                     assert(o);
-                    if(o->first)
-                    {
-                        err = SCRIPT_ERR_OK;
-                        is_valid = true;
-                    }
-                    else
-                    {
-                        err = o->second;
-                        is_valid = false; 
-                    }
+                    err = o.value();
+                    is_valid = (err == SCRIPT_ERR_OK);
                 }
                 if (is_valid != should_be_valid){
                     BOOST_ERROR("Bad test: " << strTest << 
@@ -531,7 +522,7 @@ void CheckWithFlag(const CheckFlagParams& params)
                          flags,
                          TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue));
         assert(o);
-        const bool ret = o->first;
+        const bool ret = (o.value() == SCRIPT_ERR_OK);
         BOOST_CHECK_MESSAGE(ret == flag_item.second, std::string("failed result: ") + (ret? "true":"false"));
     }
 }

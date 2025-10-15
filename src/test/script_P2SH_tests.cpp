@@ -55,8 +55,8 @@ static bool Verify(const CScript& scriptSig,
                                                                      txFrom.vout[0]
                                                                          .nValue));
     assert(res);
-    err = res->second;
-    return res->first;
+    err = res.value();
+    return res.value() == SCRIPT_ERR_OK;
 }
 
 BOOST_FIXTURE_TEST_SUITE(script_P2SH_tests, BasicTestingSetup)

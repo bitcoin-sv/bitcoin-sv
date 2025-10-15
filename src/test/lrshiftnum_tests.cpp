@@ -4,19 +4,18 @@
 #include "config.h"
 #include "overload.h"
 #include "script/limitedstack.h"
-#include "script/malleability_status.h"
 #include "script/opcodes.h"
 #include "script/script_error.h"
 #include "script/script_flags.h"
+#include "script/script_num.h"
+#include "script/shiftnum.h"
 #include "script/sign.h"
 #include "taskcancellation.h"
 #include "test/test_bitcoin.h"
-#include "script/shiftnum.h"
 
 #include <boost/test/unit_test.hpp>
 #include <boost/test/unit_test_suite.hpp>
 #include <iterator>
-#include <script/script_num.h>
 
 BOOST_AUTO_TEST_SUITE(lrshiftnum_tests)
 
@@ -207,10 +206,8 @@ BOOST_AUTO_TEST_CASE(lshiftnum_tests)
     for(const auto& [ip, sb, exp_status, exp_data] : test_data)
     {
         auto source = task::CCancellationSource::Make();
-        malleability::status ms{malleability::non_malleable};
         CScriptNum num{sb,
                        min_encoding_check::no,
-                       ms,
                        CScriptNum::MAXIMUM_ELEMENT_SIZE,
                        true};
         vector<uint8_t> op(ip.size(), 42);
@@ -232,14 +229,14 @@ BOOST_AUTO_TEST_CASE(eval_script_op_lshiftnum)
 
     using test_args = tuple<uint32_t,                                        // flags
                             vector<uint8_t>,                                 // script
-                            std::variant<ScriptError, malleability::status>, // expected return
+                            ScriptError,                                     // expected return
                             std::vector<std::vector<uint8_t>>>;              // expected stack
     const vector<test_args> test_data
     {
         // Pre-Chronicle
         {{},
          {OP_1, OP_NOP7},
-         malleability::non_malleable,
+         SCRIPT_ERR_OK,
          {{1}}},
         {SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS,
          {OP_1, OP_NOP7},
@@ -262,42 +259,42 @@ BOOST_AUTO_TEST_CASE(eval_script_op_lshiftnum)
         
         {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
          {{}, OP_1, OP_LSHIFTNUM},  // empty input data
-         malleability::non_malleable,
+         SCRIPT_ERR_OK,
          {{}}},
         
         {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
          {OP_1, OP_0, OP_LSHIFTNUM},  // Shift by 0
-         malleability::non_malleable,
+         SCRIPT_ERR_OK,
          {{1}}},
 
         {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
          {OP_1, OP_8, OP_LSHIFTNUM},  // Shift by size of stack element (or greater)
-         malleability::non_malleable,
+         SCRIPT_ERR_OK,
          {{0}}},
 
         {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
          {2, 1, 2, OP_8, OP_LSHIFTNUM}, // Shift 1 byte
-         malleability::non_malleable,
+         SCRIPT_ERR_OK,
          {{2, 0}}},
 
         {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
          {3, 1, 2, 3, OP_16, OP_LSHIFTNUM}, // Shift 2 bytes
-         malleability::non_malleable,
+         SCRIPT_ERR_OK,
          {{3, 0, 0}}},
 
         {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
          {OP_1, OP_1, OP_LSHIFTNUM}, // shift by 1 bit
-         malleability::non_malleable,
+         SCRIPT_ERR_OK,
          {{0x2}}},
 
         {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
          {OP_1, OP_2, OP_LSHIFTNUM}, // shift by 2 bits
-         malleability::non_malleable,
+         SCRIPT_ERR_OK,
          {{4}}},
 
         {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
          {2, 1, 2, OP_9, OP_LSHIFTNUM}, // Shift by bits and bytes
-         malleability::non_malleable,
+         SCRIPT_ERR_OK,
          {{4, 0}}},
     };
     for(const auto& [flags, script, expected, exp_stack] : test_data)
@@ -311,28 +308,20 @@ BOOST_AUTO_TEST_CASE(eval_script_op_lshiftnum)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        std::visit(overload([&expected, &exp_stack, &stack](const malleability::status ms)
-                            {
-                                BOOST_CHECK_EQUAL(std::get<malleability::status>(expected),
-                                                  ms);
-                                BOOST_CHECK_EQUAL(exp_stack.size(), stack.size());
-
-                                // Validate all elements in the stack, not just the top
-                                for (size_t i = 0; i < exp_stack.size(); ++i)
-                                {
-                                    const auto& actual_element = stack.at(i).GetElement();
-                                    const auto& expected_element = exp_stack[i];
-                                    BOOST_CHECK_EQUAL_COLLECTIONS(actual_element.begin(), actual_element.end(),
-                                                                  expected_element.begin(), expected_element.end());
-                                }
-                            },
-                            [&expected, &exp_stack, &stack](const ScriptError se)
-                            {
-                                BOOST_CHECK_EQUAL(std::get<ScriptError>(expected), se);
-                                BOOST_CHECK_EQUAL(exp_stack.size(), stack.size());
-                            }),
-                   *status);
+        BOOST_REQUIRE(status);
+        BOOST_CHECK_EQUAL(expected, status.value());
+        BOOST_CHECK_EQUAL(exp_stack.size(), stack.size());
+        if(expected == SCRIPT_ERR_OK)
+        {
+            // Validate all elements in the stack, not just the top
+            for (size_t i = 0; i < exp_stack.size(); ++i)
+            {
+                const auto& actual_element = stack.at(i).GetElement();
+                const auto& expected_element = exp_stack[i];
+                BOOST_CHECK_EQUAL_COLLECTIONS(actual_element.begin(), actual_element.end(),
+                                              expected_element.begin(), expected_element.end());
+            }
+        }
     }
 }
 
@@ -357,8 +346,7 @@ BOOST_AUTO_TEST_CASE(eval_script_large_op_lshiftnum_1bit)
                                    flags,
                                    BaseSignatureChecker{});
     BOOST_CHECK(status);
-    BOOST_CHECK_EQUAL(1, status->index());
-    BOOST_CHECK_EQUAL(malleability::non_malleable, std::get<malleability::status>(*status));
+    BOOST_CHECK_EQUAL(status.value(), SCRIPT_ERR_OK);
     BOOST_CHECK_EQUAL(1, stack.size());
     const auto& e{stack.front().GetElement()};
     BOOST_CHECK_EQUAL(data_size, e.size());
@@ -393,8 +381,7 @@ BOOST_AUTO_TEST_CASE(eval_script_large_op_lshiftnum_size_minus_1bit)
                                    flags,
                                    BaseSignatureChecker{});
     BOOST_CHECK(status);
-    BOOST_CHECK_EQUAL(1, status->index());
-    BOOST_CHECK_EQUAL(malleability::non_malleable, std::get<malleability::status>(*status));
+    BOOST_CHECK_EQUAL(status.value(), SCRIPT_ERR_OK);
     BOOST_CHECK_EQUAL(1, stack.size());
     const auto& e{stack.front().GetElement()};
     BOOST_CHECK_EQUAL(data_size, e.size());

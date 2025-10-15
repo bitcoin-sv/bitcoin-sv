@@ -34,8 +34,7 @@ static void op_dup(benchmark::State& state)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        assert(status->first);
+        assert(status == SCRIPT_ERR_OK);
     }
 }
 BENCHMARK(op_dup);
@@ -62,8 +61,7 @@ static void op_2rot(benchmark::State& state)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        assert(status->first);
+        assert(status == SCRIPT_ERR_OK);
     }
 }
 BENCHMARK(op_2rot);
@@ -92,8 +90,7 @@ static void op_split(benchmark::State& state)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        assert(status->first);
+        assert(status == SCRIPT_ERR_OK);
     }
 }
 BENCHMARK(op_split);
@@ -120,8 +117,7 @@ static void op_roll(benchmark::State& state)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        assert(status->first);
+        assert(status == SCRIPT_ERR_OK);
     }
 }
 BENCHMARK(op_roll);
@@ -148,8 +144,7 @@ static void op_pick(benchmark::State& state)
                                        CScript{script.begin(), script.end()},
                                        flags,
                                        BaseSignatureChecker{});
-        assert(status);
-        assert(status->first);
+        assert(status == SCRIPT_ERR_OK);
     }
 }
 BENCHMARK(op_pick);
