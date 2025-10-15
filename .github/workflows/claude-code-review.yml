@@ -62,6 +62,18 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Load code review guidelines
+        id: code-review-guidelines
+        run: |
+          if [ ! -f ".claude/prompts/code-review-guidelines.md" ]; then
+            echo "ERROR: .claude/prompts/code-review-guidelines.md not found!"
+            echo "This file is required for code reviews to function correctly."
+            exit 1
+          fi
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          cat .claude/prompts/code-review-guidelines.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
@@ -70,6 +82,8 @@ jobs:
           track_progress: true
           use_sticky_comment: true
           prompt: |
+            ${{ steps.code-review-guidelines.outputs.content }}
+
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
@@ -84,6 +98,8 @@ jobs:
             **For C++/C files** (.cpp, .h, .c, .hpp, .cc, .cxx, .hxx):
             Launch cpp-pro subagent with this prompt:
             ```
+            First, read the file .claude/prompts/code-review-guidelines.md for critical review guidelines and follow them strictly.
+
             You are reviewing C++ code changes in PR #${{ github.event.pull_request.number }} for repository ${{ github.repository }}.
 
             Focus on C++ files only (.cpp, .h, .c, .hpp, .cc, .cxx, .hxx).
@@ -105,6 +121,8 @@ jobs:
             **For Python files** (.py):
             Launch general-purpose subagent with this prompt:
             ```
+            First, read the file .claude/prompts/code-review-guidelines.md for critical review guidelines and follow them strictly.
+
             You are reviewing Python code changes in PR #${{ github.event.pull_request.number }} for repository ${{ github.repository }}.
 
             Focus on Python files only (.py). These are primarily test scripts for the C++ codebase.
