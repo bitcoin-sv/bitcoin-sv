@@ -55,6 +55,7 @@ jobs:
       pull-requests: write
       issues: read
       id-token: write
+      actions: read  # Required for github_ci MCP server to read CI results
 
     steps:
       - name: Checkout repository
