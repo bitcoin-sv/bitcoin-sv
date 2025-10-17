@@ -105,6 +105,32 @@ jobs:
 
             Focus on C++ files only (.cpp, .h, .c, .hpp, .cc, .cxx, .hxx).
 
+            **STEP 0: Deduplication Setup (Prevent Duplicate Comments)**
+
+            BEFORE reviewing any code, build a comment cache to avoid posting duplicates:
+
+            1. Fetch existing Claude comments (one API call):
+               gh api /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments \
+                 --jq '[.[] | select(.user.login == "claude[bot]") | {path, line, body: .body[0:200]}]'
+
+            2. Build in-memory lookup of existing comments:
+               - Create a map of file:line → comment summary
+               - Example: "src/script/shiftnum.cpp:124" → "Potential Integer Overflow..."
+               - For file-level comments (no line), use "filepath:null"
+
+            3. Before posting EACH inline comment via mcp__github_inline_comment__create_inline_comment:
+               - Check cache: Does this file:line already have a comment?
+               - If YES and describes SAME issue → SKIP (avoid duplicate)
+               - If YES and describes DIFFERENT issue → POST (different problem, same location)
+               - If NO → POST (new issue)
+
+            4. Similarity check for "same issue":
+               - Extract key terms from both issue descriptions
+               - If 60%+ overlap in key technical terms → Consider same issue
+               - Examples:
+                 * "Missing null check" vs "Critical: Missing null check" → SAME (skip)
+                 * "Memory leak" vs "Race condition" → DIFFERENT (post both)
+
             **Review Focus:**
             1. **Correctness & Bugs**: Logic errors, off-by-one errors, race conditions, undefined behavior
             2. **Memory Safety**: Leaks, use-after-free, buffer overflows, lifetime issues, RAII violations
@@ -128,6 +154,32 @@ jobs:
 
             Focus on Python files only (.py). These are primarily test scripts for the C++ codebase.
 
+            **STEP 0: Deduplication Setup (Prevent Duplicate Comments)**
+
+            BEFORE reviewing any code, build a comment cache to avoid posting duplicates:
+
+            1. Fetch existing Claude comments (one API call):
+               gh api /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments \
+                 --jq '[.[] | select(.user.login == "claude[bot]") | {path, line, body: .body[0:200]}]'
+
+            2. Build in-memory lookup of existing comments:
+               - Create a map of file:line → comment summary
+               - Example: "test/functional/bsv-op-lshift.py:145" → "Missing edge case test..."
+               - For file-level comments (no line), use "filepath:null"
+
+            3. Before posting EACH inline comment via mcp__github_inline_comment__create_inline_comment:
+               - Check cache: Does this file:line already have a comment?
+               - If YES and describes SAME issue → SKIP (avoid duplicate)
+               - If YES and describes DIFFERENT issue → POST (different problem, same location)
+               - If NO → POST (new issue)
+
+            4. Similarity check for "same issue":
+               - Extract key terms from both issue descriptions
+               - If 60%+ overlap in key technical terms → Consider same issue
+               - Examples:
+                 * "Missing edge case test" vs "Critical: Missing edge case test" → SAME (skip)
+                 * "Missing edge case test" vs "Incorrect assertion" → DIFFERENT (post both)
+
             **Review Focus:**
             1. **Test Coverage**: Are edge cases tested? Are assertions clear and comprehensive?
             2. **Test Structure**: Is test organization logical? Are tests independent?
@@ -144,25 +196,56 @@ jobs:
             **Step 3: Combine Feedback and Submit Review**
             Once all subagents complete:
             1. Collect all issues from both subagents
-            2. All inline comments should already be posted by the subagents
-            3. Create a unified summary comment using `gh pr comment` covering:
+            2. All inline comments should already be posted by the subagents (with deduplication)
+            3. Return your unified summary in your final response covering:
                - C++ review summary (if applicable)
                - Python review summary (if applicable)
                - Overall assessment
                - Any positive aspects worth noting
-            4. Submit ONE formal review using `gh pr review`:
-               - **Request changes** if ANY subagent found critical or major issues that must be fixed
-               - **Approve** only if ALL subagents found no blocking issues
-               - Include a brief summary in the review body
+               (The sticky_comment mechanism will automatically post/update this - DO NOT use gh pr comment)
+            4. Determine enforcement decision using ABSOLUTE ZERO-TOLERANCE POLICY:
+
+               a. Get review thread resolution status:
+                  gh api graphql -f query='{ repository(owner: "${{ github.event.pull_request.head.repo.owner.login }}", name: "${{ github.event.pull_request.head.repo.name }}") { pullRequest(number: ${{ github.event.pull_request.number }}) { reviewThreads(first: 100) { nodes { isResolved resolvedBy { login } comments(first: 1) { nodes { author { login } } } } } } } }'
+
+               b. Count UNRESOLVED Claude threads (excluding CODEOWNER-resolved):
+                  - For each reviewThread where author is "claude[bot]":
+                    * If isResolved == false → Count as blocking
+                    * If isResolved == true AND resolvedBy is in @teranode-group/svn-global-owners → Don't count (CODEOWNER override)
+                    * If isResolved == true AND resolvedBy is NOT CODEOWNER → Don't count (issue was fixed)
+
+               c. Check CODEOWNERS membership dynamically:
+                  gh api orgs/teranode-group/teams/svn-global-owners/members --jq '.[].login'
+                  (Query returns current team members from GitHub API)
+
+               d. Make enforcement decision:
+                  unresolved_count = (number of unresolved Claude threads not dismissed by CODEOWNERS)
+
+                  If unresolved_count > 0:
+                    gh pr review ${{ github.event.pull_request.number }} --request-changes \
+                      --body "Absolute Zero-Tolerance: {unresolved_count} unresolved issue(s) block merge. All comments must be addressed or resolved by CODEOWNERS."
+                  Else:
+                    gh pr review ${{ github.event.pull_request.number }} --approve \
+                      --body "All issues resolved. Code review passed."
 
             **For Re-Reviews (when reviewing updated code):**
-            1. First, use `gh pr view ${{ github.event.pull_request.number }} --json comments,reviewThreads` to see previous comments
-            2. Launch the same subagents to verify fixes across all file types
-            3. For each previous issue:
-               - If properly fixed, resolve using: `gh api --method PATCH /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/{comment_id} -f state=resolved`
-               - If issue persists, keep unresolved
-            4. Check for new issues
-            5. Submit updated summary and formal review
+            1. Get resolution status of all previous threads:
+               - Use GraphQL to fetch reviewThreads with isResolved and resolvedBy
+               - Use REST API to get inline comment details
+
+            2. Launch the same subagents with deduplication enabled:
+               - Subagents will check existing comments and NOT re-post duplicates
+               - Subagents will identify which issues are fixed vs. still present
+
+            3. For each previous issue thread:
+               - If resolvedBy is CODEOWNER → DO NOT re-post comment (respect dismissal)
+               - If issue was fixed by developer → Resolve thread:
+                 gh api --method PATCH /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/{comment_id} -f state=resolved
+               - If issue still persists → Leave unresolved (already has comment from deduplication)
+
+            4. Apply absolute zero-tolerance enforcement (Step 3.4 above)
+               - Count only unresolved threads (excluding CODEOWNER dismissals)
+               - Block merge if any unresolved issues remain
 
             Use the repository's CLAUDE.md for guidance. Be thorough, constructive, and coordinate effectively between subagents.
 
