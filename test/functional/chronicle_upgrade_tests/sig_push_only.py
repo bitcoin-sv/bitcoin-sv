@@ -74,7 +74,7 @@ class SigPushOnlyTestCase(ChronicleHeightTestsCase):
             # 1 input, OTDA, version non-malleable
             tx_non_push, tx_push_only = self.new_transactions(utxos, SIGHASH_OTDA, VERSION_NON_MALLEABLE)
             tx_collection.add_tx(tx_non_push,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Only non-push operators allowed in signatures)',
                                  block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_push_only,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
@@ -82,7 +82,7 @@ class SigPushOnlyTestCase(ChronicleHeightTestsCase):
             # 1 input, OTDA, version malleable
             tx_non_push, tx_push_only = self.new_transactions(utxos, SIGHASH_OTDA, VERSION_MALLEABLE)
             tx_collection.add_tx(tx_non_push,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Only non-push operators allowed in signatures)',
                                  block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_push_only,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
@@ -144,7 +144,7 @@ class SigPushOnlyTestCase(ChronicleHeightTestsCase):
             # 1 input, OTDA, version non-malleable
             tx_non_push, tx_push_only = self.new_transactions(utxos, SIGHASH_OTDA, VERSION_NON_MALLEABLE)
             tx_collection.add_tx(tx_non_push,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Only non-push operators allowed in signatures)',
                                  block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_push_only,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
@@ -152,7 +152,7 @@ class SigPushOnlyTestCase(ChronicleHeightTestsCase):
             # 1 input, OTDA, version malleable
             tx_non_push, tx_push_only = self.new_transactions(utxos, SIGHASH_OTDA, VERSION_MALLEABLE)
             tx_collection.add_tx(tx_non_push,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Only non-push operators allowed in signatures)',
                                  block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_push_only,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
@@ -214,7 +214,7 @@ class SigPushOnlyTestCase(ChronicleHeightTestsCase):
             # 1 input, OTDA, version non-malleable
             tx_non_push, tx_push_only = self.new_transactions(utxos, SIGHASH_OTDA, VERSION_NON_MALLEABLE)
             tx_collection.add_tx(tx_non_push,
-                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Only non-push operators allowed in signatures)',
                                  block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_push_only,
                                  p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
@@ -222,7 +222,7 @@ class SigPushOnlyTestCase(ChronicleHeightTestsCase):
             # 1 input, OTDA, version malleable
             tx_non_push, tx_push_only = self.new_transactions(utxos, SIGHASH_OTDA, VERSION_MALLEABLE)
             tx_collection.add_tx(tx_non_push,
-                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
+                                 p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Only non-push operators allowed in signatures)',
                                  block_reject_reason=b'blk-bad-inputs')
             tx_collection.add_tx(tx_push_only,
                                  p2p_reject_reason=b'flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)',
