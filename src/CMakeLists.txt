@@ -400,7 +400,6 @@ add_library(common
 	script/int_serialization.h
 	script/interpreter.h
 	script/limitedstack.h
-    script/malleability_status.h
 	script/opcodes.h
 	script/script.h
 	script/script_error.h
@@ -468,7 +467,6 @@ add_library(bitcoinconsensus
 	script/instruction_iterator.h
 	script/interpreter.cpp
 	script/limitedstack.cpp
-    script/malleability_status.cpp
 	script/opcodes.cpp
 	script/shiftnum.cpp
 	script/script.cpp
