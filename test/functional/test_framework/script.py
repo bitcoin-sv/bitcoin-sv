@@ -237,7 +237,7 @@ OP_CHECKSEQUENCEVERIFY = CScriptOp(0xb2)
 OP_SUBSTR = CScriptOp(0xb3)
 OP_LEFT = CScriptOp(0xb4)
 OP_RIGHT = CScriptOp(0xb5)
-OP_NOP7 = CScriptOp(0xb6)
+OP_LSHIFTNUM = CScriptOp(0xb6)
 OP_NOP8 = CScriptOp(0xb7)
 OP_NOP9 = CScriptOp(0xb8)
 OP_NOP10 = CScriptOp(0xb9)
@@ -364,7 +364,7 @@ VALID_OPCODES = {
     OP_SUBSTR,
     OP_LEFT,
     OP_RIGHT,
-    OP_NOP7,
+    OP_LSHIFTNUM,
     OP_NOP8,
     OP_NOP9,
     OP_NOP10,
@@ -483,7 +483,7 @@ OPCODE_NAMES.update({
     OP_SUBSTR: 'OP_SUBSTR',
     OP_LEFT: 'OP_LEFT',
     OP_RIGHT: 'OP_RIGHT',
-    OP_NOP7: 'OP_NOP7',
+    OP_LSHIFTNUM: 'OP_LSHIFTNUM',
     OP_NOP8: 'OP_NOP8',
     OP_NOP9: 'OP_NOP9',
     OP_NOP10: 'OP_NOP10',
@@ -602,7 +602,7 @@ OPCODES_BY_NAME = {
     'OP_SUBSTR': OP_SUBSTR,
     'OP_LEFT': OP_LEFT,
     'OP_RIGHT': OP_RIGHT,
-    'OP_NOP7': OP_NOP7,
+    'OP_LSHIFTNUM': OP_LSHIFTNUM,
     'OP_NOP8': OP_NOP8,
     'OP_NOP9': OP_NOP9,
     'OP_NOP10': OP_NOP10,

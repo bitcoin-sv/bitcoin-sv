@@ -6,6 +6,7 @@ from test_framework.height_based_test_framework import SimpleTestDefinition
 from test_framework.script import CScript, OP_TRUE, OP_FALSE, OP_DROP, OP_VER, OP_EQUAL
 from test_framework.script import OP_VERIF, OP_VERNOTIF, OP_ELSE, OP_ENDIF, OP_SUBSTR
 from test_framework.script import OP_1, OP_2, OP_4, OP_5, OP_LEFT, OP_RIGHT, OP_2MUL, OP_2DIV
+from test_framework.script import OP_LSHIFTNUM
 
 """
 Test that all new/reactivated opcodes are still rejected pre-Chronicle,
@@ -59,6 +60,12 @@ class OpcodesTestCase(ChronicleHeightBasedSimpleTestsCase):
                              p2p_reject_reason=b'mandatory-script-verify-flag-failed (Attempted to use a disabled opcode)',
                              block_reject_reason=b'blk-bad-inputs'),
 
+        SimpleTestDefinition(None, CScript([OP_1, OP_2, OP_LSHIFTNUM, OP_4, OP_EQUAL]),
+                             "PRE_CHRONICLE", CScript(),
+                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (NOPx reserved for soft-fork upgrades)',
+                             block_reject_reason=b'blk-bad-inputs'),
+
+
         # Block before Chronicle grace period
         SimpleTestDefinition(None, CScript([OP_VER, OP_DROP, OP_TRUE]),
                              "CHRONICLE_PRE_GRACE", CScript(),
@@ -98,6 +105,11 @@ class OpcodesTestCase(ChronicleHeightBasedSimpleTestsCase):
         SimpleTestDefinition(None, CScript([OP_2, OP_2DIV, OP_1, OP_EQUAL]),
                              "CHRONICLE_PRE_GRACE", CScript(),
                              p2p_reject_reason=b'mandatory-script-verify-flag-failed (Attempted to use a disabled opcode)',
+                             block_reject_reason=b'blk-bad-inputs'),
+
+        SimpleTestDefinition(None, CScript([OP_1, OP_2, OP_LSHIFTNUM, OP_4, OP_EQUAL]),
+                             "CHRONICLE_PRE_GRACE", CScript(),
+                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (NOPx reserved for soft-fork upgrades)',
                              block_reject_reason=b'blk-bad-inputs'),
 
 
@@ -142,6 +154,11 @@ class OpcodesTestCase(ChronicleHeightBasedSimpleTestsCase):
                              p2p_reject_reason=b'chronicle-script-verify-flag-failed (Attempted to use a disabled opcode)',
                              block_reject_reason=b'blk-bad-inputs'),
 
+        SimpleTestDefinition(None, CScript([OP_1, OP_2, OP_LSHIFTNUM, OP_4, OP_EQUAL]),
+                             "CHRONICLE_GRACE_BEGIN", CScript(),
+                             p2p_reject_reason=b'chronicle-script-verify-flag-failed (NOPx reserved for soft-fork upgrades)',
+                             block_reject_reason=b'blk-bad-inputs'),
+
 
         # Block before Chronicle activation
         SimpleTestDefinition(None, CScript([OP_VER, OP_DROP, OP_TRUE]),
@@ -164,6 +181,10 @@ class OpcodesTestCase(ChronicleHeightBasedSimpleTestsCase):
 
         SimpleTestDefinition(None, CScript([OP_1, OP_2MUL, OP_2, OP_EQUAL]),
                              "CHRONICLE_PRE_ACTIVATION", CScript()),
+
+        SimpleTestDefinition(None, CScript([OP_1, OP_2, OP_LSHIFTNUM, OP_4, OP_EQUAL]),
+                             "CHRONICLE_PRE_ACTIVATION", CScript()),
+
 
         # Chronicle activation height
         SimpleTestDefinition(None, CScript([OP_VER, OP_DROP, OP_TRUE]),
@@ -188,6 +209,9 @@ class OpcodesTestCase(ChronicleHeightBasedSimpleTestsCase):
                              "CHRONICLE_ACTIVATION", CScript()),
 
         SimpleTestDefinition(None, CScript([OP_2, OP_2DIV, OP_1, OP_EQUAL]),
+                             "CHRONICLE_ACTIVATION", CScript()),
+
+        SimpleTestDefinition(None, CScript([OP_1, OP_2, OP_LSHIFTNUM, OP_4, OP_EQUAL]),
                              "CHRONICLE_ACTIVATION", CScript()),
 
 
@@ -216,6 +240,9 @@ class OpcodesTestCase(ChronicleHeightBasedSimpleTestsCase):
         SimpleTestDefinition(None, CScript([OP_2, OP_2DIV, OP_1, OP_EQUAL]),
                              "CHRONICLE_POST_ACTIVATION", CScript()),
 
+        SimpleTestDefinition(None, CScript([OP_1, OP_2, OP_LSHIFTNUM, OP_4, OP_EQUAL]),
+                             "CHRONICLE_POST_ACTIVATION", CScript()),
+
 
         # End of chronicle grace period
         SimpleTestDefinition(None, CScript([OP_VER, OP_DROP, OP_TRUE]),
@@ -240,6 +267,9 @@ class OpcodesTestCase(ChronicleHeightBasedSimpleTestsCase):
                              "CHRONICLE_GRACE_END", CScript()),
 
         SimpleTestDefinition(None, CScript([OP_2, OP_2DIV, OP_1, OP_EQUAL]),
+                             "CHRONICLE_GRACE_END", CScript()),
+
+        SimpleTestDefinition(None, CScript([OP_1, OP_2, OP_LSHIFTNUM, OP_4, OP_EQUAL]),
                              "CHRONICLE_GRACE_END", CScript()),
 
 
@@ -268,4 +298,6 @@ class OpcodesTestCase(ChronicleHeightBasedSimpleTestsCase):
         SimpleTestDefinition(None, CScript([OP_2, OP_2DIV, OP_1, OP_EQUAL]),
                              "POST_CHRONICLE", CScript()),
 
+        SimpleTestDefinition(None, CScript([OP_1, OP_2, OP_LSHIFTNUM, OP_4, OP_EQUAL]),
+                             "POST_CHRONICLE", CScript()),
     ]
