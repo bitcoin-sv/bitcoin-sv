@@ -5,32 +5,33 @@ name: Claude Code Review
 # How it works:
 # 1. Triggers when a PR is marked "Ready for review" (or opened/updated)
 # 2. Claude analyzes the code and posts inline comments for specific issues
-# 3. Claude posts a summary comment with overall feedback
-# 4. Claude submits a formal GitHub review:
-#    - REQUEST CHANGES (❌) if critical issues found → blocks merge
-#    - APPROVE (✅) if code quality is good → allows merge
+# 3. Claude posts a summary comment with overall feedback (updates in-place on re-reviews)
+# 4. Claude sets a commit status check for enforcement:
+#    - FAILURE (❌) if any unresolved issues found → blocks merge
+#    - SUCCESS (✅) if all issues resolved or dismissed by CODEOWNERS → allows merge
 # 5. When new commits are pushed, Claude automatically re-reviews:
 #    - Checks if previous issues were properly fixed
 #    - Auto-resolves comment threads where issues are verified as fixed
-#    - Keeps unresolved comments where issues persist
+#    - Un-resolves threads that were prematurely marked resolved (prevents bypass)
 #    - Posts new comments for any new issues found
-#    - Updates formal review based on current state
+#    - Updates commit status check based on current state
 #
 # Required Branch Protection Setup (configure in GitHub repository settings):
 # 1. Go to Settings → Branches → Add branch protection rule for your main branch
-# 2. Enable "Require approvals" (set to 1 or more for human review)
-# 3. Enable "Dismiss stale reviews when new commits are pushed"
-#    - This ensures Claude re-reviews after changes
-# 4. Enable "Require conversation resolution before merging"
-#    - This ensures all Claude's comments are either fixed (and auto-resolved) or addressed
+# 2. Enable "Require status checks to pass before merging"
+#    - Add "Claude Code Review" to the list of required status checks
+#    - This blocks merge if Claude finds any unresolved issues
+# 3. Enable "Require conversation resolution before merging"
+#    - This ensures all Claude's comments are either fixed (and auto-resolved) or dismissed by CODEOWNERS
+# 4. Enable "Require approvals" (set to 1 or more for human review)
 # 5. Optional: Add a CODEOWNERS file to specify required human reviewers
 #
 # This ensures:
-# - Claude reviews first and blocks merge if issues found
+# - Claude reviews first and blocks merge if issues found (via status check)
 # - Developers address Claude's feedback and push updates
-# - Claude verifies fixes and auto-resolves resolved issues
+# - Claude verifies fixes and auto-resolves verified issues
 # - Human reviewers can see which issues were fixed and verified by Claude
-# - PR can only merge when: all conversations resolved + Claude approves + human approves
+# - PR can only merge when: status check passes + all conversations resolved + human approves
 
 on:
   pull_request:
@@ -203,53 +204,74 @@ jobs:
                - Overall assessment
                - Any positive aspects worth noting
                (The sticky_comment mechanism will automatically post/update this - DO NOT use gh pr comment)
-            4. Determine enforcement decision using ABSOLUTE ZERO-TOLERANCE POLICY:
 
-               a. Get review thread resolution status:
-                  gh api graphql -f query='{ repository(owner: "${{ github.event.pull_request.head.repo.owner.login }}", name: "${{ github.event.pull_request.head.repo.name }}") { pullRequest(number: ${{ github.event.pull_request.number }}) { reviewThreads(first: 100) { nodes { isResolved resolvedBy { login } comments(first: 1) { nodes { author { login } } } } } } } }'
+            **Step 4: Enforcement via Commit Status Check (ABSOLUTE ZERO-TOLERANCE)**
 
-               b. Count UNRESOLVED Claude threads (excluding CODEOWNER-resolved):
-                  - For each reviewThread where author is "claude[bot]":
-                    * If isResolved == false → Count as blocking
-                    * If isResolved == true AND resolvedBy is in @teranode-group/svn-global-owners → Don't count (CODEOWNER override)
-                    * If isResolved == true AND resolvedBy is NOT CODEOWNER → Don't count (issue was fixed)
+            a. Get review thread resolution status:
+               gh api graphql -f query='{ repository(owner: "${{ github.event.pull_request.head.repo.owner.login }}", name: "${{ github.event.pull_request.head.repo.name }}") { pullRequest(number: ${{ github.event.pull_request.number }}) { reviewThreads(first: 100) { nodes { isResolved resolvedBy { login } comments(first: 1) { nodes { author { login } } } } } } } }'
 
-               c. Check CODEOWNERS membership dynamically:
-                  gh api orgs/teranode-group/teams/svn-global-owners/members --jq '.[].login'
-                  (Query returns current team members from GitHub API)
+            b. Count UNRESOLVED Claude threads (excluding CODEOWNER-resolved):
+               - For each reviewThread where author is "claude[bot]":
+                 * If isResolved == false → Count as blocking
+                 * If isResolved == true AND resolvedBy is in @teranode-group/svn-global-owners → Don't count (CODEOWNER override)
+                 * If isResolved == true AND resolvedBy is NOT CODEOWNER → Don't count (issue was fixed)
 
-               d. Make enforcement decision:
-                  unresolved_count = (number of unresolved Claude threads not dismissed by CODEOWNERS)
+            c. Check CODEOWNERS membership dynamically:
+               gh api orgs/teranode-group/teams/svn-global-owners/members --jq '.[].login'
+               (Query returns current team members from GitHub API)
 
-                  If unresolved_count > 0:
-                    gh pr review ${{ github.event.pull_request.number }} --request-changes \
-                      --body "Absolute Zero-Tolerance: {unresolved_count} unresolved issue(s) block merge. All comments must be addressed or resolved by CODEOWNERS."
-                  Else:
-                    gh pr review ${{ github.event.pull_request.number }} --approve \
-                      --body "All issues resolved. Code review passed."
+            d. Set commit status based on unresolved count:
+               unresolved_count = (number of unresolved Claude threads not dismissed by CODEOWNERS)
+
+               If unresolved_count > 0:
+                 gh api /repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
+                   -f state=failure \
+                   -f context="Claude Code Review" \
+                   -f description="Absolute Zero-Tolerance: {unresolved_count} unresolved issue(s) block merge" \
+                   -f target_url="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
+               Else:
+                 gh api /repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
+                   -f state=success \
+                   -f context="Claude Code Review" \
+                   -f description="All issues resolved. Code review passed." \
+                   -f target_url="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
 
             **For Re-Reviews (when reviewing updated code):**
             1. Get resolution status of all previous threads:
                - Use GraphQL to fetch reviewThreads with isResolved and resolvedBy
-               - Use REST API to get inline comment details
+               - Use REST API to get inline comment details and their thread IDs
 
             2. Launch the same subagents with deduplication enabled:
                - Subagents will check existing comments and NOT re-post duplicates
-               - Subagents will identify which issues are fixed vs. still present
+               - Subagents MUST verify each previous issue: Does the code problem still exist?
+               - Subagents return a report for EACH previous comment: FIXED or PERSISTS
 
-            3. For each previous issue thread:
-               - If resolvedBy is CODEOWNER → DO NOT re-post comment (respect dismissal)
-               - If issue was fixed by developer → Resolve thread:
-                 gh api --method PATCH /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/{comment_id} -f state=resolved
-               - If issue still persists → Leave unresolved (already has comment from deduplication)
+            3. For each previous issue thread, take action based on verification:
 
-            4. Apply absolute zero-tolerance enforcement (Step 3.4 above)
-               - Count only unresolved threads (excluding CODEOWNER dismissals)
-               - Block merge if any unresolved issues remain
+               **If resolvedBy is CODEOWNER (member of svn-global-owners):**
+               - DO NOT re-post comment (respect the override/dismissal)
+               - Keep thread resolved (CODEOWNER decision is final)
+
+               **If issue was FIXED (verified by subagent):**
+               - Ensure thread is marked resolved (if not already):
+                 gh api --method PUT /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments/{comment_id}/reactions -f content="+1"
+                 gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "{thread_id}"}) { thread { id } } }'
+
+               **If issue PERSISTS (verified by subagent):**
+               - Check current thread state:
+                 * If already unresolved → Keep unresolved (good state)
+                 * If prematurely resolved → UN-RESOLVE the thread:
+                   gh api graphql -f query='mutation { unresolveReviewThread(input: {threadId: "{thread_id}"}) { thread { id } } }'
+               - This prevents developers from bypassing enforcement by clicking "Resolve" without fixing
+
+            4. Apply absolute zero-tolerance enforcement via commit status check (Step 4 above)
+               - Count only UNRESOLVED threads after verification (excluding CODEOWNER dismissals)
+               - Set commit status to failure if any unresolved issues remain
+               - Set commit status to success if all issues resolved
 
             Use the repository's CLAUDE.md for guidance. Be thorough, constructive, and coordinate effectively between subagents.
 
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://docs.claude.com/en/docs/claude-code/cli-reference for available options
-          claude_args: '--allowed-tools "Task,mcp__github_inline_comment__create_inline_comment,Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr review:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh api:*)"'
+          claude_args: '--allowed-tools "Task,mcp__github_inline_comment__create_inline_comment,Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh api:*)"'
 
