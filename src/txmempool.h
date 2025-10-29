@@ -50,12 +50,6 @@ class CoinsDB;
 class CoinsDBView; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CAsyncMempoolTxDB;
 
-/**
- * Fake height value used in Coins to signify they are only in the memory
- * pool(since 0.8)
- */
-static const int32_t MEMPOOL_HEIGHT = 0x7FFFFFFF;
-
 struct LockPoints {
     // Will be set to the blockchain height and median time past values that
     // would be necessary to satisfy all relative locktime constraints (BIP68)

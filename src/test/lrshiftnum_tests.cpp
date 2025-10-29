@@ -299,7 +299,7 @@ BOOST_AUTO_TEST_CASE(eval_script_op_lshiftnum)
     };
     for(const auto& [flags, script, expected, exp_stack] : test_data)
     {
-        const auto params{make_eval_script_params(GlobalConfig::GetConfig(), flags, false)};
+        const auto params{make_eval_script_params(GlobalConfig::GetConfig().GetConfigScriptPolicy(), flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(params,
@@ -333,7 +333,7 @@ BOOST_AUTO_TEST_CASE(eval_script_large_op_lshiftnum_1bit)
 
     constexpr int32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
 
-    const auto params{make_eval_script_params(GlobalConfig::GetConfig(), flags, false)};
+    const auto params{make_eval_script_params(GlobalConfig::GetConfig().GetConfigScriptPolicy(), flags, false)};
     auto source = task::CCancellationSource::Make();
     constexpr auto data_size{1'000'000'000};
     const std::vector<uint8_t> data(data_size, 0x80);
@@ -368,7 +368,7 @@ BOOST_AUTO_TEST_CASE(eval_script_large_op_lshiftnum_size_minus_1bit)
     using namespace std;
 
     constexpr int32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
-    const auto params{make_eval_script_params(GlobalConfig::GetConfig(), flags, false)};
+    const auto params{make_eval_script_params(GlobalConfig::GetConfig().GetConfigScriptPolicy(), flags, false)};
     auto source = task::CCancellationSource::Make();
     constexpr auto data_size{1'000'000'000};
     const std::vector<uint8_t> data(data_size, 1);

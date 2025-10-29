@@ -165,24 +165,22 @@ public:
     }
 
     bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn,
-                                    std::string* /*err*/ = nullptr) override
+                                    std::string* err = nullptr) override
     {
-        genesisActivationHeight = genesisActivationHeightIn;
-        return true;
+        return dummyPolicySettings.SetGenesisActivationHeight(genesisActivationHeightIn, err);
     }
     int32_t GetGenesisActivationHeight() const override
     {
-        return genesisActivationHeight;
+        return dummyPolicySettings.GetGenesisActivationHeight();
     }
     bool SetChronicleActivationHeight(int32_t chronicleActivationHeightIn,
-                                      std::string* /*err*/ = nullptr) override
+                                      std::string* err = nullptr) override
     {
-        chronicleActivationHeight = chronicleActivationHeightIn;
-        return true;
+        return dummyPolicySettings.SetChronicleActivationHeight(chronicleActivationHeightIn, err);
     }
     int32_t GetChronicleActivationHeight() const override
     {
-        return chronicleActivationHeight;
+        return dummyPolicySettings.GetChronicleActivationHeight();
     }
 
     bool SetMaxConcurrentAsyncTasksPerNode(int /*maxConcurrentAsyncTasksPerNode*/,
@@ -1069,18 +1067,23 @@ public:
 
     void Reset() override;
 
+    const ConfigScriptPolicy& GetConfigScriptPolicy() const override { return dummyPolicySettings; };
+
 private:
+
+    ConfigScriptPolicy dummyPolicySettings{};
+    uint64_t maxScriptSizePolicy{DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS};
+
     std::unique_ptr<CChainParams> chainParams;
     uint64_t dataCarrierSize{DEFAULT_DATA_CARRIER_SIZE};
     bool dataCarrier{DEFAULT_ACCEPT_DATACARRIER};
-    int32_t genesisActivationHeight{};
-    int32_t chronicleActivationHeight{};
+
     uint64_t maxTxSizePolicy{DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS};
     uint64_t minConsolidationFactor{DEFAULT_MIN_CONSOLIDATION_FACTOR};
     uint64_t maxConsolidationInputScriptSize{DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE};
     uint64_t minConfConsolidationInput{DEFAULT_MIN_CONF_CONSOLIDATION_INPUT};
     uint64_t acceptNonStdConsolidationInput{DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT};
-    uint64_t maxScriptSizePolicy{DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS};
+
     std::set<uint256> mInvalidBlocks;
     std::set<std::string> mBannedUAClients{DEFAULT_CLIENTUA_BAN_PATTERNS};
     std::set<std::string> mAllowedUAClients;

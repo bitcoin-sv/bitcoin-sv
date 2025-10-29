@@ -538,7 +538,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
 
         // Sign
         SignatureData sigdata;
-        SignAndVerify(config,
+        SignAndVerify(config.GetConfigScriptPolicy(),
                       true,
                       MutableTransactionSignatureCreator(&keystore,
                                                          &tx,
@@ -551,7 +551,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                       sigdata);
 
         UpdateTransaction(tx, 0, sigdata);
-        SignAndVerify(config,
+        SignAndVerify(config.GetConfigScriptPolicy(),
                       true,
                       MutableTransactionSignatureCreator(&keystore,
                                                          &tx,

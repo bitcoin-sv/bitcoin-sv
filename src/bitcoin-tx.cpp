@@ -677,7 +677,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
         if((sigHashType.getBaseType() != BaseSigHashType::SINGLE) ||
            (i < mergedTx.vout.size()))
         {
-            SignAndVerify(config,
+            SignAndVerify(config.GetConfigScriptPolicy(),
                           true,
                           MutableTransactionSignatureCreator(&keystore,
                                                              &mergedTx,
@@ -691,7 +691,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
         }
         constexpr bool consensus{true};
         const uint32_t flags{MandatoryScriptVerifyFlags(ActiveEra)};
-        const auto params{make_eval_script_params(config, flags, consensus)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, consensus)};
         for(const CTransaction& txv : txVariants)
         {
             // ... and merge in other signatures:
@@ -711,7 +711,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
         const auto std_input_flags{StandardScriptVerifyFlags(ActiveEra) |
                                    InputScriptVerifyFlags(ActiveEra, utxoEra)};
 
-        const auto std_input_params{make_verify_script_params(config, std_input_flags, consensus)};
+        const auto std_input_params{make_verify_script_params(config.GetConfigScriptPolicy(), std_input_flags, consensus)};
         auto source = task::CCancellationSource::Make();
         const auto res = VerifyScript(std_input_params,
                                       source->GetToken(),

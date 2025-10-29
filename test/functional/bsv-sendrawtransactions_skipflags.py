@@ -433,8 +433,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         invalid_txs = (
             [{'reject_reason': "non-mandatory-script-verify-flag (Script is too big)"} for _ in range(4)]
             + falses(5)
-            + [{'reject_reason': "non-mandatory-script-verify-flag (Script is too big)"} for _ in range(3)]
-            + [{'reject_reason': "mandatory-script-verify-flag-failed (Script is too big)"}]
+            + [{'reject_reason': "non-mandatory-script-verify-flag (Script is too big)"} for _ in range(4)]
             + falses(3))
 
         overrides_pertx = [None for _ in range(8)] + [config_overrides_increase, None, None, None,
@@ -449,10 +448,10 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         base_utxos = self.prepare_base_txs(utxos[i_utxo:i_utxo + 16], target_script_size=self.maxscriptsize)
 
         invalid_txs = (falses(4)
-                       + [{'reject_reason': "mandatory-script-verify-flag-failed (Script is too big)"} for _ in range(4)]
-                       + [{'reject_reason': "mandatory-script-verify-flag-failed (Script is too big)"}]
+                       + [{'reject_reason': "non-mandatory-script-verify-flag (Script is too big)"} for _ in range(4)]
+                       + [{'reject_reason': "non-mandatory-script-verify-flag (Script is too big)"}]
                        + falses(4)
-                       + [{'reject_reason': "mandatory-script-verify-flag-failed (Script is too big)"} for _ in range(3)])
+                       + [{'reject_reason': "non-mandatory-script-verify-flag (Script is too big)"} for _ in range(3)])
 
         overrides_pertx = (
             [None for _ in range(8)]

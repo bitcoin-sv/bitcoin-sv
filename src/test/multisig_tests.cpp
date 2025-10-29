@@ -45,7 +45,7 @@ CScript sign_multisig(const CScript& scriptPubKey,
 BOOST_AUTO_TEST_CASE(multisig_verify)
 {
     constexpr uint32_t flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC;
-    const auto params{make_verify_script_params(testConfig, flags, true)};
+    const auto params{make_verify_script_params(testConfig.GetConfigScriptPolicy(), flags, true)};
 
     ScriptError err{};
     std::array<CKey, 4> key;
@@ -425,11 +425,11 @@ BOOST_AUTO_TEST_CASE(multisig_Sign) {
     }
 
     for (int i = 0; i < 3; i++) {
-        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, CTransaction(txFrom),
+        BOOST_CHECK_MESSAGE(SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, CTransaction(txFrom),
                                           txTo[i], 0,
                                           SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));
-        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom),
+        BOOST_CHECK_MESSAGE(SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom),
                                           txTo[i], 0,
                                           SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));

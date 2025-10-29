@@ -304,7 +304,7 @@ public:
      */
     template <typename Stream>
     CTransaction(deserialize_type, Stream &s)
-        : CTransaction(CMutableTransaction(deserialize, s)) {}
+        : CTransaction(CMutableTransaction(::deserialize, s)) {}
 
     bool IsNull() const { return vin.empty() && vout.empty(); }
 

@@ -3,17 +3,17 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "script/sign.h"
+#include "configscriptpolicy.h"
 #include "key.h"
 #include "keystore.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
 #include "protocol_era.h"
 #include "script/interpreter.h"
+#include "script/sign.h"
 #include "script/standard.h"
 #include "taskcancellation.h"
 #include "uint256.h"
-#include "config.h"
 
 #include <cstdint>
 
@@ -143,8 +143,7 @@ static CScript PushAll(const std::vector<valtype> &values) {
     return result;
 }
 
-static bool ProduceSignature(const Config&,
-                             const BaseSignatureCreator& creator,
+static bool ProduceSignature(const BaseSignatureCreator& creator,
                              ProtocolEra utxoEra,
                              const CScript& fromPubKey,
                              SignatureData& sigdata)
@@ -172,7 +171,7 @@ static bool ProduceSignature(const Config&,
     return solved;
 }
 
-bool SignAndVerify(const Config& config,
+bool SignAndVerify(const ConfigScriptPolicy& policySettings,
                    const bool consensus,
                    const BaseSignatureCreator& creator,
                    const ProtocolEra era,
@@ -180,8 +179,7 @@ bool SignAndVerify(const Config& config,
                    const CScript& fromPubKey,
                    SignatureData& sigdata)
 {
-    const bool solved = ProduceSignature(config,
-                                         creator,
+    const bool solved = ProduceSignature(creator,
                                          utxoEra,
                                          fromPubKey,
                                          sigdata);
@@ -192,7 +190,7 @@ bool SignAndVerify(const Config& config,
     // because wallet only produces standard transactions
     auto source = task::CCancellationSource::Make();
     uint32_t flags = StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra);
-    const auto params{make_verify_script_params(config, flags, consensus)};
+    const auto params{make_verify_script_params(policySettings, flags, consensus)};
     const auto o = VerifyScript(params,
                                 source->GetToken(),
                                 sigdata.scriptSig,
@@ -217,7 +215,7 @@ void UpdateTransaction(CMutableTransaction &tx, unsigned int nIn,
     tx.vin[nIn].scriptSig = data.scriptSig;
 }
 
-bool SignSignature(const Config& config, const CKeyStore& keystore,
+bool SignSignature(const ConfigScriptPolicy& policySettings, const CKeyStore& keystore,
                    ProtocolEra era, ProtocolEra utxoEra,
                    const CScript& fromPubKey,
                    CMutableTransaction& txTo, unsigned int nIn,
@@ -230,7 +228,7 @@ bool SignSignature(const Config& config, const CKeyStore& keystore,
     SignatureData sigdata;
     //Consensus parameter can be set to false or true here, because MULTISIG OP is a nonstandard transaction. 
     //Method SignSignature handles only standard transactions
-    const bool ret = SignAndVerify(config,
+    const bool ret = SignAndVerify(policySettings,
                                    false,
                                    creator,
                                    era,
@@ -241,7 +239,7 @@ bool SignSignature(const Config& config, const CKeyStore& keystore,
     return ret;
 }
 
-bool SignSignature(const Config &config, const CKeyStore &keystore,
+bool SignSignature(const ConfigScriptPolicy& policySettings, const CKeyStore &keystore,
                    ProtocolEra era, ProtocolEra utxoEra,
                    const CTransaction &txFrom,
                    CMutableTransaction &txTo, unsigned int nIn,
@@ -251,7 +249,7 @@ bool SignSignature(const Config &config, const CKeyStore &keystore,
     assert(txin.prevout.GetN() < txFrom.vout.size());
     const CTxOut &txout = txFrom.vout[txin.prevout.GetN()];
 
-    return SignSignature(config, keystore, era, utxoEra,
+    return SignSignature(policySettings, keystore, era, utxoEra,
                          txout.scriptPubKey, txTo, nIn, txout.nValue,
                          sigHashType);
 }

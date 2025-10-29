@@ -814,11 +814,11 @@ Examples:
                 // it overrides per-input script verification flags.
                 flags &= ~SCRIPT_UTXO_AFTER_GENESIS;
                 flags &= ~SCRIPT_UTXO_AFTER_CHRONICLE;
-                if(IsProtocolActive(GetProtocolEra(config, *txo_height), ProtocolName::Genesis))
+                if(IsProtocolActive(GetProtocolEra(config.GetConfigScriptPolicy(), *txo_height), ProtocolName::Genesis))
                 {
                     flags |= SCRIPT_UTXO_AFTER_GENESIS;
                 }
-                if(IsProtocolActive(GetProtocolEra(config, *txo_height), ProtocolName::Chronicle))
+                if(IsProtocolActive(GetProtocolEra(config.GetConfigScriptPolicy(), *txo_height), ProtocolName::Chronicle))
                 {
                     flags |= SCRIPT_UTXO_AFTER_CHRONICLE;
                 }
@@ -855,7 +855,7 @@ Examples:
         }
 
         constexpr bool consensus{};
-        const auto params{make_verify_script_params(config, scr.flags, consensus)};
+        const auto params{make_verify_script_params(config.GetConfigScriptPolicy(), scr.flags, consensus)};
 
         CScriptCheck script_check{params,
                                   scr.txo_lock,
@@ -1216,7 +1216,7 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
 
     obj.push_back(Pair("maxscriptsizepolicy", config.GetMaxScriptSize(true, false)));
     obj.push_back(Pair("maxopsperscriptpolicy", config.GetMaxOpsPerScript(true, false)));
-    obj.push_back(Pair("maxscriptnumlengthpolicy", config.GetMaxScriptNumLength(GetProtocolEra(config, chainActive.Height()), false)));
+    obj.push_back(Pair("maxscriptnumlengthpolicy", config.GetMaxScriptNumLength(GetProtocolEra(config.GetConfigScriptPolicy(), chainActive.Height()), false)));
     obj.push_back(Pair("maxpubkeyspermultisigpolicy", config.GetMaxPubKeysPerMultiSig(true, false)));
     obj.push_back(Pair("maxtxsigopscountspolicy", config.GetMaxTxSigOpsCountPolicy(ProtocolEra::PostGenesis)));
     obj.push_back(Pair("maxstackmemoryusagepolicy", config.GetMaxStackMemoryUsage(true, false)));

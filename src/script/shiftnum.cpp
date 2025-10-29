@@ -6,6 +6,7 @@
 #include "taskcancellation.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <iterator>
 

@@ -6,24 +6,22 @@
 #define BITCOIN_CONFIG_H
 
 #include "amount.h"
+#include "configscriptpolicy.h"
+#include "invalid_txn_publisher.h"
 #include "mining/factory.h"
 #include "net/net.h"
 #include "policy/policy.h"
-#include "protocol_era.h"
 #include "rpc/client_config.h"
 #include "script/standard.h"
 #include "txn_validation_config.h"
 #include "validation.h"
-#include "invalid_txn_publisher.h"
-
-#include <boost/noncopyable.hpp>
 
 #include <chrono>
 #include <cstdint>
 #include <memory>
-#include <string>
 #include <orphan_txns.h>
 #include <shared_mutex>
+#include <string>
 
 class CChainParams;
 struct DefaultBlockSizeParams;
@@ -34,11 +32,17 @@ inline bool fRequireStandard{true};
 class Config : public boost::noncopyable
 {
 public:
+
+    // Policies settings for script eval/verify
     virtual uint64_t GetMaxOpsPerScript(bool isGenesisEnabled, bool isConsensus) const = 0;
     virtual uint64_t GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const = 0;
     virtual uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const = 0;
     virtual uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool isConsensus) const = 0;
     virtual uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool isConsensus) const = 0;
+    virtual int32_t GetGenesisActivationHeight() const = 0;
+    virtual int32_t GetChronicleActivationHeight() const = 0;
+    virtual const ConfigScriptPolicy& GetConfigScriptPolicy() const = 0;
+
     virtual uint64_t GetMaxBlockSize() const = 0;
     virtual bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxGeneratedBlockSize() const = 0;
@@ -64,8 +68,6 @@ public:
     virtual uint64_t GetFactorMaxSendQueuesBytes() const = 0;
     virtual uint64_t GetMaxSendQueuesBytes() const = 0; // calculated based on factorMaxSendQueuesBytes
     virtual mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const = 0;
-    virtual int32_t GetGenesisActivationHeight() const = 0;
-    virtual int32_t GetChronicleActivationHeight() const = 0;
     virtual int GetMaxConcurrentAsyncTasksPerNode() const = 0;
     virtual int GetMaxParallelBlocks() const = 0;
     virtual int GetPerBlockTxnValidatorThreadsCount() const = 0;
@@ -210,6 +212,17 @@ protected:
 // NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor, cppcoreguidelines-special-member-functions)
 class ConfigInit : public Config {
 public:
+
+    // Policies settings for script eval/verify
+    virtual bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error) = 0;
+    virtual bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) = 0;
+    virtual bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) = 0;
+    virtual bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) = 0;
+    virtual bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) = 0;
+
+    virtual bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err = nullptr) = 0;
+    virtual bool SetChronicleActivationHeight(int32_t chronicleActivationHeightIn, std::string* err = nullptr) = 0;
+
     // used to specify default block size related parameters
     virtual void SetDefaultBlockSizeParams(const DefaultBlockSizeParams& params) = 0;
     virtual bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) = 0;
@@ -228,8 +241,6 @@ public:
     virtual void SetTestBlockCandidateValidity(bool test) = 0;
     virtual void SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytes) = 0;
     virtual void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) = 0;
-    virtual bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err = nullptr) = 0;
-    virtual bool SetChronicleActivationHeight(int32_t chronicleActivationHeightIn, std::string* err = nullptr) = 0;
     virtual bool SetMaxConcurrentAsyncTasksPerNode(
         int maxConcurrentAsyncTasksPerNode,
         std::string* error = nullptr) = 0;
@@ -239,19 +250,15 @@ public:
         int perValidatorTxnThreadsCount,
         int perValidatorThreadMaxBatchSize,
         std::string* error = nullptr) = 0;
-    virtual bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error) = 0;
     /** Sets the maximum policy number of sigops we're willing to relay/mine in a single tx */
     virtual bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) = 0;
-    virtual bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) = 0;
     virtual bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
     virtual bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
     virtual bool SetMaxTxnValidatorAsyncTasksRunDuration(int ms, std::string* err = nullptr) = 0;
     virtual bool SetMaxTxnChainValidationBudget(int ms, std::string* err = nullptr) = 0;
     virtual void SetValidationClockCPU(bool enable) = 0;
     virtual bool SetPTVTaskScheduleStrategy(PTVTaskScheduleStrategy strategy, std::string* err = nullptr) = 0;
-    virtual bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) = 0;
-    virtual bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) = 0;
-    virtual bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) = 0;
+
     virtual bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) = 0;
     virtual bool SetChronicleGracefulPeriod(int64_t chronicleGracefulPeriodIn, std::string* err = nullptr) = 0;
     virtual void SetAcceptNonStandardOutput(bool accept) = 0;
@@ -397,6 +404,8 @@ protected:
 class GlobalConfig : public ConfigInit {
 public:
     GlobalConfig();
+
+    const ConfigScriptPolicy& GetConfigScriptPolicy() const override;
 
     // Set block size related default. This must be called after constructing GlobalConfig
     void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) override;
@@ -802,9 +811,6 @@ private:
         bool testBlockCandidateValidity;
         mining::CMiningFactory::BlockAssemblerType blockAssemblerType;
 
-        int32_t genesisActivationHeight;
-        int32_t chronicleActivationHeight;
-
         int mMaxConcurrentAsyncTasksPerNode;
 
         int mMaxParallelBlocks;
@@ -812,12 +818,8 @@ private:
         int mPerBlockScriptValidatorThreadsCount;
         int mPerBlockScriptValidationMaxBatchSize;
 
-        uint64_t maxOpsPerScriptPolicy;
-
         uint64_t maxTxSigOpsCountPolicy;
         uint64_t maxPubKeysPerMultiSig;
-        uint64_t genesisGracefulPeriod;
-        uint64_t chronicleGracefulPeriod;
 
         std::chrono::milliseconds mMaxStdTxnValidationDuration;
         std::chrono::milliseconds mMaxNonStdTxnValidationDuration;
@@ -827,13 +829,6 @@ private:
         bool mValidationClockCPU;
     
         PTVTaskScheduleStrategy mPTVTaskScheduleStrategy;
-
-        uint64_t maxStackMemoryUsagePolicy;
-        uint64_t maxStackMemoryUsageConsensus;
-
-        uint64_t maxScriptSizePolicy;
-
-        uint64_t maxScriptNumLengthPolicy;
 
         bool mAcceptNonStandardOutput;
 
@@ -956,6 +951,8 @@ private:
     #endif
 
         std::int32_t mSoftConsensusFreezeDuration;
+
+        ConfigScriptPolicy scriptPolicysettings;
 
         // Only for values that can change in runtime
         mutable std::shared_mutex configMtx{};

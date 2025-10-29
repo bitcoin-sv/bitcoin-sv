@@ -1135,7 +1135,7 @@ static UniValue signrawtransaction(const Config &config,
     // rehashing.
     const CTransaction txConst(mergedTx);
 
-    ProtocolEra era { GetProtocolEra(config, activeChainHeight + 1) };
+    ProtocolEra era { GetProtocolEra(config.GetConfigScriptPolicy(), activeChainHeight + 1) };
 
     // Sign what we can:
     for (size_t i = 0; i < mergedTx.vin.size(); i++) {
@@ -1150,14 +1150,14 @@ static UniValue signrawtransaction(const Config &config,
         const CScript &prevPubKey = coin->GetTxOut().scriptPubKey;
         const Amount amount = coin->GetTxOut().nValue;
 
-        ProtocolEra utxoEra { GetProtocolEra(config, coin.value(), activeChainHeight + 1) };
+        ProtocolEra utxoEra { coin.value().GetProtocolEra(config.GetConfigScriptPolicy(), activeChainHeight + 1) };
 
         SignatureData sigdata;
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
         if((sigHashType.getBaseType() != BaseSigHashType::SINGLE) ||
            (i < mergedTx.vout.size()))
         {
-            SignAndVerify(config,
+            SignAndVerify(config.GetConfigScriptPolicy(),
                           true,
                           MutableTransactionSignatureCreator(&keystore,
                                                              &mergedTx,
@@ -1172,7 +1172,7 @@ static UniValue signrawtransaction(const Config &config,
 
         constexpr bool consensus{true};
         const auto flags{MandatoryScriptVerifyFlags(era)};
-        const auto params{make_eval_script_params(config, flags, consensus)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, consensus)};
 
         // ... and merge in other signatures:
         for(const CMutableTransaction& txv : txVariants)
@@ -1195,7 +1195,7 @@ static UniValue signrawtransaction(const Config &config,
 
         auto source = task::CCancellationSource::Make();
         const auto std_input_flags{StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra)};
-        const auto std_input_params{make_verify_script_params(config, std_input_flags, consensus)};
+        const auto std_input_params{make_verify_script_params(config.GetConfigScriptPolicy(), std_input_flags, consensus)};
         const auto res = VerifyScript(std_input_params,
                                       source->GetToken(),
                                       txin.scriptSig,
@@ -1913,7 +1913,7 @@ void sendrawtransactions(const Config& config,
     uint32_t skipScriptFlagsGlobal = 0;
 
     // Get active protocol
-    ProtocolEra era { GetProtocolEra(config, chainActive.Height()) };
+    ProtocolEra era { GetProtocolEra(config.GetConfigScriptPolicy(), chainActive.Height()) };
 
     // Check if we have a second parameter that provides config for all inputs
     if (!request.params[1].empty() && request.params[1].isObject())

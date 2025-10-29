@@ -14,10 +14,13 @@
 
 using namespace std;
 using namespace bsv;
-    
-static constexpr array<uint8_t, 4> magic_bytes{0xda, 0xb5, 0xbf, 0xfa};
-constexpr int type{1};
-constexpr int version{2};
+
+namespace {
+    // Internal linkage
+    constexpr array<uint8_t, 4> magic_bytes{0xda, 0xb5, 0xbf, 0xfa};
+    constexpr int type{1};
+    constexpr int version{2};
+}
 
 BOOST_AUTO_TEST_SUITE(net_msg_tests)
 

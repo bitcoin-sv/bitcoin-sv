@@ -157,7 +157,7 @@ std::optional<bool> DSAttemptHandler::ValidateDoubleSpend(
     }
 
     // Get script verification flags
-    ProtocolEra era { GetProtocolEra(mConfig, chainActive.Height() + 1) };
+    ProtocolEra era { GetProtocolEra(mConfig.GetConfigScriptPolicy(), chainActive.Height() + 1) };
     uint32_t scriptVerifyFlags { GetScriptVerifyFlags(mConfig, era) };
 
     // Set verification timeout to the longest we'll allow

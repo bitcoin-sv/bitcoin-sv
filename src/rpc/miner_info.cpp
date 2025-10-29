@@ -214,7 +214,7 @@ public:
             mtx.vin.emplace_back(*fundingOutPoint, CTxIn::SEQUENCE_FINAL);
 
             keystore.AddKeyPubKey(fundingKey_.getPrivKey(), fundingKey_.getPrivKey().GetPubKey());
-            SignAndVerify(config,
+            SignAndVerify(config.GetConfigScriptPolicy(),
                           true,
                           MutableTransactionSignatureCreator(&keystore,
                                                              &mtx,

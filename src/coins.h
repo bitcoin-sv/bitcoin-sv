@@ -309,6 +309,20 @@ public:
 
     const Amount& GetAmount() const { return GetTxOut().nValue; }
 
+    // Get protocol activation status for the given coin at a particular "mining height".
+    // When a coin is present in mempool it will have height MEMPOOL_HEIGHT. 
+    // In this case you should call this overload and specify the expected height at which
+    // it will be mined (chainActive.Height()+1) to correctly determine which release
+    // is enabled for this coin.
+    ProtocolEra GetProtocolEra(const ConfigScriptPolicy& config, int32_t miningHeight) const {
+        const auto height { GetHeight() };
+        if(height == MEMPOOL_HEIGHT)
+        {
+            return ::GetProtocolEra(config, miningHeight);
+        }
+        return ::GetProtocolEra(config, height);
+    }
+
 private:
     //! Constructor from a CTxOut and height/coinbase information.
     CoinWithScript(CTxOut&& outIn, int32_t nHeightIn, bool IsCoinbase, bool IsConfiscation)

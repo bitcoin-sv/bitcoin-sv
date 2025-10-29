@@ -34,7 +34,7 @@
 bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScriptPubKeyHeight, txnouttype &whichType)
 {
     std::vector<std::vector<uint8_t>> vSolutions;
-    if (!Solver(scriptPubKey, GetProtocolEra(config, nScriptPubKeyHeight), whichType, vSolutions)) {
+    if (!Solver(scriptPubKey, GetProtocolEra(config.GetConfigScriptPolicy(), nScriptPubKeyHeight), whichType, vSolutions)) {
         return false;
     }
 
@@ -201,7 +201,7 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight,
         return false;
     }
 
-    ProtocolEra era { GetProtocolEra(config, nHeight) };
+    ProtocolEra era { GetProtocolEra(config.GetConfigScriptPolicy(), nHeight) };
 
     // Extremely large transactions with lots of inputs can cost the network
     // almost as much to process as they cost the sender in fees, because
@@ -278,7 +278,7 @@ std::optional<bool> AreInputsStandard(
 
     constexpr bool consensus{};
     constexpr uint32_t flags{SCRIPT_VERIFY_NONE};
-    const auto params{make_eval_script_params(config, flags, consensus)};
+    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, consensus)};
 
     for (size_t i = 0; i < tx.vin.size(); i++) {
         auto prev = mapInputs.GetCoinWithScript( tx.vin[i].prevout );
@@ -290,7 +290,7 @@ std::optional<bool> AreInputsStandard(
         // get the scriptPubKey corresponding to this input:
         const CScript &prevScript = prev->GetTxOut().scriptPubKey;
 
-        if (!Solver(prevScript, GetProtocolEra(config, prev.value(), mempoolHeight), whichType, vSolutions)) {
+        if (!Solver(prevScript, prev.value().GetProtocolEra(config.GetConfigScriptPolicy(), mempoolHeight), whichType, vSolutions)) {
             return false;
         }
 

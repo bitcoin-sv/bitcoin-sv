@@ -22,7 +22,7 @@ static void op_dup(benchmark::State& state)
                                   OP_2DUP,
                                   OP_3DUP, OP_3DUP, OP_3DUP, OP_3DUP, OP_3DUP,
                                   OP_3DUP, OP_3DUP, OP_3DUP, OP_3DUP, OP_3DUP};
-    const auto eval_script_params{make_eval_script_params(config, flags, false)};
+    const auto eval_script_params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
     while(state.KeepRunning())
     {
         auto source = task::CCancellationSource::Make();
@@ -50,7 +50,7 @@ static void op_2rot(benchmark::State& state)
                                   OP_3DUP,
 								  OP_2ROT, OP_2ROT, OP_2ROT, OP_2ROT, OP_2ROT,
                                   OP_2ROT, OP_2ROT, OP_2ROT, OP_2ROT, OP_2ROT};
-    const auto params{make_eval_script_params(GlobalConfig::GetConfig(), flags, false)};
+    const auto params{make_eval_script_params(GlobalConfig::GetConfig().GetConfigScriptPolicy(), flags, false)};
     while(state.KeepRunning())
     {
         auto source = task::CCancellationSource::Make();
@@ -79,7 +79,7 @@ static void op_split(benchmark::State& state)
                                         3, 0xff, 0xff, 0x07, OP_SPLIT,
                                         3, 0xff, 0xff, 0x03, OP_SPLIT,
                                         3, 0xff, 0xff, 0x01, OP_SPLIT };
-    const auto params{make_eval_script_params(config, flags, false)};
+    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
     while(state.KeepRunning())
     {
         auto source = task::CCancellationSource::Make();
@@ -106,7 +106,7 @@ static void op_roll(benchmark::State& state)
                                   OP_DUP,
 								  OP_2, OP_ROLL, 
                                   OP_2, OP_ROLL};
-    const auto params{make_eval_script_params(config, flags, false)};
+    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
     while(state.KeepRunning())
     {
         auto source = task::CCancellationSource::Make();
@@ -133,7 +133,7 @@ static void op_pick(benchmark::State& state)
                                   OP_DUP,
 								  OP_2, OP_PICK, 
                                   OP_2, OP_PICK};
-    const auto params{make_eval_script_params(config, flags, false)};
+    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
     while(state.KeepRunning())
     {
         auto source = task::CCancellationSource::Make();

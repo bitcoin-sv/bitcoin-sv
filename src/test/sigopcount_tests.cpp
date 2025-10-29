@@ -205,7 +205,7 @@ ScriptError VerifyWithFlag(const CTransaction& output,
                            const CMutableTransaction& input,
                            const int flags)
 {
-    const auto params{make_verify_script_params(GlobalConfig::GetConfig(), flags, true)};
+    const auto params{make_verify_script_params(GlobalConfig::GetConfig().GetConfigScriptPolicy(), flags, true)};
     CTransaction inputi(input);
     const auto ret =
         VerifyScript(params,
@@ -277,7 +277,7 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
         for(int nHeight : {genesisHeight-1, genesisHeight}){ // test before and after genesis (should be the same)
             BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, nHeight);
 
-            ProtocolEra era { GetProtocolEra(testConfig, nHeight) };
+            ProtocolEra era { GetProtocolEra(testConfig.GetConfigScriptPolicy(), nHeight) };
             bool sigOpCountError {false};
 
             // Legacy counting only includes signature operations in scriptSigs and

@@ -131,7 +131,7 @@ void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
 
             for (auto verify_flags: flags_to_check)
             {
-                const auto params{make_verify_script_params(globalConfig, verify_flags, true)};
+                const auto params{make_verify_script_params(globalConfig.GetConfigScriptPolicy(), verify_flags, true)};
 
                 bool is_valid = true;
                 PrecomputedTransactionData txdata(tx);
@@ -349,10 +349,10 @@ void CreateCreditAndSpend(const CKeyStore &keystore, const CScript &outscript,
     inputm.vout.resize(1);
     inputm.vout[0].nValue = Amount(1);
     inputm.vout[0].scriptPubKey = CScript();
-    bool retAfter = SignSignature(config, keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, *output, inputm, 0,
+    bool retAfter = SignSignature(config.GetConfigScriptPolicy(), keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, *output, inputm, 0,
                                    SigHashType().withForkId());
     BOOST_CHECK_EQUAL(retAfter, successAfterGenesis);
-    bool retBefore = SignSignature(config, keystore, ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, *output, inputm, 0,
+    bool retBefore = SignSignature(config.GetConfigScriptPolicy(), keystore, ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, *output, inputm, 0,
                                    SigHashType().withForkId());
     BOOST_CHECK_EQUAL(retBefore, successBeforeGenesis);
     CDataStream ssin(SER_NETWORK, PROTOCOL_VERSION);
@@ -382,7 +382,7 @@ void ReplaceRedeemScript(CScript &script, const CScript &redeemScript) {
     const Config& config = GlobalConfig::GetConfig();
 
     constexpr uint32_t flags{SCRIPT_VERIFY_STRICTENC};
-    const auto params{make_eval_script_params(config, flags, true)};
+    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, true)};
     LimitedStack stack(UINT32_MAX);
     EvalScript(params,
                task::CCancellationSource::Make()->GetToken(),
@@ -437,7 +437,7 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
     // sign all inputs
     for (size_t i = 0; i < mtx.vin.size(); i++) {
         bool hashSigned =
-            SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, scriptPubKey, mtx, i, Amount(1000),
+            SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, scriptPubKey, mtx, i, Amount(1000),
                           sigHashes.at(i % sigHashes.size()));
         BOOST_CHECK_MESSAGE(hashSigned, "Failed to sign test transaction");
     }
@@ -468,7 +468,7 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
         const CTxOut& out = coins[tx.vin[i].prevout.GetN()].GetTxOut();
 
         constexpr bool consensus{true};
-        vChecks.emplace_back(make_verify_script_params(testConfig,
+        vChecks.emplace_back(make_verify_script_params(testConfig.GetConfigScriptPolicy(),
                                                        PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS,
                                                        consensus),
                              out.scriptPubKey,
@@ -478,7 +478,7 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
                              PRE_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS,
                              false,
                              txdata);
-        vChecks.emplace_back(make_verify_script_params(testConfig,
+        vChecks.emplace_back(make_verify_script_params(testConfig.GetConfigScriptPolicy(),
                                                        POST_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS,
                                                        consensus),
                              out.scriptPubKey,
@@ -513,7 +513,7 @@ void CheckWithFlag(const CheckFlagParams& params)
     for(const auto& flag_item : flagList)
     {
         const auto flags{flag_item.first | SCRIPT_ENABLE_SIGHASH_FORKID};
-        const auto verify_params{make_verify_script_params(config, flags, true)};
+        const auto verify_params{make_verify_script_params(config.GetConfigScriptPolicy(), flags, true)};
         const auto o =
             VerifyScript(verify_params,
                          task::CCancellationSource::Make()->GetToken(),
@@ -739,7 +739,7 @@ BOOST_AUTO_TEST_CASE(test_witness) {
     BOOST_CHECK(*output1 == *output2);
     constexpr bool consensus{true};
     const uint32_t flags{MandatoryScriptVerifyFlags(ProtocolEra::PreGenesis)};
-    const auto params{make_eval_script_params(testConfig, flags, consensus)};
+    const auto params{make_eval_script_params(testConfig.GetConfigScriptPolicy(), flags, consensus)};
     UpdateTransaction(input1,
                       0,
                       CombineSignatures(params,

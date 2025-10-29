@@ -5,6 +5,7 @@
 
 #include "bitcoinconsensus.h"
 
+#include "config.h"
 #include "primitives/transaction.h"
 #include "pubkey.h"
 #include "script/interpreter.h"
@@ -96,7 +97,7 @@ static int verify_script(const Config& config,
         auto source = task::CCancellationSource::Make();
 
         constexpr bool consensus{true};
-        const auto params{make_verify_script_params(config, flags, consensus)};
+        const auto params{make_verify_script_params(config.GetConfigScriptPolicy(), flags, consensus)};
         const auto
             res = VerifyScript(params,
                                source->GetToken(),

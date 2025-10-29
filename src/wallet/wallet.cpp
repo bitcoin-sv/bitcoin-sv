@@ -10,6 +10,7 @@
 #include "chain.h"
 #include "checkpoints.h"
 #include "config.h"
+#include "configscriptpolicy.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
 #include "dstencode.h"
@@ -2776,7 +2777,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
         AvailableCoins(vAvailableCoins, true, &coinControl);
 
         Config &config = GlobalConfig::GetConfig();
-        ProtocolEra era { GetProtocolEra(config, chainActive.Height() + 1) };
+        ProtocolEra era { GetProtocolEra(config.GetConfigScriptPolicy(), chainActive.Height() + 1) };
 
         nFeeRet = Amount(0);
         // Start with no fee and loop until there is enough fee.
@@ -3037,7 +3038,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                     coin.first->tx->vout[coin.second].scriptPubKey;
                 SignatureData sigdata;
 
-                if(!SignAndVerify(config,
+                if(!SignAndVerify(config.GetConfigScriptPolicy(),
                                   true,
                                   TransactionSignatureCreator(this,
                                                               &txNewConst,
@@ -4591,9 +4592,9 @@ ProtocolEra CMerkleTx::GetProtocolEra() const
     if (height == MEMPOOL_HEIGHT)
     {
         AssertLockHeld(cs_main);
-        return ::GetProtocolEra(GlobalConfig::GetConfig(), chainActive.Height() + 1);
+        return ::GetProtocolEra(GlobalConfig::GetConfig().GetConfigScriptPolicy(), chainActive.Height() + 1);
     }
-    return ::GetProtocolEra(GlobalConfig::GetConfig(), height);
+    return ::GetProtocolEra(GlobalConfig::GetConfig().GetConfigScriptPolicy(), height);
 }
 
 int CMerkleTx::GetBlocksToMaturity() const {

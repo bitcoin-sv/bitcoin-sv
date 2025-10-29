@@ -111,6 +111,7 @@ BITCOIN_CORE_H = \
   compiler_warnings.h \
   compressor.h \
   config.h \
+  configscriptpolicy.h \
   consensus/consensus.h \
   core_io.h \
   core_memusage.h \
@@ -432,6 +433,7 @@ libbitcoin_server_a_SOURCES = \
   validation.cpp \
   validationinterface.cpp \
   vmtouch.cpp \
+  warnings.cpp \
   $(BITCOIN_CORE_H)
 
 if ENABLE_ZMQ
@@ -549,6 +551,7 @@ libbitcoin_common_a_SOURCES = \
   cfile_util.h \
   chainparams.cpp \
   config.cpp \
+  configscriptpolicy.cpp \
   coins.cpp \
   compressor.cpp \
   dstencode.cpp \
@@ -565,7 +568,6 @@ libbitcoin_common_a_SOURCES = \
   script/standard.cpp \
   transaction_specific_config.cpp \
   txhasher.cpp \
-  warnings.cpp \
   write_preferring_upgradable_mutex.cpp \
   $(BITCOIN_CORE_H)
 

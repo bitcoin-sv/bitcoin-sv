@@ -2395,7 +2395,7 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
                 changeSet,
                 tip,
                 // NOLINTNEXTLINE(*-narrowing-conversions)
-                StandardNonFinalVerifyFlags(GetProtocolEra(config, tip.GetHeight())));
+                StandardNonFinalVerifyFlags(GetProtocolEra(config.GetConfigScriptPolicy(), tip.GetHeight())));
 
         if(tip.GetHeight() + 1 < CFrozenTXOCheck::Get_max_FrozenTXOData_enforceAtHeight_stop())
         {
@@ -2461,7 +2461,7 @@ void CTxMemPool::RemoveFromMempoolForReorg(const Config &config,
             changeSet,
             tip,
             // NOLINTNEXTLINE(*-narrowing-conversions)
-            StandardNonFinalVerifyFlags(GetProtocolEra(config, tip.GetHeight())));
+            StandardNonFinalVerifyFlags(GetProtocolEra(config.GetConfigScriptPolicy(), tip.GetHeight())));
     }
 
     // Check mempool & journal

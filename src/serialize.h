@@ -960,7 +960,7 @@ void Serialize(Stream &os, const std::unique_ptr<const T> &p) {
 
 template <typename Stream, typename T>
 void Unserialize(Stream &is, std::unique_ptr<const T> &p) {
-    p.reset(new T(deserialize, is));
+    p.reset(new T(::deserialize, is));
 }
 
 /**
@@ -973,7 +973,7 @@ void Serialize(Stream &os, const std::shared_ptr<const T> &p) {
 
 template <typename Stream, typename T>
 void Unserialize(Stream &is, std::shared_ptr<const T> &p) {
-    p = std::make_shared<const T>(deserialize, is);
+    p = std::make_shared<const T>(::deserialize, is);
 }
 
 /**

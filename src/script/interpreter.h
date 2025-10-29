@@ -6,10 +6,11 @@
 #ifndef BITCOIN_SCRIPT_INTERPRETER_H
 #define BITCOIN_SCRIPT_INTERPRETER_H
 
+#include "configscriptpolicy.h"
+#include "limitedstack.h"
 #include "primitives/transaction.h"
 #include "script_error.h"
 #include "sighashtype.h"
-#include "limitedstack.h"
 
 #include <cstdint>
 #include <optional>
@@ -160,7 +161,7 @@ static_assert(eval_script_params(1, 2, 3, 4).MaxScriptNumLength() == 2);
 static_assert(eval_script_params(1, 2, 3, 4).MaxScriptSize() == 3);
 static_assert(eval_script_params(1, 2, 3, 4).MaxPubKeysPerMultiSig() == 4);
 
-eval_script_params make_eval_script_params(const Config&,
+eval_script_params make_eval_script_params(const ConfigScriptPolicy& policySettings,
                                            uint32_t flags,
                                            bool consensus);
 
@@ -184,7 +185,7 @@ static_assert(verify_script_params(eval_script_params{1, 2, 3, 4}, 5).EvalScript
               == eval_script_params{1, 2, 3, 4});
 static_assert(verify_script_params(eval_script_params{1, 2, 3, 4}, 5).MaxStackMemoryUsage() == 5);
 
-verify_script_params make_verify_script_params(const Config&,
+verify_script_params make_verify_script_params(const ConfigScriptPolicy& policySettings,
                                                uint32_t flags,
                                                bool consensus);
 

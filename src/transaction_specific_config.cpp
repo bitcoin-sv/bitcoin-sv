@@ -3,9 +3,93 @@
 
 #include "transaction_specific_config.h"
 
+SpecificConfigScriptPolicy::SpecificConfigScriptPolicy(const ConfigScriptPolicy& cfg) : ConfigScriptPolicy(cfg){}
+
+uint64_t SpecificConfigScriptPolicy::GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const {
+    if(isConsensus || !mMaxScriptNumLength.has_value())
+    {
+        return ConfigScriptPolicy::GetMaxScriptNumLength(era, isConsensus);
+    }
+
+    // Return value as though it were set in GlobalConfig. This ensures we get the
+    // right value for the era if policy is unlimited.
+    ConfigScriptPolicy tmp{};
+    if(std::string err; !tmp.SetMaxScriptNumLengthPolicy(*mMaxScriptNumLength, &err))
+    {
+        // Someone has set the policy limit to a value incompatible with the era they
+        // are then requesting it for. Assume they know what they're doing and just give
+        // them back the value they set.
+        return *mMaxScriptNumLength;
+    }
+
+    return ConfigScriptPolicy::GetMaxScriptNumLength(era, isConsensus);
+}
+
+uint64_t SpecificConfigScriptPolicy::GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const{
+    if(isConsensus || !isGenesisEnabled)
+    {
+        return ConfigScriptPolicy::GetMaxScriptSize(isGenesisEnabled, isConsensus);
+    }
+    return mMaxScriptSize.has_value() ? *mMaxScriptSize : ConfigScriptPolicy::GetMaxScriptSize(isGenesisEnabled, isConsensus);
+}
+
+uint64_t SpecificConfigScriptPolicy::GetMaxStackMemoryUsage(bool isGenesisEnabled, bool isConsensus) const{
+    // concept of max stack memory usage is not defined before genesis
+    // before Genesis stricter limitations exist, so maxStackMemoryUsage can be infinite
+    if (!isGenesisEnabled)
+    {
+        return ConfigScriptPolicy::GetMaxStackMemoryUsage(isGenesisEnabled, isConsensus);
+    }
+
+    if (isConsensus)
+    {
+        return mMaxStackMemoryUsageConsensus.has_value() ? *mMaxStackMemoryUsageConsensus : ConfigScriptPolicy::GetMaxStackMemoryUsage(isGenesisEnabled, isConsensus);
+    }
+
+    return mMaxStackMemoryUsagePolicy.has_value() ? *mMaxStackMemoryUsagePolicy : ConfigScriptPolicy::GetMaxStackMemoryUsage(isGenesisEnabled, isConsensus);
+}
+
+bool SpecificConfigScriptPolicy::SetSpecificMaxScriptNumLengthPolicy(ProtocolEra era, int64_t maxScriptNumLengthIn, std::string* err){
+    if(!ConfigScriptPolicy::SetMaxScriptNumLengthPolicy(maxScriptNumLengthIn, err))
+    {
+        return false;
+    }
+
+    mMaxScriptNumLength = ConfigScriptPolicy::GetMaxScriptNumLength(era, false);
+    return true;
+}
+
+bool SpecificConfigScriptPolicy::SetSpecificMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err){
+    if(!ConfigScriptPolicy::SetMaxScriptSizePolicy(maxScriptSizePolicyIn, err))
+    {
+        return false;
+    }
+
+    mMaxScriptSize = ConfigScriptPolicy::GetMaxScriptSize(true, false);
+    return true;
+}
+
+bool SpecificConfigScriptPolicy::SetSpecificMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err){
+    if(!ConfigScriptPolicy::SetMaxStackMemoryUsage(maxStackMemoryUsageConsensusIn, maxStackMemoryUsagePolicyIn, err))
+    {
+        return false;
+    }
+
+    mMaxStackMemoryUsageConsensus = ConfigScriptPolicy::GetMaxStackMemoryUsage(true, true);
+    mMaxStackMemoryUsagePolicy = ConfigScriptPolicy::GetMaxStackMemoryUsage(true, false);
+    return true;
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
 TransactionSpecificConfig::TransactionSpecificConfig(const GlobalConfig& config)
-  : GlobalConfig( config.getGlobalConfigData() )
+  : GlobalConfig( config.getGlobalConfigData() ), mScriptPolicysettings(config.GetConfigScriptPolicy())
 {
+}
+
+const ConfigScriptPolicy& TransactionSpecificConfig::GetConfigScriptPolicy() const{
+    return mScriptPolicysettings;
 }
 
 bool TransactionSpecificConfig::SetTransactionSpecificMaxTxSize(int64_t maxTxSizePolicyIn, std::string* err)
@@ -44,95 +128,32 @@ uint64_t TransactionSpecificConfig::GetDataCarrierSize() const
 
 bool TransactionSpecificConfig::SetTransactionSpecificMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err)
 {
-    // see comment in SetTransactionSpecificMaxTxSize 
-    GlobalConfig tmp;
-    if(!tmp.SetMaxScriptSizePolicy(maxScriptSizePolicyIn, err))
-    {
-        return false;
-    }
-
-    mMaxScriptSize = tmp.GetMaxScriptSize(true, false);
-    return true;
+    return mScriptPolicysettings.SetSpecificMaxScriptSizePolicy(maxScriptSizePolicyIn, err);
 };
 
 uint64_t TransactionSpecificConfig::GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const
 {
-    if(isConsensus || !isGenesisEnabled)
-    {
-        GlobalConfig::GetMaxScriptSize(isGenesisEnabled, isConsensus);
-    }
-    return mMaxScriptSize.has_value() ? *mMaxScriptSize : GlobalConfig::GetMaxScriptSize(isGenesisEnabled, isConsensus);
+    return mScriptPolicysettings.GetMaxScriptSize(isGenesisEnabled, isConsensus);
 };
 
 bool TransactionSpecificConfig::SetTransactionSpecificMaxScriptNumLengthPolicy(ProtocolEra era, int64_t maxScriptNumLengthIn, std::string* err)
 {
-    // see comment in SetTransactionSpecificMaxTxSize
-    GlobalConfig tmp;
-    if(!tmp.SetMaxScriptNumLengthPolicy(maxScriptNumLengthIn, err))
-    {
-        return false;
-    }
-
-    mMaxScriptNumLength = tmp.GetMaxScriptNumLength(era, false);
-    return true;
+    return mScriptPolicysettings.SetSpecificMaxScriptNumLengthPolicy(era, maxScriptNumLengthIn, err);
 };
 
 uint64_t TransactionSpecificConfig::GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const
 { 
-    if(isConsensus)
-    {
-        GlobalConfig::GetMaxScriptNumLength(era, isConsensus);
-    }
-
-    if(! mMaxScriptNumLength.has_value())
-    {
-        return GlobalConfig::GetMaxScriptNumLength(era, isConsensus);
-    }
-
-    // Return value as though it were set in GlobalConfig. This ensures we get the
-    // right value for the era if policy is unlimited.
-    GlobalConfig tmp {};
-    if(std::string err; !tmp.SetMaxScriptNumLengthPolicy(*mMaxScriptNumLength, &err))
-    {
-        // Someone has set the policy limit to a value incompatible with the era they
-        // are then requesting it for. Assume they know what they're doing and just give
-        // them back the value they set.
-        return *mMaxScriptNumLength;
-    }
-    return tmp.GetMaxScriptNumLength(era, isConsensus);
+    return mScriptPolicysettings.GetMaxScriptNumLength(era, isConsensus);
 };
 
 bool TransactionSpecificConfig::SetTransactionSpecificMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err)
 {
-    // To avoid duplicating code from GlobalConfig we create temporary GlobalConfig object and call getter and setter
-    // for specific policy setting.
-    GlobalConfig tmp;
-    if(!tmp.SetMaxStackMemoryUsage(maxStackMemoryUsageConsensusIn, maxStackMemoryUsagePolicyIn, err))
-    {
-        return false;
-    }
-
-    mMaxStackMemoryUsageConsensus = tmp.GetMaxStackMemoryUsage(true, true);
-    mMaxStackMemoryUsagePolicy = tmp.GetMaxStackMemoryUsage(true, false);
-
-    return true;
+    return mScriptPolicysettings.SetSpecificMaxStackMemoryUsage(maxStackMemoryUsageConsensusIn, maxStackMemoryUsagePolicyIn, err);
 };
 
 uint64_t TransactionSpecificConfig::GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const
 { 
-    // concept of max stack memory usage is not defined before genesis
-    // before Genesis stricter limitations exist, so maxStackMemoryUsage can be infinite
-    if (!isGenesisEnabled)
-    {
-        return GlobalConfig::GetMaxStackMemoryUsage(isGenesisEnabled, consensus);
-    }
-
-    if (consensus)
-    {
-        return mMaxStackMemoryUsageConsensus.has_value() ? *mMaxStackMemoryUsageConsensus : GlobalConfig::GetMaxStackMemoryUsage(isGenesisEnabled, consensus);
-    }
-
-    return mMaxStackMemoryUsagePolicy.has_value() ? *mMaxStackMemoryUsagePolicy : GlobalConfig::GetMaxStackMemoryUsage(isGenesisEnabled, consensus);
+    return mScriptPolicysettings.GetMaxStackMemoryUsage(isGenesisEnabled, consensus);
 };
 
 

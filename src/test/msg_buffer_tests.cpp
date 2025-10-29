@@ -22,9 +22,12 @@
 
 using namespace std;
 using namespace bsv;
-    
-constexpr auto type{1};
-constexpr auto version{2};
+
+namespace {
+    // Internal linkage
+    constexpr auto type{1};
+    constexpr auto version{2};
+}
 
 static auto make_msg_header{[](const string& cmd) // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 {

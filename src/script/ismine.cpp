@@ -99,7 +99,7 @@ isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey,
         SignatureData sigs;
         
         const Config &config = GlobalConfig::GetConfig();
-        return SignAndVerify(config, true, DummySignatureCreator(&keystore),
+        return SignAndVerify(config.GetConfigScriptPolicy(), true, DummySignatureCreator(&keystore),
                              ProtocolEra::PostGenesis, utxoEra,
                              scriptPubKey, sigs)
                    ? ISMINE_WATCH_SOLVABLE

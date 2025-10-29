@@ -5,6 +5,31 @@
 
 #include "config.h"
 
+/* SpecificConfigScriptPolicy inherit from ConfigScriptPolicy.
+ * It hold its own data for specific transaction settings and its own specific behaviour for getters
+ * and setters
+ *
+ * This is allow the isolation of the TransactionSpecificConfig from the GlobalConfig
+ */
+struct SpecificConfigScriptPolicy: public ConfigScriptPolicy {
+
+    SpecificConfigScriptPolicy(const ConfigScriptPolicy& cfg);
+
+    uint64_t GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const override;
+    uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const override;
+    uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool isConsensus) const override;
+
+    bool SetSpecificMaxScriptNumLengthPolicy(ProtocolEra era, int64_t maxScriptNumLengthIn, std::string* err = nullptr);
+    bool SetSpecificMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr);
+    bool SetSpecificMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr);
+
+private :
+    std::optional<uint64_t> mMaxScriptSize;
+    std::optional<uint64_t> mMaxScriptNumLength;
+    std::optional<uint64_t> mMaxStackMemoryUsageConsensus;
+    std::optional<uint64_t> mMaxStackMemoryUsagePolicy;
+};
+
 /*
 * TransactionSpecificConfig class is child of GlobalConfig. It stores std::optional values of policy settings relevant for transaction validation.
 * It contains custom setters for policy settings and overrides getters from GlobalConfig. If new value is set in this class it is returned through getter,
@@ -16,6 +41,8 @@ class TransactionSpecificConfig : public GlobalConfig
 {
 public:
     TransactionSpecificConfig(const GlobalConfig& config);
+
+    const ConfigScriptPolicy& GetConfigScriptPolicy() const override;
 
     bool SetTransactionSpecificMaxTxSize(int64_t value, std::string* err = nullptr);
     uint64_t GetMaxTxSize(ProtocolEra era, bool isConsensus) const override;
@@ -75,12 +102,10 @@ public:
     uint32_t GetSkipScriptFlags() const;
 
 private:
+
+    SpecificConfigScriptPolicy mScriptPolicysettings;
     std::optional<uint64_t> mMaxTxSize;
     std::optional<uint64_t> mDataCarrierSize;
-    std::optional<uint64_t> mMaxScriptSize;
-    std::optional<uint64_t> mMaxScriptNumLength;
-    std::optional<uint64_t> mMaxStackMemoryUsageConsensus;
-    std::optional<uint64_t> mMaxStackMemoryUsagePolicy;
     std::optional<uint64_t> mLimitAncestorCount;
     std::optional<uint64_t> mLimitCPFPGroupMembersCount;
     std::optional<bool> mAcceptNonStdOutputs;

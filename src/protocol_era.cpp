@@ -2,9 +2,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "protocol_era.h"
-
-#include "config.h"
-#include "txmempool.h"
+#include "configscriptpolicy.h"
 
 #include <stdexcept>
 
@@ -41,24 +39,11 @@ ProtocolEra GetProtocolEra(const int32_t genesis_activation_height,
 }
 
 // Get protocol activation states for the given block height
-ProtocolEra GetProtocolEra(const Config& config, int32_t nHeight)
+ProtocolEra GetProtocolEra(const ConfigScriptPolicy& config, int32_t nHeight)
 {
     return GetProtocolEra(config.GetGenesisActivationHeight(), 
                           config.GetChronicleActivationHeight(), 
                           nHeight);
-}
-
-// Get protocol activation status for the given coin at a particular mining height.
-ProtocolEra GetProtocolEra(const Config& config, const CoinWithScript& coin, int32_t miningHeight)
-{
-    const auto height { coin.GetHeight() };
-
-    if(height == MEMPOOL_HEIGHT)
-    {
-        return GetProtocolEra(config, miningHeight);
-    }
-
-    return GetProtocolEra(config, height);
 }
 
 // Get the "inverse" of the given protocol era for the given protocol grace period name.
@@ -118,7 +103,7 @@ bool IsProtocolActive(ProtocolEra era, ProtocolName name)
 }
 
 // Check whether we are within the activation grace period for a protocol
-bool InProtocolGracePeriod(const Config& config, ProtocolName name, int32_t spendHeight)
+bool InProtocolGracePeriod(const ConfigScriptPolicy& config, ProtocolName name, int32_t spendHeight)
 {
     int32_t activationHeight {0};
     int32_t gracePeriod {0};

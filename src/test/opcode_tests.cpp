@@ -44,7 +44,7 @@ static void CheckStackSize(const std::vector<valtype> &original_stack_elements, 
     LimitedStack stack = LimitedStack(original_stack_elements, maxStackSize);
                               
     constexpr uint32_t flags{flagset[0]};
-    const auto params{make_eval_script_params(config, flags, true)};
+    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, true)};
     const auto r = EvalScript(params,
                               source->GetToken(),
                               stack,
@@ -82,7 +82,7 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
         LimitedStack stack = LimitedStack(original_stack, UINT32_MAX);
         LimitedStack expectedStack = LimitedStack(expected, UINT32_MAX);
         const uint32_t flags_up{flags | upgradeFlag};
-        const auto params{make_eval_script_params(config, flags_up, true)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags_up, true)};
         auto r = EvalScript(params,
                             source->GetToken(),
                             stack,
@@ -117,7 +117,7 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
     LimitedStack stack = LimitedStack(original_stack, UINT32_MAX);
 
     const uint32_t flags_up{flags | upgradeFlag};
-    const auto params{make_eval_script_params(config, flags_up, true)};
+    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags_up, true)};
     auto source = task::CCancellationSource::Make();
     auto r = EvalScript(params,
                         source->GetToken(),
@@ -699,7 +699,7 @@ BOOST_AUTO_TEST_CASE(rshift_big_int)
 
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     constexpr uint32_t flags{flagset[0] | SCRIPT_UTXO_AFTER_GENESIS};
-    const auto params{make_eval_script_params(config, flags, true)};
+    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, true)};
     const auto o = EvalScript(params,
                               source->GetToken(),
                               stack,
@@ -719,7 +719,7 @@ BOOST_AUTO_TEST_CASE(lshift_big_int)
 
     Config& config = GlobalConfig::GetConfig();
     constexpr uint32_t flags{flagset[0] | SCRIPT_UTXO_AFTER_GENESIS};
-    const auto params{make_eval_script_params(config, flags, true)};
+    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, true)};
     BaseSignatureChecker sigchecker;
     auto source = task::CCancellationSource::Make();
 
@@ -1225,7 +1225,7 @@ static void CheckTestForOpCodeLimit(const CScript &script,
     const Config& config = GlobalConfig::GetConfig();
     for(uint32_t flags : flagset)
     {
-        const auto params{make_eval_script_params(config, flags, true)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, true)};
         LimitedStack stack(UINT32_MAX);
         const auto o = EvalScript(params,
                                   task::CCancellationSource::Make(),
@@ -1321,7 +1321,7 @@ BOOST_AUTO_TEST_CASE(op_ver_pre_chronicle)
     CScript script(args.begin(), args.end());
 
     const auto flags{SCRIPT_GENESIS};
-    const auto params{make_eval_script_params(config, flags, false)};
+    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
     const auto o = EvalScript(params,
@@ -1362,7 +1362,7 @@ BOOST_AUTO_TEST_CASE(op_ver_post_chronicle)
     for(const auto& [tx_version, script, exp_status, exp_stack_top] : test_data)
     {
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
-        const auto params{make_eval_script_params(config, flags, false)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         CMutableTransaction mtx;
@@ -1415,7 +1415,7 @@ BOOST_AUTO_TEST_CASE(op_verif_pre_chronicle)
                      flags,
                      exp_error] : test_data)
     {
-        const auto params{make_eval_script_params(config, flags, false)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto o = EvalScript(params,
@@ -1593,7 +1593,7 @@ BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
                      exp_stack_size,
                      exp_stack_top] : test_data)
     {
-        const auto params{make_eval_script_params(config, flags, false)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         CMutableTransaction mtx;
@@ -1657,7 +1657,7 @@ BOOST_AUTO_TEST_CASE(op_vernotif_pre_chronicle)
                      flags,
                      exp_error] : test_data)
     {
-        const auto params{make_eval_script_params(config, flags, false)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto o = EvalScript(params,
@@ -1834,7 +1834,7 @@ BOOST_AUTO_TEST_CASE(op_vernotif_post_chronicle)
                      exp_stack_size,
                      exp_stack_top] : test_data)
     {
-        const auto params{make_eval_script_params(config, flags, false)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         CMutableTransaction mtx;
@@ -1885,7 +1885,7 @@ BOOST_AUTO_TEST_CASE(op_substr_pre_chronicle)
                      flags,
                      exp_error] : test_data)
     {
-        const auto params{make_eval_script_params(config, flags, false)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto o = EvalScript(params,
@@ -1971,7 +1971,7 @@ BOOST_AUTO_TEST_CASE(op_substr_post_chronicle)
                      exp_stack_size,
                      exp_stack_top] : test_data)
     {
-        const auto params{make_eval_script_params(config, flags, false)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(params,
@@ -2018,7 +2018,7 @@ BOOST_AUTO_TEST_CASE(op_left_pre_chronicle)
                      flags,
                      exp_error] : test_data)
     {
-        const auto params{make_eval_script_params(config, flags, false)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto o = EvalScript(params,
@@ -2091,7 +2091,7 @@ BOOST_AUTO_TEST_CASE(op_left_post_chronicle)
                      exp_stack_size,
                      exp_stack_top] : test_data)
     {
-        const auto params{make_eval_script_params(config, flags, false)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(params,
@@ -2138,7 +2138,7 @@ BOOST_AUTO_TEST_CASE(op_right_pre_chronicle)
                      flags,
                      exp_error] : test_data)
     {
-        const auto params{make_eval_script_params(config, flags, false)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto o = EvalScript(params,
@@ -2211,7 +2211,7 @@ BOOST_AUTO_TEST_CASE(op_right_post_chronicle)
                      exp_stack_size,
                      exp_stack_top] : test_data)
     {
-        const auto params{make_eval_script_params(config, flags, false)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(params,
@@ -2265,7 +2265,7 @@ BOOST_AUTO_TEST_CASE(op_2mul_pre_chronicle)
                      flags,
                      exp_error] : test_data)
     {
-        const auto params{make_eval_script_params(config, flags, false)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto o = EvalScript(params,
@@ -2349,7 +2349,7 @@ BOOST_AUTO_TEST_CASE(op_2mul_post_chronicle)
                      exp_stack_size,
                      exp_stack_top] : test_data)
     {
-        const auto params{make_eval_script_params(config, flags, false)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(params,
@@ -2403,7 +2403,7 @@ BOOST_AUTO_TEST_CASE(op_2div_pre_chronicle)
                      flags,
                      exp_error] : test_data)
     {
-        const auto params{make_eval_script_params(config, flags, false)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto o = EvalScript(params,
@@ -2487,7 +2487,7 @@ BOOST_AUTO_TEST_CASE(op_2div_post_chronicle)
                      exp_stack_size,
                      exp_stack_top] : test_data)
     {
-        const auto params{make_eval_script_params(config, flags, false)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(params,
@@ -2521,7 +2521,7 @@ BOOST_AUTO_TEST_CASE(EvalScript_flag_check_post_chronicle)
 
     const Config& config = GlobalConfig::GetConfig();
     constexpr uint32_t flags{SCRIPT_UTXO_AFTER_CHRONICLE}; // <- NO SCRIPT_UTXO_AFTER_GENESIS
-    const auto params{make_eval_script_params(config, flags, false)};
+    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
     auto source = task::CCancellationSource::Make();
     LimitedStack stack(UINT32_MAX);
     const auto o = EvalScript(params,
@@ -2559,7 +2559,7 @@ BOOST_AUTO_TEST_CASE(op_2rot)
                      exp_error,
                      exp_stack] : test_data)
     {
-        const auto params{make_eval_script_params(config, flags, false)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
         auto source = task::CCancellationSource::Make();
         LimitedStack stack(UINT32_MAX);
         const auto o = EvalScript(params,

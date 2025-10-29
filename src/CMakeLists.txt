@@ -310,6 +310,8 @@ add_library(common
 	compressor.h
 	config.cpp
 	config.h
+	configscriptpolicy.cpp
+	configscriptpolicy.h
 	consensus/consensus.h
 	consensus/merkle.cpp
 	consensus/merkle.h
@@ -439,8 +441,6 @@ add_library(common
 	validation.h
 	version.h
 	versionbits.h
-	warnings.cpp
-	warnings.h
 	write_preferring_upgradable_mutex.cpp
 	write_preferring_upgradable_mutex.h
 )
@@ -674,6 +674,8 @@ add_library(server
 	validationinterface.h
 	vmtouch.cpp
 	vmtouch.h
+	warnings.cpp
+	warnings.h
 )
 
 enable_coverage(server)
@@ -702,6 +704,7 @@ else()
   find_library(BCRYPT_LIBRARY NAMES bcrypt)
   target_link_libraries(server ${BCRYPT_LIBRARY})
 endif()
+
 
 # Test suite.
 add_subdirectory(test)

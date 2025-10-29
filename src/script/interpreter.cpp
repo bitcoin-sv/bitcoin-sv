@@ -618,7 +618,6 @@ std::optional<ScriptError> EvalScript(
 
                         const CScriptNum bn_len{stack.stacktop(-1).GetElement(), requireMinimal, params.MaxScriptNumLength()};
                         const auto len{bn_len.getint()};
-
                         const CScriptNum bn_begin{stack.stacktop(-2).GetElement(), requireMinimal, params.MaxScriptNumLength()};
                         const auto offset{bn_begin.getint()};
                         
@@ -2190,26 +2189,26 @@ static_assert(ProtocolEra::PostChronicle == utxo_era(SCRIPT_UTXO_AFTER_CHRONICLE
 static_assert(ProtocolEra::PostChronicle == utxo_era(SCRIPT_UTXO_AFTER_CHRONICLE));
 
 // Pre-condition: valid_flags (see above)
-eval_script_params make_eval_script_params(const Config& config,
+eval_script_params make_eval_script_params(const ConfigScriptPolicy& policySettings,
                                            const uint32_t flags,
                                            const bool consensus)
 {
     const ProtocolEra era{utxo_era(flags)};
     const bool utxo_after_genesis{IsUtxoAfterGenesis(flags)};
-    return eval_script_params{config.GetMaxOpsPerScript(utxo_after_genesis, consensus),
-                              config.GetMaxScriptNumLength(era, consensus),
-                              config.GetMaxScriptSize(utxo_after_genesis, consensus),
-                              config.GetMaxPubKeysPerMultiSig(utxo_after_genesis, consensus)};
+    return eval_script_params{policySettings.GetMaxOpsPerScript(utxo_after_genesis, consensus),
+                              policySettings.GetMaxScriptNumLength(era, consensus),
+                              policySettings.GetMaxScriptSize(utxo_after_genesis, consensus),
+                              policySettings.GetMaxPubKeysPerMultiSig(utxo_after_genesis, consensus)};
 }
 
 // Pre-condition: valid_flags (see above)
-verify_script_params make_verify_script_params(const Config& config,
+verify_script_params make_verify_script_params(const ConfigScriptPolicy& policySettings,
                                                const uint32_t flags,
                                                const bool consensus)
 {
     const bool utxo_after_genesis{IsUtxoAfterGenesis(flags)};
-    return verify_script_params{make_eval_script_params(config, flags, consensus),
-                                config.GetMaxStackMemoryUsage(utxo_after_genesis, consensus)};
+    return verify_script_params{make_eval_script_params(policySettings, flags, consensus),
+                                policySettings.GetMaxStackMemoryUsage(utxo_after_genesis, consensus)};
 }
 
 std::optional<ScriptError> VerifyScript(

@@ -39,7 +39,7 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, ProtocolEra era, bool& sigOpCoun
         if(it->opcode() == OP_INVALIDOPCODE)
             break;
 
-        if(fAccurate || IsProtocolActive(era, ProtocolName::Genesis))
+        if(fAccurate || ::IsProtocolActive(era, ProtocolName::Genesis))
         {
             if(opcode == OP_RETURN && scopeLevel == 0)
             {
@@ -70,12 +70,12 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, ProtocolEra era, bool& sigOpCoun
         else if(opcode == OP_CHECKMULTISIG || 
             opcode == OP_CHECKMULTISIGVERIFY)
         {
-            if ((fAccurate || IsProtocolActive(era, ProtocolName::Genesis)) && lastOpcode >= OP_1 && lastOpcode <= OP_16)
+            if ((fAccurate || ::IsProtocolActive(era, ProtocolName::Genesis)) && lastOpcode >= OP_1 && lastOpcode <= OP_16)
             {
                 n += DecodeOP_N(lastOpcode);
             }
             // post Genesis we always count accurate ops because it's not significantly costlier
-            else if (IsProtocolActive(era, ProtocolName::Genesis))
+            else if (::IsProtocolActive(era, ProtocolName::Genesis))
             {
                 if (lastOpcode == OP_0) 
                 {

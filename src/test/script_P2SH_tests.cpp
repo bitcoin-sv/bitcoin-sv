@@ -31,7 +31,7 @@ static bool Verify(const CScript& scriptSig,
 {
     const uint32_t flags = (fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE)
                            | SCRIPT_ENABLE_SIGHASH_FORKID;
-    const auto params{make_verify_script_params(GlobalConfig::GetConfig(), flags, true)};
+    const auto params{make_verify_script_params(GlobalConfig::GetConfig().GetConfigScriptPolicy(), flags, true)};
 
     // Create dummy to/from transactions:
     CMutableTransaction txFrom;
@@ -124,23 +124,23 @@ BOOST_AUTO_TEST_CASE(sign) {
         if (isP2SH) {
             // If UTOX is created after Genesis, we do not recognize P2SH outputs and 
             // therefore we are not able to sign them.
-            BOOST_CHECK_MESSAGE(!SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis,
+            BOOST_CHECK_MESSAGE(!SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis,
                                               CTransaction(txFrom), txTo[i], 0,
                                               SigHashType().withForkId()),
                                 strprintf("SignSignature %d", i));
         } else {
-            BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis,
+            BOOST_CHECK_MESSAGE(SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis,
                                               CTransaction(txFrom), txTo[i], 0,
                                               SigHashType().withForkId()),
                                 strprintf("SignSignature %d", i));
         }
         
-        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PreGenesis,
+        BOOST_CHECK_MESSAGE(SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PostGenesis, ProtocolEra::PreGenesis,
                                           CTransaction(txFrom),
                                           txTo[i], 0,
                                           SigHashType().withForkId()),
                            strprintf("SignSignature %d", i));
-        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, ProtocolEra::PreGenesis, ProtocolEra::PreGenesis,
+        BOOST_CHECK_MESSAGE(SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PreGenesis, ProtocolEra::PreGenesis,
                                           CTransaction(txFrom), txTo[i], 0,
                                           SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));
@@ -161,7 +161,7 @@ BOOST_AUTO_TEST_CASE(sign) {
                                      | SCRIPT_VERIFY_STRICTENC
                                      | SCRIPT_ENABLE_SIGHASH_FORKID};
             constexpr bool consensus{true};
-            const auto params{make_verify_script_params(testConfig, flags, consensus)};
+            const auto params{make_verify_script_params(testConfig.GetConfigScriptPolicy(), flags, consensus)};
             const auto sigOK = CScriptCheck(params,
                                             output.scriptPubKey,
                                             output.nValue,
@@ -265,19 +265,19 @@ BOOST_AUTO_TEST_CASE(set) {
             strprintf("IsMine %d", i));
     }
     for (int i = 0; i < 4; i++) {
-        BOOST_CHECK_MESSAGE(!SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, CTransaction(txFrom),
+        BOOST_CHECK_MESSAGE(!SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, CTransaction(txFrom),
                                            txTo[i], 0,
                                            SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));
-        BOOST_CHECK_MESSAGE(!SignSignature(testConfig, keystore, ProtocolEra::PreGenesis, ProtocolEra::PostGenesis, CTransaction(txFrom),
+        BOOST_CHECK_MESSAGE(!SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PreGenesis, ProtocolEra::PostGenesis, CTransaction(txFrom),
                                            txTo[i], 0,
                                            SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));
-        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom),
+        BOOST_CHECK_MESSAGE(SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom),
                                           txTo[i], 0,
                                           SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));
-        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, ProtocolEra::PreGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom),
+        BOOST_CHECK_MESSAGE(SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PreGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom),
                                           txTo[i], 0,
                                           SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));
@@ -473,25 +473,25 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
         txTo.vin[i].prevout = COutPoint(txFrom.GetId(), i);
     }
 
-    BOOST_CHECK(!SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, CTransaction(txFrom), txTo, 0,
+    BOOST_CHECK(!SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, CTransaction(txFrom), txTo, 0,
                                SigHashType().withForkId())); // is P2SH
-    BOOST_CHECK(SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, CTransaction(txFrom), txTo, 1,
+    BOOST_CHECK(SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, CTransaction(txFrom), txTo, 1,
                                SigHashType().withForkId())); // is not P2SH
-    BOOST_CHECK(SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, CTransaction(txFrom), txTo, 2,
+    BOOST_CHECK(SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PostGenesis, ProtocolEra::PostGenesis, CTransaction(txFrom), txTo, 2,
                                SigHashType().withForkId())); // is not P2SH
 
-    BOOST_CHECK(SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom), txTo, 0,
+    BOOST_CHECK(SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom), txTo, 0,
                               SigHashType().withForkId()));
-    BOOST_CHECK(SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom), txTo, 1,
+    BOOST_CHECK(SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom), txTo, 1,
                               SigHashType().withForkId()));
-    BOOST_CHECK(SignSignature(testConfig, keystore, ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom), txTo, 2,
+    BOOST_CHECK(SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom), txTo, 2,
                               SigHashType().withForkId()));
 
-    BOOST_CHECK(SignSignature(testConfig, keystore, ProtocolEra::PreGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom), txTo, 0,
+    BOOST_CHECK(SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PreGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom), txTo, 0,
                               SigHashType().withForkId()));
-    BOOST_CHECK(SignSignature(testConfig, keystore, ProtocolEra::PreGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom), txTo, 1,
+    BOOST_CHECK(SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PreGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom), txTo, 1,
                               SigHashType().withForkId()));
-    BOOST_CHECK(SignSignature(testConfig, keystore, ProtocolEra::PreGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom), txTo, 2,
+    BOOST_CHECK(SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PreGenesis, ProtocolEra::PreGenesis, CTransaction(txFrom), txTo, 2,
                               SigHashType().withForkId()));
 
     // SignSignature doesn't know how to sign these. We're not testing

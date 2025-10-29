@@ -91,6 +91,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	write_preferring_upgradable_mutex_tests.cpp
 	compress_tests.cpp
 	config_tests.cpp
+	configscriptpolicy_tests.cpp
 	core_io_tests.cpp
 	cpfp_tests.cpp
 	crypto_tests.cpp
@@ -224,6 +225,10 @@ add_test_to_suite(bitcoin test_bitcoin
 )
 
 set_source_files_properties(
+    mempooltxdb_tests.cpp
+    mempool_dump_load_tests.cpp
+    msg_buffer_tests.cpp
+    net_message_tests.cpp
     test_bitcoin_main.cpp
     PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
 

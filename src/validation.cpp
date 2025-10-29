@@ -370,7 +370,7 @@ bool CheckSequenceLocks(
     CCoinsViewCache* viewMemPool)
 {
     // Post-genesis we don't care about the old sequence lock calculations
-    if(IsProtocolActive(GetProtocolEra(config, tip.GetHeight()), ProtocolName::Genesis))
+    if(IsProtocolActive(GetProtocolEra(config.GetConfigScriptPolicy(), tip.GetHeight()), ProtocolName::Genesis))
     {
         return true;
     }
@@ -478,7 +478,7 @@ uint64_t GetP2SHSigOpCount(const Config& config,
 
         ProtocolEra era { ProtocolEra::PostGenesis };
         if (coin->GetHeight() != MEMPOOL_HEIGHT) {
-            era = GetProtocolEra(config, coin->GetHeight());
+            era = GetProtocolEra(config.GetConfigScriptPolicy(), coin->GetHeight());
         }
         if (IsProtocolActive(era, ProtocolName::Genesis)) {
             continue;
@@ -1030,7 +1030,7 @@ CTxnValResult TxnValidation(
 
     // First check against consensus limits. If this check fails, then banscore will be increased. 
     // We re-test the transaction with policy rules later in this method (without banning if rules are violated)
-    ProtocolEra era { GetProtocolEra(config, chainActive.Height() + 1) };
+    ProtocolEra era { GetProtocolEra(config.GetConfigScriptPolicy(), chainActive.Height() + 1) };
     uint64_t maxTxSigOpsCountConsensusBeforeGenesis = config.GetMaxTxSigOpsCountConsensusBeforeGenesis();
     uint64_t maxTxSizeConsensus = config.GetMaxTxSize(era, true);
     // Coinbase is only valid in a block, not as a loose transaction.
@@ -1039,7 +1039,7 @@ CTxnValResult TxnValidation(
         // Re-check the transaction if we are in the Genesis grace period to check if the opposite rules would 
         // allow this script transaction to be accepted. If it is valid using the opposite old/new rules we
         // only reject it without adding banscore.
-        if (InProtocolGracePeriod(config, ProtocolName::Genesis, chainActive.Height() + 1))
+        if (InProtocolGracePeriod(config.GetConfigScriptPolicy(), ProtocolName::Genesis, chainActive.Height() + 1))
         {
             ProtocolEra inverseEra { GetInverseProtocolEra(era, ProtocolName::Genesis) };
             uint64_t maxTxSizeGraceful = config.GetMaxTxSize(inverseEra, true);
@@ -1099,7 +1099,7 @@ CTxnValResult TxnValidation(
     {
         const CBlockIndex* tip = chainActive.Tip();
         int32_t height { tip->GetHeight() };
-        lockTimeFlags = StandardNonFinalVerifyFlags(GetProtocolEra(config, height));
+        lockTimeFlags = StandardNonFinalVerifyFlags(GetProtocolEra(config.GetConfigScriptPolicy(), height));
         ContextualCheckTransactionForCurrentBlock(config, tx, height,
                                                   // NOLINTBEGIN(*-narrowing-conversions)
                                                   tip->GetMedianTimePast(),
@@ -1361,7 +1361,7 @@ CTxnValResult TxnValidation(
         // Chronicle changes several script verification flags including mandatory ones,
         // so check again with the inverse protocol era flags if we are in the grace period
         // to see if the txn would be valid under those rules.
-        if(InProtocolGracePeriod(config, ProtocolName::Chronicle, chainActive.Height() + 1))
+        if(InProtocolGracePeriod(config.GetConfigScriptPolicy(), ProtocolName::Chronicle, chainActive.Height() + 1))
         {
             uint32_t inverseScriptFlags { GetScriptVerifyFlags(config, GetInverseProtocolEra(era, ProtocolName::Chronicle)) };
             inverseScriptFlags &= ~pTxInputData->GetSkipScriptFlags();
@@ -2174,7 +2174,7 @@ bool GetTransaction(const Config &config,
     if (ptx) {
         txOut = ptx;
         // Assume that the transaction from mempool will be mined in next block
-        era = GetProtocolEra(config, chainActive.Height() + 1);
+        era = GetProtocolEra(config.GetConfigScriptPolicy(), chainActive.Height() + 1);
         return true;
     }
 
@@ -2193,7 +2193,7 @@ bool GetTransaction(const Config &config,
             {
                 return error("%s: mapBlockIndex mismatch  ", __func__);
             }
-            era = GetProtocolEra(config, foundBlockIndex->GetHeight());
+            era = GetProtocolEra(config.GetConfigScriptPolicy(), foundBlockIndex->GetHeight());
             return true;
         }
     }
@@ -2219,7 +2219,7 @@ bool GetTransaction(const Config &config,
                 if (tx->GetId() == txid) {
                     txOut = blockStreamReader->GetLastTransactionRef();
                     hashBlock = pindexSlow->GetBlockHash();
-                    era = GetProtocolEra(config, pindexSlow->GetHeight());
+                    era = GetProtocolEra(config.GetConfigScriptPolicy(), pindexSlow->GetHeight());
                     return true;
                 }
             }
@@ -2693,14 +2693,14 @@ std::optional<bool> CheckInputScripts(
 {
     // What era are activated for this coin?
     int32_t inputScriptBlockHeight = GetInputScriptBlockHeight(coinHeight);
-    ProtocolEra era { GetProtocolEra(config, spendHeight) };
-    ProtocolEra utxoEra { GetProtocolEra(config, inputScriptBlockHeight) };
+    ProtocolEra era { GetProtocolEra(config.GetConfigScriptPolicy(), spendHeight) };
+    ProtocolEra utxoEra { GetProtocolEra(config.GetConfigScriptPolicy(), inputScriptBlockHeight) };
     uint32_t perInputScriptFlags { InputScriptVerifyFlags(era, utxoEra) };
 
     // ScriptExecutionCache does NOT contain per-input flags. That's why we clear the
     // cache when we are about to cross a protocol era activation line (see function FinalizeEraCrossing).
 
-    const verify_script_params params{make_verify_script_params(config, flags | perInputScriptFlags, consensus)};
+    const verify_script_params params{make_verify_script_params(config.GetConfigScriptPolicy(), flags | perInputScriptFlags, consensus)};
     CScriptCheck check(params,
                        scriptPubKey,
                        amount,
@@ -2723,14 +2723,14 @@ std::optional<bool> CheckInputScripts(
     else if (!res.value())
     {
         // Checking script conditions with non-mandatory flags.
-        ProtocolEra spendHeightEra { GetProtocolEra(config, spendHeight) };
+        ProtocolEra spendHeightEra { GetProtocolEra(config.GetConfigScriptPolicy(), spendHeight) };
         uint32_t standardNotMandatoryFlags { StandardNotMandatoryScriptVerifyFlags(spendHeightEra) };
         const bool hasNonMandatoryFlags = ((flags | perInputScriptFlags) & standardNotMandatoryFlags) != 0;
         if (hasNonMandatoryFlags)
         {
             // In a grace period?
-            bool genesisGracePeriod { InProtocolGracePeriod(config, ProtocolName::Genesis, spendHeight) };
-            bool chronicleGracePeriod { InProtocolGracePeriod(config, ProtocolName::Chronicle, spendHeight) };
+            bool genesisGracePeriod { InProtocolGracePeriod(config.GetConfigScriptPolicy(), ProtocolName::Genesis, spendHeight) };
+            bool chronicleGracePeriod { InProtocolGracePeriod(config.GetConfigScriptPolicy(), ProtocolName::Chronicle, spendHeight) };
 
             // Check whether the failure was caused by a non-mandatory
             // script verification check, such as non-standard DER encodings
@@ -2741,7 +2741,7 @@ std::optional<bool> CheckInputScripts(
             // Consensus flag is set to true, because we check policy rules in check1. If we would test policy rules 
             // again and fail because the transaction exceeds our policy limits, the node would get banned and this is not ok
             
-            CScriptCheck check2(make_verify_script_params(config, flags2Check, true),
+            CScriptCheck check2(make_verify_script_params(config.GetConfigScriptPolicy(), flags2Check, true),
                                 scriptPubKey,
                                 amount,
                                 tx,
@@ -2772,7 +2772,7 @@ std::optional<bool> CheckInputScripts(
                 uint32_t inverseInputFlags { InputScriptVerifyFlags(era, GetInverseProtocolEra(utxoEra, ProtocolName::Genesis)) };
                 uint32_t flags3Check = (flags | inverseInputFlags) & ~standardNotMandatoryFlags;
 
-                CScriptCheck check3(make_verify_script_params(config, flags3Check, true),
+                CScriptCheck check3(make_verify_script_params(config.GetConfigScriptPolicy(), flags3Check, true),
                                     scriptPubKey,
                                     amount,
                                     tx,
@@ -2796,7 +2796,7 @@ std::optional<bool> CheckInputScripts(
                 uint32_t inverseInputFlags { InputScriptVerifyFlags(era, GetInverseProtocolEra(utxoEra, ProtocolName::Chronicle)) };
                 uint32_t flags3Check = (flags | inverseInputFlags) & ~standardNotMandatoryFlags;
 
-                CScriptCheck check3(make_verify_script_params(config, flags3Check, true),
+                CScriptCheck check3(make_verify_script_params(config.GetConfigScriptPolicy(), flags3Check, true),
                                     scriptPubKey,
                                     amount,
                                     tx,
@@ -2979,7 +2979,7 @@ uint32_t GetBlockScriptFlags(const Config& config, const CBlockIndex* pChainTip)
     const auto height = pChainTip->GetHeight();
     return GetBlockScriptFlags(consensusparams,
                                height,
-                               GetProtocolEra(config, height + 1));
+                               GetProtocolEra(config.GetConfigScriptPolicy(), height + 1));
 }
 
 static int64_t nTimeCheck = 0;
@@ -3460,7 +3460,7 @@ private:
 
         const Consensus::Params& consensusParams =
             config_.GetChainParams().GetConsensus();
-        ProtocolEra era { GetProtocolEra(config_, pindex_->GetHeight()) };
+        ProtocolEra era { GetProtocolEra(config_.GetConfigScriptPolicy(), pindex_->GetHeight()) };
 
         // Start enforcing BIP68 (sequence locks).
         int nLockTimeFlags = 0;
@@ -3995,10 +3995,10 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew)
 
 static void FinalizeEraCrossing(const Config& config, int32_t height, const CJournalChangeSetPtr& changeSet)
 {
-    bool crossingGenesis { IsProtocolActive(GetProtocolEra(config, height + 1), ProtocolName::Genesis) &&
-                          !IsProtocolActive(GetProtocolEra(config, height), ProtocolName::Genesis) };
-    bool crossingChronicle { IsProtocolActive(GetProtocolEra(config, height + 1), ProtocolName::Chronicle) &&
-                            !IsProtocolActive(GetProtocolEra(config, height), ProtocolName::Chronicle) };
+    bool crossingGenesis { IsProtocolActive(GetProtocolEra(config.GetConfigScriptPolicy(), height + 1), ProtocolName::Genesis) &&
+                          !IsProtocolActive(GetProtocolEra(config.GetConfigScriptPolicy(), height), ProtocolName::Genesis) };
+    bool crossingChronicle { IsProtocolActive(GetProtocolEra(config.GetConfigScriptPolicy(), height + 1), ProtocolName::Chronicle) &&
+                            !IsProtocolActive(GetProtocolEra(config.GetConfigScriptPolicy(), height), ProtocolName::Chronicle) };
 
     if (crossingGenesis || crossingChronicle)
     {
@@ -5771,7 +5771,7 @@ bool CheckBlock(const Config &config, const CBlock &block,
         }
     }
 
-    ProtocolEra era { GetProtocolEra(config, blockHeight) };
+    ProtocolEra era { GetProtocolEra(config.GetConfigScriptPolicy(), blockHeight) };
     uint64_t maxTxSigOpsCountConsensusBeforeGenesis = config.GetMaxTxSigOpsCountConsensusBeforeGenesis();
     uint64_t maxTxSizeConsensus = config.GetMaxTxSize(era, true);
 
@@ -5935,7 +5935,7 @@ bool ContextualCheckTransaction(const Config &config, const CTransaction &tx,
     if(!IsFinalTx(tx, nHeight, nLockTimeCutoff))
     {
         state.SetNonFinal();
-        if(!fromBlock && IsProtocolActive(GetProtocolEra(config, nHeight), ProtocolName::Genesis))
+        if(!fromBlock && IsProtocolActive(GetProtocolEra(config.GetConfigScriptPolicy(), nHeight), ProtocolName::Genesis))
         {
             return false;
         }

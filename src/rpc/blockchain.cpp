@@ -183,7 +183,7 @@ void writeBlockHeaderEnhancedJSONFields(CJSONWriter& jWriter,
     if(coinbaseTx)
     {
         jWriter.writeBeginArray("tx");
-        TxToJSON(*coinbaseTx, uint256(), GetProtocolEra(config, blockindex->GetHeight()), RPCSerializationFlags(), jWriter);
+        TxToJSON(*coinbaseTx, uint256(), GetProtocolEra(config.GetConfigScriptPolicy(), blockindex->GetHeight()), RPCSerializationFlags(), jWriter);
         jWriter.writeEndArray();
     }
 
@@ -1684,7 +1684,7 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
     }
 
     jWriter.writeBeginArray("tx");
-    ProtocolEra era { GetProtocolEra(config, blockIndex.GetHeight()) };
+    ProtocolEra era { GetProtocolEra(config.GetConfigScriptPolicy(), blockIndex.GetHeight()) };
     do
     {
         const CTransaction& transaction = reader->ReadTransaction();
@@ -1985,7 +1985,7 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
             int height = (coin.GetHeight() == MEMPOOL_HEIGHT)
                              ? (chainActive.Height() + 1)
                              : coin.GetHeight();
-            ScriptPubKeyToUniv(coin.GetTxOut().scriptPubKey, true, GetProtocolEra(config, height), o);
+            ScriptPubKeyToUniv(coin.GetTxOut().scriptPubKey, true, GetProtocolEra(config.GetConfigScriptPolicy(), height), o);
             ret.push_back(Pair("scriptPubKey", o));
             ret.push_back(Pair("coinbase", coin.IsCoinBase()));
             ret.push_back(Pair("confiscation", coin.IsConfiscation()));

@@ -7,6 +7,7 @@
 #define BITCOIN_WALLET_WALLET_H
 
 #include "amount.h"
+#include "config.h"
 #include "protocol_era.h"
 #include "script/ismine.h"
 #include "script/sign.h"
@@ -1202,7 +1203,7 @@ bool CWallet::DummySignTx(const Config& config, CMutableTransaction& txNew,
             coin.first->tx->vout[coin.second].scriptPubKey;
         SignatureData sigdata;
 
-        if (!SignAndVerify(config, false, DummySignatureCreator(this),
+        if (!SignAndVerify(config.GetConfigScriptPolicy(), false, DummySignatureCreator(this),
                           ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, scriptPubKey,
                           sigdata)) {
             return false;

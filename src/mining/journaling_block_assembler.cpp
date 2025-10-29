@@ -182,7 +182,7 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t m
         if(pindex)
         {
             int32_t height { pindex->GetHeight() + 1 };
-            ProtocolEra era { GetProtocolEra(mConfig, height) };
+            ProtocolEra era { GetProtocolEra(mConfig.GetConfigScriptPolicy(), height) };
             mLockTimeCutoff = (StandardNonFinalVerifyFlags(era) & LOCKTIME_MEDIAN_TIME_PAST) ?
                 pindex->GetMedianTimePast() : GetAdjustedTime();
         }

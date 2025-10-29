@@ -86,7 +86,7 @@ struct SignatureData {
 };
 
 /** Produce a script signature using a generic signature creator. */
-bool SignAndVerify(const Config& config,
+bool SignAndVerify(const ConfigScriptPolicy& policySettings,
                    bool consensus,
                    const BaseSignatureCreator&,
                    ProtocolEra era,
@@ -95,12 +95,12 @@ bool SignAndVerify(const Config& config,
                    SignatureData&);
 
 /** Produce a script signature for a transaction. */
-bool SignSignature(const Config& config, const CKeyStore& keystore,
+bool SignSignature(const ConfigScriptPolicy& policySettings, const CKeyStore& keystore,
                    ProtocolEra era, ProtocolEra utxoEra,
                    const CScript& fromPubKey,
                    CMutableTransaction& txTo, unsigned int nIn,
                    const Amount amount, SigHashType sigHashType);
-bool SignSignature(const Config& config, const CKeyStore& keystore,
+bool SignSignature(const ConfigScriptPolicy& policySettings, const CKeyStore& keystore,
                    ProtocolEra era, ProtocolEra utxoEra,
                    const CTransaction& txFrom,
                    CMutableTransaction& txTo, unsigned int nIn,
