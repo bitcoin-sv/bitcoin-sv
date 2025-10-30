@@ -89,6 +89,15 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
+            **ABSOLUTE ZERO-TOLERANCE ENFORCEMENT ACTIVE:**
+            - Every issue found MUST be posted as an inline comment (except formatting issues)
+            - All issues block merge equally (no severity distinctions for enforcement)
+            - Only CODEOWNER dismissal or fixing the issue can unblock
+            - Formatting tools handle:
+              * C++ formatting → clang-format (skip these issues)
+              * Python formatting → flake8 (skip these issues)
+            - Everything else MUST be posted to ensure proper enforcement counting
+
             You are coordinating a comprehensive multi-language code review for this PR.
 
             **Step 1: Analyze Changed Files**
@@ -124,6 +133,7 @@ jobs:
                - If YES and describes SAME issue → SKIP (avoid duplicate)
                - If YES and describes DIFFERENT issue → POST (different problem, same location)
                - If NO → POST (new issue)
+               - REMEMBER: In zero-tolerance mode, post ALL non-formatting issues
 
             4. Similarity check for "same issue":
                - Extract key terms from both issue descriptions
@@ -141,9 +151,25 @@ jobs:
             6. **Security**: Input validation, DoS vectors, integer overflows
 
             Use `gh pr diff ${{ github.event.pull_request.number }}` to see the changes.
-            Use `mcp__github_inline_comment__create_inline_comment` to post specific issues.
 
-            Return a detailed report of all issues found, organized by severity (critical, major, minor).
+            **MANDATORY: Post ALL issues as inline comments for zero-tolerance enforcement**
+
+            EXCEPTIONS - DO NOT comment on:
+            - Code formatting issues that clang-format handles (indentation, spacing, braces, line length)
+            - Any style issue that clang-format would automatically fix
+
+            MUST POST as inline comments (using mcp__github_inline_comment__create_inline_comment):
+            - ALL logic errors, bugs, potential crashes
+            - ALL memory safety issues (leaks, buffer overflows, use-after-free)
+            - ALL thread safety issues (race conditions, deadlocks)
+            - ALL performance problems (algorithmic complexity, unnecessary allocations)
+            - ALL missing error handling or edge cases
+            - ALL unclear naming or missing documentation
+            - ALL code quality issues (const correctness, RAII violations, missing noexcept)
+            - Even "minor" suggestions like "consider using std::string_view" MUST be posted
+
+            Zero-tolerance means EVERY non-formatting issue blocks merge until resolved.
+            After posting all comments, return a summary report organized by severity.
             ```
 
             **For Python files** (.py):
@@ -173,6 +199,7 @@ jobs:
                - If YES and describes SAME issue → SKIP (avoid duplicate)
                - If YES and describes DIFFERENT issue → POST (different problem, same location)
                - If NO → POST (new issue)
+               - REMEMBER: In zero-tolerance mode, post ALL non-formatting issues
 
             4. Similarity check for "same issue":
                - Extract key terms from both issue descriptions
@@ -189,9 +216,26 @@ jobs:
             5. **Correctness**: Logic errors, off-by-one errors in test ranges, improper assertions
 
             Use `gh pr diff ${{ github.event.pull_request.number }}` to see the changes.
-            Use `mcp__github_inline_comment__create_inline_comment` to post specific issues.
 
-            Return a detailed report of all issues found, organized by severity (critical, major, minor).
+            **MANDATORY: Post ALL issues as inline comments for zero-tolerance enforcement**
+
+            EXCEPTIONS - DO NOT comment on:
+            - Python formatting issues that flake8 handles (line length, whitespace, indentation)
+            - PEP8 style violations that flake8 would catch (import order, spacing around operators)
+            - Any formatting issue that flake8 would automatically flag
+
+            MUST POST as inline comments (using mcp__github_inline_comment__create_inline_comment):
+            - ALL test coverage gaps or missing assertions
+            - ALL logic errors or incorrect test expectations
+            - ALL performance issues in tests
+            - ALL unclear test names or poor test structure
+            - ALL missing edge case tests
+            - ALL error handling issues
+            - ALL maintainability problems (complex functions, unclear logic)
+            - Even "minor" suggestions like "test could be more descriptive" MUST be posted
+
+            Zero-tolerance means EVERY non-formatting issue blocks merge until resolved.
+            After posting all comments, return a summary report organized by severity.
             ```
 
             **Step 3: Combine Feedback and Submit Review**
