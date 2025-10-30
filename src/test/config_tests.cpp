@@ -209,10 +209,10 @@ BOOST_AUTO_TEST_CASE(max_bignum_length_policy) {
     BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PreGenesis, false) == MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
 
     // default post genesis policy max length
-    BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PostGenesis, false) == MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS);
+    BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PostGenesis, false) == DEFAULT_SCRIPT_NUM_LENGTH_POLICY);
 
     // default post chronicle policy max length
-    BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PostChronicle, false) == MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE);
+    BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PostChronicle, false) == DEFAULT_SCRIPT_NUM_LENGTH_POLICY);
 
     // default pre genesis consensus max length
     BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PreGenesis, true) == MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);

@@ -4,7 +4,7 @@
 from chronicle_upgrade_tests.test_base import ChronicleHeightTestsCase
 from test_framework.script import CScript, OP_1ADD, OP_DROP, OP_TRUE, OP_DUP, OP_MUL, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.mininode import CTransaction, COutPoint, CTxIn, CTxOut
-from test_framework.cdefs import MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS, ONE_KILOBYTE
+from test_framework.cdefs import MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS, MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE, DEFAULT_SCRIPT_NUM_LENGTH_POLICY
 from test_framework.key import CECKey
 
 """
@@ -34,7 +34,7 @@ def new_transactions(key, utxo, script_num_size, locking_script=[OP_1ADD, OP_DRO
     tx1.vin.append(CTxIn(COutPoint(tx_to_spend.sha256, n), b''))
     tx1.vout.append(CTxOut(tx_to_spend.vout[0].nValue - 100_000, CScript([bytearray([42] * script_num_size)] + locking_script)))
     sighash = SignatureHash(tx_to_spend.vout[0].scriptPubKey, tx1, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
-    sig = key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
+    sig = key.sign(sighash) + bytes([SIGHASH_ALL | SIGHASH_FORKID])
     tx1.vin[0].scriptSig = CScript([sig])
     tx1.rehash()
 
@@ -71,6 +71,392 @@ class ScriptNumSizeDefaultPolicyTestCase(ChronicleHeightTestsCase):
         if tx_collection.label == "PRE_CHRONICLE":
             utxos, _ = self.utxos["PRE_CHRONICLE"]
 
+            # Create tx with script number equal to policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'max-script-num-length-policy-limit-violated (Script number overflow)')
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'max-script-num-length-policy-limit-violated (Script number overflow)')
+
+            # Create tx with script number over pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Save one of these pre-Chronicle post-genesis UTXOs for later
+            self.post_genesis_utxo = tx1
+
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+        # Block before Chronicle grace period
+        elif tx_collection.label == "CHRONICLE_PRE_GRACE":
+            utxos, _ = self.utxos["CHRONICLE_PRE_GRACE"]
+
+            # Create tx with script number equal to policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'max-script-num-length-policy-limit-violated (Script number overflow)')
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'max-script-num-length-policy-limit-violated (Script number overflow)')
+
+            # Create tx with script number over pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+        # Start of Chronicle grace period
+        elif tx_collection.label == "CHRONICLE_GRACE_BEGIN":
+            utxos, _ = self.utxos["CHRONICLE_GRACE_BEGIN"]
+
+            # Create tx with script number equal to policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over policy maximum
+            # In the grace period we get a different soft rejection message
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            # In the grace period we get a different soft rejection message
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over pre-Chronicle consensus maximum
+            # In the grace period we get a soft rejection because this wouldn't be a consensus failure after Chronicle
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            # In the grace period we get a soft rejection because this wouldn't be a consensus failure after Chronicle
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+        # Block before Chronicle activation
+        elif tx_collection.label == "CHRONICLE_PRE_ACTIVATION":
+            utxos, _ = self.utxos["CHRONICLE_PRE_ACTIVATION"]
+
+            # Create tx with script number equal to policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over pre-Chronicle consensus maximum
+            # Soft rejected just like a policy failure because otherwise it could be accepted for mining into the next block
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            # Soft rejected just like a policy failure because otherwise it could be accepted for mining into the next block
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # And still reject an attempt to spend a post-Genesis UTXO with
+            # script num larger than consensus at the time it was mined.
+            tx2 = spend_script_num_transaction(self.post_genesis_utxo)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+        # Chronicle activation height
+        elif tx_collection.label == "CHRONICLE_ACTIVATION":
+            utxos, _ = self.utxos["CHRONICLE_ACTIVATION"]
+
+            # Create tx with script number equal to policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # And still reject an attempt to spend a post-Genesis UTXO with
+            # script num larger than consensus at the time it was mined.
+            tx2 = spend_script_num_transaction(self.post_genesis_utxo)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+        # Block after Chronicle activation height
+        elif tx_collection.label == "CHRONICLE_POST_ACTIVATION":
+            utxos, _ = self.utxos["CHRONICLE_POST_ACTIVATION"]
+
+            # Create tx with script number equal to policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # And still reject an attempt to spend a post-Genesis UTXO with
+            # script num larger than consensus at the time it was mined.
+            tx2 = spend_script_num_transaction(self.post_genesis_utxo)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+        # End of Chronicle grace period
+        elif tx_collection.label == "CHRONICLE_GRACE_END":
+            utxos, _ = self.utxos["CHRONICLE_GRACE_END"]
+
+            # Create tx with script number equal to policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # And still reject an attempt to spend a post-Genesis UTXO with
+            # script num larger than consensus at the time it was mined.
+            tx2 = spend_script_num_transaction(self.post_genesis_utxo)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+        # After Chronicle
+        elif tx_collection.label == "POST_CHRONICLE":
+            utxos, _ = self.utxos["POST_CHRONICLE"]
+
+            # Create tx with script number equal to policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over policy maximum
+            # Now we're out of the grace period we revert to the standard policy rejection message
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'max-script-num-length-policy-limit-violated (Script number overflow)')
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            # Now we're out of the grace period we revert to the standard policy rejection message
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'max-script-num-length-policy-limit-violated (Script number overflow)')
+
+            # Create tx with script number over pre-Chronicle consensus maximum
+            # Now we're out of the grace period we revert to the standard policy rejection message
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'max-script-num-length-policy-limit-violated (Script number overflow)')
+
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            # Now we're out of the grace period we revert to the standard policy rejection message
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'max-script-num-length-policy-limit-violated (Script number overflow)')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # And still reject an attempt to spend a post-Genesis UTXO with
+            # script num larger than consensus at the time it was mined.
+            tx2 = spend_script_num_transaction(self.post_genesis_utxo)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Check a ridiculously large script num in a calculation can't bring down the node
+            # 5 minute timeout is sufficient on all current test systems
+            # Since these tests use the default policy max script num size, this will be rejected as a script number overflow
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), script_num_size=1000, locking_script=[OP_DUP, OP_MUL] * 50 + [OP_DROP, OP_TRUE])
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs',
+                                 p2p_timeout=300)
+
+
+"""
+At all heights, check behaviour if the max script number size policy is set to unlimited
+"""
+
+
+class ScriptNumSizeUnlimitedPolicyTestCase(ChronicleHeightTestsCase):
+    NAME = "Test maximum script number size limits (Unlimited policy)"
+    ARGS = ChronicleHeightTestsCase.ARGS + ['-whitelist=127.0.0.1',
+                                            '-maxscriptsizepolicy=0',
+                                            '-maxscriptnumlengthpolicy=0',
+                                            '-maxnonstdtxvalidationduration=1000000',
+                                            '-maxtxnvalidatorasynctasksrunduration=1000001']
+    _UTXO_KEY = make_key()
+
+    post_genesis_utxo = None
+
+    def get_transactions_for_test(self, tx_collection, coinbases):
+        # Before Chronicle
+        if tx_collection.label == "PRE_CHRONICLE":
+            utxos, _ = self.utxos["PRE_CHRONICLE"]
+
+            # Create tx with script number equal to default policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over default policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
             # Create tx with script number equal to pre-Chronicle consensus maximum
             tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
             tx_collection.add_mempool_tx(tx1)
@@ -86,16 +472,55 @@ class ScriptNumSizeDefaultPolicyTestCase(ChronicleHeightTestsCase):
             # Save one of these pre-Chronicle post-genesis UTXOs for later
             self.post_genesis_utxo = tx1
 
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
         # Block before Chronicle grace period
         elif tx_collection.label == "CHRONICLE_PRE_GRACE":
             utxos, _ = self.utxos["CHRONICLE_PRE_GRACE"]
 
-            # No change from pre-Chronicle behaviour
+            # Create tx with script number equal to default policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over default policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
             tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2)
 
+            # Create tx with script number over pre-Chronicle consensus maximum
             tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
@@ -105,31 +530,83 @@ class ScriptNumSizeDefaultPolicyTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_GRACE_BEGIN":
             utxos, _ = self.utxos["CHRONICLE_GRACE_BEGIN"]
 
+            # Create tx with script number equal to default policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over default policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
             tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2)
 
-            # Now we soft reject the oversized script num
+            # Create tx with script number over pre-Chronicle consensus maximum
+            # In the grace period we get a soft rejection because this wouldn't be a consensus failure after Chronicle
             tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2,
                                  p2p_reject_reason=b'chronicle-script-verify-flag-failed (Script number overflow)',
                                  block_reject_reason=b'blk-bad-inputs')
 
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            # In the grace period we get a soft rejection because this wouldn't be a consensus failure after Chronicle
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
         # Block before Chronicle activation
         elif tx_collection.label == "CHRONICLE_PRE_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_PRE_ACTIVATION"]
 
+            # Create tx with script number equal to default policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over default policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
             tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2)
 
-            # Will be accepted for mining into the next block
+            # Create tx with script number over pre-Chronicle consensus maximum
+            # Accepted for mining into the next block
             tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2)
 
-            # But still reject an attempt to spend a post-Genesis UTXO with
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            # Accepted for mining into the next block
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # And still reject an attempt to spend a post-Genesis UTXO with
             # script num larger than consensus at the time it was mined.
             tx2 = spend_script_num_transaction(self.post_genesis_utxo)
             tx_collection.add_tx(tx2,
@@ -140,11 +617,40 @@ class ScriptNumSizeDefaultPolicyTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_ACTIVATION"]
 
-            # From now on we accept what used to be oversized script nums
+            # Create tx with script number equal to default policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over default policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over pre-Chronicle consensus maximum
             tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2)
 
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # And still reject an attempt to spend a post-Genesis UTXO with
+            # script num larger than consensus at the time it was mined.
             tx2 = spend_script_num_transaction(self.post_genesis_utxo)
             tx_collection.add_tx(tx2,
                                  p2p_reject_reason=b'chronicle-script-verify-flag-failed (Script number overflow)',
@@ -154,10 +660,40 @@ class ScriptNumSizeDefaultPolicyTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_POST_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_POST_ACTIVATION"]
 
+            # Create tx with script number equal to default policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over default policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over pre-Chronicle consensus maximum
             tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2)
 
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # And still reject an attempt to spend a post-Genesis UTXO with
+            # script num larger than consensus at the time it was mined.
             tx2 = spend_script_num_transaction(self.post_genesis_utxo)
             tx_collection.add_tx(tx2,
                                  p2p_reject_reason=b'chronicle-script-verify-flag-failed (Script number overflow)',
@@ -167,10 +703,40 @@ class ScriptNumSizeDefaultPolicyTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "CHRONICLE_GRACE_END":
             utxos, _ = self.utxos["CHRONICLE_GRACE_END"]
 
+            # Create tx with script number equal to default policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over default policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over pre-Chronicle consensus maximum
             tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2)
 
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # And still reject an attempt to spend a post-Genesis UTXO with
+            # script num larger than consensus at the time it was mined.
             tx2 = spend_script_num_transaction(self.post_genesis_utxo)
             tx_collection.add_tx(tx2,
                                  p2p_reject_reason=b'chronicle-script-verify-flag-failed (Script number overflow)',
@@ -180,16 +746,48 @@ class ScriptNumSizeDefaultPolicyTestCase(ChronicleHeightTestsCase):
         elif tx_collection.label == "POST_CHRONICLE":
             utxos, _ = self.utxos["POST_CHRONICLE"]
 
+            # Create tx with script number equal to default policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over default policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), DEFAULT_SCRIPT_NUM_LENGTH_POLICY + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over pre-Chronicle consensus maximum
             tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2)
 
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2)
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # And still reject an attempt to spend a post-Genesis UTXO with
+            # script num larger than consensus at the time it was mined.
             tx2 = spend_script_num_transaction(self.post_genesis_utxo)
             tx_collection.add_tx(tx2,
                                  p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
                                  block_reject_reason=b'blk-bad-inputs')
 
             # Check a ridiculously large script num in a calculation can't bring down the node
+            # 5 minute timeout is sufficient on all current test systems
+            # Since these tests use unlimited policy max script num size, this will be rejected as an OpenSSL error
             tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), script_num_size=1000, locking_script=[OP_DUP, OP_MUL] * 50 + [OP_DROP, OP_TRUE])
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2,
@@ -204,10 +802,12 @@ At all heights, check that we observe any configured maximum script number size 
 
 
 class ScriptNumSizeSetPolicyTestCase(ChronicleHeightTestsCase):
-    NAME = "Test maximum script number size limits with 10K set policy"
-    MAX_SCRIPT_SIZE_POLICY = ONE_KILOBYTE * 10
-    ARGS = ChronicleHeightTestsCase.ARGS + ['-whitelist=127.0.0.1', '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy={}'.format(MAX_SCRIPT_SIZE_POLICY)]
+    NAME = "Test maximum script number size limits (Set double default policy)"
+    MAX_SCRIPT_NUM_SIZE_POLICY = DEFAULT_SCRIPT_NUM_LENGTH_POLICY * 2
+    ARGS = ChronicleHeightTestsCase.ARGS + ['-whitelist=127.0.0.1', '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy={}'.format(MAX_SCRIPT_NUM_SIZE_POLICY)]
     _UTXO_KEY = make_key()
+
+    post_genesis_utxo = None
 
     def get_transactions_for_test(self, tx_collection, coinbases):
         # Before Chronicle
@@ -215,95 +815,345 @@ class ScriptNumSizeSetPolicyTestCase(ChronicleHeightTestsCase):
             utxos, _ = self.utxos["PRE_CHRONICLE"]
 
             # Create tx with script number equal to policy maximum
-            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_SIZE_POLICY)
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_NUM_SIZE_POLICY)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2)
 
             # Create tx with script number over policy maximum
-            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_SIZE_POLICY + 1)
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_NUM_SIZE_POLICY + 1)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2, p2p_reject_reason=b'max-script-num-length-policy-limit-violated (Script number overflow)')
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'max-script-num-length-policy-limit-violated (Script number overflow)')
+
+            # Create tx with script number over pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Save one of these pre-Chronicle post-genesis UTXOs for later
+            self.post_genesis_utxo = tx1
+
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
 
         # Block before Chronicle grace period
         elif tx_collection.label == "CHRONICLE_PRE_GRACE":
             utxos, _ = self.utxos["CHRONICLE_PRE_GRACE"]
 
-            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_SIZE_POLICY)
+            # Create tx with script number equal to policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_NUM_SIZE_POLICY)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2)
 
-            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_SIZE_POLICY + 1)
+            # Create tx with script number over policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_NUM_SIZE_POLICY + 1)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2, p2p_reject_reason=b'max-script-num-length-policy-limit-violated (Script number overflow)')
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'max-script-num-length-policy-limit-violated (Script number overflow)')
+
+            # Create tx with script number over pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
 
         # Start of Chronicle grace period
         elif tx_collection.label == "CHRONICLE_GRACE_BEGIN":
             utxos, _ = self.utxos["CHRONICLE_GRACE_BEGIN"]
 
-            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_SIZE_POLICY)
+            # Create tx with script number equal to policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_NUM_SIZE_POLICY)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2)
 
-            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_SIZE_POLICY + 1)
+            # Create tx with script number over policy maximum
+            # In the grace period we get a different soft rejection message
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_NUM_SIZE_POLICY + 1)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            # In the grace period we get a different soft rejection message
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over pre-Chronicle consensus maximum
+            # In the grace period we get a soft rejection because this wouldn't be a consensus failure after Chronicle
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            # In the grace period we get a soft rejection because this wouldn't be a consensus failure after Chronicle
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
 
         # Block before Chronicle activation
         elif tx_collection.label == "CHRONICLE_PRE_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_PRE_ACTIVATION"]
 
-            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_SIZE_POLICY)
+            # Create tx with script number equal to policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_NUM_SIZE_POLICY)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2)
 
-            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_SIZE_POLICY + 1)
+            # Create tx with script number over policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_NUM_SIZE_POLICY + 1)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over pre-Chronicle consensus maximum
+            # Soft rejected just like a policy failure because otherwise it could be accepted for mining into the next block
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            # Soft rejected just like a policy failure because otherwise it could be accepted for mining into the next block
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # And still reject an attempt to spend a post-Genesis UTXO with
+            # script num larger than consensus at the time it was mined.
+            tx2 = spend_script_num_transaction(self.post_genesis_utxo)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
 
         # Chronicle activation height
         elif tx_collection.label == "CHRONICLE_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_ACTIVATION"]
 
-            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_SIZE_POLICY)
+            # Create tx with script number equal to policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_NUM_SIZE_POLICY)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2)
 
-            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_SIZE_POLICY + 1)
+            # Create tx with script number over policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_NUM_SIZE_POLICY + 1)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # And still reject an attempt to spend a post-Genesis UTXO with
+            # script num larger than consensus at the time it was mined.
+            tx2 = spend_script_num_transaction(self.post_genesis_utxo)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
 
         # Block after Chronicle activation height
         elif tx_collection.label == "CHRONICLE_POST_ACTIVATION":
             utxos, _ = self.utxos["CHRONICLE_POST_ACTIVATION"]
 
-            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_SIZE_POLICY)
+            # Create tx with script number equal to policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_NUM_SIZE_POLICY)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2)
 
-            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_SIZE_POLICY + 1)
+            # Create tx with script number over policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_NUM_SIZE_POLICY + 1)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # And still reject an attempt to spend a post-Genesis UTXO with
+            # script num larger than consensus at the time it was mined.
+            tx2 = spend_script_num_transaction(self.post_genesis_utxo)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
 
         # End of Chronicle grace period
         elif tx_collection.label == "CHRONICLE_GRACE_END":
             utxos, _ = self.utxos["CHRONICLE_GRACE_END"]
 
-            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_SIZE_POLICY)
+            # Create tx with script number equal to policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_NUM_SIZE_POLICY)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2)
 
-            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_SIZE_POLICY + 1)
+            # Create tx with script number over policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_NUM_SIZE_POLICY + 1)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over pre-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # And still reject an attempt to spend a post-Genesis UTXO with
+            # script num larger than consensus at the time it was mined.
+            tx2 = spend_script_num_transaction(self.post_genesis_utxo)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'chronicle-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
 
         # After Chronicle
         elif tx_collection.label == "POST_CHRONICLE":
             utxos, _ = self.utxos["POST_CHRONICLE"]
 
-            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_SIZE_POLICY)
+            # Create tx with script number equal to policy maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_NUM_SIZE_POLICY)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2)
 
-            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_SIZE_POLICY + 1)
+            # Create tx with script number over policy maximum
+            # Now we're out of the grace period we revert to the standard policy rejection message
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), self.MAX_SCRIPT_NUM_SIZE_POLICY + 1)
             tx_collection.add_mempool_tx(tx1)
             tx_collection.add_tx(tx2, p2p_reject_reason=b'max-script-num-length-policy-limit-violated (Script number overflow)')
+
+            # Create tx with script number equal to pre-Chronicle consensus maximum
+            # Now we're out of the grace period we revert to the standard policy rejection message
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'max-script-num-length-policy-limit-violated (Script number overflow)')
+
+            # Create tx with script number over pre-Chronicle consensus maximum
+            # Now we're out of the grace period we revert to the standard policy rejection message
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'max-script-num-length-policy-limit-violated (Script number overflow)')
+
+            # Create tx with script number equal to post-Chronicle consensus maximum
+            # Now we're out of the grace period we revert to the standard policy rejection message
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2, p2p_reject_reason=b'max-script-num-length-policy-limit-violated (Script number overflow)')
+
+            # Create tx with script number over post-Chronicle consensus maximum
+            tx1, tx2 = new_transactions(self._UTXO_KEY, utxos.pop(0), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1)
+            tx_collection.add_mempool_tx(tx1)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')
+
+            # And still reject an attempt to spend a post-Genesis UTXO with
+            # script num larger than consensus at the time it was mined.
+            tx2 = spend_script_num_transaction(self.post_genesis_utxo)
+            tx_collection.add_tx(tx2,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script number overflow)',
+                                 block_reject_reason=b'blk-bad-inputs')

@@ -63,7 +63,7 @@ static const uint64_t MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS = 4;
 // Maximum script number length after Genesis
 static const uint64_t MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS = 750 * ONE_KILOBYTE; 
 // Maximum script number length after Chronicle
-static const uint64_t MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE = std::numeric_limits<uint64_t>::max();
+static const uint64_t MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE = 32 * ONE_MEGABYTE;
 
 // Maximum coinbase scriptSig size
 static const uint64_t MAX_COINBASE_SCRIPTSIG_SIZE = 100;

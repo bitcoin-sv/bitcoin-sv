@@ -158,7 +158,7 @@ BOOST_AUTO_TEST_CASE(reset_default_behavior)
     policy.ResetDefault();
 
     BOOST_CHECK_EQUAL(policy.GetMaxOpsPerScript(true, false), DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS);
-    BOOST_CHECK_EQUAL(policy.GetMaxScriptNumLength(ProtocolEra::PostGenesis, false), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS);
+    BOOST_CHECK_EQUAL(policy.GetMaxScriptNumLength(ProtocolEra::PostGenesis, false), DEFAULT_SCRIPT_NUM_LENGTH_POLICY);
     BOOST_CHECK_EQUAL(policy.GetMaxScriptSize(true, false), DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS);
     BOOST_CHECK_EQUAL(policy.GetMaxPubKeysPerMultiSig(true, false), DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS);
     BOOST_CHECK_EQUAL(policy.GetMaxStackMemoryUsage(true, false), DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS);

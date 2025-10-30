@@ -81,7 +81,7 @@ uint64_t ConfigScriptPolicy::GetMaxScriptNumLength(ProtocolEra era, bool isConse
         {
             return MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS; // limit after Genesis
         }
-        return MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE;   // Chronicle removes consensus limit
+        return MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE;   // Chronicle consensus limit
     }
 
     // Use policy limit
