@@ -339,6 +339,13 @@ class DSDetectedTests(BitcoinTestFramework):
         peer.send_and_ping(dsdMessage)
         assert_equal(self.get_JSON_notification(), None)
 
+        # Webhook should not receive the notification if we send dsdetected message with merkle proof for different block than the one in block details
+        dsdMessage = msg_dsdetected(blocksDetails=[
+            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
+            BlockDetails([CBlockHeader(blockB)], DSMerkleProof(1, txF, blockF.hashMerkleRoot, [MerkleProofNode(blockF.vtx[0].sha256)]))])
+        peer.send_and_ping(dsdMessage)
+        assert_equal(self.get_JSON_notification(), None)
+
         # Webhook should not receive the notification if we send dsdetected message with transactions that are not double spending
         # Create a block similar as before, but with a transaction spending a different utxo
         blockC, _ = make_block(connection, parent_block=utxoBlock)
@@ -385,7 +392,7 @@ class DSDetectedTests(BitcoinTestFramework):
         assert_equal(self.get_JSON_notification(), None)
 
         end_banscore = node.getpeerinfo()[0]['banscore']
-        assert ((end_banscore - start_banscore) / 10 == 13)  # because we have 13 negative tests so far
+        assert ((end_banscore - start_banscore) / 10 == 14)  # because we have 14 negative tests so far
 
         # Finally, webhook should receive the notification if we send a proper dsdetected message
         dsdMessage = msg_dsdetected(blocksDetails=[
