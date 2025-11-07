@@ -58,6 +58,8 @@ jobs:
       id-token: write
       actions: read  # Required for github_ci MCP server to read CI results
       statuses: write
+    
+    timeout-minutes: 20 
 
     steps:
       - name: Checkout repository
