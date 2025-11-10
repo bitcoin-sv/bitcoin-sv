@@ -293,6 +293,7 @@ jobs:
 
       - name: Enforce Zero-Tolerance Policy
         env:
+          GH_TOKEN: ${{ github.token }}
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
         run: .github/workflows/claude-code-review-enforcement.sh
 
