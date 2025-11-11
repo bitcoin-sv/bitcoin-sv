@@ -6,13 +6,17 @@
 set -euo pipefail
 
 : "${COMMIT_SHA:?Required}"
+: "${GITHUB_REPOSITORY:?Required}"
 
-readonly sha=$COMMIT_SHA pr=$(gh pr view --json number -q .number)
+readonly sha=$COMMIT_SHA
+readonly pr=$(gh pr view --json number -q .number)
+readonly owner=${GITHUB_REPOSITORY%/*}
+readonly repo=${GITHUB_REPOSITORY#*/}
 
 # Fetch review threads via GraphQL
 response=$(gh api graphql -f query='
-query($pr: Int!) {
-  repository(owner: "{owner}", name: "{repo}") {
+query($owner: String!, $repo: String!, $pr: Int!) {
+  repository(owner: $owner, name: $repo) {
     pullRequest(number: $pr) {
       reviewThreads(first: 100) {
         nodes {
@@ -28,7 +32,7 @@ query($pr: Int!) {
       }
     }
   }
-}' -F pr="$pr" -q '.data.repository.pullRequest.reviewThreads.nodes')
+}' -F owner="$owner" -F repo="$repo" -F pr="$pr" -q '.data.repository.pullRequest.reviewThreads.nodes')
 
 # Count unresolved Claude threads
 unresolved=0
@@ -47,7 +51,7 @@ done < <(jq -c '.[]' <<< "$response")
 # Set commit status and exit
 if ((unresolved > 0)); then
   printf "\n%d unresolved issue(s) - BLOCKING\n" "$unresolved"
-  gh api "repos/{owner}/{repo}/statuses/$sha" \
+  gh api "repos/$owner/$repo/statuses/$sha" \
     -f state=failure \
     -f context="Claude Code Review" \
     -f description="$unresolved unresolved issue(s) block merge"
@@ -55,7 +59,7 @@ if ((unresolved > 0)); then
 fi
 
 printf "All issues resolved - PASSING\n"
-gh api "repos/{owner}/{repo}/statuses/$sha" \
+gh api "repos/$owner/$repo/statuses/$sha" \
   -f state=success \
   -f context="Claude Code Review" \
   -f description="All issues resolved"
