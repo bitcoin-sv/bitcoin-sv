@@ -38,6 +38,7 @@ query {
 
 # Count unresolved Claude threads
 unresolved=0
+total=0
 if [[ $response == "null" || $response == "[]" ]]; then
   printf "No review threads found\n"
 else
@@ -46,6 +47,7 @@ else
     is_resolved=$(jq -r '.isResolved' <<< "$thread")
 
     if [[ $author =~ ^(claude|github-actions)(\[bot\])?$ ]]; then
+      ((++total))
       if [[ $is_resolved == "false" ]]; then
         ((++unresolved))
         path=$(jq -r '.comments.nodes[0].path // "unknown"' <<< "$thread")
@@ -56,7 +58,8 @@ else
   done < <(jq -c '.[]' <<< "$response")
 fi
 
-printf "\nTotal unresolved Claude issues: %d\n" "$unresolved"
+resolved=$((total - unresolved))
+printf "\nClaude issues: %d resolved out of %d\n" "$resolved" "$total"
 
 # Set commit status and exit
 if ((unresolved > 0)); then
