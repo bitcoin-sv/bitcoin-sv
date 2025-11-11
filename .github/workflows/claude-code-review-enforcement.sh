@@ -7,16 +7,18 @@ set -euo pipefail
 
 : "${COMMIT_SHA:?Required}"
 : "${GITHUB_REPOSITORY:?Required}"
+: "${PR_NUMBER:?Required}"
 
 readonly sha=$COMMIT_SHA
-readonly pr=$(gh pr view --json number -q .number)
+readonly pr=$PR_NUMBER
 readonly owner=${GITHUB_REPOSITORY%/*}
 readonly repo=${GITHUB_REPOSITORY#*/}
 
 # Fetch review threads via GraphQL
-response=$(gh api graphql -f query='
-query($owner: String!, $repo: String!, $pr: Int!) {
-  repository(owner: $owner, name: $repo) {
+printf "Fetching review threads...\n"
+response=$(gh api graphql -f query="
+query {
+  repository(owner: \"$owner\", name: \"$repo\") {
     pullRequest(number: $pr) {
       reviewThreads(first: 100) {
         nodes {
@@ -32,21 +34,29 @@ query($owner: String!, $repo: String!, $pr: Int!) {
       }
     }
   }
-}' -F owner="$owner" -F repo="$repo" -F pr="$pr" -q '.data.repository.pullRequest.reviewThreads.nodes')
+}" -q '.data.repository.pullRequest.reviewThreads.nodes')
 
 # Count unresolved Claude threads
 unresolved=0
-while IFS= read -r thread; do
-  author=$(jq -r '.comments[0].author.login' <<< "$thread")
-  is_resolved=$(jq -r '.isResolved' <<< "$thread")
+if [[ $response == "null" || $response == "[]" ]]; then
+  printf "No review threads found\n"
+else
+  while IFS= read -r thread; do
+    author=$(jq -r '.comments.nodes[0].author.login' <<< "$thread")
+    is_resolved=$(jq -r '.isResolved' <<< "$thread")
 
-  if [[ $author =~ ^(claude|github-actions)(\[bot\])?$ && $is_resolved == false ]]; then
-    ((++unresolved))
-    path=$(jq -r '.comments[0].path // "unknown"' <<< "$thread")
-    line=$(jq -r '.comments[0].line // "?"' <<< "$thread")
-    printf "Unresolved: %s:%s\n" "$path" "$line"
-  fi
-done < <(jq -c '.[]' <<< "$response")
+    if [[ $author =~ ^(claude|github-actions)(\[bot\])?$ ]]; then
+      if [[ $is_resolved == "false" ]]; then
+        ((++unresolved))
+        path=$(jq -r '.comments.nodes[0].path // "unknown"' <<< "$thread")
+        line=$(jq -r '.comments.nodes[0].line // "?"' <<< "$thread")
+        printf "Unresolved: %s:%s\n" "$path" "$line"
+      fi
+    fi
+  done < <(jq -c '.[]' <<< "$response")
+fi
+
+printf "\nTotal unresolved Claude issues: %d\n" "$unresolved"
 
 # Set commit status and exit
 if ((unresolved > 0)); then

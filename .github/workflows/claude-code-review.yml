@@ -296,5 +296,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: .github/workflows/claude-code-review-enforcement.sh
 
