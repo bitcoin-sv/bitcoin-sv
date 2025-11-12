@@ -3,6 +3,7 @@
 // LICENSE.
 
 #include "big_int.h"
+#include "consensus/consensus.h"
 
 #include <array>
 
@@ -445,6 +446,27 @@ BOOST_AUTO_TEST_CASE(to_size_t_limited)
     for(const auto n : test_data)
     {
         BOOST_TEST(n == bsv::to_size_t_limited(bint{n}));
+    }
+}
+
+BOOST_AUTO_TEST_CASE(max_size)
+{
+    // Check the maximum size (in terms of memory usage) of a big_int
+    // is still above the consensus limit for a script num.
+
+    bsv::bint b {1};
+
+    while(static_cast<uint64_t>(b.size_bytes()) <= MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE)
+    {
+        try
+        {
+            b <<= ONE_MEBIBYTE * 8;
+        }
+        catch(const bsv::big_int_error& e)
+        {
+            BOOST_FAIL("BigInt can't store script num of consensus size");
+            break;
+        }
     }
 }
 
