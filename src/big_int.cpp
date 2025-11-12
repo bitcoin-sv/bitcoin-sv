@@ -19,7 +19,8 @@ void bsv::bint::empty_bn_deleter::operator()(bignum_st* p) const
     ::BN_free(p);
 }
 
-bsv::bint::bint() : value_{nullptr} {}
+bsv::bint::bint() : bint{0} 
+{}
 
 bsv::bint::bint(const int i) : value_(BN_new(), empty_bn_deleter())
 {
@@ -236,9 +237,8 @@ bsv::bint& bsv::bint::operator*=(const bint& other)
 bsv::bint& bsv::bint::operator/=(const bint& other)
 {
     // assert(value_);
-    bint rem;
     unique_ctx_ptr ctx{make_unique_ctx_ptr()};
-    const auto s{BN_div(value_.get(), rem.value_.get(), value_.get(),
+    const auto s{BN_div(value_.get(), nullptr, value_.get(),
                         other.value_.get(), ctx.get())};
     // assert(s);
     if(!s)
@@ -249,7 +249,6 @@ bsv::bint& bsv::bint::operator/=(const bint& other)
 bsv::bint& bsv::bint::operator%=(const bint& other)
 {
     // assert(value_);
-    bint rem;
     unique_ctx_ptr ctx{make_unique_ctx_ptr()};
     const auto s{
         BN_mod(value_.get(), value_.get(), other.value_.get(), ctx.get())};
@@ -533,7 +532,10 @@ bsv::bint bsv::bint::deserialize(span<const uint8_t> s)
     tmp[3] = (size >> 0) & 0xff;
     reverse_copy(begin(s), end(s), begin(tmp) + length_in_bytes);
     // NOLINTNEXTLINE(*-narrowing-conversions)
-    auto p{BN_mpi2bn(tmp.data(), tmp.size(), nullptr)};
+    const auto p{BN_mpi2bn(tmp.data(), tmp.size(), nullptr)};
+    if(!p)
+        throw big_int_error{};
+
     bint b;
     b.value_.reset(p);
     return b;

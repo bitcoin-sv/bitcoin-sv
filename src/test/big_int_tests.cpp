@@ -153,13 +153,17 @@ BOOST_AUTO_TEST_CASE(swap)
 
 BOOST_AUTO_TEST_CASE(output_streamable)
 {
-    ostringstream oss;
-    oss << bint{};
-    BOOST_CHECK_EQUAL("", oss.str());
+    {
+        ostringstream oss;
+        oss << bint{};
+        BOOST_CHECK_EQUAL("0", oss.str());
+    }
 
-    bint a{123};
-    oss << a;
-    BOOST_CHECK_EQUAL("123", oss.str());
+    {
+        ostringstream oss;
+        oss << bint{123};
+        BOOST_CHECK_EQUAL("123", oss.str());
+    }
 }
 
 BOOST_AUTO_TEST_CASE(add)
@@ -419,7 +423,7 @@ BOOST_AUTO_TEST_CASE(absolute_value)
 
 BOOST_AUTO_TEST_CASE(to_string)
 {
-    BOOST_TEST("" == bsv::to_string(bint{}));
+    BOOST_TEST("0" == bsv::to_string(bint{}));
 
     constexpr int64_t min64{int64_min};
     constexpr int64_t max64{int64_max};
@@ -432,7 +436,7 @@ BOOST_AUTO_TEST_CASE(to_string)
 
 BOOST_AUTO_TEST_CASE(to_size_t_limited)
 {
-    BOOST_TEST("" == bsv::to_string(bint{}));
+    BOOST_TEST("0" == bsv::to_string(bint{}));
 
     constexpr size_t size_t_min{ std::numeric_limits<size_t>::min() };
     constexpr size_t size_t_max{ static_cast<size_t>(std::numeric_limits<int32_t>::max()) };
