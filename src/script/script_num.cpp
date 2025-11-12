@@ -5,33 +5,64 @@
 // LICENSE.
 #include "script_num.h"
 
+#include <climits>
 #include <compare>
 #include <cstdint>
 #include <limits>
 #include <iostream>
 #include <iterator>
 #include <limits>
+#include <variant>
 
 #include "int_serialization.h"
 #include "overload.h"
 
 using bsv::bint;
 using namespace std;
+    
+CScriptNum::CScriptNum():
+    m_value{0},
+    m_max_length{MAXIMUM_ELEMENT_SIZE}
+{}
 
-CScriptNum::CScriptNum(span<const uint8_t> span,
-                       const min_encoding_check min_encode_check,
-                       const size_t nMaxNumSize,
-                       const bool big_int)
+CScriptNum::CScriptNum(const int64_t& n, const size_t max_length):
+    m_value{n},
+    m_max_length{max_length}
 {
-    assert(m_value.index() == 0);
-    assert(get<0>(m_value) == 0);
-
-    if(span.size() > nMaxNumSize)
+    // Validate that max_length is not greater than INT64_SERIALIZED_SIZE
+    if(m_max_length > INT64_SERIALIZED_SIZE)
     {
         throw scriptnum_overflow_error("script number overflow");
     }
 
-    if(min_encode_check == min_encoding_check::yes && !bsv::IsMinimallyEncoded(span, nMaxNumSize))
+    // Validate that the value fits within the max_length
+    if(getvch().size() > m_max_length)
+    {
+        throw scriptnum_overflow_error("script number overflow");
+    }
+}
+
+CScriptNum::CScriptNum(const bsv::bint& n, const size_t max_length):
+    m_value{n},
+    m_max_length{max_length}
+{
+}
+
+CScriptNum::CScriptNum(const span<const uint8_t> span,
+                       const min_encoding_check min_encode_check,
+                       const size_t max_length,
+                       const bool big_int):
+    m_max_length{max_length}
+{
+    assert(m_value.index() == 0);
+    assert(get<0>(m_value) == 0);
+
+    if(span.size() > max_length)
+    {
+        throw scriptnum_overflow_error("script number overflow");
+    }
+
+    if(min_encode_check == min_encoding_check::yes && !bsv::IsMinimallyEncoded(span, max_length))
     {
         throw scriptnum_minencode_error("non-minimally encoded script number");
     }
@@ -44,7 +75,7 @@ CScriptNum::CScriptNum(span<const uint8_t> span,
             assert(m_value.index() == 1);
         }
     }
-    else if(span.size() <= nMaxNumSize)
+    else if(span.size() <= max_length)
     {
         if(big_int)
             m_value = bsv::bint::deserialize(span);
@@ -196,10 +227,73 @@ CScriptNum& CScriptNum::operator%=(const CScriptNum& other)
     return *this;
 }
 
+CScriptNum& CScriptNum::operator<<=(const CScriptNum& sn_bit_shift)
+{
+    static_assert(variant_size_v<CScriptNum::value_type> == 2);
+    assert(equal_index(sn_bit_shift));
+
+    if(m_value.index() == 0)
+    {
+        const auto value{get<0>(m_value)};
+        const auto bit_shift{get<0>(sn_bit_shift.m_value)};
+
+        if(bit_shift >= static_cast<int64_t>(
+                            sizeof(std::variant_alternative_t<0, value_type>) * CHAR_BIT))
+        {
+            if(value != 0)
+                throw scriptnum_overflow_error("script number overflow");
+        }
+        else if(value < 0)
+        {
+            if(value < (std::numeric_limits<int64_t>::min() >> bit_shift))
+                throw scriptnum_overflow_error("script number overflow");
+
+            // Left-shifting negative signed integers is undefined behavior (pre-C++20)
+            // or implementation-defined (C++20+). Convert to unsigned for well-defined
+            // bit manipulation, then convert back to preserve the shifted bit pattern.
+            const uint64_t unsigned_value{static_cast<uint64_t>(value)};
+            get<0>(m_value) = static_cast<int64_t>(unsigned_value << bit_shift);
+        }
+        else
+        {
+            if(value > (std::numeric_limits<int64_t>::max() >> bit_shift))
+                throw scriptnum_overflow_error("script number overflow");
+
+            get<0>(m_value) <<= bit_shift;
+        }
+
+        if(getvch().size() > m_max_length)
+            throw scriptnum_overflow_error("script number overflow");
+    }
+    else
+    {
+        auto& value{get<1>(m_value)};
+        const auto& bit_shift{get<1>(sn_bit_shift.m_value)};
+
+        const auto current_size{value.serialized_size()};
+        const bsv::bint shift_bytes{bit_shift / CHAR_BIT};
+        if(bsv::bint{current_size} + shift_bytes > bsv::bint{m_max_length})
+            throw scriptnum_overflow_error("script number overflow");
+
+        value <<= bit_shift;
+        if(value.serialized_size() > m_max_length)
+            throw scriptnum_overflow_error("script number overflow");
+    }
+
+    assert(equal_index(sn_bit_shift));
+    return *this;
+}
+
 CScriptNum CScriptNum::operator-() const
 {
-    return std::visit([](auto& n) -> CScriptNum { return CScriptNum{-n}; },
-                      m_value);
+    if(m_value.index() == 0)
+    {
+        return CScriptNum{-std::get<0>(m_value), m_max_length};
+    }
+    else
+    {
+        return CScriptNum{-std::get<1>(m_value), m_max_length};
+    }
 }
 
 std::ostream& operator<<(std::ostream& os, const CScriptNum& n)

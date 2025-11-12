@@ -6,7 +6,6 @@
 #include "script/interpreter.h"
 
 #include "big_int.h"
-#include "config.h"
 #include "crypto/ripemd160.h"
 #include "crypto/sha1.h"
 #include "crypto/sha256.h"
@@ -19,7 +18,6 @@
 #include "script/script_error.h"
 #include "script/script_flags.h"
 #include "script/script_num.h"
-#include "script/shiftnum.h"
 #include "taskcancellation.h"
 #include "uint256.h"
 
@@ -31,6 +29,8 @@
 
 namespace
 {
+    constexpr uint8_t bits_per_byte{8};
+
     inline constexpr bool IsMalleableTxnVersion(const int32_t version)
     {
         // Post-Chronicle, malleability is permitted if txn version > 1
@@ -446,7 +446,7 @@ std::optional<ScriptError> EvalScript(
             //
             if (!script.GetOp(pc, opcode, vchPushValue))
                 return SCRIPT_ERR_BAD_OPCODE;
- 
+
             ipc = pc - script.begin();
 
             if (!utxo_after_genesis && (vchPushValue.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS))
@@ -700,21 +700,26 @@ std::optional<ScriptError> EvalScript(
                         if(stack.size() < 2)
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
-                        const LimitedVector a = stack.stacktop(-2);
                         const auto& s0{stack.stacktop(-1).GetElement()};
-                        CScriptNum n{s0, requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis};
+                        const auto max_len{params.MaxScriptNumLength()};
+                        const CScriptNum n{s0,
+                                           requireMinimal,
+                                           max_len,
+                                           true};
                         if(n < 0)
                             return SCRIPT_ERR_INVALID_NUMBER_RANGE;
-
                         stack.pop_back();
+
+                        CScriptNum values{stack.stacktop(-1).GetElement(),
+                                          requireMinimal,
+                                          max_len,
+                                          true};
+                        // Note: Unlike OP_LSHIFT, no cancellation chunking is needed here.
+                        // CScriptNum::operator<<= enforces MaxScriptNumLength(), which bounds
+                        // the result size.
+                        values <<= n;
                         stack.pop_back();
-                        auto values{a.GetElement()};
-
-                        const auto cancelled{lshiftnum(token, n, values, values)};
-                        if(cancelled)
-                            return {};
-
-                        stack.push_back(std::move(values));
+                        stack.push_back(values.getvch());
                         break;
                     }
 
@@ -896,11 +901,11 @@ std::optional<ScriptError> EvalScript(
                         if (stack.size() < 6)
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
-						const auto stack_size{stack.size()};
-						stack.swapElements(stack_size-1, stack_size-3);
-						stack.swapElements(stack_size-2, stack_size-4);
-						stack.swapElements(stack_size-1, stack_size-5);
-						stack.swapElements(stack_size-2, stack_size-6);
+                        const auto stack_size{stack.size()};
+                        stack.swapElements(stack_size-1, stack_size-3);
+                        stack.swapElements(stack_size-2, stack_size-4);
+                        stack.swapElements(stack_size-1, stack_size-5);
+                        stack.swapElements(stack_size-2, stack_size-6);
                     } break;
 
                     case OP_2SWAP: {
@@ -925,7 +930,7 @@ std::optional<ScriptError> EvalScript(
 
                     case OP_DEPTH: {
                         // -- stacksize
-                        const CScriptNum bn(bsv::bint{stack.size()});
+                        const CScriptNum bn(bsv::bint{stack.size()}, params.MaxScriptNumLength());
                         stack.push_back(bn.getvch());
                     } break;
 
@@ -1019,7 +1024,7 @@ std::optional<ScriptError> EvalScript(
                         if (stack.size() < 1)
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
-                        CScriptNum bn(bsv::bint{stack.stacktop(-1).size()});
+                        CScriptNum bn(bsv::bint{stack.stacktop(-1).size()}, params.MaxScriptNumLength());
                         stack.push_back(bn.getvch());
                     } break;
 
@@ -1104,7 +1109,7 @@ std::optional<ScriptError> EvalScript(
                                 if(token.IsCanceled())
                                     return {};
                                 n -= utxo_after_genesis
-                                         ? CScriptNum{bsv::bint{INT32_MAX}}
+                                         ? CScriptNum{bsv::bint{INT32_MAX}, params.MaxScriptNumLength()}
                                          : CScriptNum{INT32_MAX};
                             } while(n > 0);
                         }
@@ -1138,7 +1143,7 @@ std::optional<ScriptError> EvalScript(
                                 if(token.IsCanceled())
                                     return {};
                                 n -= utxo_after_genesis
-                                         ? CScriptNum{bsv::bint{INT32_MAX}}
+                                         ? CScriptNum{bsv::bint{INT32_MAX}, params.MaxScriptNumLength()}
                                          : CScriptNum{INT32_MAX};
                             } while(n > 0);
                         }
@@ -1196,21 +1201,21 @@ std::optional<ScriptError> EvalScript(
                         switch (opcode) {
                             case OP_1ADD:
                                 bn += utxo_after_genesis
-                                          ? CScriptNum{bsv::bint{1}}
+                                          ? CScriptNum{bsv::bint{1}, params.MaxScriptNumLength()}
                                           : bnOne;
                                 break;
                             case OP_1SUB:
                                 bn -= utxo_after_genesis
-                                          ? CScriptNum{bsv::bint{1}}
+                                          ? CScriptNum{bsv::bint{1}, params.MaxScriptNumLength()}
                                           : bnOne;
                                 break;
                             case OP_2MUL:
                                 // post-Chronicle only
-                                bn += bn; 
+                                bn += bn;
                                 break;
                             case OP_2DIV:
                                 // post-Chronicle only
-                                bn /= CScriptNum{bsv::bint{2}};
+                                bn /= CScriptNum{bsv::bint{2}, params.MaxScriptNumLength()};
                                 break;
                             case OP_NEGATE:
                                 bn = -bn;

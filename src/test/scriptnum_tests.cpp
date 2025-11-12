@@ -18,13 +18,89 @@ using bsv::bint;
 
 namespace
 {
+    constexpr auto max8 = numeric_limits<int8_t>::max();
+    constexpr auto min8 = numeric_limits<int8_t>::min();
+    constexpr auto max16 = numeric_limits<int16_t>::max();
+    constexpr auto min16 = numeric_limits<int16_t>::min();
+    constexpr auto max32 = numeric_limits<int32_t>::max();
+    constexpr auto min32 = numeric_limits<int32_t>::min();
     constexpr auto min64 = numeric_limits<int64_t>::min();
     constexpr auto max64 = numeric_limits<int64_t>::max();
+    constexpr size_t test_bint_max_len{16};
 
     vector<int64_t> test_data{min64, -1, 0, 1, max64}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 }
 
 BOOST_AUTO_TEST_SUITE(scriptnum_tests)
+
+BOOST_AUTO_TEST_CASE(default_construction)
+{
+    CScriptNum n;
+    BOOST_CHECK_EQUAL(0, n.index());
+    BOOST_CHECK_EQUAL(CScriptNum::MAXIMUM_ELEMENT_SIZE, n.max_length());
+}
+
+BOOST_AUTO_TEST_CASE(int64_construction)
+{
+    using test_args = tuple<int64_t,    // value
+                            size_t>;    // max_length
+
+    // Valid constructions - max_length is sufficient for the value
+    const vector<test_args> valid_constructions = {
+        // Default max_length should be MAXIMUM_ELEMENT_SIZE
+        {0, CScriptNum::MAXIMUM_ELEMENT_SIZE},
+
+        // Values that fit in 1 byte
+        {max8, 1},
+        {-1, 1},
+
+        // Values that require 2 bytes
+        {min8, 2},        // -128 requires 2 bytes (magnitude 0x80 needs extra sign byte)
+        {max8 + 1, 2},    // 128
+        {min8 - 1, 2},    // -129
+
+        // Max/min values that fit in MAXIMUM_ELEMENT_SIZE (4 bytes)
+        {max32, CScriptNum::MAXIMUM_ELEMENT_SIZE},
+        {-max32, CScriptNum::MAXIMUM_ELEMENT_SIZE},
+
+        // Values requiring INT64_SERIALIZED_SIZE
+        {min64, CScriptNum::INT64_SERIALIZED_SIZE},
+        {max64, CScriptNum::INT64_SERIALIZED_SIZE},
+    };
+
+    for(const auto& [value, max_len] : valid_constructions)
+    {
+        const CScriptNum sn{value, max_len};
+        BOOST_CHECK_EQUAL(max_len, sn.max_length());
+        BOOST_CHECK_EQUAL(0, sn.index());
+    }
+
+    // Invalid constructions
+    const vector<test_args> invalid_constructions = {
+        // max_length too small for the value
+        {min64, 4},         // min64 requires 9 bytes
+        {min16, 2},         // -32768 requires more than 2 bytes
+        {max16 + 1, 2},     // 32768 requires more than 2 bytes
+        {min32, CScriptNum::MAXIMUM_ELEMENT_SIZE},  // min32 requires 5 bytes
+        {static_cast<int64_t>(max32) + 1, CScriptNum::MAXIMUM_ELEMENT_SIZE}, // -min32 requires 5 bytes
+
+        // max_length > INT64_SERIALIZED_SIZE (wrong constructor for big integers)
+        {0, 100},
+        {1, 20},
+        {min64, 50},
+    };
+
+    for(const auto& [value, max_len] : invalid_constructions)
+    {
+        BOOST_CHECK_THROW(CScriptNum(value, max_len), scriptnum_overflow_error);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(bint_construction)
+{
+    const CScriptNum a{bint{}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+    BOOST_CHECK_EQUAL(CScriptNum::MAXIMUM_ELEMENT_SIZE, a.max_length());
+}
 
 BOOST_AUTO_TEST_CASE(construction)
 {
@@ -55,7 +131,8 @@ BOOST_AUTO_TEST_CASE(construction)
     {
         try
         {
-            CScriptNum actual{v, min_encoding_check::no, max_size, big_int};
+            const CScriptNum a{v, min_encoding_check::no, max_size, big_int};
+            BOOST_CHECK_EQUAL(max_size, a.max_length());
         }
         catch(...)
         {
@@ -81,6 +158,121 @@ BOOST_AUTO_TEST_CASE(construction)
         catch(...)
         {
         }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(lshift_max_length_invariant)
+{
+    using test_args = tuple<int64_t,    // value
+                            int64_t,    // shift
+                            size_t>;    // max_len
+
+    // Test cases that should complete successfully without throwing
+    const vector<test_args> non_throwing_cases = {
+        {1, 14, 2},
+        {1, 24, 4},
+    };
+    // Test non-throwing cases with int64-based CScriptNum
+    for(const auto& [value, shift, max_len] : non_throwing_cases)
+    {
+        const auto v_value{CScriptNum{value}.getvch()};
+        CScriptNum sn_value{value, max_len};
+
+        const auto v_shift{CScriptNum{shift}.getvch()};
+        const CScriptNum sn_shift{v_shift, min_encoding_check::no, max_len, false};
+
+        sn_value <<= sn_shift;
+        BOOST_CHECK(sn_value.getvch().size() <= max_len);
+    }
+    // Test non-throwing cases with bint-based CScriptNum
+    for(const auto& [value, shift, max_len] : non_throwing_cases)
+    {
+        CScriptNum sn_value{bint{value}, max_len};
+        const CScriptNum sn_shift{bint{shift}, max_len};
+
+        sn_value <<= sn_shift;
+        BOOST_CHECK(sn_value.getvch().size() <= max_len);
+    }
+
+    // Test cases that should throw due to max_len constraint
+    const vector<test_args> throwing_cases = {
+        {1, 15, 2},
+        {1, 32, 4},
+        {0x7FFFFF, 9, 4},
+    };
+    // Test throwing cases with int64-based CScriptNum
+    for(const auto& [value, shift, max_len] : throwing_cases)
+    {
+        const auto v_value{CScriptNum{value}.getvch()};
+        CScriptNum sn_value{value, max_len};
+
+        const auto v_shift{CScriptNum{shift}.getvch()};
+        const CScriptNum sn_shift{v_shift, min_encoding_check::no, max_len, false};
+
+        BOOST_CHECK_THROW(sn_value <<= sn_shift, scriptnum_overflow_error);
+    }
+
+    // Test throwing cases with bint-based CScriptNum
+    for(const auto& [value, shift, max_len] : throwing_cases)
+    {
+        CScriptNum sn_value{bint{value}, max_len};
+        const CScriptNum sn_shift{bint{shift}, max_len};
+
+        BOOST_CHECK_THROW(sn_value <<= sn_shift, scriptnum_overflow_error);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(lshift_negative_value)
+{
+    using test_args = tuple<int64_t, int64_t, int64_t>;
+    const vector<test_args> test_data = {
+        {-1, 1, -2},
+        {-4, 3, -32},
+        {-2, 5, -64},
+        {-1, 63, min64},
+        {min64 / 2, 1, min64},
+    };
+
+    for(const auto& [value, shift, expected] : test_data)
+    {
+        CScriptNum v_int64{value, CScriptNum::INT64_SERIALIZED_SIZE};
+        v_int64 <<= CScriptNum{shift, CScriptNum::INT64_SERIALIZED_SIZE};
+        const CScriptNum expected_int64{expected, CScriptNum::INT64_SERIALIZED_SIZE};
+        BOOST_CHECK_EQUAL(expected_int64, v_int64);
+
+        CScriptNum v_bint{bint{value}, test_bint_max_len};
+        v_bint <<= CScriptNum{bint{shift}, test_bint_max_len};
+        const CScriptNum expected_bint{bint{expected}, test_bint_max_len};
+        BOOST_CHECK_EQUAL(expected_bint, v_bint);
+    }
+
+    // Test overflow cases for negative values
+    {
+        CScriptNum v_int64{min64, CScriptNum::INT64_SERIALIZED_SIZE};
+        const CScriptNum shift{int64_t{1}, CScriptNum::INT64_SERIALIZED_SIZE};
+        BOOST_CHECK_THROW(v_int64 <<= shift, scriptnum_overflow_error);
+    }
+
+    {
+        CScriptNum v_int64{min64 / 2 - 1, CScriptNum::INT64_SERIALIZED_SIZE};
+        const CScriptNum shift{int64_t{1}, CScriptNum::INT64_SERIALIZED_SIZE};
+        BOOST_CHECK_THROW(v_int64 <<= shift, scriptnum_overflow_error);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(lshift_overflow_int64)
+{
+    CScriptNum a{int64_t{1} << 62, CScriptNum::INT64_SERIALIZED_SIZE};
+    const CScriptNum shift{int64_t{1}, CScriptNum::INT64_SERIALIZED_SIZE};
+
+    try
+    {
+        a <<= shift;
+        BOOST_FAIL("should throw scriptnum_overflow_error when shift would overflow");
+    }
+    catch(const scriptnum_overflow_error& e)
+    {
+        BOOST_CHECK_EQUAL(std::string{e.what()}, "script number overflow");
     }
 }
 
@@ -136,7 +328,7 @@ BOOST_AUTO_TEST_CASE(insertion_op)
 {
     for(const int64_t n : test_data)
     {
-        CScriptNum a{n};
+        CScriptNum a{n, CScriptNum::INT64_SERIALIZED_SIZE};
         ostringstream actual;
         actual << a;
 
@@ -147,7 +339,7 @@ BOOST_AUTO_TEST_CASE(insertion_op)
 
     for(const int64_t n : test_data)
     {
-        CScriptNum a{bint{n}};
+        CScriptNum a{bint{n}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
         ostringstream actual;
         actual << a;
 
@@ -161,8 +353,8 @@ BOOST_AUTO_TEST_CASE(equality)
 {
     for(const int64_t n : test_data)
     {
-        CScriptNum a{n};
-        CScriptNum b{n};
+        CScriptNum a{n, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum b{n, CScriptNum::INT64_SERIALIZED_SIZE};
         BOOST_CHECK_EQUAL(a, a);
         BOOST_CHECK_EQUAL(a, b);
         BOOST_CHECK_EQUAL(b, a);
@@ -172,8 +364,8 @@ BOOST_AUTO_TEST_CASE(equality)
     {
         bint bn{n};
         bn *= bint{10}; // *10 so we are testing outside of range of int64_t
-        CScriptNum a{bn};
-        CScriptNum b{bn};
+        CScriptNum a{bn, test_bint_max_len};
+        CScriptNum b{bn, test_bint_max_len};
         BOOST_CHECK_EQUAL(a, a);
         BOOST_CHECK_EQUAL(a, b);
         BOOST_CHECK_EQUAL(b, a);
@@ -186,8 +378,8 @@ BOOST_AUTO_TEST_CASE(less)
         {min64, -1}, {-1, 0}, {0, 1}, {min64, max64}, {1, max64}};
     for(const auto& [n, m] : test_data)
     {
-        CScriptNum a{n};
-        CScriptNum b{m};
+        CScriptNum a{n, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum b{m, CScriptNum::INT64_SERIALIZED_SIZE};
         BOOST_CHECK_LT(a, b);
         BOOST_CHECK_LE(a, a);
         BOOST_CHECK_GE(a, a);
@@ -197,8 +389,8 @@ BOOST_AUTO_TEST_CASE(less)
     for(const auto& [n, m] : test_data)
     {
         // n *= 10; // *10 so we are testing outside of range of int64_t
-        CScriptNum a{bint{n}};
-        CScriptNum b{bint{m}};
+        CScriptNum a{bint{n}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum b{bint{m}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
         BOOST_CHECK_LT(a, b);
         BOOST_CHECK_LE(a, a);
         BOOST_CHECK_GE(a, a);
@@ -207,8 +399,8 @@ BOOST_AUTO_TEST_CASE(less)
 
     for(const auto& [n, m] : test_data)
     {
-        CScriptNum a{n};
-        CScriptNum b{bint{m}};
+        CScriptNum a{n, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum b{bint{m}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
         BOOST_CHECK_LT(a, b);
         BOOST_CHECK_LE(a, a);
         BOOST_CHECK_GE(a, a);
@@ -231,18 +423,18 @@ BOOST_AUTO_TEST_CASE(addition)
     for(const auto& [n, m, o] : test_data)
     {
         // little int + little int
-        CScriptNum a{n};
-        CScriptNum b{m};
-        CScriptNum c{o};
+        CScriptNum a{n, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum b{m, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum c{o, CScriptNum::INT64_SERIALIZED_SIZE};
         BOOST_CHECK_EQUAL(c, a + b);
     }
 
     for(const auto& [n, m, o] : test_data)
     {
         // big int + big int
-        CScriptNum a{bint{n}};
-        CScriptNum b{bint{m}};
-        CScriptNum c{bint{o}};
+        CScriptNum a{bint{n}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum b{bint{m}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum c{bint{o}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
         BOOST_CHECK_EQUAL(c, a + b);
     }
 }
@@ -262,18 +454,18 @@ BOOST_AUTO_TEST_CASE(subtraction)
     for(const auto& [n, m, o] : test_data)
     {
         // little int - little int
-        CScriptNum a{n};
-        CScriptNum b{m};
-        CScriptNum c{o};
+        CScriptNum a{n, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum b{m, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum c{o, CScriptNum::INT64_SERIALIZED_SIZE};
         BOOST_CHECK_EQUAL(c, a - b);
     }
 
     for(const auto& [n, m, o] : test_data)
     {
         // big int - big int
-        CScriptNum a{bint{n}};
-        CScriptNum b{bint{m}};
-        CScriptNum c{bint{o}};
+        CScriptNum a{bint{n}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum b{bint{m}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum c{bint{o}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
         BOOST_CHECK_EQUAL(c, a - b);
     }
 }
@@ -299,18 +491,18 @@ BOOST_AUTO_TEST_CASE(multiplication)
     for(const auto& [n, m, o] : test_data)
     {
         // little int * little int
-        CScriptNum a{n};
-        CScriptNum b{m};
-        CScriptNum c{o};
+        CScriptNum a{n, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum b{m, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum c{o, CScriptNum::INT64_SERIALIZED_SIZE};
         BOOST_CHECK_EQUAL(c, a * b);
     }
 
     for(const auto& [n, m, o] : test_data)
     {
         // big int * big int
-        CScriptNum a{bint{n}};
-        CScriptNum b{bint{m}};
-        CScriptNum c{bint{o}};
+        CScriptNum a{bint{n}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum b{bint{m}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum c{bint{o}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
         BOOST_CHECK_EQUAL(c, a * b);
     }
 }
@@ -331,18 +523,18 @@ BOOST_AUTO_TEST_CASE(division)
     for(const auto& [n, m, o] : test_data)
     {
         // little int / little int
-        CScriptNum a{n};
-        CScriptNum b{m};
-        CScriptNum c{o};
+        CScriptNum a{n, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum b{m, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum c{o, CScriptNum::INT64_SERIALIZED_SIZE};
         BOOST_CHECK_EQUAL(c, a / b);
     }
 
     for(const auto& [n, m, o] : test_data)
     {
         // big int / big int
-        CScriptNum a{bint{n}};
-        CScriptNum b{bint{m}};
-        CScriptNum c{bint{o}};
+        CScriptNum a{bint{n}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum b{bint{m}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum c{bint{o}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
         BOOST_CHECK_EQUAL(c, a / b);
     }
 }
@@ -359,18 +551,18 @@ BOOST_AUTO_TEST_CASE(modular)
     for(const auto& [n, m, o] : test_data)
     {
         // little int % little int
-        CScriptNum a{n};
-        CScriptNum b{m};
-        CScriptNum c{o};
+        CScriptNum a{n, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum b{m, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum c{o, CScriptNum::INT64_SERIALIZED_SIZE};
         BOOST_CHECK_EQUAL(c, a % b);
     }
 
     for(const auto& [n, m, o] : test_data)
     {
         // big int % big int
-        CScriptNum a{bint{n}};
-        CScriptNum b{bint{m}};
-        CScriptNum c{bint{o}};
+        CScriptNum a{bint{n}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum b{bint{m}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum c{bint{o}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
         BOOST_CHECK_EQUAL(c, a % b);
     }
 }
@@ -389,18 +581,18 @@ BOOST_AUTO_TEST_CASE(and_)
     for(const auto& [n, m, o] : test_data)
     {
         // little int & little int
-        CScriptNum a{n};
-        CScriptNum b{m};
-        CScriptNum c{o};
+        CScriptNum a{n, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum b{m, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum c{o, CScriptNum::INT64_SERIALIZED_SIZE};
         BOOST_CHECK_EQUAL(c, a & b);
     }
 
     for(const auto& [n, m, o] : test_data)
     {
         // big int & big int
-        CScriptNum a{bint{n}};
-        CScriptNum b{bint{m}};
-        CScriptNum c{bint{o}};
+        CScriptNum a{bint{n}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum b{bint{m}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum c{bint{o}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
         BOOST_CHECK_EQUAL(c, a & b);
     }
 }
@@ -420,16 +612,16 @@ BOOST_AUTO_TEST_CASE(negation)
     for(const auto& [n, m] : test_data)
     {
         // little int & little int
-        CScriptNum a{n};
-        CScriptNum b{m};
+        CScriptNum a{n, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum b{m, CScriptNum::INT64_SERIALIZED_SIZE};
         BOOST_CHECK_EQUAL(b, -a);
     }
 
     for(const auto& [n, m] : test_data)
     {
         // big int & big int
-        CScriptNum a{bint{n}};
-        CScriptNum b{bint{m}};
+        CScriptNum a{bint{n}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum b{bint{m}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
         BOOST_CHECK_EQUAL(b, -a);
     }
 }
@@ -440,11 +632,11 @@ BOOST_AUTO_TEST_CASE(getint)
     constexpr int max_int{numeric_limits<int>::max()};
 
     const bint max64{max_int};
-    CScriptNum max{max64 + 1};
+    CScriptNum max{max64 + 1, test_bint_max_len};
     BOOST_CHECK_EQUAL(max_int, max.getint());
 
     const bint min64{min_int};
-    CScriptNum min{min64 - 1};
+    CScriptNum min{min64 - 1, test_bint_max_len};
     BOOST_CHECK_EQUAL(min_int, min.getint());
 }
 
@@ -459,9 +651,12 @@ BOOST_AUTO_TEST_CASE(to_size_t_limited)
     BOOST_CHECK_EQUAL(size_t_min, CScriptNum{size_t_min}.to_size_t_limited());
     BOOST_CHECK_EQUAL(1U, CScriptNum{1}.to_size_t_limited());
 
-    BOOST_CHECK_EQUAL(size_t_min, CScriptNum{bint{size_t_min}}.to_size_t_limited());
-    BOOST_CHECK_EQUAL(1U, CScriptNum{bint{1}}.to_size_t_limited());
-    BOOST_CHECK_EQUAL(size_t_max, CScriptNum{bint{size_t_max}}.to_size_t_limited());
+    CScriptNum sn_min{bint{size_t_min}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+    BOOST_CHECK_EQUAL(size_t_min, sn_min.to_size_t_limited());
+    CScriptNum sn_one{bint{1}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+    BOOST_CHECK_EQUAL(1U, sn_one.to_size_t_limited());
+    CScriptNum sn_max{bint{size_t_max}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+    BOOST_CHECK_EQUAL(size_t_max, sn_max.to_size_t_limited());
 }
 
 // clang-format off
@@ -490,43 +685,46 @@ static bool verify(const CScriptNum10 &bignum, const CScriptNum &scriptnum) {
 }
 
 static void CheckCreateVch(const int64_t &num) {
-    CScriptNum10 bignum(num);
-    CScriptNum scriptnum(num);
+    CScriptNum10 bignum{num};
+    CScriptNum scriptnum{num, CScriptNum::INT64_SERIALIZED_SIZE};
     BOOST_CHECK(verify(bignum, scriptnum));
 
     std::vector<uint8_t> vch = bignum.getvch();
 
-    CScriptNum10 bignum2(bignum.getvch(), false);
+    CScriptNum10 bignum2{bignum.getvch(), false};
     vch = scriptnum.getvch();
-    CScriptNum scriptnum2(scriptnum.getvch(), min_encoding_check::no);
+    CScriptNum scriptnum2{scriptnum.getvch(), min_encoding_check::no};
     BOOST_CHECK(verify(bignum2, scriptnum2));
 
-    CScriptNum10 bignum3(scriptnum2.getvch(), false);
-    CScriptNum scriptnum3(bignum2.getvch(), min_encoding_check::no);
+    CScriptNum10 bignum3{scriptnum2.getvch(), false};
+    CScriptNum scriptnum3{bignum2.getvch(), min_encoding_check::no};
     BOOST_CHECK(verify(bignum3, scriptnum3));
 }
 
 static void CheckCreateInt(const int64_t &num) {
-    CScriptNum10 bignum(num);
-    CScriptNum scriptnum(num);
+    constexpr size_t max_len = CScriptNum::INT64_SERIALIZED_SIZE;
+    CScriptNum10 bignum{num};
+    CScriptNum scriptnum{num, max_len};
     BOOST_CHECK(verify(bignum, scriptnum));
-    BOOST_CHECK(
-        verify(CScriptNum10(bignum.getint()), CScriptNum(scriptnum.getint())));
-    BOOST_CHECK(
-        verify(CScriptNum10(scriptnum.getint()), CScriptNum(bignum.getint())));
-    BOOST_CHECK(verify(CScriptNum10(CScriptNum10(scriptnum.getint()).getint()),
-                       CScriptNum(CScriptNum(bignum.getint()).getint())));
+    BOOST_CHECK(verify(CScriptNum10{bignum.getint()},
+                       CScriptNum{scriptnum.getint(), max_len}));
+    BOOST_CHECK(verify(CScriptNum10{scriptnum.getint()},
+                       CScriptNum{bignum.getint(), max_len}));
+    BOOST_CHECK(verify(CScriptNum10{CScriptNum10{scriptnum.getint()}.getint()},
+                       CScriptNum{CScriptNum{bignum.getint(), max_len}.getint(),
+                                  max_len}));
 }
 
 static void CheckAdd(const int64_t &num1, const int64_t &num2) {
-    const CScriptNum10 bignum1(num1);
-    const CScriptNum10 bignum2(num2);
-    const CScriptNum scriptnum1(num1);
-    const CScriptNum scriptnum2(num2);
-    CScriptNum10 bignum3(num1);
-    CScriptNum10 bignum4(num1);
-    CScriptNum scriptnum3(num1);
-    CScriptNum scriptnum4(num1);
+    constexpr size_t max_len = CScriptNum::INT64_SERIALIZED_SIZE;
+    const CScriptNum10 bignum1{num1};
+    const CScriptNum10 bignum2{num2};
+    const CScriptNum scriptnum1{num1, max_len};
+    const CScriptNum scriptnum2{num2, max_len};
+    CScriptNum10 bignum3{num1};
+    CScriptNum10 bignum4{num1};
+    CScriptNum scriptnum3{num1, max_len};
+    CScriptNum scriptnum4{num1, max_len};
 
     // int64_t overflow is undefined.
     bool invalid =
@@ -541,8 +739,8 @@ static void CheckAdd(const int64_t &num1, const int64_t &num2) {
 }
 
 static void CheckNegate(const int64_t &num) {
-    const CScriptNum10 bignum(num);
-    const CScriptNum scriptnum(num);
+    const CScriptNum10 bignum{num};
+    const CScriptNum scriptnum{num, CScriptNum::INT64_SERIALIZED_SIZE};
 
     // -INT64_MIN is undefined
     if (num != std::numeric_limits<int64_t>::min())
@@ -550,10 +748,11 @@ static void CheckNegate(const int64_t &num) {
 }
 
 static void CheckSubtract(const int64_t &num1, const int64_t &num2) {
-    const CScriptNum10 bignum1(num1);
-    const CScriptNum10 bignum2(num2);
-    const CScriptNum scriptnum1(num1);
-    const CScriptNum scriptnum2(num2);
+    constexpr size_t max_len = CScriptNum::INT64_SERIALIZED_SIZE;
+    const CScriptNum10 bignum1{num1};
+    const CScriptNum10 bignum2{num2};
+    const CScriptNum scriptnum1{num1, max_len};
+    const CScriptNum scriptnum2{num2, max_len};
     bool invalid = false;
 
     // int64_t overflow is undefined.
@@ -575,10 +774,11 @@ static void CheckSubtract(const int64_t &num1, const int64_t &num2) {
 }
 
 static void CheckCompare(const int64_t &num1, const int64_t &num2) {
-    const CScriptNum10 bignum1(num1);
-    const CScriptNum10 bignum2(num2);
-    const CScriptNum scriptnum1(num1);
-    const CScriptNum scriptnum2(num2);
+    constexpr size_t max_len = CScriptNum::INT64_SERIALIZED_SIZE;
+    const CScriptNum10 bignum1{num1};
+    const CScriptNum10 bignum2{num2};
+    const CScriptNum scriptnum1{num1, max_len};
+    const CScriptNum scriptnum2{num2, max_len};
 
     BOOST_CHECK((bignum1 == bignum1) == (scriptnum1 == scriptnum1));
     BOOST_CHECK((bignum1 != bignum1) == (scriptnum1 != scriptnum1));
@@ -607,7 +807,7 @@ static void CheckCompare(const int64_t &num1, const int64_t &num2) {
 
 static void RunCreate(const int64_t &num) {
     CheckCreateInt(num);
-    CScriptNum scriptnum(num);
+    CScriptNum scriptnum{num, CScriptNum::INT64_SERIALIZED_SIZE};
     if (scriptnum.getvch().size() <= CScriptNum::MAXIMUM_ELEMENT_SIZE) {
         CheckCreateVch(num);
     } else {

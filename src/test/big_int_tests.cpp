@@ -8,18 +8,19 @@
 #include <array>
 
 #include <boost/test/unit_test.hpp>
+#include <climits>
 #include "compiler_warnings.h"
 
 using namespace std;
 using bsv::bint;
 
-constexpr int int_min{numeric_limits<int>::min()+1};
+constexpr int int_min{numeric_limits<int>::min()};
 constexpr int int_max{numeric_limits<int>::max()};
 
-constexpr int64_t int64_min{numeric_limits<int64_t>::min() + 1};
+constexpr int64_t int64_min{numeric_limits<int64_t>::min()};
 constexpr int64_t int64_max{numeric_limits<int64_t>::max()};
 
-constexpr size_t size_t_min{numeric_limits<size_t>::min() + 1};
+constexpr size_t size_t_min{numeric_limits<size_t>::min()};
 constexpr size_t size_t_max{numeric_limits<size_t>::max()};
 
 BOOST_AUTO_TEST_SUITE(bint_tests)
@@ -249,7 +250,7 @@ BOOST_AUTO_TEST_CASE(mod)
 
 BOOST_AUTO_TEST_CASE(negate)
 {
-    const vector<int64_t> test_data{0, 1, -1, int64_max, -int64_max, int64_min};
+    const vector<int64_t> test_data{0, 1, -1, int64_max, -int64_max, int64_min + 1};
     for(const auto n : test_data)
     {
         bint bn(n);
@@ -387,6 +388,49 @@ BOOST_AUTO_TEST_CASE(shift_left)
     }
 }
 
+BOOST_AUTO_TEST_CASE(shift_left_bint)
+{
+    vector<tuple<bint, bint>> test_data
+    {
+        make_tuple(bint{1}, bint{0}),
+        make_tuple(bint{1}, bint{1}),
+        make_tuple(bint{1}, bint{7}),
+        make_tuple(bint{1}, bint{15}),
+
+        make_tuple(bint{-1}, bint{0}),
+        make_tuple(bint{-1}, bint{1}),
+        make_tuple(bint{-1}, bint{7}),
+        make_tuple(bint{-1}, bint{15}),
+    };
+
+    for(const auto& [a, b] : test_data)
+    {
+        bint actual = a;
+        actual <<= b;
+        const bint expected = a * bsv::pow(bint{2}, b);
+        BOOST_CHECK_EQUAL(expected, actual);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(shift_left_bint_max_script_len)
+{
+    bint a{1};
+    a <<= MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE * CHAR_BIT;
+
+    std::vector<uint8_t> v(MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE + 1, 0);
+    v.back() = 0x1;
+    const auto expected{bint::deserialize(v)};
+    BOOST_CHECK_EQUAL(expected, a);
+}
+
+BOOST_AUTO_TEST_CASE(shift_left_bint_exceeds_int_max)
+{
+    // Test that shifting by an amount exceeding INT_MAX throws an exception
+    bint a{1};
+    const bint shift_amount{static_cast<int64_t>(INT_MAX) + 1};
+    BOOST_CHECK_THROW(a <<= shift_amount, bsv::big_int_error);
+}
+
 BOOST_AUTO_TEST_CASE(shift_right)
 {
     // clang-format off
@@ -424,29 +468,41 @@ BOOST_AUTO_TEST_CASE(absolute_value)
 
 BOOST_AUTO_TEST_CASE(to_string)
 {
-    BOOST_TEST("0" == bsv::to_string(bint{}));
+    BOOST_TEST("0" == bsv::to_dec(bint{}));
 
     constexpr int64_t min64{int64_min};
     constexpr int64_t max64{int64_max};
     vector<int64_t> test_data{0, 1, -1, min64, max64};
     for(const auto n : test_data)
     {
-        BOOST_TEST(std::to_string(n) == bsv::to_string(bint{n}));
+        BOOST_TEST(std::to_string(n) == bsv::to_dec(bint{n}));
     }
 }
 
 BOOST_AUTO_TEST_CASE(to_size_t_limited)
 {
-    BOOST_TEST("0" == bsv::to_string(bint{}));
-
-    constexpr size_t size_t_min{ std::numeric_limits<size_t>::min() };
-    constexpr size_t size_t_max{ static_cast<size_t>(std::numeric_limits<int32_t>::max()) };
+    BOOST_TEST("0" == bsv::to_dec(bint{}));
 
     vector<size_t> test_data{ size_t_min, 1, size_t_max };
     for(const auto n : test_data)
     {
         BOOST_TEST(n == bsv::to_size_t_limited(bint{n}));
     }
+}
+
+BOOST_AUTO_TEST_CASE(to_int64_t_test)
+{
+    const vector<int64_t> test_data{0, 1, -1, int64_max, int64_min};
+    for(const auto n : test_data)
+    {
+        BOOST_TEST(n == bsv::to_int64_t(bint{n}));
+    }
+
+    const bint too_large{bint{int64_max} + 1};
+    BOOST_CHECK_THROW(bsv::to_int64_t(too_large), bsv::big_int_error);
+
+    const bint too_small{bint{int64_min} - 1};
+    BOOST_CHECK_THROW(bsv::to_int64_t(too_small), bsv::big_int_error);
 }
 
 BOOST_AUTO_TEST_CASE(max_size)
@@ -467,6 +523,53 @@ BOOST_AUTO_TEST_CASE(max_size)
             BOOST_FAIL("BigInt can't store script num of consensus size");
             break;
         }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(serialized_size_test)
+{
+    // Test that serialized_size() returns the same value as serialize().size()
+    // without actually performing the full serialization
+
+    vector<bint> test_values {
+        bint{0},
+        bint{1},
+        bint{-1},
+        bint{std::numeric_limits<int8_t>::max()},
+        bint{std::numeric_limits<int8_t>::max() + 1},
+        bint{std::numeric_limits<int8_t>::min()},
+        bint{std::numeric_limits<int8_t>::min() - 1},
+        bint{std::numeric_limits<int16_t>::max()},
+        bint{std::numeric_limits<int16_t>::min()},
+        bint{std::numeric_limits<int32_t>::max()},
+        bint{std::numeric_limits<int32_t>::min()},
+        bint{std::numeric_limits<int64_t>::max()},
+        bint{std::numeric_limits<int64_t>::min()},
+    };
+
+    // Test basic values
+    for(const auto& val : test_values)
+    {
+        const size_t expected_size = val.serialize().size();
+        const size_t actual_size = val.serialized_size();
+        BOOST_CHECK_EQUAL(expected_size, actual_size);
+    }
+
+    // Test large numbers beyond int64_t range
+    const bint bn_max64{std::numeric_limits<int64_t>::max()};
+    const bint bn_min64{std::numeric_limits<int64_t>::min()};
+    vector<bint> large_values {
+        bn_max64 + 1,
+        bn_max64 + bn_max64,
+        bn_max64 * bn_max64,
+        bn_min64 + bn_min64,
+    };
+
+    for(const auto& val : large_values)
+    {
+        const size_t expected_size = val.serialize().size();
+        const size_t actual_size = val.serialized_size();
+        BOOST_CHECK_EQUAL(expected_size, actual_size);
     }
 }
 

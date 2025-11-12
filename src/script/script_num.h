@@ -32,7 +32,7 @@ public:
     {
     }
 };
-    
+
 enum class min_encoding_check
 {
     no,
@@ -51,14 +51,15 @@ class CScriptNum
      * arithmetic is done or the result is interpreted as an integer.
      */
 public:
-    static const size_t MAXIMUM_ELEMENT_SIZE = 4;
+    static constexpr size_t MAXIMUM_ELEMENT_SIZE{4};
+    static constexpr size_t INT64_SERIALIZED_SIZE{9};
 
-    CScriptNum():m_value(0){}
-    explicit CScriptNum(const int64_t& n) : m_value(n) {}
-    explicit CScriptNum(const bsv::bint& n) : m_value(n) {}
+    CScriptNum();
+    explicit CScriptNum(const int64_t& n, size_t max_length=MAXIMUM_ELEMENT_SIZE);
+    explicit CScriptNum(const bsv::bint& n, size_t max_length);
     explicit CScriptNum(std::span<const uint8_t>,
                         min_encoding_check,
-                        size_t nMaxNumSize = MAXIMUM_ELEMENT_SIZE,
+                        size_t max_length = MAXIMUM_ELEMENT_SIZE,
                         bool big_int = false);
 
     CScriptNum& operator=(int64_t rhs)
@@ -77,6 +78,7 @@ public:
     CScriptNum& operator*=(const CScriptNum&);
     CScriptNum& operator/=(const CScriptNum&);
     CScriptNum& operator%=(const CScriptNum&);
+	CScriptNum& operator<<=(const CScriptNum&);
 
     CScriptNum& operator&=(const CScriptNum&);
     CScriptNum& operator&=(int64_t);
@@ -92,11 +94,15 @@ public:
     // Precondition: n <= numeric_limit<int32_t>::max() and n>=0
     size_t to_size_t_limited() const;
 
+    constexpr size_t max_length() const { return m_max_length; }
+    constexpr auto index() const { return m_value.index(); }
+
 private:
     bool equal_index(const CScriptNum&) const;
 
     using value_type = std::variant<int64_t, bsv::bint>;
     value_type m_value;
+    size_t m_max_length;
 };
 
 inline auto operator<=>(const CScriptNum& a, int64_t b)

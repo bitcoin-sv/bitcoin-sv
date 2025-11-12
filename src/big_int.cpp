@@ -8,7 +8,8 @@
 #include <cassert>
 #include <compare>
 #include <iostream>
-#include <sstream>
+#include <utility>
+
 #include <openssl/asn1.h>
 #include <openssl/bn.h>
 
@@ -355,6 +356,18 @@ bsv::bint& bsv::bint::operator<<=(const int n)
     return *this;
 }
 
+bsv::bint& bsv::bint::operator<<=(const bint& n)
+{
+    if(n <= 0)
+        return *this;
+
+    if(n > INT_MAX)
+        throw big_int_error();
+
+    const auto nn{to_int64_t(n)};
+    return *this <<= static_cast<int>(nn);
+}
+
 bsv::bint& bsv::bint::operator>>=(const int n)
 {
     if(n <= 0)
@@ -425,11 +438,6 @@ namespace
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     using unique_str_ptr = std::unique_ptr<const char[], empty_str_deleter>;
     static_assert(sizeof(unique_str_ptr) == sizeof(const char*));
-
-    unique_str_ptr to_str(bignum_st* bn)
-    {
-        return unique_str_ptr{BN_bn2dec(bn)};
-    }
 }
 
 std::ostream& bsv::operator<<(std::ostream& os, const bint& n)
@@ -437,7 +445,9 @@ std::ostream& bsv::operator<<(std::ostream& os, const bint& n)
     if(n.value_ == nullptr)
         return os;
 
-    const auto s{to_str(n.value_.get())};
+    const unique_str_ptr s{BN_bn2dec(n.value_.get())};
+    if(!s)
+        throw big_int_error();
     os << s.get();
     return os;
 }
@@ -450,11 +460,20 @@ bool bsv::is_negative(const bint& n)
 
 bsv::bint bsv::abs(const bint& n) { return is_negative(n) ? -n : n; }
 
-std::string bsv::to_string(const bint& n) // used in gdb pretty-printer
+std::string bsv::to_dec(const bint& n) // used in gdb pretty-printer
 {
-    std::ostringstream oss;
-    oss << n;
-    return oss.str();
+    const unique_str_ptr s{BN_bn2dec(n.value_.get())};
+    if(!s)
+        throw big_int_error();
+    return std::string{s.get()};
+}
+
+std::string bsv::to_hex(const bint& n) // used in gdb pretty-printer
+{
+    const unique_str_ptr s{BN_bn2hex(n.value_.get())};
+    if(!s)
+        throw big_int_error();
+    return std::string{s.get()};
 }
 
 namespace
@@ -470,6 +489,20 @@ namespace
     {
         return unique_asn1_ptr{BN_to_ASN1_INTEGER(bn, nullptr)};
     }
+}
+
+int64_t bsv::to_int64_t(const bint& n)
+{
+    const auto asn1{to_asn1(n.value_.get())};
+    if(!asn1)
+        throw big_int_error();
+
+    int64_t result{};
+    const auto status{ASN1_INTEGER_get_int64(&result, asn1.get())};
+    if(!status)
+        throw big_int_error();
+
+    return result;
 }
 
 long bsv::to_long(const bint& n)
@@ -522,6 +555,13 @@ std::vector<uint8_t> bsv::bint::serialize() const
     return result;
 }
 
+size_t bsv::bint::serialized_size() const
+{
+    const auto len{BN_bn2mpi(value_.get(), nullptr)};
+    // assert(len >= length_in_bytes);
+    return static_cast<size_t>(len - length_in_bytes);
+}
+
 bsv::bint bsv::bint::deserialize(span<const uint8_t> s)
 {
     const auto size{s.size()};
@@ -539,6 +579,16 @@ bsv::bint bsv::bint::deserialize(span<const uint8_t> s)
     bint b;
     b.value_.reset(p);
     return b;
+}
+
+bsv::bint bsv::pow(const bint& a, const bint& b)
+{
+    bint result;
+    unique_ctx_ptr ctx{make_unique_ctx_ptr()};
+    const int s{BN_exp(result.value_.get(), a.value_.get(), b.value_.get(), ctx.get())};
+    if(!s)
+        throw big_int_error();
+    return result;
 }
 
 // Notes

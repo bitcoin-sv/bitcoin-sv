@@ -44,8 +44,9 @@ namespace bsv
         bint& operator*=(const bint&);
         bint& operator/=(const bint&);
         bint& operator%=(const bint&);
+        bint& operator<<=(const bint&);
         bint operator-() const;
-        
+
         bint& operator+=(int64_t other){ return *this += bint(other); }
         bint& operator-=(int64_t other){ return *this -= bint(other); }
         bint& operator&=(int64_t other){ return *this &= bint(other); }
@@ -53,22 +54,27 @@ namespace bsv
         // Bit-manipulation operators
         bint& operator>>=(int n);
         bint& operator<<=(int n);
-        
+
         bint& operator&=(const bint&);
         bint& operator|=(const bint&);
 
         uint8_t lsb() const;
-        
+
         int size_bytes() const;
 
         friend std::ostream& operator<<(std::ostream&, const bint&);
 
         friend bool is_negative(const bint&);
 
+        friend int64_t to_int64_t(const bint&);
         friend long to_long(const bint&);
         friend std::size_t to_size_t_limited(const bint&);
+        friend std::string to_dec(const bint&);
+        friend std::string to_hex(const bint&);
+        friend bint pow(const bint&, const bint&);
 
         std::vector<uint8_t> serialize() const;
+        size_t serialized_size() const;
         static bint deserialize(std::span<const uint8_t>);
 
     private:
@@ -80,7 +86,7 @@ namespace bsv
         using buffer_type = std::vector<unsigned char>;
         buffer_type to_bin() const;
         void mask_bits(int n);
-        
+
         struct empty_bn_deleter // See Note 1.
         {
             void operator()(bignum_st* ) const;
@@ -94,7 +100,7 @@ namespace bsv
 
     std::strong_ordering operator<=>(const bint&, const bint&);
     bool operator==(const bint&, const bint&);
-        
+
     inline bint operator+(bint a, const bint& b)
     {
         a += b;
@@ -150,12 +156,16 @@ namespace bsv
     inline uint8_t operator&(const bint& a, const uint8_t b) { 
         return a.lsb() & b;
     }
-    
+
     bool is_negative(const bint&);
     bint abs(const bint&);
-    std::string to_string(const bint&);
+    std::string to_dec(const bint&);
+    std::string to_hex(const bint&);
     std::size_t to_size_t_limited(const bint&);
+    int64_t to_int64_t(const bint&);
     long to_long(const bint&);
+
+    bint pow(const bint&, const bint&);
 
     template <typename O>
     inline void serialize(const bint& n, O o)
