@@ -1,6 +1,7 @@
 #!/bin/bash
-# Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
+# Copyright (c) 2025 Bitcoin Association Distributed under the Open BSV
 # software license, see the accompanying file LICENSE
+
 # Enforce Zero-Tolerance Policy for Claude Code Review
 
 set -euo pipefail
