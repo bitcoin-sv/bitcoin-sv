@@ -88,6 +88,7 @@ jobs:
       - name: Detect Review Mode
         id: detect-mode
         env:
+          GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: .github/workflows/claude-code-review-detect-mode.sh
@@ -96,6 +97,7 @@ jobs:
         id: filter-threads
         if: steps.detect-mode.outputs.mode == 'rereview'
         env:
+          GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: .github/workflows/claude-code-review-verify-threads.sh
 
