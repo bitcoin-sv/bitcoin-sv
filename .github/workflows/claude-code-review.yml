@@ -75,6 +75,16 @@ jobs:
           cat .claude/prompts/code-review-guidelines.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Load subagent instructions
+        id: subagent-instructions
+        run: |
+          echo "cpp<<EOF" >> $GITHUB_OUTPUT
+          cat .claude/prompts/claude-code-review-cpp-instructions.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "python<<EOF" >> $GITHUB_OUTPUT
+          cat .claude/prompts/claude-code-review-python-instructions.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Detect Review Mode
         id: detect-mode
         env:
@@ -88,6 +98,22 @@ jobs:
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: .github/workflows/claude-code-review-verify-threads.sh
+
+      - name: Load initial review prompt
+        id: initial-prompt
+        if: steps.detect-mode.outputs.mode == 'initial'
+        run: |
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          cat .claude/prompts/claude-code-review-initial-prompt.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Load re-review prompt
+        id: rereview-prompt
+        if: steps.detect-mode.outputs.mode == 'rereview'
+        run: |
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          cat .claude/prompts/claude-code-review-rereview-prompt.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Run Claude Code Review
         id: claude-review
@@ -109,279 +135,11 @@ jobs:
 
             You are coordinating a comprehensive multi-language code review for this PR.
 
-            ${{ steps.detect-mode.outputs.mode == 'initial' && '
             ═══════════════════════════════════════════════════════════════════════
-            **INITIAL REVIEW MODE**
-            ═══════════════════════════════════════════════════════════════════════' || '
+            MODE: ${{ steps.detect-mode.outputs.mode }}
             ═══════════════════════════════════════════════════════════════════════
-            **RE-REVIEW MODE**
-            ═══════════════════════════════════════════════════════════════════════' }}
 
-            ${{ steps.detect-mode.outputs.mode == 'initial' && '
-
-            **Step 1: Analyze Changed Files**
-            Use `gh pr diff --name-only ${{ github.event.pull_request.number }}`
-            to get the list of changed files.
-
-            **Step 2: Launch Specialized Subagents in Parallel**
-            Based on file extensions, launch appropriate subagents:
-
-            **For C++/C files** (.cpp, .h, .c, .hpp, .cc, .cxx, .hxx):
-            Launch cpp-pro subagent with this prompt:
-            ```
-            First, read the file .claude/prompts/code-review-guidelines.md for
-            critical review guidelines and follow them strictly.
-
-            You are reviewing C++ code changes in PR
-            #${{ github.event.pull_request.number }} for repository
-            ${{ github.repository }}.
-
-            Focus on C++ files only (.cpp, .h, .c, .hpp, .cc, .cxx, .hxx).
-
-            **STEP 0: MANDATORY Deduplication (CRITICAL - MUST NOT SKIP)**
-
-            ⚠️  ABSOLUTE REQUIREMENT: You MUST fetch and check existing comments BEFORE reviewing.
-            Posting duplicate comments is a critical failure. Follow these steps exactly:
-
-            1. Fetch existing Claude comments (REQUIRED first step):
-               gh api \
-                 /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments \
-                 --jq \
-                 '[.[] | select(.user.login == "claude[bot]") |
-                   {path, line, body: .body[0:200]}]'
-
-            2. Build in-memory lookup map (file:line → comment):
-               - Key format: "path:line" (e.g., "src/file.cpp:124")
-               - For file-level comments (no line): "path:null"
-               - Store first 200 chars of body for similarity check
-
-            3. BEFORE EACH mcp__github_inline_comment__create_inline_comment call:
-               - Check: Does map contain this file:line?
-               - If NO → POST (new issue, proceed)
-               - If YES → Compare issue descriptions:
-                 * Extract key technical terms from both
-                 * If 60%+ term overlap → SKIP (duplicate, DO NOT POST)
-                 * If <60% overlap → POST (different issue, same location)
-
-            4. Clarification on "Post ALL issues":
-               - "ALL" means all NEW/UNIQUE issues, not duplicates
-               - Zero-tolerance applies to unique issues only
-               - Duplicates violate deduplication requirement
-
-            Examples of SAME issue (SKIP):
-            - "Missing null check" vs "Critical: Missing null check"
-            - "Potential memory leak" vs "Memory leak in allocation"
-
-            Examples of DIFFERENT issues (POST both):
-            - "Memory leak" vs "Race condition" (different problems)
-            - "Missing null check for ptr" vs "ptr never freed" (different issues)
-
-            **Review Focus:**
-            1. **Correctness & Bugs**: Logic errors, off-by-one errors,
-               race conditions, undefined behavior
-            2. **Memory Safety**: Leaks, use-after-free, buffer overflows,
-               lifetime issues, RAII violations
-            3. **Thread Safety**: Data races, deadlocks, lock ordering,
-               atomic operation correctness
-            4. **Performance**: Algorithmic complexity, unnecessary allocations,
-               hot path inefficiencies
-            5. **Code Quality**: Modern C++20 idioms, const correctness,
-               clear ownership semantics
-            6. **Security**: Input validation, DoS vectors, integer overflows
-
-            Use `gh pr diff ${{ github.event.pull_request.number }}` to see the changes.
-
-            Post ALL issues as inline comments (except clang-format issues).
-            After posting, return a summary report organized by severity.
-            ```
-
-            **For Python files** (.py):
-            Launch general-purpose subagent with this prompt:
-            ```
-            First, read the file .claude/prompts/code-review-guidelines.md for
-            critical review guidelines and follow them strictly.
-
-            You are reviewing Python code changes in PR
-            #${{ github.event.pull_request.number }} for repository
-            ${{ github.repository }}.
-
-            Focus on Python files only (.py). These are primarily test scripts for the C++ codebase.
-
-            **STEP 0: MANDATORY Deduplication (CRITICAL - MUST NOT SKIP)**
-
-            ⚠️  ABSOLUTE REQUIREMENT: You MUST fetch and check existing comments BEFORE reviewing.
-            Posting duplicate comments is a critical failure. Follow these steps exactly:
-
-            1. Fetch existing Claude comments (REQUIRED first step):
-               gh api \
-                 /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments \
-                 --jq \
-                 '[.[] | select(.user.login == "claude[bot]") |
-                   {path, line, body: .body[0:200]}]'
-
-            2. Build in-memory lookup map (file:line → comment):
-               - Key format: "path:line" (e.g., "test/functional/test.py:145")
-               - For file-level comments (no line): "path:null"
-               - Store first 200 chars of body for similarity check
-
-            3. BEFORE EACH mcp__github_inline_comment__create_inline_comment call:
-               - Check: Does map contain this file:line?
-               - If NO → POST (new issue, proceed)
-               - If YES → Compare issue descriptions:
-                 * Extract key technical terms from both
-                 * If 60%+ term overlap → SKIP (duplicate, DO NOT POST)
-                 * If <60% overlap → POST (different issue, same location)
-
-            4. Clarification on "Post ALL issues":
-               - "ALL" means all NEW/UNIQUE issues, not duplicates
-               - Zero-tolerance applies to unique issues only
-               - Duplicates violate deduplication requirement
-
-            Examples of SAME issue (SKIP):
-            - "Missing edge case test" vs "Critical: Missing edge case test"
-            - "Incorrect assertion" vs "Assertion check incorrect"
-
-            Examples of DIFFERENT issues (POST both):
-            - "Missing edge case test" vs "Incorrect assertion"
-            - "Missing test coverage" vs "Performance issue in loop"
-
-            **Review Focus:**
-            1. **Test Coverage**: Are edge cases tested? Are assertions clear and comprehensive?
-            2. **Test Structure**: Is test organization logical? Are tests independent?
-            3. **Python Best Practices**: PEP8 compliance, proper error handling, clear naming
-            4. **Performance**: Are tests efficient? Any unnecessarily slow operations?
-            5. **Correctness**: Logic errors, off-by-one errors in test ranges, improper assertions
-
-            Use `gh pr diff ${{ github.event.pull_request.number }}` to see the changes.
-
-            Post ALL issues as inline comments (except flake8 issues).
-            After posting, return a summary report organized by severity.
-            ```
-
-            **Step 3: Combine Feedback and Submit Review**
-            Once all subagents complete:
-            1. Collect all issues from both subagents
-            2. All inline comments should already be posted by the subagents (with deduplication)
-            3. Return your unified summary in your final response covering:
-               - C++ review summary (if applicable)
-               - Python review summary (if applicable)
-               - Overall assessment
-               - Any positive aspects worth noting
-               (Posted automatically via sticky_comment - do not use gh pr comment)
-
-            NOTE: Commit status check is set automatically by workflow.
-            ' || '
-            ⚠️  CRITICAL: This is a RE-REVIEW. Your task is to VERIFY
-            previous issues, NOT do a fresh review.
-
-            **Step 1: Load Threads to Verify**
-
-            Load the threads from `/tmp/claude-actionable-threads.json`:
-            ```bash
-            threads=$(cat /tmp/claude-actionable-threads.json)
-            ```
-
-            For each thread, note: thread_id, path, line, isResolved, issue description
-
-            **Step 2: Verify Each Previous Issue**
-
-            For EACH previous thread, you must determine if the issue was fixed or still persists.
-
-            Launch verification subagents (cpp-pro or general-purpose based on
-            file type) with this prompt template (fill in the PR NUMBER from
-            above and the list of issues from the threads you fetched):
-            ```
-            VERIFICATION TASK for PR #${{ github.event.pull_request.number }}
-
-            You are verifying whether previous code review issues were fixed.
-
-            **Previous issues to verify:**
-            [List each thread with: file:line, issue description from thread]
-
-            **Your task:**
-            1. Read the CURRENT code at each file:line location
-            2. For EACH previous issue, determine:
-               - FIXED: The code change addresses the issue
-                 (e.g., null check added, memory leak fixed)
-               - PERSISTS: The issue still exists in the current code
-            3. Return a verification report in this format:
-               ```
-               Thread ID: <thread_id>
-               Location: <path>:<line>
-               Status: FIXED | PERSISTS
-               Evidence: [Brief explanation of what you found in the code]
-               ```
-
-            **IMPORTANT:**
-            - DO NOT post new inline comments
-            - DO NOT re-post existing comments
-            - ONLY analyze whether previous issues were addressed
-            - Check for new issues on NEW lines and report separately
-            ```
-
-            **Step 3: Resolve/Unresolve Threads Based on Verification**
-
-            For each verified thread, take action based on verification result:
-
-            **If issue status is FIXED (verified by subagent):**
-
-            REQUIRED OUTCOME:
-            - Only resolve threads that Claude created
-            - Claude must never resolve threads from other reviewers (CODEOWNERs or developers)
-
-            IMPLEMENTATION:
-            1. Check thread.comments.nodes[0].author.login (first comment author)
-               - If NOT "claude": SKIP (cannot resolve other reviewers' threads)
-               - If "claude": Proceed to resolve using GraphQL
-            2. Resolve via GraphQL mutation:
-               ```bash
-               gh api graphql -f query='mutation {
-                 resolveReviewThread(input: {threadId: "<thread_id>"}) {
-                   thread { id }
-                 }
-               }'
-               ```
-            3. NO comment needed (resolution itself indicates Claude verified the fix)
-
-            **If issue status is PERSISTS (verified by subagent):**
-
-            REQUIRED OUTCOME:
-            1. If thread resolved by non-CODEOWNER, unresolve it (catches bypass)
-            2. If latest comment from non-CODEOWNER developer, post reply explaining:
-               * What evidence shows the issue still exists
-               * What specific changes are needed to fix it
-               * Why developer's response/fix is insufficient
-
-            IMPLEMENTATION:
-            1. Check thread.resolvedBy.login against CODEOWNER list
-               - If CODEOWNER resolved: SKIP (do nothing, dismissal is final)
-               - If non-CODEOWNER and isResolved==true: unresolve via GraphQL
-            2. Check thread.comments.nodes[-1].author.login (latest comment)
-               - If from "claude": SKIP (already responded)
-               - If from CODEOWNER: SKIP (await their decision)
-               - If from non-CODEOWNER developer: post reply via gh api POST
-
-            **Step 4: Check for New Issues on New Lines**
-
-            After verifying previous threads:
-            - Scan the diff for any NEW lines that were NOT previously
-              commented
-            - If you find NEW issues on NEW lines (not near previous
-              comments), post NEW inline comments
-            - Before posting, check existing comments to avoid duplicates
-
-            **Step 5: Return Summary**
-
-            Return a summary covering:
-            - Total previous threads verified
-            - How many were FIXED vs PERSISTS
-            - Any new issues found on new lines
-            - Overall re-review assessment
-
-            (Posted automatically via sticky_comment - do not use gh pr comment)
-
-            NOTE: Commit status check is set automatically by workflow.
-            ' }}
+            ${{ steps.detect-mode.outputs.mode == 'initial' && steps.initial-prompt.outputs.content || steps.rereview-prompt.outputs.content }}
 
             ═══════════════════════════════════════════════════════════════════════
 
