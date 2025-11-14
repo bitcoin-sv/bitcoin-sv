@@ -418,13 +418,18 @@ jobs:
             - NO comment needed (resolution itself indicates Claude verified the fix)
 
             **If issue status is PERSISTS (verified by subagent):**
-            - **MANDATORY**: Post a reply to the existing thread explaining why issue persists:
-              * Use: gh api POST /repos/{repo}/pulls/{pr}/comments/{comment_id}/replies
-              * Replace {comment_id} with first comment ID from the thread
-              * Explain what evidence shows the issue still exists
-              * Specify what needs to be changed to fix it
-              * If developer said "Done" but issue persists, explain the discrepancy
-            - After posting the mandatory comment, check if thread is currently resolved:
+
+            REQUIRED OUTCOME:
+            - Post a reply comment on the existing unresolved thread explaining:
+              * What evidence shows the issue still exists
+              * What specific changes are needed to fix it
+              * If developer said "Done", explain why the fix is incomplete
+
+            IMPLEMENTATION:
+            - Reply to thread using: gh api POST /repos/.../comments/{comment_id}/replies
+            - Get {comment_id} from thread.comments.nodes[0].id (first comment in thread)
+
+            - After posting reply, check if thread is currently resolved:
               - If thread.isResolved == false → Good, keep as-is
               - If thread.isResolved == true → UN-RESOLVE it (developer bypassed):
                 ```bash
