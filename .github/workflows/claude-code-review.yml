@@ -418,12 +418,12 @@ jobs:
             - NO comment needed (resolution itself indicates Claude verified the fix)
 
             **If issue status is PERSISTS (verified by subagent):**
-            - **MANDATORY**: Post a comment explaining why the issue still persists:
-              * Use mcp__github_inline_comment__create_inline_comment to reply to the thread
+            - **MANDATORY**: Post a reply to the existing thread explaining why issue persists:
+              * Use: gh api POST /repos/{repo}/pulls/{pr}/comments/{comment_id}/replies
+              * Replace {comment_id} with first comment ID from the thread
               * Explain what evidence shows the issue still exists
               * Specify what needs to be changed to fix it
               * If developer said "Done" but issue persists, explain the discrepancy
-              * Example: "Issue persists: Code at line X has [problem]. Fix: [solution]."
             - After posting the mandatory comment, check if thread is currently resolved:
               - If thread.isResolved == false → Good, keep as-is
               - If thread.isResolved == true → UN-RESOLVE it (developer bypassed):
