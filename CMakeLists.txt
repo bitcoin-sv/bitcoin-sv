@@ -102,6 +102,36 @@ set(CMAKE_MODULE_PATH
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Setup GDB pretty printers for development
+# Create symlinks to contrib/gdb/.gdbinit in common working directories
+# so pretty-printers work from root, src/, and src/test/
+set(GDBINIT_SOURCE "contrib/gdb/.gdbinit")
+set(GDBINIT_SYMLINKS
+    "${CMAKE_SOURCE_DIR}/.gdbinit:${GDBINIT_SOURCE}"
+    "${CMAKE_SOURCE_DIR}/src/.gdbinit:../${GDBINIT_SOURCE}"
+    "${CMAKE_SOURCE_DIR}/src/test/.gdbinit:../../${GDBINIT_SOURCE}"
+)
+
+foreach(SYMLINK_SPEC ${GDBINIT_SYMLINKS})
+    string(REPLACE ":" ";" SYMLINK_PARTS "${SYMLINK_SPEC}")
+    list(GET SYMLINK_PARTS 0 SYMLINK_PATH)
+    list(GET SYMLINK_PARTS 1 SYMLINK_TARGET)
+
+    if(NOT EXISTS "${SYMLINK_PATH}")
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -E create_symlink "${SYMLINK_TARGET}" "${SYMLINK_PATH}"
+            RESULT_VARIABLE SYMLINK_RESULT
+        )
+        if(SYMLINK_RESULT EQUAL 0)
+            message(STATUS "GDB pretty printers: Created symlink ${SYMLINK_PATH} -> ${SYMLINK_TARGET}")
+        else()
+            message(WARNING "GDB pretty printers: Failed to create symlink ${SYMLINK_PATH}")
+        endif()
+    else()
+        message(STATUS "GDB pretty printers: ${SYMLINK_PATH} already exists")
+    endif()
+endforeach()
+
 # If ccache is available, then use it.
 find_program(CCACHE ccache)
 if(CCACHE)
