@@ -24,6 +24,7 @@ query {
       reviewThreads(first: 100) {
         nodes {
           isResolved
+          isOutdated
           comments(first: 1) {
             nodes {
               author { login }
@@ -37,18 +38,27 @@ query {
   }
 }" -q '.data.repository.pullRequest.reviewThreads.nodes')
 
-# Count unresolved Claude threads
+# Count unresolved Claude threads (excluding outdated)
 unresolved=0
 total=0
+outdated_count=0
 if [[ $response == "null" || $response == "[]" ]]; then
   printf "No review threads found\n"
 else
   while IFS= read -r thread; do
     author=$(jq -r '.comments.nodes[0].author.login' <<< "$thread")
     is_resolved=$(jq -r '.isResolved' <<< "$thread")
+    is_outdated=$(jq -r '.isOutdated' <<< "$thread")
 
     if [[ $author =~ ^(claude|github-actions)(\[bot\])?$ ]]; then
       ((++total))
+
+      # Skip outdated comments - they refer to code that has changed
+      if [[ $is_outdated == "true" ]]; then
+        ((++outdated_count))
+        continue
+      fi
+
       if [[ $is_resolved == "false" ]]; then
         ((++unresolved))
         path=$(jq -r '.comments.nodes[0].path // "unknown"' <<< "$thread")
@@ -59,8 +69,12 @@ else
   done < <(jq -c '.[]' <<< "$response")
 fi
 
-resolved=$((total - unresolved))
-printf "\nClaude issues: %d resolved out of %d\n" "$resolved" "$total"
+resolved=$((total - unresolved - outdated_count))
+printf "\nClaude issues: %d resolved out of %d" "$resolved" "$total"
+if ((outdated_count > 0)); then
+  printf " (skipped %d outdated)" "$outdated_count"
+fi
+printf "\n"
 
 # Set commit status and exit
 if ((unresolved > 0)); then
