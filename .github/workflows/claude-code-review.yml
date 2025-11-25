@@ -157,6 +157,7 @@ jobs:
             Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),
             Bash(gh api /repos/*/pulls/*/comments:*),
             Bash(gh api POST /repos/*/pulls/*/comments/*:*),
+            Bash(gh api POST /repos/*/pulls/*/comments/*/replies:*),
             Bash(gh api graphql:*)"
 
       - name: Enforce Zero-Tolerance Policy
