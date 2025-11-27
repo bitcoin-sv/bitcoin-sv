@@ -44,7 +44,10 @@ namespace bsv
         bint& operator*=(const bint&);
         bint& operator/=(const bint&);
         bint& operator%=(const bint&);
+        bint& operator>>=(const bint&);
+        bint& operator>>=(int n);
         bint& operator<<=(const bint&);
+        bint& operator<<=(int n);
         bint operator-() const;
 
         bint& operator+=(int64_t other){ return *this += bint(other); }
@@ -52,9 +55,6 @@ namespace bsv
         bint& operator&=(int64_t other){ return *this &= bint(other); }
 
         // Bit-manipulation operators
-        bint& operator>>=(int n);
-        bint& operator<<=(int n);
-
         bint& operator&=(const bint&);
         bint& operator|=(const bint&);
 

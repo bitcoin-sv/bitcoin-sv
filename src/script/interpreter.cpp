@@ -723,9 +723,44 @@ std::optional<ScriptError> EvalScript(
                         stack.push_back(values.getvch());
                         break;
                     }
+                    case OP_RSHIFTNUM:
+                    {
+                        if(!utxo_after_chronicle)
+                        {
+                            if(IsDiscourageUpgradableNops(flags))
+                                return SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS;
+                            else
+                                break;
+                        }
+
+                        // (x n -- out)
+                        if(stack.size() < 2)
+                            return SCRIPT_ERR_INVALID_STACK_OPERATION;
+
+                        const auto& s0{stack.stacktop(-1).GetElement()};
+                        const auto max_len{params.MaxScriptNumLength()};
+                        const CScriptNum n{s0,
+                                           requireMinimal,
+                                           max_len,
+                                           true};
+                        if(n < 0)
+                            return SCRIPT_ERR_INVALID_NUMBER_RANGE;
+                        stack.pop_back();
+
+                        CScriptNum values{stack.stacktop(-1).GetElement(),
+                                          requireMinimal,
+                                          max_len,
+                                          true};
+                        // Note: Unlike OP_RSHIFT, no cancellation chunking is needed here.
+                        // CScriptNum enforces MaxScriptNumLength(), which bounds
+                        // the result size.
+                        values >>= n;
+                        stack.pop_back();
+                        stack.push_back(values.getvch());
+                        break;
+                    }
 
                     case OP_NOP1:
-                    case OP_NOP8:
                     case OP_NOP9:
                     case OP_NOP10: {
                         if (flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)

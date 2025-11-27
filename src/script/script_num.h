@@ -79,6 +79,7 @@ public:
     CScriptNum& operator/=(const CScriptNum&);
     CScriptNum& operator%=(const CScriptNum&);
 	CScriptNum& operator<<=(const CScriptNum&);
+	CScriptNum& operator>>=(const CScriptNum&);
 
     CScriptNum& operator&=(const CScriptNum&);
     CScriptNum& operator&=(int64_t);

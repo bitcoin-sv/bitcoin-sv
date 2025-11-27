@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "big_int.h"
 #include "script/int_serialization.h"
 #include "script/script.h"
 #include "script/script_error.h"
@@ -10,8 +11,6 @@
 
 #include <boost/test/unit_test.hpp>
 #include <cstdint>
-
-#include "big_int.h"
 
 using namespace std;
 using bsv::bint;
@@ -941,5 +940,62 @@ BOOST_AUTO_TEST_CASE(minimize_encoding_test) {
     }
 }
 // clang-format on
+
+BOOST_AUTO_TEST_CASE(rshift_division_semantics)
+{
+    // Verify that right shift implements division by 2^n (round toward zero)
+    // not arithmetic right shift (round toward negative infinity)
+    using test_args = std::tuple<int64_t,  // value
+                                 int64_t,  // shift
+                                 int64_t>; // expected;
+    const std::vector<test_args> test_data 
+    {
+        {0, 1, 0},
+        {0, 63, 0},
+        {0, 64, 0},
+
+        {8, 1, 4},
+        {8, 2, 2},
+        {8, 3, 1},
+
+        // Negative values - division rounds toward zero
+        {-3, 1, -1},  // -3/2 = -1.5 → -1 (not -2 from arithmetic shift)
+        {-5, 2, -1},  // -5/4 = -1.25 → -1 (not -2 from arithmetic shift)
+        {-7, 2, -1},  // -7/4 = -1.75 → -1 (not -2 from arithmetic shift)
+        {-8, 3, -1},  // -8/8 = -1
+        {-1, 1, 0},   // -1/2 = -0.5 → 0 (not -1 from arithmetic shift)
+
+        // INT64_MIN boundary cases
+        {min64, 1, min64 / 2},   // -2^63 / 2 = -2^62
+        {min64, 63, -1},         // -2^63 / 2^63 = -1
+        {min64, 62, -2},         // -2^63 / 2^62 = -2
+
+        // Shift >= bit width (64 bits)
+        {1, 64, 0},
+        {-1, 64, 0},
+        {max64, 64, 0},
+        {min64, 64, 0},
+    };
+
+    // Test int64_t (use INT64_SERIALIZED_SIZE to accommodate min64/max64)
+    for(const auto& [value, shift, expected] : test_data)
+    {
+        CScriptNum sn_value{value, CScriptNum::INT64_SERIALIZED_SIZE};
+        const CScriptNum sn_shift{shift, CScriptNum::INT64_SERIALIZED_SIZE};
+        sn_value >>= sn_shift;
+        const CScriptNum sn_expected{expected, CScriptNum::INT64_SERIALIZED_SIZE};
+        BOOST_CHECK_EQUAL(sn_value, sn_expected);
+    }
+
+    // Test bint (use test_bint_max_len to accommodate large values)
+    for(const auto& [value, shift, expected] : test_data)
+    {
+        CScriptNum sv_value{bint{value}, test_bint_max_len};
+        const CScriptNum sn_shift{bint{shift}, test_bint_max_len};
+        sv_value >>= sn_shift;
+        const CScriptNum sn_expected{bint{expected}, test_bint_max_len};
+        BOOST_CHECK_EQUAL(sv_value, sn_expected);
+    }
+}
 
 BOOST_AUTO_TEST_SUITE_END()

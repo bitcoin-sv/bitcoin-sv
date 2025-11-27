@@ -367,29 +367,6 @@ BOOST_AUTO_TEST_CASE(bitwise_or)
 
 BOOST_AUTO_TEST_CASE(shift_left)
 {
-    // clang-format off
-    array<tuple<bint, int, bint>, 5> v
-    {
-        make_tuple(bint{0x1}, 0, bint{0x1}),
-        make_tuple(bint{0x1}, 1, bint{0x2}),
-        make_tuple(bint{0x1}, 2, bint{0x4}),
-        make_tuple(bint{0x1}, 3, bint{0x8}),
-        make_tuple(bint{0x0f}, 4, bint{0xf0}),
-    };
-    // clang-format on
-
-    for(const auto& e : v)
-    {
-        bint lhs{get<0>(e)};
-        int n{get<1>(e)};
-        lhs <<= n;
-        bint expected{get<2>(e)};
-        BOOST_CHECK_EQUAL(lhs, expected);
-    }
-}
-
-BOOST_AUTO_TEST_CASE(shift_left_bint)
-{
     vector<tuple<bint, bint>> test_data
     {
         make_tuple(bint{1}, bint{0}),
@@ -433,26 +410,44 @@ BOOST_AUTO_TEST_CASE(shift_left_bint_exceeds_int_max)
 
 BOOST_AUTO_TEST_CASE(shift_right)
 {
-    // clang-format off
-    array<tuple<bint, int, bint>, 6> v
+    const vector<tuple<bint, bint, bint>> test_data
     {
-        make_tuple(bint{0x1}, 0, bint{0x1}),
-        make_tuple(bint{0x1}, 1, bint{0x0}),
-        make_tuple(bint{0x2}, 1, bint{0x1}),
-        make_tuple(bint{0x4}, 2, bint{0x1}),
-        make_tuple(bint{0x8}, 3, bint{0x1}),
-        make_tuple(bint{0xf0}, 4, bint{0xf}),
-    };
-    // clang-format on
+        make_tuple(bint{1}, bint{1}, bint{0}),
+        make_tuple(bint{2}, bint{1}, bint{1}),
+        make_tuple(bint{0x80}, bint{7}, bint{1}),
+        make_tuple(bint{0x8000}, bint{15}, bint{1}),
 
-    for(const auto& e : v)
+        make_tuple(bint{-1}, bint{1}, bint{0}),
+        make_tuple(bint{-2}, bint{1}, bint{-1}),
+        make_tuple(bint{-0x80}, bint{7}, bint{-1}),
+        make_tuple(bint{-0x8000}, bint{15}, bint{-1}),
+    };
+
+    for(const auto& [a, b, expected] : test_data)
     {
-        bint lhs{get<0>(e)};
-        int n{get<1>(e)};
-        lhs >>= n;
-        bint expected{get<2>(e)};
-        BOOST_CHECK_EQUAL(lhs, expected);
+        bint actual{a};
+        actual >>= b;
+        BOOST_CHECK_EQUAL(expected, actual);
     }
+}
+
+BOOST_AUTO_TEST_CASE(shift_right_bint_max_script_len)
+{
+    constexpr auto byte_len{MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE};
+    constexpr auto bit_len{byte_len * CHAR_BIT};
+    vector<uint8_t> v(byte_len, 0xc0);
+    bint a = bsv::deserialize(v.begin(), v.end());
+    a >>= bit_len - 2;
+    const bint expected{-1};
+    BOOST_CHECK_EQUAL(expected, a);
+}
+
+BOOST_AUTO_TEST_CASE(shift_right_bint_exceeds_int_max)
+{
+    // Test that shifting by an amount exceeding INT_MAX throws an exception
+    bint a{1};
+    const bint shift_amount{static_cast<int64_t>(INT_MAX) + 1};
+    BOOST_CHECK_THROW(a >>= shift_amount, bsv::big_int_error);
 }
 
 BOOST_AUTO_TEST_CASE(absolute_value)

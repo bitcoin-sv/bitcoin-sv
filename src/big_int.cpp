@@ -380,6 +380,18 @@ bsv::bint& bsv::bint::operator>>=(const int n)
     return *this;
 }
 
+bsv::bint& bsv::bint::operator>>=(const bint& n)
+{
+    if(n <= 0)
+        return *this;
+
+    if(n > INT_MAX)
+        throw big_int_error();
+
+    const auto nn{to_int64_t(n)};
+    return *this >>= static_cast<int>(nn);
+}
+
 bsv::bint bsv::bint::operator-() const
 {
     bint rv{*this};

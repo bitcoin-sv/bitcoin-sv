@@ -281,7 +281,7 @@ CScriptNum& CScriptNum::operator<<=(const CScriptNum& sn_bit_shift)
         if(getvch().size() > m_max_length)
             throw scriptnum_overflow_error("script number overflow");
     }
-    else
+    else [[likely]]
     {
         auto& value{get<1>(m_value)};
         const auto& bit_shift{get<1>(sn_bit_shift.m_value)};
@@ -294,6 +294,59 @@ CScriptNum& CScriptNum::operator<<=(const CScriptNum& sn_bit_shift)
         value <<= bit_shift;
         if(value.serialized_size() > m_max_length)
             throw scriptnum_overflow_error("script number overflow");
+    }
+
+    assert(equal_index(sn_bit_shift));
+    return *this;
+}
+
+CScriptNum& CScriptNum::operator>>=(const CScriptNum& sn_bit_shift)
+{
+    static_assert(variant_size_v<CScriptNum::value_type> == 2);
+    assert(equal_index(sn_bit_shift));
+
+    if(m_value.index() == 0)
+    {
+        const auto value{get<0>(m_value)};
+        const auto bit_shift{get<0>(sn_bit_shift.m_value)};
+
+        constexpr auto bit_shift_max{sizeof(std::variant_alternative_t<0, value_type>) * CHAR_BIT};
+        if(bit_shift >= static_cast<int64_t>(bit_shift_max))
+        {
+            // Shifting by 64 or more bits: mathematical division by 2^64 or more
+            // gives 0 for any value that fits in int64_t
+            get<0>(m_value) = 0;
+        }
+        else if(value < 0)
+        {
+            // Mathematical division by 2^bit_shift, rounding toward zero
+            // C++ arithmetic right shift rounds toward negative infinity,
+            // but we want division semantics (round toward zero)
+            // For negative values: n / 2^k = -((-n) >> k)
+            //
+            // Special case: -INT64_MIN overflows int64_t (undefined behavior).
+            // For INT64_MIN = -2^63, arithmetic right shift gives the correct
+            // division result because -2^63 is exactly divisible by all powers of 2.
+            if(value == std::numeric_limits<int64_t>::min())
+            {
+                get<0>(m_value) = value >> bit_shift;
+            }
+            else
+            {
+                get<0>(m_value) = -((-value) >> bit_shift);
+            }
+        }
+        else
+        {
+            // Simple right shift for positive values
+            get<0>(m_value) >>= bit_shift;
+        }
+    }
+    else [[likely]]
+    {
+        auto& value{get<1>(m_value)};
+        const auto& bit_shift{get<1>(sn_bit_shift.m_value)};
+        value >>= bit_shift;
     }
 
     assert(equal_index(sn_bit_shift));

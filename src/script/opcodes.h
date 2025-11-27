@@ -142,7 +142,8 @@ enum opcodetype
     OP_NOP6 = OP_RIGHT,
     OP_LSHIFTNUM = 0xb6,
     OP_NOP7 = OP_LSHIFTNUM,
-    OP_NOP8 = 0xb7,
+    OP_RSHIFTNUM = 0xb7,
+    OP_NOP8 = OP_RSHIFTNUM,
     OP_NOP9 = 0xb8,
     OP_NOP10 = 0xb9,
 

@@ -266,4 +266,158 @@ BOOST_AUTO_TEST_CASE(eval_script_op_lshiftnum_gt_max_script_len)
     BOOST_CHECK_EQUAL(1, e[0]);
 }
 
+BOOST_AUTO_TEST_CASE(eval_script_op_rshiftnum)
+{
+    using namespace std;
+
+    using test_args = tuple<uint32_t,                                        // flags
+                            vector<uint8_t>,                                 // script
+                            ScriptError,                                     // expected return
+                            std::vector<std::vector<uint8_t>>>;              // expected stack
+    const vector<test_args> test_data
+    {
+        // Pre-Chronicle
+        {{},
+         {OP_1, OP_NOP7},
+         SCRIPT_ERR_OK,
+         {{1}}},
+        {SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS,
+         {OP_1, OP_NOP7},
+         SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS,
+         {{1}}},
+
+        // Post-Chronicle
+        {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
+         {OP_RSHIFTNUM},
+         SCRIPT_ERR_INVALID_STACK_OPERATION,
+         {}},
+        {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
+         {OP_1, OP_RSHIFTNUM},
+         SCRIPT_ERR_INVALID_STACK_OPERATION,
+         {{1}}},
+        {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
+         {OP_2, OP_1NEGATE, OP_RSHIFTNUM},
+         SCRIPT_ERR_INVALID_NUMBER_RANGE,
+         {{2}, {0x81}}},
+
+        {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
+         {{}, OP_1, OP_RSHIFTNUM},  // empty input data
+         SCRIPT_ERR_OK,
+         {{}}},
+
+        {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
+         {OP_1, OP_0, OP_RSHIFTNUM},  // shift by 0
+         SCRIPT_ERR_OK,
+         {{1}}},
+
+        {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
+         {2, 1, 2, OP_8, OP_RSHIFTNUM}, // shift 1 byte
+         SCRIPT_ERR_OK,
+         {{2}}},
+
+        {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
+         {3, 1, 2, 3, OP_16, OP_RSHIFTNUM}, // shift 2 bytes
+         SCRIPT_ERR_OK,
+         {{3}}},
+
+        {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
+         {OP_2, OP_1, OP_RSHIFTNUM}, // shift by 1 bit
+         SCRIPT_ERR_OK,
+         {{0x1}}},
+
+        {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
+         {OP_4, OP_2, OP_RSHIFTNUM}, // shift by 2 bits
+         SCRIPT_ERR_OK,
+         {{1}}},
+
+        {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
+         {2, 0, 1, OP_1, OP_RSHIFTNUM}, // 256 >> 1 -> 128
+         SCRIPT_ERR_OK,
+         {{0x80, 0x00}}},
+  
+        {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
+         {2, 0, 0x81, OP_1, OP_RSHIFTNUM}, // -256 >> 1 -> -128
+         SCRIPT_ERR_OK,
+         {{0x80, 0x80}}},
+
+        {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
+         {3, 1, 2, 4, OP_9, OP_RSHIFTNUM}, // shift by bits and bytes
+         SCRIPT_ERR_OK,
+         {{1, 2}}},
+
+        // round to 0
+        {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
+         {OP_1, OP_1, OP_RSHIFTNUM}, // 1 >> 1 -> 0
+         SCRIPT_ERR_OK,
+         {{}}},
+
+        {SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE,
+         {OP_1NEGATE, OP_1, OP_RSHIFTNUM}, // -1 >> 1 -> 0
+         SCRIPT_ERR_OK,
+         {{}}}, // Note: Changes size of the data
+    };
+    for(const auto& [flags, script, expected, exp_stack] : test_data)
+    {
+        const auto params{make_eval_script_params(GlobalConfig::GetConfig().GetConfigScriptPolicy(),
+                                                  flags,
+                                                  false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto status = EvalScript(params,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{});
+        BOOST_REQUIRE(status);
+        BOOST_CHECK_EQUAL(expected, status.value());
+        BOOST_CHECK_EQUAL(exp_stack.size(), stack.size());
+        if(expected == SCRIPT_ERR_OK)
+        {
+            // Validate all elements in the stack, not just the top
+            for(size_t i = 0; i < exp_stack.size(); ++i)
+            {
+                const auto& actual_element = stack.at(i).GetElement();
+                const auto& expected_element = exp_stack[i];
+                BOOST_TEST(actual_element == expected_element, boost::test_tools::per_element());
+            }
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(eval_script_large_op_rshiftnum_1bit)
+{
+    using namespace std;
+
+    constexpr int32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+    const auto params{make_eval_script_params(GlobalConfig::GetConfig().GetConfigScriptPolicy(),
+                                              flags,
+                                              false)};
+    auto source = task::CCancellationSource::Make();
+    const auto data_size{params.MaxScriptNumLength()};
+    const std::vector<uint8_t> data(data_size, 0x80);
+    LimitedStack stack = LimitedStack({data}, INT64_MAX);
+    const vector<uint8_t> script{OP_1, OP_RSHIFTNUM};
+    const auto status = EvalScript(params,
+                                   source->GetToken(),
+                                   stack,
+                                   CScript{script.begin(), script.end()},
+                                   flags,
+                                   BaseSignatureChecker{});
+    BOOST_CHECK(status);
+    BOOST_CHECK_EQUAL(status.value(), SCRIPT_ERR_OK);
+    BOOST_CHECK_EQUAL(1, stack.size());
+    const auto& e{stack.front().GetElement()};
+    BOOST_CHECK_EQUAL(data_size - 1, e.size());
+
+    // Sample check throughout the data (checking every byte takes too long)
+    BOOST_CHECK_EQUAL(0x40, e[0]);
+    BOOST_CHECK_EQUAL(0x40, e[1]);
+    BOOST_CHECK_EQUAL(0x40, e[size_t(data_size) / 4]);
+    BOOST_CHECK_EQUAL(0x40, e[size_t(data_size) / 2]);
+    BOOST_CHECK_EQUAL(0x40, e[size_t(data_size) * 3 / 4]);
+    BOOST_CHECK_EQUAL(0x40, e.at(e.size()-2));
+    BOOST_CHECK_EQUAL(0xc0, e.at(e.size()-1));
+}
+
 BOOST_AUTO_TEST_SUITE_END()
