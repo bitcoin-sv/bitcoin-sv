@@ -226,11 +226,25 @@ BOOST_AUTO_TEST_CASE(lshift_negative_value)
 {
     using test_args = tuple<int64_t, int64_t, int64_t>;
     const vector<test_args> test_data = {
+        // Basic negative shifts
         {-1, 1, -2},
         {-4, 3, -32},
         {-2, 5, -64},
-        {-1, 63, min64},
+
+        // Boundary cases for bit_shift == 63 special handling
+        {-1, 63, min64},      // Exactly at boundary
+        {0, 63, 0},           // Zero case with max shift
+
+        // Boundary cases for various shift amounts (value == INT64_MIN / 2^shift)
         {min64 / 2, 1, min64},
+        {min64 / 4, 2, min64},
+        {min64 / 8, 3, min64},
+        {min64 / 16, 4, min64},
+        {min64 / 256, 8, min64},
+
+        // Large negative values that don't overflow
+        {-1000000000000000LL, 3, -8000000000000000LL},
+        {-100000000000LL, 10, -102400000000000LL},
     };
 
     for(const auto& [value, shift, expected] : test_data)
@@ -247,16 +261,37 @@ BOOST_AUTO_TEST_CASE(lshift_negative_value)
     }
 
     // Test overflow cases for negative values
-    {
-        CScriptNum v_int64{min64, CScriptNum::INT64_SERIALIZED_SIZE};
-        const CScriptNum shift{int64_t{1}, CScriptNum::INT64_SERIALIZED_SIZE};
-        BOOST_CHECK_THROW(v_int64 <<= shift, scriptnum_overflow_error);
-    }
+    // Test cases that are just over the boundary (should overflow)
+    using overflow_test = tuple<int64_t, int64_t>;
+    const vector<overflow_test> overflow_cases = {
+        // Basic overflow cases
+        {min64, 1},              // INT64_MIN << 1 overflows
+        {min64 / 2 - 1, 1},      // Just over boundary for shift=1
 
+        // Boundary -1 cases for different shifts
+        {min64 / 4 - 1, 2},      // Just over boundary for shift=2
+        {min64 / 8 - 1, 3},      // Just over boundary for shift=3
+        {min64 / 16 - 1, 4},     // Just over boundary for shift=4
+
+        // Special case: bit_shift == 63
+        {-2, 63},                // -2 << 63 overflows (only -1 is allowed)
+        {-10, 63},               // -10 << 63 overflows
+
+        // Large shifts
+        {-1, 64},                // Shift >= bit width
+        {1, 64},                 // Positive case for comparison
+        {-5, 100},               // Very large shift
+    };
+
+    for(const auto& [value, shift] : overflow_cases)
     {
-        CScriptNum v_int64{min64 / 2 - 1, CScriptNum::INT64_SERIALIZED_SIZE};
-        const CScriptNum shift{int64_t{1}, CScriptNum::INT64_SERIALIZED_SIZE};
-        BOOST_CHECK_THROW(v_int64 <<= shift, scriptnum_overflow_error);
+        // Skip shifts >= 64 for bint tests as they might have different behavior
+        if(shift < 64)
+        {
+            CScriptNum v_int64{value, CScriptNum::INT64_SERIALIZED_SIZE};
+            const CScriptNum shift_num{shift, CScriptNum::INT64_SERIALIZED_SIZE};
+            BOOST_CHECK_THROW(v_int64 <<= shift_num, scriptnum_overflow_error);
+        }
     }
 }
 

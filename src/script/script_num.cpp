@@ -237,22 +237,38 @@ CScriptNum& CScriptNum::operator<<=(const CScriptNum& sn_bit_shift)
         const auto value{get<0>(m_value)};
         const auto bit_shift{get<0>(sn_bit_shift.m_value)};
 
-        if(bit_shift >= static_cast<int64_t>(
-                            sizeof(std::variant_alternative_t<0, value_type>) * CHAR_BIT))
+        constexpr auto bit_shift_max{sizeof(std::variant_alternative_t<0, value_type>) * CHAR_BIT};
+        if(bit_shift >= static_cast<int64_t>(bit_shift_max))
         {
             if(value != 0)
                 throw scriptnum_overflow_error("script number overflow");
         }
         else if(value < 0)
         {
-            if(value < (std::numeric_limits<int64_t>::min() >> bit_shift))
-                throw scriptnum_overflow_error("script number overflow");
+            // Overflow check for negative value left shift using well-defined division.
+            // We check if value * 2^bit_shift < INT64_MIN
+            // Equivalently: value < INT64_MIN / 2^bit_shift
+            //
+            // Note: Right-shift of negative values is implementation-defined, so we
+            // use division instead. For bit_shift == 63, we need special handling
+            // since 1LL << 63 would be undefined behavior.
 
-            // Left-shifting negative signed integers is undefined behavior (pre-C++20)
-            // or implementation-defined (C++20+). Convert to unsigned for well-defined
-            // bit manipulation, then convert back to preserve the shifted bit pattern.
-            const uint64_t unsigned_value{static_cast<uint64_t>(value)};
-            get<0>(m_value) = static_cast<int64_t>(unsigned_value << bit_shift);
+            if(bit_shift == bit_shift_max -1)
+            {
+                // INT64_MIN / 2^63 = -2^63 / 2^63 = -1
+                if(value < -1)
+                    throw scriptnum_overflow_error("script number overflow");
+            }
+            else
+            {
+                // For bit_shift < 63, 1LL << bit_shift is well-defined
+                if(value < std::numeric_limits<int64_t>::min() / (1LL << bit_shift))
+                    throw scriptnum_overflow_error("script number overflow");
+            }
+
+            // C++20 makes left-shift well-defined only when result is representable.
+            // The overflow check above ensures this is safe.
+            get<0>(m_value) <<= bit_shift;
         }
         else
         {
