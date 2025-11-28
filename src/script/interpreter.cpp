@@ -1295,7 +1295,7 @@ std::optional<ScriptError> EvalScript(
                         if (stack.size() < 2)
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
-                        const auto& arg_2 = stack.stacktop(-2);                        
+                        const auto& arg_2 = stack.stacktop(-2);
                         const auto& arg_1 = stack.stacktop(-1);
 
                         const CScriptNum bn1(arg_2.GetElement(), requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis);
@@ -1384,7 +1384,6 @@ std::optional<ScriptError> EvalScript(
                         // (x min max -- out)
                         if (stack.size() < 3)
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
-
 
                         const auto& top_3{stack.stacktop(-3).GetElement()};
                         const CScriptNum bn1{top_3, requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis};

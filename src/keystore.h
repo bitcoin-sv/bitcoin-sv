@@ -14,10 +14,13 @@
 // Use CCriticalSection from sync.h when it is not wasm build
 #include "sync.h"
 #else
-// WASM build can not have concurency and do not need it
-// Stub the struct CCriticalSection and LOCK macro
-struct CCriticalSection {};
-#define LOCK(cs)   // empty macro, does nothing
+  #if defined(_REENTRANT)
+    #error "WASM build should not have threading enabled"
+  #endif
+  // WASM build can not have concurency and do not need it
+  // Stub the struct CCriticalSection and LOCK macro
+  struct CCriticalSection {};
+  #define LOCK(cs)   // empty macro, does nothing
 #endif
 
 /** A virtual base class for key stores */

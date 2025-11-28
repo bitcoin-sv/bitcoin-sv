@@ -14,6 +14,8 @@
 
 #include <cstdint>
 #include <optional>
+#include <stdexcept>
+#include <utility>
 #include <vector>
 
 class CPubKey;
@@ -133,7 +135,7 @@ public:
 class eval_script_params
 {
     uint64_t maxOpsPerScript_;
-    uint64_t maxScriptNumLength_;
+    size_t maxScriptNumLength_;
     uint64_t maxScriptSize_;
     uint64_t maxPubKeysPerMultiSig_;
 
@@ -143,14 +145,19 @@ public:
                                  uint64_t maxScriptSize,
                                  uint64_t maxPubKeysPerMultiSig)
         : maxOpsPerScript_{maxOpsPerScript},
-          maxScriptNumLength_{maxScriptNumLength},
+          maxScriptNumLength_{[&] {
+              if (!std::in_range<size_t>(maxScriptNumLength)) {
+                  throw std::range_error("MaxScriptNumLength exceeds size_t range");
+              }
+              return static_cast<size_t>(maxScriptNumLength);
+          }()},
           maxScriptSize_{maxScriptSize},
           maxPubKeysPerMultiSig_{maxPubKeysPerMultiSig}
     {
     }
 
     constexpr uint64_t MaxOpsPerScript() const { return maxOpsPerScript_; }
-    constexpr uint64_t MaxScriptNumLength() const { return maxScriptNumLength_; }
+    constexpr size_t MaxScriptNumLength() const { return maxScriptNumLength_; }
     constexpr uint64_t MaxScriptSize() const { return maxScriptSize_; }
     constexpr uint64_t MaxPubKeysPerMultiSig() const { return maxPubKeysPerMultiSig_; }
 

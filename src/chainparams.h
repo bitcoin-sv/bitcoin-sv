@@ -12,9 +12,9 @@
 #include "protocol.h"
 
 #include <memory>
-#include <vector>
 #include <optional>
 #include <string>
+#include <vector>
 
 struct CDNSSeedData {
     std::string name, host;

@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <sstream>
+#include <utility>
 
 static_assert(EncodeOP_N(0) == OP_0);
 static_assert(EncodeOP_N(1) == OP_1);
@@ -238,7 +239,9 @@ CScript &CScript::operator<<(const CScriptNum &b) {
 
 bsv::instruction_iterator CScript::begin_instructions() const
 {
-    return bsv::instruction_iterator{span<const uint8_t>{data(), size()}};
+    const auto s = size();
+    assert(std::in_range<size_t>(s) && "Script size exceeds size_t range");
+    return bsv::instruction_iterator{span<const uint8_t>{data(), static_cast<size_t>(s)}};
 }
 
 bsv::instruction_iterator CScript::end_instructions() const

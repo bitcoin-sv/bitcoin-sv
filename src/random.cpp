@@ -195,6 +195,7 @@ static void RandAddSeedPerfmon() {
  *compatible way to get cryptographic randomness on UNIX-ish platforms.
  */
 void GetDevURandom(uint8_t *ent32) {
+    assert(ent32 != nullptr);
     #ifndef __EMSCRIPTEN__
         int f = open("/dev/urandom", O_RDONLY);
         if (f == -1) {

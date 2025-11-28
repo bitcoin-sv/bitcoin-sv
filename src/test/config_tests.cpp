@@ -262,10 +262,10 @@ BOOST_AUTO_TEST_CASE(chain_params) {
     SelectParams(CBaseChainParams::MAIN);
     BOOST_CHECK_EQUAL(&Params(), &config.GetChainParams());
 
-    SelectParams(CBaseChainParams::TESTNET, MagicBytesFromCommandLine());
+    SelectParams(CBaseChainParams::TESTNET);
     BOOST_CHECK_EQUAL(&Params(), &config.GetChainParams());
 
-    SelectParams(CBaseChainParams::REGTEST, MagicBytesFromCommandLine());
+    SelectParams(CBaseChainParams::REGTEST);
     BOOST_CHECK_EQUAL(&Params(), &config.GetChainParams());
 }
 
@@ -701,7 +701,7 @@ BOOST_AUTO_TEST_CASE(disable_BIP30)
     for(const auto& networkType: {CBaseChainParams::TESTNET, CBaseChainParams::REGTEST, CBaseChainParams::STN})
     {
         config.Reset();
-        SelectParams(networkType, MagicBytesFromCommandLine());
+        SelectParams(networkType);
         BOOST_CHECK(config.GetDisableBIP30Checks() == false);
         BOOST_CHECK(config.SetDisableBIP30Checks(true, &err) == true);
         BOOST_CHECK(config.GetDisableBIP30Checks() == true);

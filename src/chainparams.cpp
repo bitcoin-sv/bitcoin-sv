@@ -4,19 +4,17 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "chainparams.h"
-#include "consensus/merkle.h"
 
+#include "chainparamsseeds.h"
+#include "consensus/merkle.h"
+#include "logging.h"
 #include "policy/policy.h"
 #include "script/script_num.h"
-
-#include "logging.h"
 #include "tinyformat.h"
 #include "utilstrencodings.h"
 
 #include <cassert>
 #include <cstdint>
-
-#include "chainparamsseeds.h"
 
 #define GENESIS_ACTIVATION_MAIN                 620538
 #define GENESIS_ACTIVATION_STN                  100

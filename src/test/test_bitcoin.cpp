@@ -78,7 +78,7 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(
     GetLogger().SetPrintToDebugLog(false);
 
     fCheckBlockIndex = true;
-    SelectParams(chainName, MagicBytesFromCommandLine());
+    SelectParams(chainName);
     noui_connect();
     testConfig.Reset(); // make sure that we start every test with a clean config
     testConfig.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());

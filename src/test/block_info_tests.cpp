@@ -19,7 +19,7 @@ BOOST_AUTO_TEST_SUITE(block_index_tests)
 
 BOOST_AUTO_TEST_CASE(mtp)
 {
-    SelectParams( CBaseChainParams::REGTEST, MagicBytesFromCommandLine() );
+    SelectParams( CBaseChainParams::REGTEST );
 
     BlockIndexStore blockIndexStore;
     CChain blocks;
