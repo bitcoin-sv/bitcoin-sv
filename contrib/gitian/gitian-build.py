@@ -31,10 +31,7 @@ def setup():
     programs = ['ruby', 'git', 'apt-cacher-ng', 'make', 'wget', 'lxc', 'debootstrap']
     subprocess.check_call(['sudo', 'apt-get', 'install', '-qq'] + programs)
 
-    print("Cloning repos")
-    # TODO: gitian.sigs repository is empty and we don't use it. Signing is done manually.
-    if not os.path.isdir('gitian.sigs'):
-        subprocess.check_call(['git', 'clone', 'https://github.com/bitcoin-sv/gitian.sigs.git'])
+    print("Cloning repo")
     if not os.path.isdir('gitian-builder'):
         subprocess.check_call(['git', 'clone', 'https://github.com/devrandom/gitian-builder.git'])
         # Checkout a specific commit. Since the last tag is 0.2 from year 2015 we use a later commit from master
@@ -131,37 +128,6 @@ def build():
 
     os.chdir(workdir)
 
-def sign():
-    print("Signing...")
-    global args, workdir, commit_hash
-    os.chdir('gitian-builder')
-    
-    if args.linux:
-        subprocess.check_call(['bin/gsign', '-p', args.sign_prog, '--signer', args.sign, '--release', commit_hash + '-linux', '--destination', workdir+'/gitian.sigs/', srcdir+'/contrib/gitian-descriptors/' + args.linux_yml])
-
-    if args.windows:
-        print('\nSigning ' + commit_hash + ' Windows')
-        subprocess.check_call('cp inputs/bitcoin-' + commit_hash + '-win-unsigned.tar.gz inputs/bitcoin-win-unsigned.tar.gz', shell=True)
-        subprocess.check_call(['bin/gbuild', '--skip-image', '--commit', 'signature='+args.commit, '../bitcoin-sv/contrib/gitian-descriptors/gitian-win-signer.yml'])
-        subprocess.check_call(['bin/gsign', '-p', args.sign_prog, '--signer', args.sign, '--release', commit_hash+'-win-signed', '--destination', '../gitian.sigs/', srcdir+'/gitian-descriptors/gitian-win-signer.yml'])
-
-    os.chdir(workdir)
-
-def verify():
-    global args, workdir
-    os.chdir('gitian-builder')
-    if args.linux:
-        print('\nVerifying v'+commit_hash+' Linux\n')
-        subprocess.check_call(['bin/gverify', '-v', '-d', workdir+'/gitian.sigs/', '-r', commit_hash+'-linux', srcdir+'/contrib/gitian-descriptors/' + args.linux_yml])
-
-    if args.windows:
-        print('\nVerifying v'+commit_hash+' Windows\n')
-        subprocess.check_call(['bin/gverify', '-v', '-d', workdir+'/gitian.sigs/', '-r', commit_hash+'-win-unsigned', srcdir+'/contrib/gitian-descriptors/' + args.win_yml])
-        print('\nVerifying v'+commit_hash+' Signed Windows\n')
-        subprocess.check_call(['bin/gverify', '-v', '-d', workdir+'/gitian.sigs/', '-r', commit_hash+'-win-signed', srcdir+'/contrib/gitian-descriptors/gitian-win-signer.yml'])
-
-    os.chdir(workdir)
-
 def copy_files():
     print("Copying files...")
     version_compatible = args.version.replace('/', '-')
@@ -174,21 +140,6 @@ def copy_files():
     if args.windows:
         subprocess.check_call('mv build/out/bitcoin-*-win-unsigned.tar.gz inputs/', shell=True)
         subprocess.check_call('mv build/out/bitcoin-*.zip build/out/bitcoin-*.exe result/bitcoin*.yml ../bitcoin-binaries/' + version_compatible, shell=True)
-
-        if args.sign():
-            subprocess.check_call('mv build/out/bitcoin-*win64-setup.exe ../bitcoin-binaries/' + version_compatible, shell=True)
-            subprocess.check_call('mv build/out/bitcoin-*win32-setup.exe ../bitcoin-binaries/' + version_compatible, shell=True)
-
-    os.chdir(workdir)
-
-def commit_signitures():
-    print('\nCommitting ' + commit_hash + ' Signed Sigs\n')
-    os.chdir('gitian.sigs')
-    subprocess.check_call(['git', 'add', commit_hash + '-linux/' + args.signer])
-    subprocess.check_call(['git', 'add', commit_hash + '-win-unsigned/' + args.signer])
-    subprocess.check_call(['git', 'commit', '-m', 'Add ' + commit_hash + ' unsigned sigs for ' + args.signer])
-    subprocess.check_call(['git', 'add', commit_hash + '-win-signed/' + args.sign])
-    subprocess.check_call(['git', 'commit', '-a', '-m', 'Add ' + commit_hash + ' signed binary sigs for ' + args.sign])
 
     os.chdir(workdir)
 
@@ -210,28 +161,19 @@ def main():
         epilog='Examples of use\n'
                'Setup:\n   ./' + script_name+' --setup\n'
                'Build remote (build only):\n  ./' + script_name+' --os l -j4 --url=https://github.com/bitcoin-sv/bitcoin-sv --version=v1.0.8 --build\n'
-               'Build remote (complete):\n  ./' + script_name+' --os l -j4 --url=https://github.com/bitcoin-sv/bitcoin-sv --version=v1.0.8 --detach-sign --build --sign=support@bitcoinsv.io --verify\n'
                'Build local:\n  ./' + script_name + ' --os l -j4 --build\n'
         )
     parser.add_argument('-c', '--commit', action='store_true', dest='commit', help='Indicate that the version argument is for a commit or branch')
     parser.add_argument('-u', '--url', dest='url', default=None, help='Specify the URL of the repository. If unspecified, will build local code')
-    parser.add_argument('-v', '--verify', action='store_true', dest='verify', help='Verify the Gitian build')
     parser.add_argument('-b', '--build', action='store_true', dest='build', help='Do a Gitian build')
     parser.add_argument('-o', '--os', dest='os', default='l', help='Specify which Operating Systems the build is for. Default is %(default)s. l for Linux, w for Windows')
     parser.add_argument('-j', '--jobs', dest='jobs', default='2', help='Number of processes to use. Default %(default)s')
     parser.add_argument('-m', '--memory', dest='memory', default='2000', help='Memory to allocate in MiB. Default %(default)s')
     parser.add_argument('-S', '--setup', action='store_true', dest='setup', help='Set up the Gitian building environment. Uses LXC.')
-    parser.add_argument('-D', '--detach-sign', action='store_true', dest='detach_sign', help='Create the assert file for detached signing. Will not commit anything.')
-    parser.add_argument('-n', '--commit-sigs', action='store_true', dest='commit_sigs', help='Commit signatures to git')
-    parser.add_argument('-a', '--all-arch', action='store_true', dest='all_arch', help='Build for all supported architiectures')
-    parser.add_argument('-s', '--sign', help='GPG signer to sign each build assert file')
+    parser.add_argument('-a', '--all-arch', action='store_true', dest='all_arch', help='Build for all supported architectures')
     parser.add_argument('-e', '--version', help='Version number, commit, or branch to build. If building a commit or branch, the -c option must be specified')
-    parser.add_argument('-r', '--release', dest='ubuntu_version', default='bionic', help='Ubuntu release to build under. Default is %(default)')
+    parser.add_argument('-r', '--release', dest='ubuntu_version', default='focal', help='Ubuntu release to build under. Default is %(default)')
     args = parser.parse_args()
-
-    # Fail if trying to commit signatures without signing
-    if args.commit_sigs and args.sign is None and args.setup is False:
-            raise Exception('Missing signer. Use --no-commit or --sign=<signer> options.')
 
     # Parse OS args
     args.linux = 'l' in args.os
@@ -258,10 +200,6 @@ def main():
         os.environ['GITIAN_HOST_IP'] = '10.0.3.1'
     if not 'LXC_GUEST_IP' in os.environ.keys():
         os.environ['LXC_GUEST_IP'] = '10.0.3.5'
-
-    # This will pass the signing program to the 'gsign' script.
-    # Passing program 'true' will make it do nothing
-    args.sign_prog = 'true' if args.detach_sign else 'gpg --detach-sign'
 
     # Error if argument version is missing
     if args.url is not None and args.version is None:
@@ -311,17 +249,8 @@ def main():
     if args.build:
         build()
 
-    if args.sign:
-        sign()
-
-    if args.verify:
-        verify()
-
     if args.build and not args.setup:
         copy_files()
-
-    if args.commit_sigs and not args.setup:
-        commit_signitures()
 
 if __name__ == '__main__':
     main()
