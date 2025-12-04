@@ -46,6 +46,8 @@ CScriptNum::CScriptNum(const bsv::bint& n, const size_t max_length):
     m_value{n},
     m_max_length{max_length}
 {
+    if(n.serialized_size() > max_length)
+        throw scriptnum_overflow_error("script number overflow");
 }
 
 CScriptNum::CScriptNum(const span<const uint8_t> span,
@@ -155,7 +157,13 @@ CScriptNum& CScriptNum::operator+=(const CScriptNum& other)
         get<0>(m_value) += get<0>(other.m_value);
     }
     else
-        get<1>(m_value) += get<1>(other.m_value);
+    {
+        auto& value{get<1>(m_value)};
+        value += get<1>(other.m_value);
+
+        if(value.serialized_size() > m_max_length)
+            throw scriptnum_overflow_error("script number overflow");
+    }
 
     assert(equal_index(other));
     return *this;
@@ -179,7 +187,13 @@ CScriptNum& CScriptNum::operator-=(const CScriptNum& other)
         get<0>(m_value) -= get<0>(other.m_value);
     }
     else
-        get<1>(m_value) -= get<1>(other.m_value);
+    {
+        auto& value{get<1>(m_value)};
+        value -= get<1>(other.m_value);
+
+        if(value.serialized_size() > m_max_length)
+            throw scriptnum_overflow_error("script number overflow");
+    }
 
     assert(equal_index(other));
     return *this;
@@ -193,7 +207,13 @@ CScriptNum& CScriptNum::operator*=(const CScriptNum& other)
     if(m_value.index() == 0)
         get<0>(m_value) *= get<0>(other.m_value);
     else
-        get<1>(m_value) *= get<1>(other.m_value);
+    {
+        auto& value{get<1>(m_value)};
+        value *= get<1>(other.m_value);
+
+        if(value.serialized_size() > m_max_length)
+            throw scriptnum_overflow_error("script number overflow");
+    }
 
     assert(equal_index(other));
     return *this;

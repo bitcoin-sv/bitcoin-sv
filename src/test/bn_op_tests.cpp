@@ -404,7 +404,7 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
     {max_arg_len + 1, max_arg_len,   OP_SUB, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len,   max_arg_len + 1, OP_SUB, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len + 1, max_arg_len + 1, OP_SUB, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
-    {max_arg_len,   max_arg_len,   OP_MUL, SCRIPT_ERR_OK},
+    {max_arg_len,   max_arg_len,   OP_MUL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len + 1, max_arg_len,   OP_MUL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len,   max_arg_len + 1, OP_MUL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len + 1, max_arg_len + 1, OP_MUL, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},

@@ -9,8 +9,10 @@
 #include "script/script_num.h"
 #include "scriptnum10.h"
 
+#include <boost/test/tools/old/interface.hpp>
 #include <boost/test/unit_test.hpp>
 #include <cstdint>
+#include <exception>
 
 using namespace std;
 using bsv::bint;
@@ -99,6 +101,17 @@ BOOST_AUTO_TEST_CASE(bint_construction)
 {
     const CScriptNum a{bint{}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
     BOOST_CHECK_EQUAL(CScriptNum::MAXIMUM_ELEMENT_SIZE, a.max_length());
+
+    try
+    {
+        const CScriptNum b{bint{-0x80}, 1};
+        BOOST_FAIL("Expected script number overflow");
+    }
+    catch(std::exception& e)
+    {
+        const string expected{"script number overflow"};
+        BOOST_CHECK_EQUAL(expected, e.what());
+    }
 }
 
 BOOST_AUTO_TEST_CASE(construction)
@@ -373,7 +386,7 @@ BOOST_AUTO_TEST_CASE(insertion_op)
 
     for(const int64_t n : test_data)
     {
-        CScriptNum a{bint{n}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum a{bint{n}, CScriptNum::INT64_SERIALIZED_SIZE};
         ostringstream actual;
         actual << a;
 
@@ -423,8 +436,8 @@ BOOST_AUTO_TEST_CASE(less)
     for(const auto& [n, m] : test_data)
     {
         // n *= 10; // *10 so we are testing outside of range of int64_t
-        CScriptNum a{bint{n}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
-        CScriptNum b{bint{m}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum a{bint{n}, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum b{bint{m}, CScriptNum::INT64_SERIALIZED_SIZE};
         BOOST_CHECK_LT(a, b);
         BOOST_CHECK_LE(a, a);
         BOOST_CHECK_GE(a, a);
@@ -434,7 +447,7 @@ BOOST_AUTO_TEST_CASE(less)
     for(const auto& [n, m] : test_data)
     {
         CScriptNum a{n, CScriptNum::INT64_SERIALIZED_SIZE};
-        CScriptNum b{bint{m}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum b{bint{m}, CScriptNum::INT64_SERIALIZED_SIZE};
         BOOST_CHECK_LT(a, b);
         BOOST_CHECK_LE(a, a);
         BOOST_CHECK_GE(a, a);
@@ -466,9 +479,9 @@ BOOST_AUTO_TEST_CASE(addition)
     for(const auto& [n, m, o] : test_data)
     {
         // big int + big int
-        CScriptNum a{bint{n}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
-        CScriptNum b{bint{m}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
-        CScriptNum c{bint{o}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum a{bint{n}, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum b{bint{m}, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum c{bint{o}, CScriptNum::INT64_SERIALIZED_SIZE};
         BOOST_CHECK_EQUAL(c, a + b);
     }
 }
@@ -497,9 +510,9 @@ BOOST_AUTO_TEST_CASE(subtraction)
     for(const auto& [n, m, o] : test_data)
     {
         // big int - big int
-        CScriptNum a{bint{n}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
-        CScriptNum b{bint{m}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
-        CScriptNum c{bint{o}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum a{bint{n}, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum b{bint{m}, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum c{bint{o}, CScriptNum::INT64_SERIALIZED_SIZE};
         BOOST_CHECK_EQUAL(c, a - b);
     }
 }
@@ -534,10 +547,136 @@ BOOST_AUTO_TEST_CASE(multiplication)
     for(const auto& [n, m, o] : test_data)
     {
         // big int * big int
-        CScriptNum a{bint{n}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
-        CScriptNum b{bint{m}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
-        CScriptNum c{bint{o}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum a{bint{n}, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum b{bint{m}, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum c{bint{o}, CScriptNum::INT64_SERIALIZED_SIZE};
         BOOST_CHECK_EQUAL(c, a * b);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(add_max_length_invariant)
+{
+    using test_args = tuple<int64_t,    // a
+                            int64_t,    // b
+                            size_t>;    // max_len
+    const vector<test_args> non_throwing_cases
+    {
+        {0x1,  0x1, 1},
+        {0x7f,  0x1, 2},
+        {-0x1, -0x1, 1},
+        {-0x7f, -0x1, 2},
+    };
+    // int64_t
+    for(const auto& [a, b, max_len] : non_throwing_cases)
+    {
+        CScriptNum sn_a{a, max_len};
+        const CScriptNum sn_b{b, max_len};
+        sn_a += sn_b;
+        BOOST_CHECK_EQUAL(sn_a.getvch().size(), max_len);
+    }
+    // bint
+    for(const auto& [a, b, max_len] : non_throwing_cases)
+    {
+        CScriptNum sn_a{bint{a}, max_len};
+        const CScriptNum sn_b{bint{b}, max_len};
+        sn_a += sn_b;
+        BOOST_CHECK_EQUAL(sn_a.getvch().size(), max_len);
+    }
+
+    // (bsv::bint only - int64_t intentionally unchanged for backward compatibility)
+    const vector<test_args> throwing_cases
+    {
+        {0x7f,  0x1, 1},
+        {-0x7f, -0x1, 1},
+    };
+    for(const auto& [a, b, max_len] : throwing_cases)
+    {
+        CScriptNum sn_a{bint{a}, max_len};
+        const CScriptNum sn_b{bint{b}, max_len};
+        BOOST_CHECK_THROW(sn_a += sn_b, scriptnum_overflow_error);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(sub_max_length_invariant)
+{
+    using test_args = tuple<int64_t,    // a
+                            int64_t,    // b
+                            size_t>;    // max_len
+    const vector<test_args> non_throwing_cases
+    {
+        {0,  0x7f, 1},
+        {-1, 0x7f, 2},
+    };
+    // int64_t
+    for(const auto& [a, b, max_len] : non_throwing_cases)
+    {
+        CScriptNum sn_a{a, max_len};
+        const CScriptNum sn_b{b, max_len};
+        sn_a -= sn_b;
+        BOOST_CHECK_EQUAL(sn_a.getvch().size(), max_len);
+    }
+    // bint
+    for(const auto& [a, b, max_len] : non_throwing_cases)
+    {
+        CScriptNum sn_a{bint{a}, max_len};
+        const CScriptNum sn_b{bint{b}, max_len};
+        sn_a -= sn_b;
+        BOOST_CHECK_EQUAL(sn_a.getvch().size(), max_len);
+    }
+
+    // (bsv::bint only - int64_t intentionally unchanged for backward compatibility)
+    const vector<test_args> throwing_cases
+    {
+        {-1, 0x7f, 1},
+    };
+    for(const auto& [a, b, max_len] : throwing_cases)
+    {
+        CScriptNum sn_a{bint{a}, max_len};
+        const CScriptNum sn_b{bint{b}, max_len};
+        BOOST_CHECK_THROW(sn_a -= sn_b, scriptnum_overflow_error);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(mul_max_length_invariant)
+{
+    using test_args = tuple<int64_t,    // a
+                            int64_t,    // b
+                            size_t>;    // max_len
+    const vector<test_args> non_throwing_cases
+    {
+        {0x20,  0x2, 1},    // = 0x40
+        {0x40,  0x2, 2},    // = 0x0, 0x80
+        {0x20, -0x2, 1},    // = 0xc0
+        {0x40, -0x2, 2},    // = 0x80, 0x80
+    };
+    // int64_t
+    for(const auto& [a, b, max_len] : non_throwing_cases)
+    {
+        CScriptNum sn_a{a, max_len};
+        const CScriptNum sn_b{b, max_len};
+        sn_a *= sn_b;
+        BOOST_CHECK_EQUAL(sn_a.getvch().size(), max_len);
+    }
+    // bint
+    for(const auto& [a, b, max_len] : non_throwing_cases)
+    {
+        CScriptNum sn_a{bint{a}, max_len};
+        const CScriptNum sn_b{bint{b}, max_len};
+        sn_a *= sn_b;
+        BOOST_CHECK_EQUAL(sn_a.getvch().size(), max_len);
+    }
+
+    // (bsv::bint only - int64_t intentionally unchanged for backward compatibility)
+    const vector<test_args> throwing_cases
+    {
+        {0x40,  0x2, 1},    // = 0x0, 0x80
+        {0x40, -0x2, 1},    // = 0x80, 0x80
+    };
+    for(const auto& [a, b, max_len] : throwing_cases)
+    {
+        CScriptNum sn_a{bint{a}, max_len};
+        const CScriptNum sn_b{bint{b}, max_len};
+        BOOST_CHECK_THROW(sn_a *= sn_b, scriptnum_overflow_error);
     }
 }
 
@@ -566,9 +705,9 @@ BOOST_AUTO_TEST_CASE(division)
     for(const auto& [n, m, o] : test_data)
     {
         // big int / big int
-        CScriptNum a{bint{n}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
-        CScriptNum b{bint{m}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
-        CScriptNum c{bint{o}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum a{bint{n}, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum b{bint{m}, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum c{bint{o}, CScriptNum::INT64_SERIALIZED_SIZE};
         BOOST_CHECK_EQUAL(c, a / b);
     }
 }
@@ -624,9 +763,9 @@ BOOST_AUTO_TEST_CASE(and_)
     for(const auto& [n, m, o] : test_data)
     {
         // big int & big int
-        CScriptNum a{bint{n}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
-        CScriptNum b{bint{m}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
-        CScriptNum c{bint{o}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum a{bint{n}, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum b{bint{m}, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum c{bint{o}, CScriptNum::INT64_SERIALIZED_SIZE};
         BOOST_CHECK_EQUAL(c, a & b);
     }
 }
@@ -654,8 +793,8 @@ BOOST_AUTO_TEST_CASE(negation)
     for(const auto& [n, m] : test_data)
     {
         // big int & big int
-        CScriptNum a{bint{n}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
-        CScriptNum b{bint{m}, CScriptNum::MAXIMUM_ELEMENT_SIZE};
+        CScriptNum a{bint{n}, CScriptNum::INT64_SERIALIZED_SIZE};
+        CScriptNum b{bint{m}, CScriptNum::INT64_SERIALIZED_SIZE};
         BOOST_CHECK_EQUAL(b, -a);
     }
 }

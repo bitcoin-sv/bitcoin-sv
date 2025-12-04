@@ -2290,7 +2290,7 @@ BOOST_AUTO_TEST_CASE(op_2mul_post_chronicle)
     using namespace std;
 
     const Config& config = GlobalConfig::GetConfig();
-    
+
     using exp_stack_top_type = std::optional<std::vector<uint8_t>>;
     using test_args = tuple<vector<uint8_t>,            // script
                             ScriptError,                // expected scriptError
@@ -2303,7 +2303,7 @@ BOOST_AUTO_TEST_CASE(op_2mul_post_chronicle)
         // stack too small
         {{OP_2MUL}, 
                 SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top_type{}},
-       
+
         // Happy cases
         {{OP_0, OP_2MUL}, 
                 SCRIPT_ERR_OK, 1, exp_stack_top_type{ std::in_place }},
@@ -2322,16 +2322,16 @@ BOOST_AUTO_TEST_CASE(op_2mul_post_chronicle)
           OP_2DUP,
           OP_EQUALVERIFY}, 
                 SCRIPT_ERR_OK, 2, exp_stack_top_type{ {0xfe, 0x80} }},
-        
+
         // INT64_MAX
         {{OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0x7f, OP_2MUL},
-                
+
                 SCRIPT_ERR_OK, 1, exp_stack_top_type{ {0xfe, 0xff, 0xff, 0xff, 0x0} }},
         // INT64_MIN
         {{OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0xff, OP_2MUL},
-                
+
                 SCRIPT_ERR_OK, 1, exp_stack_top_type{ {0xfe, 0xff, 0xff, 0xff, 0x80} }},
-        
+
         // conditionals 
         {{OP_0,
           OP_IF,
@@ -2375,6 +2375,138 @@ BOOST_AUTO_TEST_CASE(op_2mul_post_chronicle)
                                           actual.begin(), actual.end());
         }
     }
+}
+
+BOOST_AUTO_TEST_CASE(op_mul_len_invariant)
+{
+    using namespace std;
+
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const vector<uint8_t> script{ 1, 0x40, OP_2, OP_MUL };
+    const int64_t max_ops{1};
+    const int64_t max_scriptnum_len{1};
+    const eval_script_params params{max_ops, max_scriptnum_len, script.size(), 0};
+    const auto status = EvalScript(params,
+                                   source->GetToken(),
+                                   stack,
+                                   CScript{script.begin(), script.end()},
+                                   flags,
+                                   BaseSignatureChecker{});
+    BOOST_CHECK(status);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_SCRIPTNUM_OVERFLOW, *status);
+}
+
+BOOST_AUTO_TEST_CASE(op_2mul_len_invariant)
+{
+    using namespace std;
+
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const vector<uint8_t> script{ 1, 0x40, OP_2MUL };
+    const int64_t max_ops{1};
+    const int64_t max_scriptnum_len{1};
+    const eval_script_params params{max_ops, max_scriptnum_len, script.size(), 0};
+    const auto status = EvalScript(params,
+                                   source->GetToken(),
+                                   stack,
+                                   CScript{script.begin(), script.end()},
+                                   flags,
+                                   BaseSignatureChecker{});
+    BOOST_CHECK(status);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_SCRIPTNUM_OVERFLOW, *status);
+}
+
+BOOST_AUTO_TEST_CASE(op_add_len_invariant)
+{
+    using namespace std;
+
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const vector<uint8_t> script{ 1, 0x7f, 1, 0x7f, OP_ADD };
+    const int64_t max_ops{1};
+    const int64_t max_scriptnum_len{1};
+    const eval_script_params params{max_ops, max_scriptnum_len, script.size(), 0};
+    const auto status = EvalScript(params,
+                                   source->GetToken(),
+                                   stack,
+                                   CScript{script.begin(), script.end()},
+                                   flags,
+                                   BaseSignatureChecker{});
+    BOOST_CHECK(status);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_SCRIPTNUM_OVERFLOW, *status);
+}
+
+BOOST_AUTO_TEST_CASE(op_1add_len_invariant)
+{
+    using namespace std;
+
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const vector<uint8_t> script{ 1, 0x7f, OP_1ADD };
+    const int64_t max_ops{1};
+    const int64_t max_scriptnum_len{1};
+    const eval_script_params params{max_ops, max_scriptnum_len, script.size(), 0};
+    const auto status = EvalScript(params,
+                                   source->GetToken(),
+                                   stack,
+                                   CScript{script.begin(), script.end()},
+                                   flags,
+                                   BaseSignatureChecker{});
+    BOOST_CHECK(status);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_SCRIPTNUM_OVERFLOW, *status);
+}
+
+BOOST_AUTO_TEST_CASE(op_sub_len_invariant)
+{
+    using namespace std;
+
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const vector<uint8_t> script{ OP_1NEGATE, 1, 0x7f, OP_SUB };
+    const int64_t max_ops{1};
+    const int64_t max_scriptnum_len{1};
+    const eval_script_params params{max_ops, max_scriptnum_len, script.size(), 0};
+    const auto status = EvalScript(params,
+                                   source->GetToken(),
+                                   stack,
+                                   CScript{script.begin(), script.end()},
+                                   flags,
+                                   BaseSignatureChecker{});
+    BOOST_CHECK(status);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_SCRIPTNUM_OVERFLOW, *status);
+}
+
+BOOST_AUTO_TEST_CASE(op_1sub_len_invariant)
+{
+    using namespace std;
+
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const vector<uint8_t> script{ 1, 0x7f, OP_NEGATE, OP_1SUB };
+    const int64_t max_ops{2};
+    const int64_t max_scriptnum_len{1};
+    const eval_script_params params{max_ops, max_scriptnum_len, script.size(), 0};
+    const auto status = EvalScript(params,
+                                   source->GetToken(),
+                                   stack,
+                                   CScript{script.begin(), script.end()},
+                                   flags,
+                                   BaseSignatureChecker{});
+    BOOST_CHECK(status);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_SCRIPTNUM_OVERFLOW, *status);
 }
 
 BOOST_AUTO_TEST_CASE(op_2div_pre_chronicle)
