@@ -197,6 +197,9 @@ class OpcodesTestCase(ChronicleHeightBasedSimpleTestsCase):
         SimpleTestDefinition(None, CScript([OP_1, OP_2MUL, OP_2, OP_EQUAL]),
                              "CHRONICLE_PRE_ACTIVATION", CScript()),
 
+        SimpleTestDefinition(None, CScript([OP_2, OP_2DIV, OP_1, OP_EQUAL]),
+                             "CHRONICLE_PRE_ACTIVATION", CScript()),
+
         SimpleTestDefinition(None, CScript([OP_1, OP_2, OP_LSHIFTNUM, OP_4, OP_EQUAL]),
                              "CHRONICLE_PRE_ACTIVATION", CScript()),
 
