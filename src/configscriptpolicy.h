@@ -40,6 +40,10 @@ struct ConfigScriptPolicy {
     virtual uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool isConsensus) const;
     virtual uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool isConsensus) const;
 
+    virtual uint64_t GetMaxTxSize(ProtocolEra era, bool isConsensus) const;
+    virtual uint64_t GetDataCarrierSize() const;
+    virtual bool GetDataCarrier() const;
+
     int32_t GetGenesisActivationHeight() const;
     int32_t GetChronicleActivationHeight() const;
     uint64_t GetGenesisGracefulPeriod() const;
@@ -56,6 +60,10 @@ struct ConfigScriptPolicy {
     bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err);
     bool SetChronicleGracefulPeriod(int64_t chronicleGracefulPeriodIn, std::string* err);
 
+    bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr);
+    void SetDataCarrierSize(uint64_t dataCarrierSize);
+    void SetDataCarrier(bool dataCarrier);
+
 private:
     uint64_t maxOpsPerScriptPolicy;
     uint64_t maxScriptNumLengthPolicy;
@@ -68,4 +76,8 @@ private:
     int32_t chronicleActivationHeight;
     uint64_t genesisGracefulPeriod;
     uint64_t chronicleGracefulPeriod;
+
+    uint64_t maxTxSizePolicy;
+    uint64_t dataCarrierSize;
+    bool dataCarrier;
 };

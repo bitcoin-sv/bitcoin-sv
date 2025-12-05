@@ -80,6 +80,40 @@ bool SpecificConfigScriptPolicy::SetSpecificMaxStackMemoryUsage(int64_t maxStack
     return true;
 }
 
+uint64_t SpecificConfigScriptPolicy::GetMaxTxSize(ProtocolEra era, bool isConsensus) const{
+    if(isConsensus || !IsProtocolActive(era, ProtocolName::Genesis))
+    {
+        return ConfigScriptPolicy::GetMaxTxSize(era, isConsensus);
+    }
+    return mMaxTxSize.has_value() ? *mMaxTxSize : ConfigScriptPolicy::GetMaxTxSize(era, isConsensus);
+}
+
+bool SpecificConfigScriptPolicy::SetSpecificMaxTxSizePolicy(int64_t value, std::string* err){
+    if(!ConfigScriptPolicy::SetMaxTxSizePolicy(value, err))
+    {
+        return false;
+    }
+
+    mMaxTxSize = ConfigScriptPolicy::GetMaxTxSize(ProtocolEra::PostGenesis, false);
+    return true;
+}
+
+uint64_t SpecificConfigScriptPolicy::GetDataCarrierSize() const{
+    return mDataCarrierSize.has_value() ? *mDataCarrierSize : ConfigScriptPolicy::GetDataCarrierSize();
+}
+
+void SpecificConfigScriptPolicy::SetSpecificDataCarrierSize(uint64_t dataCarrierSize){
+    mDataCarrierSize = dataCarrierSize;
+}
+
+bool SpecificConfigScriptPolicy::GetDataCarrier() const{
+    return mDataCarrier.has_value() ? *mDataCarrier : ConfigScriptPolicy::GetDataCarrier();
+}
+
+void SpecificConfigScriptPolicy::SetSpecificDataCarrier(bool dataCarrier){
+    mDataCarrier = dataCarrier;
+}
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,36 +128,22 @@ const ConfigScriptPolicy& TransactionSpecificConfig::GetConfigScriptPolicy() con
 
 bool TransactionSpecificConfig::SetTransactionSpecificMaxTxSize(int64_t maxTxSizePolicyIn, std::string* err)
 {
-    // To avoid duplicating code from GlobalConfig we create temporary GlobalConfig object and call getter and setter
-    // for specific policy setting.
-    GlobalConfig tmp;
-    if(!tmp.SetMaxTxSizePolicy(maxTxSizePolicyIn, err))
-    {
-        return false;
-    }
-
-    mMaxTxSize = tmp.GetMaxTxSize(ProtocolEra::PostGenesis, false);
-    return true;
+    return mScriptPolicysettings.SetSpecificMaxTxSizePolicy(maxTxSizePolicyIn, err);
 }
 
 uint64_t TransactionSpecificConfig::GetMaxTxSize(ProtocolEra era, bool isConsensus) const
 {
-    if (isConsensus || !IsProtocolActive(era, ProtocolName::Genesis))
-    {
-        return GlobalConfig::GetMaxTxSize(era, isConsensus);
-    }
-
-    return mMaxTxSize.has_value() ? *mMaxTxSize : GlobalConfig::GetMaxTxSize(era, isConsensus);
+    return mScriptPolicysettings.GetMaxTxSize(era, isConsensus);
 }
 
 void TransactionSpecificConfig::SetTransactionSpecificDataCarrierSize(uint64_t dataCarrierSize)
 {
-    mDataCarrierSize = dataCarrierSize;
+    mScriptPolicysettings.SetSpecificDataCarrierSize(dataCarrierSize);
 };
 
 uint64_t TransactionSpecificConfig::GetDataCarrierSize() const
 {
-    return mDataCarrierSize.has_value() ? *mDataCarrierSize : GlobalConfig::GetDataCarrierSize();
+    return mScriptPolicysettings.GetDataCarrierSize();
 };
 
 bool TransactionSpecificConfig::SetTransactionSpecificMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err)
@@ -332,11 +352,11 @@ CFeeRate TransactionSpecificConfig::GetDustRelayFee() const
 
 void TransactionSpecificConfig::SetTransactionSpecificDataCarrier(bool dataCarrier)
 {
-    mDataCarrier = dataCarrier;
+    mScriptPolicysettings.SetSpecificDataCarrier(dataCarrier);
 };
 bool TransactionSpecificConfig::GetDataCarrier() const
 {
-    return mDataCarrier.has_value() ? *mDataCarrier : GlobalConfig::GetDataCarrier();
+    return mScriptPolicysettings.GetDataCarrier();
 };
 
 bool TransactionSpecificConfig::SetTransactionSpecificMaxTxnValidatorAsyncTasksRunDuration(int ms, std::string* err)

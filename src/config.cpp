@@ -39,13 +39,10 @@ void GlobalConfig::Reset()
     data->maxGeneratedBlockSizeBefore = 0;
     data->maxGeneratedBlockSizeAfter = 0;
     data->maxGeneratedBlockSizeOverridden =  false;
-    data->maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
     data->minConsolidationFactor = DEFAULT_MIN_CONSOLIDATION_FACTOR;
     data->maxConsolidationInputScriptSize = DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE;
     data->minConfConsolidationInput = DEFAULT_MIN_CONF_CONSOLIDATION_INPUT;
     data->acceptNonStdConsolidationInput = DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT;
-
-    data->dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
     data->limitAncestorCount = DEFAULT_ANCESTOR_LIMIT;
     data->limitSecondaryMempoolAncestorCount = DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT;
     
@@ -306,53 +303,12 @@ int64_t GlobalConfig::GetBlockSizeActivationTime() const {
 
 bool GlobalConfig::SetMaxTxSizePolicy(int64_t maxTxSizePolicyIn, std::string* err)
 {
-    if (LessThanZero(maxTxSizePolicyIn, err, "Policy value for max tx size must not be less than 0"))
-    {
-        return false;
-    }
-    if (maxTxSizePolicyIn == 0)
-    {
-        data->maxTxSizePolicy = MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS;
-        return true;
-    }
-    uint64_t maxTxSizePolicyInUnsigned = static_cast<uint64_t>(maxTxSizePolicyIn);
-    if (maxTxSizePolicyInUnsigned > MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS)
-    {
-        if (err)
-        {
-            *err = "Policy value for max tx size must not exceed consensus limit of " + std::to_string(MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS);
-        }
-        return false;
-    }
-    else if (maxTxSizePolicyInUnsigned < MAX_TX_SIZE_POLICY_BEFORE_GENESIS)
-    {
-        if (err)
-        {
-            *err = "Policy value for max tx size must not be less than " + std::to_string(MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
-        }
-        return false;
-    }
-
-    data->maxTxSizePolicy = maxTxSizePolicyInUnsigned;
-    return true;
+    return data->scriptPolicysettings.SetMaxTxSizePolicy(maxTxSizePolicyIn, err);
 }
 
 uint64_t GlobalConfig::GetMaxTxSize(ProtocolEra era, bool isConsensus) const
 {
-    if (!IsProtocolActive(era, ProtocolName::Genesis)) // no changes before genesis
-    {
-        if (isConsensus)
-        {
-            return MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS;
-        }
-        return MAX_TX_SIZE_POLICY_BEFORE_GENESIS;
-    }
-
-    if (isConsensus)
-    {
-        return MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS;
-    }
-    return data->maxTxSizePolicy;
+    return data->scriptPolicysettings.GetMaxTxSize(era, isConsensus);
 }
 
 bool GlobalConfig::SetMinConsolidationFactor(int64_t minConsolidationFactorIn, std::string* err)
@@ -423,19 +379,19 @@ bool GlobalConfig::GetAcceptNonStdConsolidationInput() const
 }
 
 void GlobalConfig::SetDataCarrierSize(uint64_t dataCarrierSizeIn) {
-    data->dataCarrierSize = dataCarrierSizeIn;
+    data->scriptPolicysettings.SetDataCarrierSize(dataCarrierSizeIn);
 }
 
 uint64_t GlobalConfig::GetDataCarrierSize() const {
-    return data->dataCarrierSize;
+    return data->scriptPolicysettings.GetDataCarrierSize();
 }
 
 void GlobalConfig::SetDataCarrier(bool dataCarrierIn) {
-    data->dataCarrier = dataCarrierIn;
+    data->scriptPolicysettings.SetDataCarrier(dataCarrierIn);
 }
 
 bool GlobalConfig::GetDataCarrier() const {
-    return data->dataCarrier;
+    return data->scriptPolicysettings.GetDataCarrier();
 }
 
 

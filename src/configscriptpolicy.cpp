@@ -7,6 +7,7 @@
 #include "consensus/consensus.h"
 #include "policy/policy.h"
 #include "protocol_era.h"
+#include "script/standard.h"
 
 bool LessThan(
     int64_t argValue,
@@ -50,6 +51,10 @@ void ConfigScriptPolicy::ResetDefault(){
     chronicleActivationHeight = 0;
     genesisGracefulPeriod = DEFAULT_GENESIS_GRACEFUL_ACTIVATION_PERIOD;
     chronicleGracefulPeriod = DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD;
+
+    maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
+    dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
+    dataCarrier = DEFAULT_ACCEPT_DATACARRIER;
 }
 
 uint64_t ConfigScriptPolicy::GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const
@@ -382,4 +387,75 @@ bool ConfigScriptPolicy::SetChronicleGracefulPeriod(int64_t chronicleGracefulPer
 uint64_t ConfigScriptPolicy::GetChronicleGracefulPeriod() const
 {
     return chronicleGracefulPeriod;
+}
+
+uint64_t ConfigScriptPolicy::GetMaxTxSize(ProtocolEra era, bool isConsensus) const
+{
+    if (!IsProtocolActive(era, ProtocolName::Genesis)) // no changes before genesis
+    {
+        if (isConsensus)
+        {
+            return MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS;
+        }
+        return MAX_TX_SIZE_POLICY_BEFORE_GENESIS;
+    }
+
+    if (isConsensus)
+    {
+        return MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS;
+    }
+    return maxTxSizePolicy;
+}
+
+bool ConfigScriptPolicy::SetMaxTxSizePolicy(int64_t value, std::string* err)
+{
+    if (LessThanZero(value, err, "Policy value for max tx size must not be less than 0"))
+    {
+        return false;
+    }
+    if (value == 0)
+    {
+        maxTxSizePolicy = MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS;
+        return true;
+    }
+    uint64_t maxTxSizePolicyInUnsigned = static_cast<uint64_t>(value);
+    if (maxTxSizePolicyInUnsigned > MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS)
+    {
+        if (err)
+        {
+            *err = "Policy value for max tx size must not exceed consensus limit of " + std::to_string(MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS);
+        }
+        return false;
+    }
+    else if (maxTxSizePolicyInUnsigned < MAX_TX_SIZE_POLICY_BEFORE_GENESIS)
+    {
+        if (err)
+        {
+            *err = "Policy value for max tx size must not be less than " + std::to_string(MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
+        }
+        return false;
+    }
+
+    maxTxSizePolicy = maxTxSizePolicyInUnsigned;
+    return true;
+}
+
+uint64_t ConfigScriptPolicy::GetDataCarrierSize() const
+{
+    return dataCarrierSize;
+}
+
+void ConfigScriptPolicy::SetDataCarrierSize(uint64_t dataCarrierSizeIn)
+{
+    dataCarrierSize = dataCarrierSizeIn;
+}
+
+bool ConfigScriptPolicy::GetDataCarrier() const
+{
+    return dataCarrier;
+}
+
+void ConfigScriptPolicy::SetDataCarrier(bool dataCarrierIn)
+{
+    dataCarrier = dataCarrierIn;
 }

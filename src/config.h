@@ -798,13 +798,10 @@ private:
         uint64_t maxGeneratedBlockSizeAfter;
         bool maxGeneratedBlockSizeOverridden;
 
-        uint64_t maxTxSizePolicy;
         uint64_t minConsolidationFactor;
         uint64_t maxConsolidationInputScriptSize;
         uint64_t minConfConsolidationInput;
         bool acceptNonStdConsolidationInput;
-        uint64_t dataCarrierSize;
-        bool dataCarrier {DEFAULT_ACCEPT_DATACARRIER};
         uint64_t limitAncestorCount;
         uint64_t limitSecondaryMempoolAncestorCount;
 

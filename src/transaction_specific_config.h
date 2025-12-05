@@ -18,16 +18,25 @@ struct SpecificConfigScriptPolicy: public ConfigScriptPolicy {
     uint64_t GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const override;
     uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const override;
     uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool isConsensus) const override;
+    uint64_t GetMaxTxSize(ProtocolEra era, bool isConsensus) const override;
+    uint64_t GetDataCarrierSize() const override;
+    bool GetDataCarrier() const override;
 
     bool SetSpecificMaxScriptNumLengthPolicy(ProtocolEra era, int64_t maxScriptNumLengthIn, std::string* err = nullptr);
     bool SetSpecificMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr);
     bool SetSpecificMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr);
+    bool SetSpecificMaxTxSizePolicy(int64_t value, std::string* err = nullptr);
+    void SetSpecificDataCarrierSize(uint64_t dataCarrierSize);
+    void SetSpecificDataCarrier(bool dataCarrier);
 
 private :
     std::optional<uint64_t> mMaxScriptSize;
     std::optional<uint64_t> mMaxScriptNumLength;
     std::optional<uint64_t> mMaxStackMemoryUsageConsensus;
     std::optional<uint64_t> mMaxStackMemoryUsagePolicy;
+    std::optional<uint64_t> mMaxTxSize;
+    std::optional<uint64_t> mDataCarrierSize;
+    std::optional<bool> mDataCarrier;
 };
 
 /*
@@ -104,8 +113,6 @@ public:
 private:
 
     SpecificConfigScriptPolicy mScriptPolicysettings;
-    std::optional<uint64_t> mMaxTxSize;
-    std::optional<uint64_t> mDataCarrierSize;
     std::optional<uint64_t> mLimitAncestorCount;
     std::optional<uint64_t> mLimitCPFPGroupMembersCount;
     std::optional<bool> mAcceptNonStdOutputs;
@@ -118,6 +125,5 @@ private:
     std::optional<bool> mAcceptNonStdConsoldationInput;
     std::optional<uint64_t> mDustLimitFactor;
     std::optional<CFeeRate> mDustRelayFee;
-    std::optional<bool> mDataCarrier;
     uint32_t mSkipScriptFlags{0};
 };
