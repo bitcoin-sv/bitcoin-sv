@@ -12,7 +12,6 @@
 #include <boost/test/tools/old/interface.hpp>
 #include <boost/test/unit_test.hpp>
 #include <cstdint>
-#include <exception>
 
 using namespace std;
 using bsv::bint;
@@ -107,7 +106,7 @@ BOOST_AUTO_TEST_CASE(bint_construction)
         const CScriptNum b{bint{-0x80}, 1};
         BOOST_FAIL("Expected script number overflow");
     }
-    catch(std::exception& e)
+    catch(const scriptnum_overflow_error& e)
     {
         const string expected{"script number overflow"};
         BOOST_CHECK_EQUAL(expected, e.what());
@@ -644,10 +643,10 @@ BOOST_AUTO_TEST_CASE(mul_max_length_invariant)
                             size_t>;    // max_len
     const vector<test_args> non_throwing_cases
     {
-        {0x20,  0x2, 1},    // = 0x40
-        {0x40,  0x2, 2},    // = 0x0, 0x80
-        {0x20, -0x2, 1},    // = 0xc0
-        {0x40, -0x2, 2},    // = 0x80, 0x80
+        {0x20,  0x2, 1},
+        {0x40,  0x2, 2},
+        {0x20, -0x2, 1},
+        {0x40, -0x2, 2},
     };
     // int64_t
     for(const auto& [a, b, max_len] : non_throwing_cases)
@@ -669,8 +668,8 @@ BOOST_AUTO_TEST_CASE(mul_max_length_invariant)
     // (bsv::bint only - int64_t intentionally unchanged for backward compatibility)
     const vector<test_args> throwing_cases
     {
-        {0x40,  0x2, 1},    // = 0x0, 0x80
-        {0x40, -0x2, 1},    // = 0x80, 0x80
+        {0x40,  0x2, 1},
+        {0x40, -0x2, 1},
     };
     for(const auto& [a, b, max_len] : throwing_cases)
     {

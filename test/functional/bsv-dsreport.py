@@ -93,7 +93,7 @@ class DoubleSpendReport(BitcoinTestFramework):
                             '-whitelist=127.0.0.1',
                             '-genesisactivationheight=1',
                             '-maxscriptsizepolicy=0',
-                            '-maxscriptnumlengthpolicy=250000',
+                            '-maxscriptnumlengthpolicy=500000',
                             "-maxnonstdtxvalidationduration=15000",
                             "-maxtxnvalidatorasynctasksrunduration=15001",
                             "-dsnotifylevel=2"]]
@@ -388,7 +388,7 @@ class DoubleSpendReport(BitcoinTestFramework):
                                        '-banscore=100000',
                                        '-genesisactivationheight=1',
                                        '-maxscriptsizepolicy=0',
-                                       '-maxscriptnumlengthpolicy=250000',
+                                       '-maxscriptnumlengthpolicy=500000',
                                        "-maxnonstdtxvalidationduration=11",
                                        "-dsnotifylevel=1"])
         self.createConnection()
@@ -409,7 +409,7 @@ class DoubleSpendReport(BitcoinTestFramework):
                                        '-banscore=100000',
                                        '-genesisactivationheight=1',
                                        '-maxscriptsizepolicy=0',
-                                       '-maxscriptnumlengthpolicy=250000',
+                                       '-maxscriptnumlengthpolicy=500000',
                                        "-maxnonstdtxvalidationduration=11",
                                        "-dsnotifylevel=2"])
 
