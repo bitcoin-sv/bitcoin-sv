@@ -442,10 +442,6 @@ add_library(common
 	write_preferring_upgradable_mutex.h
 )
 
-set_source_files_properties(
-    config.cpp
-    PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
-
 enable_coverage(common)
 
 target_include_directories(common SYSTEM PUBLIC secp256k1/include)
