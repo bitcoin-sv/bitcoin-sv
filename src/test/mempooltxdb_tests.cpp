@@ -21,7 +21,7 @@
 
 namespace
 {
-    std::vector<CTxMemPoolEntry> GetABunchOfEntries(int howMany)
+    std::vector<CTxMemPoolEntry> MakeMempoolTxDbEntries(int howMany)
     {
         TestMemPoolEntryHelper entry;
         std::vector<CTxMemPoolEntry> result;
@@ -111,7 +111,7 @@ BOOST_AUTO_TEST_CASE(RemoveXrefKey)
 
 BOOST_AUTO_TEST_CASE(BatchWriteWrite)
 {
-    const auto entries = GetABunchOfEntries(1);
+    const auto entries = MakeMempoolTxDbEntries(1);
     const auto& entry = entries[0];
 
     CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
@@ -135,7 +135,7 @@ BOOST_AUTO_TEST_CASE(BatchWriteWrite)
 
 BOOST_AUTO_TEST_CASE(BatchWriteRemove)
 {
-    const auto entries = GetABunchOfEntries(1);
+    const auto entries = MakeMempoolTxDbEntries(1);
     const auto& entry = entries[0];
 
     CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
@@ -159,7 +159,7 @@ BOOST_AUTO_TEST_CASE(BatchWriteRemove)
 
 BOOST_AUTO_TEST_CASE(BatchWriteRemoveWrite)
 {
-    const auto entries = GetABunchOfEntries(1);
+    const auto entries = MakeMempoolTxDbEntries(1);
     const auto& entry = entries[0];
 
     CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
@@ -184,7 +184,7 @@ BOOST_AUTO_TEST_CASE(BatchWriteRemoveWrite)
 
 BOOST_AUTO_TEST_CASE(AsyncWriteToTxDB)
 {
-    const auto entries = GetABunchOfEntries(11);
+    const auto entries = MakeMempoolTxDbEntries(11);
 
     CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
@@ -210,7 +210,7 @@ BOOST_AUTO_TEST_CASE(AsyncWriteToTxDB)
 
 BOOST_AUTO_TEST_CASE(AsyncDeleteFromTxDB)
 {
-    const auto entries = GetABunchOfEntries(13);
+    const auto entries = MakeMempoolTxDbEntries(13);
 
     CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
@@ -242,7 +242,7 @@ BOOST_AUTO_TEST_CASE(AsyncDeleteFromTxDB)
 
 BOOST_AUTO_TEST_CASE(AsyncClearDB)
 {
-    const auto entries = GetABunchOfEntries(17);
+    const auto entries = MakeMempoolTxDbEntries(17);
 
     CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
@@ -268,7 +268,7 @@ BOOST_AUTO_TEST_CASE(AsyncClearDB)
 
 BOOST_AUTO_TEST_CASE(AsyncMultiWriteCoalesce)
 {
-    const auto entries = GetABunchOfEntries(1223);
+    const auto entries = MakeMempoolTxDbEntries(1223);
 
     CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
@@ -297,7 +297,7 @@ BOOST_AUTO_TEST_CASE(AsyncMultiWriteRemoveCoalesce)
 {
     std::mt19937 generator(insecure_rand());
 
-    auto entries = GetABunchOfEntries(541);
+    auto entries = MakeMempoolTxDbEntries(541);
     const auto middle = entries.begin() + ssize(entries) / 2;
 
     CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
@@ -373,7 +373,7 @@ BOOST_AUTO_TEST_CASE(AsyncAutoRemoveXrefKey)
     DeterministicUUIDGenerator gen;
     const auto uuid = gen();
     auto xref = decltype(uuid)();
-    auto entries = GetABunchOfEntries(1);
+    auto entries = MakeMempoolTxDbEntries(1);
     auto& e = entries[0];
 
     CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
@@ -470,7 +470,7 @@ BOOST_AUTO_TEST_CASE(SaveOnFullMempool)
 
 BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrim)
 {
-    const auto entries = GetABunchOfEntries(6);
+    const auto entries = MakeMempoolTxDbEntries(6);
 
     CTxMemPool testPool;
     CTxMemPoolTestAccess testPoolAccess(testPool);
@@ -507,7 +507,7 @@ BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrimDoesNotConfuseJBA)
     CTxMemPoolTestAccess testPoolAccess(testPool);
 
     auto [totalSize_entries, count_entries] = ([&testPool] () {
-        auto entries = GetABunchOfEntries(6);
+        auto entries = MakeMempoolTxDbEntries(6);
 
         // Add transactions:
         for (auto& entry : entries) {
@@ -617,7 +617,7 @@ BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrimDoesNotConfuseJBA)
 BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
 {
     constexpr unsigned numberOfEntries = 6;
-    const auto entries = GetABunchOfEntries(numberOfEntries);
+    const auto entries = MakeMempoolTxDbEntries(numberOfEntries);
 
     CTxMemPool testPool;
     CTxMemPoolTestAccess testPoolAccess(testPool);
@@ -669,7 +669,7 @@ BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
 namespace {
     CTransactionWrapperRef MakeTxWrapper(const std::shared_ptr<CMempoolTxDBReader>& txdb)
     {
-        const auto entries = GetABunchOfEntries(1);
+        const auto entries = MakeMempoolTxDbEntries(1);
         return std::make_shared<CTransactionWrapper>(entries[0].GetSharedTx(), txdb);
     }
 

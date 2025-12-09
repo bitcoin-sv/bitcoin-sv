@@ -223,8 +223,6 @@ add_test_to_suite(bitcoin test_bitcoin
 )
 
 set_source_files_properties(
-    mempooltxdb_tests.cpp
-    mempool_dump_load_tests.cpp
     msg_buffer_tests.cpp
     net_message_tests.cpp
     test_bitcoin_main.cpp
