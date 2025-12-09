@@ -56,13 +56,13 @@ namespace
         return std::ranges::all_of(groups,
             [](const auto& group) { return std::ranges::is_sorted(*group); });
     }
-
-    struct RandomContextFixture {
-        RandomContextFixture() {
-            ResetGlobalRandomContext();
-        }
-    };
 }
+
+struct RandomContextFixture {
+    RandomContextFixture() {
+        ResetGlobalRandomContext();
+    }
+};
 
 BOOST_FIXTURE_TEST_SUITE(txn_grouper, RandomContextFixture)
 

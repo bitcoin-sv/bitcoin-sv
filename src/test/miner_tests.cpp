@@ -33,16 +33,16 @@ using mining::BlockAssemblerRef;
 using mining::CBlockTemplate;
 using mining::JournalingBlockAssembler;
 
+class JournalingTestingSetup : public TestingSetup
+{
+public:
+    JournalingTestingSetup()
+        : TestingSetup(CBaseChainParams::MAIN, mining::CMiningFactory::BlockAssemblerType::JOURNALING)
+    {}
+};
+
 namespace
 {
-    class JournalingTestingSetup : public TestingSetup
-    {
-    public:
-        JournalingTestingSetup()
-            : TestingSetup(CBaseChainParams::MAIN, mining::CMiningFactory::BlockAssemblerType::JOURNALING)
-        {}
-    };
-
     class miner_tests_uid; // only used as unique identifier
 }
 

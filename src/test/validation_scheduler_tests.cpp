@@ -130,8 +130,9 @@ namespace{
         }
 
     }
+}
 
-    struct TestSetup : TestChain100Setup {
+struct ValidationScheduler100Fixture : TestChain100Setup {
         // Remember executed tasks and ids of txns in the task.
         std::vector<std::vector<TxId>> executedTasks{};
         std::mutex executedTasksMtx;
@@ -190,8 +191,7 @@ namespace{
                 CheckExecutionOrder(txsToValidate, executedTasks, expectedVariants);
             } while(std::next_permutation(permutedTxsToValidate.begin(), permutedTxsToValidate.end(), CompareTxById));
         }
-    };
-}
+};
 
 namespace std {
     // Needed by Boost to print vector
@@ -215,7 +215,7 @@ namespace std {
     }
 };
 
-BOOST_FIXTURE_TEST_SUITE(validation_scheduler_tests, TestSetup)
+BOOST_FIXTURE_TEST_SUITE(validation_scheduler_tests, ValidationScheduler100Fixture)
 
 // Isolated transactions are scheduled in parallel. Task completion is random.
 BOOST_AUTO_TEST_CASE(txs_isolated) {

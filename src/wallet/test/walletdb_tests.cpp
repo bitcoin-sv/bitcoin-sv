@@ -10,19 +10,25 @@
 
 #include <boost/test/unit_test.hpp>
 
-namespace {
-struct WalletDBTestingSetup : public TestingSetup { // NOLINT(cppcoreguidelines-special-member-functions)
-    WalletDBTestingSetup(
+struct WalletDBFixture : TestingSetup
+{
+    WalletDBFixture(
         const std::string& /*chainName*/ = CBaseChainParams::MAIN) {
         bitdb.MakeMock();
     }
 
-    ~WalletDBTestingSetup() {
+    WalletDBFixture(const WalletDBFixture&) = delete;
+    WalletDBFixture& operator=(const WalletDBFixture&) = delete;
+    WalletDBFixture(WalletDBFixture&&) = delete;
+    WalletDBFixture& operator=(WalletDBFixture&&) = delete;
+
+    ~WalletDBFixture() {
         bitdb.Flush(true);
         bitdb.Reset();
     }
 };
 
+namespace {
 static std::unique_ptr<CWalletDBWrapper> TmpDB(const fs::path &pathTemp,
                                                const std::string &testname) {
     fs::path dir = pathTemp / testname;
@@ -42,7 +48,7 @@ static std::unique_ptr<CWallet> LoadWallet(CWalletDB *db) {
 }
 } // namespace
 
-BOOST_FIXTURE_TEST_SUITE(walletdb_tests, WalletDBTestingSetup)
+BOOST_FIXTURE_TEST_SUITE(walletdb_tests, WalletDBFixture)
 
 BOOST_AUTO_TEST_CASE(write_erase_name) {
     auto walletdbwrapper = TmpDB(pathTemp, "write_erase_name");

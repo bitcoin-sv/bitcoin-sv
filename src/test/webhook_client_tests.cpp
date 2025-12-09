@@ -63,11 +63,13 @@ namespace
         std::array<char, 1024> mData{};
     };
 
-    // Simple asynchronous socket server
-    class Server
-    {
+}
+
+// Simple asynchronous socket server
+class WebhookTestServer
+{
       public:
-        Server(boost::asio::io_service& io_service, unsigned short port)
+        WebhookTestServer(boost::asio::io_service& io_service, unsigned short port)
         : mAcceptor { io_service, tcp::endpoint { tcp::v4(), port } },
           mSocket { io_service }
         {
@@ -92,20 +94,25 @@ namespace
 
         tcp::acceptor mAcceptor;
         tcp::socket mSocket;
-    };
+};
 
-    // A testing fixture that runs a TCP server
-    class ServerSetup // NOLINT(cppcoreguidelines-special-member-functions)
-    {
+// A testing fixture that runs a TCP server
+class WebhookServerFixture
+{
       public:
-        ServerSetup()
-        : mContext{}, mServer { mContext, 8888 }
+        WebhookServerFixture()
+        : mContext{}, mServer{ mContext, 8888 }
         {
             // Run TCP server in its own thread in the background
-            mFuture = std::async(std::launch::async, &ServerSetup::run, this);
+            mFuture = std::async(std::launch::async, &WebhookServerFixture::run, this);
         }
 
-        ~ServerSetup()
+        WebhookServerFixture(const WebhookServerFixture&) = delete;
+        WebhookServerFixture& operator=(const WebhookServerFixture&) = delete;
+        WebhookServerFixture(WebhookServerFixture&&) = delete;
+        WebhookServerFixture& operator=(WebhookServerFixture&&) = delete;
+
+        ~WebhookServerFixture()
         {
             mContext.stop();
             mFuture.wait();
@@ -118,10 +125,12 @@ namespace
         }
 
         boost::asio::io_service mContext;
-        Server mServer;
+        WebhookTestServer mServer;
         std::future<void> mFuture {};
-    };
+};
 
+namespace
+{
     // Make a dummy HTTPRequest to use for testing
     rpc::client::HTTPRequest MakeRequest(const rpc::client::RPCClientConfig& config)
     {
@@ -131,7 +140,7 @@ namespace
     }
 }
 
-BOOST_FIXTURE_TEST_SUITE(webhook_client_tests, ServerSetup)
+BOOST_FIXTURE_TEST_SUITE(webhook_client_tests, WebhookServerFixture)
 
 BOOST_AUTO_TEST_CASE(RequestResponse)
 {

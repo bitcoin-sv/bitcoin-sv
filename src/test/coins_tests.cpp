@@ -20,7 +20,7 @@
 
 #include <boost/test/unit_test.hpp>
 
-namespace{ class coins_tests_uid; } // only used as unique identifier
+class coins_tests_uid; // only used as unique identifier
 
 template <>
 struct CoinsStore::UnitTestAccess<coins_tests_uid>
@@ -136,8 +136,6 @@ private:
     WPUSMutex::Lock mLock;
 };
 
-namespace {
-
 class CCoinsViewCacheTest : public TestCoinsSpanCache {
 public:
     CCoinsViewCacheTest( CoinsDB& db ) : TestCoinsSpanCache(db) {}
@@ -156,6 +154,8 @@ public:
         BOOST_CHECK_EQUAL(DynamicMemoryUsage(), ret);
     }
 };
+
+namespace {
 
 CoinWithScript DataStreamToCoinWithScript(CDataStream& stream)
 {

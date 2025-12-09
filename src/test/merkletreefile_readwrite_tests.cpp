@@ -10,13 +10,6 @@
 
 namespace
 {
-    struct RegtestingSetup : public BasicTestingSetup
-    {
-        RegtestingSetup() : BasicTestingSetup(CBaseChainParams::REGTEST)
-        {
-        }
-    };
-
     // WrittenData holds information of Merkle Tree we want to use in later checks.
     struct WrittenData // NOLINT(cppcoreguidelines-pro-type-member-init)
     {
@@ -111,7 +104,7 @@ namespace
     }
 }
 
-BOOST_FIXTURE_TEST_SUITE(merkletreefile_readwrite_tests, RegtestingSetup)
+BOOST_FIXTURE_TEST_SUITE(merkletreefile_readwrite_tests, BasicRegtestFixture)
 
 BOOST_AUTO_TEST_CASE(write_read_test)
 {

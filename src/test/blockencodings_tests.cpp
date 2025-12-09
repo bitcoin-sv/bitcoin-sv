@@ -19,16 +19,10 @@
 
 namespace
 {
-
     std::vector<std::pair<uint256, CTransactionRef>> extra_txn; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
-
-    struct RegtestingSetup : public TestingSetup {
-        RegtestingSetup() : TestingSetup(CBaseChainParams::REGTEST) {}
-    };
-
 }
 
-BOOST_FIXTURE_TEST_SUITE(blockencodings_tests, RegtestingSetup)
+BOOST_FIXTURE_TEST_SUITE(blockencodings_tests, RegtestingFixture)
 
 static CBlock BuildBlockTestCase() {
     CBlock block;

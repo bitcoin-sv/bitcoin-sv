@@ -32,12 +32,14 @@ namespace
     const std::vector<uint8_t> MinerInfoProtocolPrefix { 0x60, 0x1d, 0xfa, 0xce };
     const std::vector<uint8_t> ProtocolIdVersion { 0x00 };
 
-    // v0.2 or v0.3
-    enum class MinerIDOrInfo { MINER_ID, MINER_INFO };
+}
 
-    // Additional fields for creating V3 coinbase documents
-    struct V3CoinbaseFields
-    {
+// v0.2 or v0.3
+enum class MinerIDOrInfo { MINER_ID, MINER_INFO };
+
+// Additional fields for creating V3 coinbase documents
+struct V3CoinbaseFields
+{
         V3CoinbaseFields() = default;
         V3CoinbaseFields(MinerIDOrInfo mioi) : idOrInfo{mioi} {}
         V3CoinbaseFields(MinerIDOrInfo mioi, const CKey& prevKey, const CKey& key, const std::optional<CoinbaseDocument::RevocationMessage>& rm)
@@ -54,8 +56,10 @@ namespace
         CPubKey revocationPubKey {};
         std::optional<CoinbaseDocument::RevocationMessage> revocationMessage { std::nullopt };
         std::optional<CKey> revocationCurrentMinerIdKey { std::nullopt };
-    };
+};
 
+namespace
+{
     // Dummy vctx for v0.2 miner IDs
     const std::string vctxid { "6839008199026098cc78bf5f34c9a6bdf7a8009c9f019f8399c7ca1945b4a4ff" };
 
@@ -344,10 +348,11 @@ namespace
         coinbase.vout[1].scriptPubKey << hashConcatMerklePrevBlockBytes << signature;
         block.vtx[0] = MakeTransactionRef(std::move(coinbase));
     }
+}
 
-    // Testing fixture that creates a REGTEST-mode block chain with minerIDs
-    struct SetupMinerIDChain : public TestChain100Setup
-    {
+// Testing fixture that creates a REGTEST-mode block chain with minerIDs
+struct SetupMinerIDChain : public TestChain100Setup
+{
         SetupMinerIDChain() : TestChain100Setup{}
         {
 	    // Create dataref index
@@ -645,8 +650,10 @@ namespace
         // Transactions containing dataRefs
         std::vector<CTransactionRef> dataRefTxns {};
         std::vector<std::string> dataRefTxnBrfcIds { "BrfcId1", "BrfcId2" };
-    };
+};
 
+namespace
+{
     // For ID only
     class miner_id_tests3_id;
 }

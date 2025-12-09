@@ -26,19 +26,18 @@
 
 #include <boost/test/unit_test.hpp>
 
-namespace {
-    struct TestChain100Setup2 : TestChain100Setup {
+struct ValidationCache100Fixture : TestChain100Setup {
         /**
          * Check if txn is valid and accepted by the mempool.
          *
          */
         // TxnValidator
-        bool ToMemPool(CMutableTransaction &tx) {
+        bool ToMemPool(CMutableTransaction& mtx){
             // Mock rpc txn
             auto pTxInputData {
                 std::make_shared<CTxInputData>(
                     pTxIdTracker,             // a pointer to the TxIdTracker
-                    MakeTransactionRef(tx),   // a pointer to the tx
+                    MakeTransactionRef(mtx),  // a pointer to the tx
                     TxSource::rpc,            // tx source
                     TxValidationPriority::normal,   // tx validation priority
                     TxStorage::memory,        // tx storage
@@ -66,8 +65,10 @@ namespace {
                     dsDetector,
                     pTxIdTracker)
         };
-    };
+};
 
+namespace
+{
     // Run CheckInputs (using pcoinsTip) on the given transaction, for all script
     // flags. Test that CheckInputs passes for all flags that don't overlap with the
     // failing_flags argument, but otherwise fails.
@@ -203,7 +204,7 @@ namespace {
     }
 }
 
-BOOST_FIXTURE_TEST_SUITE(txvalidationcache_tests, TestChain100Setup2)
+BOOST_FIXTURE_TEST_SUITE(txvalidationcache_tests, ValidationCache100Fixture)
 
 BOOST_AUTO_TEST_CASE(tx_mempool_block_doublespend) {
     // Make sure skipping validation of transctions that were validated going

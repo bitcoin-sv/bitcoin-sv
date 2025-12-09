@@ -136,10 +136,11 @@ namespace
 
         return document;
     }
+}
 
-    // Testing fixture that creates a REGTEST-mode block chain with minerIDs
-    struct SetupMinerIDDBChain : public TestChain100Setup
-    {
+// Testing fixture that creates a REGTEST-mode block chain with minerIDs
+struct SetupMinerIDDBChain : public TestChain100Setup
+{
         SetupMinerIDDBChain() : TestChain100Setup{}
         {
             // Create dataref index
@@ -352,8 +353,10 @@ namespace
         // Transactions containing dataRefs
         std::vector<CTransactionRef> dataRefTxns {};
         std::vector<std::string> dataRefTxnBrfcIds { "BrfcId1", "BrfcId2" };
-    };
+};
 
+namespace
+{
     // For ID only
     class miner_id_tests_id;
 }

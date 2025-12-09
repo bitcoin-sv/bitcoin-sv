@@ -22,10 +22,11 @@ namespace
 {
     // Only used as unique identifier
     class jba_tests_uid;
+}
 
-    // Testing fixture that creates a REGTEST-mode block chain with spendable coins
-    struct SetupJBAChain : public TestChain100Setup
-    {
+// Testing fixture that creates a REGTEST-mode block chain with spendable coins
+struct SetupJBAChain : public TestChain100Setup
+{
         SetupJBAChain() : TestChain100Setup{}
         {
             // Create us some spendable coinbase txns
@@ -196,8 +197,7 @@ namespace
 
         // Estimated fee per 50k txn we test with
         Amount mTxnFee { 50000 };
-    };
-}
+};
 
 // For inspection / modification of the JBA
 template<>

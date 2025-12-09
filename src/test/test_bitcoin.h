@@ -80,9 +80,20 @@ struct TestingSetup : public BasicTestingSetup {
     boost::thread_group threadGroup;
     CConnman *connman = nullptr;
 
-    TestingSetup(const std::string &chainName = CBaseChainParams::MAIN, 
+    TestingSetup(const std::string &chainName = CBaseChainParams::MAIN,
                  mining::CMiningFactory::BlockAssemblerType assemblerType = mining::CMiningFactory::BlockAssemblerType::JOURNALING);
     ~TestingSetup();
+};
+
+// Convenience fixtures for REGTEST mode
+struct BasicRegtestFixture : BasicTestingSetup
+{
+    BasicRegtestFixture(): BasicTestingSetup(CBaseChainParams::REGTEST){}
+};
+
+struct RegtestingFixture : TestingSetup
+{
+    RegtestingFixture(): TestingSetup(CBaseChainParams::REGTEST){}
 };
 
 class CBlock;

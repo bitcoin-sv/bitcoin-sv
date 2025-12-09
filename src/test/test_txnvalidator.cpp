@@ -276,23 +276,24 @@ namespace {
                 "",
                 true);
     }
-    struct TestChain100Setup2 : TestChain100Setup {
-        CScript scriptPubKey {
-            GetScriptPubKey(coinbaseKey)
-        };
-        // twoDoubleSpend2Txns contains two txns spending the same coinbase txn
-        std::vector<CMutableTransaction> doubleSpend2Txns {
-            CreateDoubleSpendTxn(coinbaseTxns[0], coinbaseKey, scriptPubKey),
-            CreateDoubleSpendTxn(coinbaseTxns[0], coinbaseKey, scriptPubKey)
-        };
-        // doubleSpend10Txns contains 10 double spend txns spending the same coinbase txn
-        std::vector<CMutableTransaction> doubleSpend10Txns {
-            CreateNDoubleSpendTxns(10, coinbaseTxns[0], coinbaseKey, scriptPubKey)
-        };    
-    };
 }
 
-BOOST_FIXTURE_TEST_SUITE(test_txnvalidator, TestChain100Setup2)
+struct DoubleSpend100Fixture : TestChain100Setup {
+    CScript scriptPubKey {
+        GetScriptPubKey(coinbaseKey)
+    };
+    // twoDoubleSpend2Txns contains two txns spending the same coinbase txn
+    std::vector<CMutableTransaction> doubleSpend2Txns {
+        CreateDoubleSpendTxn(coinbaseTxns[0], coinbaseKey, scriptPubKey),
+        CreateDoubleSpendTxn(coinbaseTxns[0], coinbaseKey, scriptPubKey)
+    };
+    // doubleSpend10Txns contains 10 double spend txns spending the same coinbase txn
+    std::vector<CMutableTransaction> doubleSpend10Txns {
+        CreateNDoubleSpendTxns(10, coinbaseTxns[0], coinbaseKey, scriptPubKey)
+    };
+};
+
+BOOST_FIXTURE_TEST_SUITE(test_txnvalidator, DoubleSpend100Fixture)
 
 BOOST_AUTO_TEST_CASE(txn_validator_creation) {
     CTxMemPool pool;

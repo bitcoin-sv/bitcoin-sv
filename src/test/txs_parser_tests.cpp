@@ -18,96 +18,96 @@ using namespace bsv;
 
 static const std::vector<uint8_t> txs = []
 {
-    std::vector<uint8_t> tx;
+    std::vector<uint8_t> txn;
 
-    tx.insert(tx.end(), 1, 2);              // tx count
+    txn.insert(txn.end(), 1, 2);              // txn count
     
-    // tx 1
-    tx.insert(tx.end(), version_len, 3);    // tx version
-    tx.push_back(2);                         // 1 input 
+    // txn 1
+    txn.insert(txn.end(), version_len, 3);    // txn version
+    txn.push_back(2);                         // 1 input 
     
     // ip 1
-    tx.insert(tx.end(), outpoint_len, 4);   // tx outpoint 
-    tx.push_back(1);                       // script length
-    tx.push_back(0x6a);                    // script (op_return)
-    tx.insert(tx.end(), seq_len, 5);        // sequence
+    txn.insert(txn.end(), outpoint_len, 4);   // txn outpoint 
+    txn.push_back(1);                         // script length
+    txn.push_back(0x6a);                      // script (op_return)
+    txn.insert(txn.end(), seq_len, 5);        // sequence
     // ip 2
-    tx.insert(tx.end(), outpoint_len, 6);   // tx outpoint 
-    tx.push_back(0xfd);                    // script length encoded 2 bytes
-    tx.push_back(2);                       // script length little endian 
-    tx.push_back(0);                       // 
-    tx.push_back(0x6a);                    // script (op_return)
-    tx.push_back(0x6a);                    // script (op_return)
-    tx.insert(tx.end(), seq_len, 7);        // sequence
+    txn.insert(txn.end(), outpoint_len, 6);   // txn outpoint 
+    txn.push_back(0xfd);                      // script length encoded 2 bytes
+    txn.push_back(2);                         // script length little endian 
+    txn.push_back(0);                         // 
+    txn.push_back(0x6a);                      // script (op_return)
+    txn.push_back(0x6a);                      // script (op_return)
+    txn.insert(txn.end(), seq_len, 7);        // sequence
 
-    tx.push_back(2);                       // number of outputs
+    txn.push_back(2);                         // number of outputs
     // op 1
-    tx.insert(tx.end(), value_len, 8);      // value
-    tx.push_back(1);                       // script length
-    tx.push_back(0x6a);                    // script (op_return)
+    txn.insert(txn.end(), value_len, 8);      // value
+    txn.push_back(1);                         // script length
+    txn.push_back(0x6a);                      // script (op_return)
     // op 2
-    tx.insert(tx.end(), value_len, 9);      // value
-    tx.push_back(0xfd);                    // script length encoded 2 bytes
-    tx.push_back(2);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0x6a);                    // script (op_return)
-    tx.push_back(0x6a);                    // script (op_return)
+    txn.insert(txn.end(), value_len, 9);      // value
+    txn.push_back(0xfd);                      // script length encoded 2 bytes
+    txn.push_back(2);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0x6a);                      // script (op_return)
+    txn.push_back(0x6a);                      // script (op_return)
 
     // locktime
-    tx.insert(tx.end(), locktime_len, 10);  // lock time
+    txn.insert(txn.end(), locktime_len, 10);  // lock time
 
-    // tx 2
-    tx.insert(tx.end(), version_len, 11);   // tx version
-    tx.push_back(2);                       // 2 inputs
+    // txn 2
+    txn.insert(txn.end(), version_len, 11);   // txn version
+    txn.push_back(2);                         // 2 inputs
     // ip 1
-    tx.insert(tx.end(), outpoint_len, 12);  // tx outpoint 
-    tx.push_back(0xfe);                    // script length encoded 4 bytes
-    tx.push_back(1);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0x6a);                    // script (op_return)
-    tx.insert(tx.end(), seq_len, 13);       // sequence
+    txn.insert(txn.end(), outpoint_len, 12);  // txn outpoint 
+    txn.push_back(0xfe);                      // script length encoded 4 bytes
+    txn.push_back(1);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0x6a);                      // script (op_return)
+    txn.insert(txn.end(), seq_len, 13);       // sequence
     // ip 2
-    tx.insert(tx.end(), outpoint_len, 14);  // tx outpoint 
-    tx.push_back(0xff);                    // script length encoded 4 bytes
-    tx.push_back(1);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0x6a);                    // script (op_return)
-    tx.insert(tx.end(), seq_len, 15);       // sequence
+    txn.insert(txn.end(), outpoint_len, 14);  // txn outpoint 
+    txn.push_back(0xff);                      // script length encoded 4 bytes
+    txn.push_back(1);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0x6a);                      // script (op_return)
+    txn.insert(txn.end(), seq_len, 15);       // sequence
 
-    tx.push_back(2);                       // number of outputs
+    txn.push_back(2);                         // number of outputs
     // op 1
-    tx.insert(tx.end(), value_len, 16);     // value
-    tx.push_back(0xfe);                       // script length
-    tx.push_back(1);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0x6a);                    // script (op_return)
+    txn.insert(txn.end(), value_len, 16);     // value
+    txn.push_back(0xfe);                      // script length
+    txn.push_back(1);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0x6a);                      // script (op_return)
     
     // op 2
-    tx.insert(tx.end(), value_len, 17);     // value
-    tx.push_back(0xff);                       // script length
-    tx.push_back(1);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0);                       // script length
-    tx.push_back(0x6a);                    // script (op_return)
-        
-    tx.insert(tx.end(), locktime_len, 18 );  // lock time
+    txn.insert(txn.end(), value_len, 17);     // value
+    txn.push_back(0xff);                      // script length
+    txn.push_back(1);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0);                         // script length
+    txn.push_back(0x6a);                      // script (op_return)
 
-    return tx;
+    txn.insert(txn.end(), locktime_len, 18 );  // lock time
+
+    return txn;
 }();
 
 constexpr auto tx_n_len{1U};
