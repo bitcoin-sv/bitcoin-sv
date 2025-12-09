@@ -222,10 +222,6 @@ add_test_to_suite(bitcoin test_bitcoin
 	${JSON_HEADERS}
 )
 
-set_source_files_properties(
-    test_bitcoin_main.cpp
-    PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
-
 enable_coverage(test_bitcoin)
 
 target_include_directories(test_bitcoin
