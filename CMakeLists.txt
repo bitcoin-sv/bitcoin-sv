@@ -2,12 +2,23 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.16)
 project(BitcoinSV)
-#Reduce warnings on MSVC, to closer match GCC compiler settings
+
+# CMP0092 (CMake 3.15): Reduce MSVC warnings to match GCC compiler settings
 if(POLICY CMP0092 AND MSVC)
    cmake_policy(SET CMP0092 NEW)
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W2")
+endif()
+
+# CMP0167 (CMake 3.30): Continue using legacy FindBoost module
+if(POLICY CMP0167)
+   cmake_policy(SET CMP0167 OLD)
+endif()
+
+# CMP0148 (CMake 3.27): Continue using FindPythonInterp module
+if(POLICY CMP0148)
+   cmake_policy(SET CMP0148 OLD)
 endif()
 
 # remove ndebug from flags for bitcoind release/relwithdebinfo to work

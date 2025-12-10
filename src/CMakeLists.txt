@@ -2,9 +2,6 @@
 # Copyright (c) 2019-2020 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-cmake_minimum_required(VERSION 3.9)
-project(BitcoinSV)
-
 set(CMAKE_CXX_STANDARD 20)
 
 # Default visibility is hidden on all targets.
@@ -279,6 +276,7 @@ endfunction(prepend)
 
 prepend(BOOST_LIBRARIES "Boost::" ${BOOST_PACKAGES_REQUIRED})
 
+set(Boost_NO_WARN_NEW_VERSIONS TRUE)
 find_package(Boost 1.74 REQUIRED ${BOOST_PACKAGES_REQUIRED})
 target_link_libraries(util univalue crypto ${BOOST_LIBRARIES})
 

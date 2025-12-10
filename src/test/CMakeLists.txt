@@ -2,8 +2,6 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-project(bitcoin-test)
-
 # Process json files.
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")
 
@@ -242,6 +240,7 @@ target_include_directories(test_bitcoin
 		${OPENSSL_INCLUDE_DIR}
 )
 
+set(Boost_NO_WARN_NEW_VERSIONS TRUE)
 find_package(Boost 1.74 REQUIRED unit_test_framework)
 
 target_link_libraries(

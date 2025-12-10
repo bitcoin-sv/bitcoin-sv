@@ -2,8 +2,6 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-project(crypto)
-
 option(CRYPTO_USE_ASM "Use assembly version of crypto primitives" ON)
 
 # The library

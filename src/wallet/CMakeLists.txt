@@ -1,7 +1,5 @@
 # Copyright (c) 2017 The Bitcoin developers
 
-project(wallet)
-
 # Add Berkeley DB dependency.
 find_package(BerkeleyDB REQUIRED)
 
