@@ -102,16 +102,16 @@ uint64_t SpecificConfigScriptPolicy::GetDataCarrierSize() const{
     return mDataCarrierSize.has_value() ? *mDataCarrierSize : ConfigScriptPolicy::GetDataCarrierSize();
 }
 
-void SpecificConfigScriptPolicy::SetSpecificDataCarrierSize(uint64_t dataCarrierSize){
-    mDataCarrierSize = dataCarrierSize;
+void SpecificConfigScriptPolicy::SetSpecificDataCarrierSize(uint64_t data_carrier_size){
+    mDataCarrierSize = data_carrier_size;
 }
 
 bool SpecificConfigScriptPolicy::GetDataCarrier() const{
     return mDataCarrier.has_value() ? *mDataCarrier : ConfigScriptPolicy::GetDataCarrier();
 }
 
-void SpecificConfigScriptPolicy::SetSpecificDataCarrier(bool dataCarrier){
-    mDataCarrier = dataCarrier;
+void SpecificConfigScriptPolicy::SetSpecificDataCarrier(bool data_carrier){
+    mDataCarrier = data_carrier;
 }
 
 
