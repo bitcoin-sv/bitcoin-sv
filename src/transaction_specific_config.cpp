@@ -269,13 +269,13 @@ bool TransactionSpecificConfig::SetTransactionSpecificMinConsolidationFactor(int
         return false;
     }
 
-    mMinColsolidationFactor = tmp.GetMinConsolidationFactor();
+    mMinConsolidationFactor = tmp.GetMinConsolidationFactor();
     return true;
 };
 
 uint64_t TransactionSpecificConfig::GetMinConsolidationFactor() const
 {
-    return mMinColsolidationFactor.has_value() ? *mMinColsolidationFactor :  GlobalConfig::GetMinConsolidationFactor();
+    return mMinConsolidationFactor.has_value() ? *mMinConsolidationFactor :  GlobalConfig::GetMinConsolidationFactor();
 };
 
 bool TransactionSpecificConfig::SetTransactionSpecificMaxConsolidationInputScriptSize(int64_t maxConsolidationInputScriptSizeIn, std::string* err)
@@ -315,12 +315,12 @@ uint64_t TransactionSpecificConfig::GetMinConfConsolidationInput() const
 
 bool TransactionSpecificConfig::SetTransactionSpecificAcceptNonStdConsolidationInput(bool flagValue, std::string* /*err*/)
 {
-    mAcceptNonStdConsoldationInput = flagValue;
+    mAcceptNonStdConsolidationInput = flagValue;
     return true;
 };
 bool TransactionSpecificConfig::GetAcceptNonStdConsolidationInput() const
 {
-    return mAcceptNonStdConsoldationInput.has_value() ? *mAcceptNonStdConsoldationInput : GlobalConfig::GetAcceptNonStdConsolidationInput();
+    return mAcceptNonStdConsolidationInput.has_value() ? *mAcceptNonStdConsolidationInput : GlobalConfig::GetAcceptNonStdConsolidationInput();
 };
 
 bool TransactionSpecificConfig::SetTransactionSpecificDustLimitFactor(int64_t factor, std::string* err)

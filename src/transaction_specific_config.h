@@ -119,10 +119,10 @@ private:
     std::optional<std::chrono::milliseconds> mMaxStdTxnValidationDuration;
     std::optional<std::chrono::milliseconds> mMaxNonStdTxnValidationDuration;
     std::optional<std::chrono::milliseconds> mMaxTxnValidatorAsyncTasksRunDuration;
-    std::optional<uint64_t> mMinColsolidationFactor;
+    std::optional<uint64_t> mMinConsolidationFactor;
     std::optional<uint64_t> mMaxConsolidationInputScriptSize;
     std::optional<uint64_t> mMinConsolidationInput;
-    std::optional<bool> mAcceptNonStdConsoldationInput;
+    std::optional<bool> mAcceptNonStdConsolidationInput;
     std::optional<uint64_t> mDustLimitFactor;
     std::optional<CFeeRate> mDustRelayFee;
     uint32_t mSkipScriptFlags{0};
