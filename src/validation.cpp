@@ -1083,7 +1083,7 @@ CTxnValResult TxnValidation(
     if(!fStandard)
     {
         if (!acceptNonStandardOutput ||
-            (IsProtocolActive(era, ProtocolName::Genesis) && fRequireStandard && reason != "scriptpubkey"))
+            (IsProtocolActive(era, ProtocolName::Genesis) && config.GetConfigScriptPolicy().GetRequireStandard() && reason != "scriptpubkey"))
         {
             state.DoS(0, false, REJECT_NONSTANDARD, reason);
             return Result{state, pTxInputData};

@@ -2959,12 +2959,13 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     // TODO: remove dust settings
     config.SetDustRelayFee(DUST_RELAY_TX_FEE);
 
-    fRequireStandard =
+    bool requireStandard =
         !gArgs.GetBoolArg("-acceptnonstdtxn", !chainparams.RequireStandard());
-    if (chainparams.RequireStandard() && !fRequireStandard)
+    if (chainparams.RequireStandard() && !requireStandard)
         return InitError(
             strprintf("acceptnonstdtxn is not currently supported for %s chain",
                       chainparams.NetworkIDString()));
+    config.SetRequireStandard(requireStandard);
 
     config.SetAcceptNonStandardOutput(
         gArgs.GetBoolArg("-acceptnonstdoutputs", config.GetAcceptNonStandardOutput(ProtocolEra::PostGenesis)));

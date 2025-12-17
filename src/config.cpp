@@ -64,8 +64,6 @@ void GlobalConfig::Reset()
 
     data->mPTVTaskScheduleStrategy = DEFAULT_PTV_TASK_SCHEDULE_STRATEGY;
 
-    data->mAcceptNonStandardOutput = true;
-
     data->mMaxCoinsViewCacheSize = 0;
     data->mMaxCoinsProviderCacheSize = DEFAULT_COINS_PROVIDER_CACHE_SIZE;
     data->mMaxCoinsDBFileSize = CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE;
@@ -843,12 +841,17 @@ uint64_t GlobalConfig::GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) 
 
 void GlobalConfig::SetAcceptNonStandardOutput(bool accept)
 {
-    data->mAcceptNonStandardOutput = accept;
+    data->scriptPolicysettings.SetAcceptNonStandardOutput(accept);
 }
 
 bool GlobalConfig::GetAcceptNonStandardOutput(ProtocolEra era) const
 {
-    return IsProtocolActive(era, ProtocolName::Genesis) ? data->mAcceptNonStandardOutput : !fRequireStandard;
+    return data->scriptPolicysettings.GetAcceptNonStandardOutput(era);
+}
+
+void GlobalConfig::SetRequireStandard(bool require)
+{
+    data->scriptPolicysettings.SetRequireStandard(require);
 }
 
 bool GlobalConfig::SetMaxCoinsViewCacheSize(int64_t max, std::string* err)

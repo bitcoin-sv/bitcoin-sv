@@ -26,8 +26,6 @@
 class CChainParams;
 struct DefaultBlockSizeParams;
 
-inline bool fRequireStandard{true};
-
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions, cppcoreguidelines-virtual-class-destructor)
 class Config : public boost::noncopyable
 {
@@ -262,6 +260,7 @@ public:
     virtual bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) = 0;
     virtual bool SetChronicleGracefulPeriod(int64_t chronicleGracefulPeriodIn, std::string* err = nullptr) = 0;
     virtual void SetAcceptNonStandardOutput(bool accept) = 0;
+    virtual void SetRequireStandard(bool require) = 0;
     virtual bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) = 0;
     virtual bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) = 0;
     virtual bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) = 0;
@@ -540,6 +539,7 @@ public:
 
     void SetAcceptNonStandardOutput(bool accept) override;
     bool GetAcceptNonStandardOutput(ProtocolEra era) const override;
+    void SetRequireStandard(bool require) override;
 
     bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) override;
     uint64_t GetMaxCoinsViewCacheSize() const override {return data->mMaxCoinsViewCacheSize;}
@@ -826,8 +826,6 @@ private:
         bool mValidationClockCPU;
 
         PTVTaskScheduleStrategy mPTVTaskScheduleStrategy;
-
-        bool mAcceptNonStandardOutput;
 
         uint64_t mMaxCoinsViewCacheSize;
         uint64_t mMaxCoinsProviderCacheSize;

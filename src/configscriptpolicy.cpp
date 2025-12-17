@@ -55,6 +55,8 @@ void ConfigScriptPolicy::ResetDefault(){
     maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
     dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
     dataCarrier = DEFAULT_ACCEPT_DATACARRIER;
+    acceptNonStandardOutput = false;
+    requireStandard = true;
 }
 
 uint64_t ConfigScriptPolicy::GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const
@@ -458,4 +460,24 @@ bool ConfigScriptPolicy::GetDataCarrier() const
 void ConfigScriptPolicy::SetDataCarrier(bool dataCarrierIn)
 {
     dataCarrier = dataCarrierIn;
+}
+
+bool ConfigScriptPolicy::GetAcceptNonStandardOutput(ProtocolEra era) const
+{
+    return IsProtocolActive(era, ProtocolName::Genesis) ? acceptNonStandardOutput : !requireStandard;
+}
+
+void ConfigScriptPolicy::SetAcceptNonStandardOutput(bool accept)
+{
+    acceptNonStandardOutput = accept;
+}
+
+bool ConfigScriptPolicy::GetRequireStandard() const
+{
+    return requireStandard;
+}
+
+void ConfigScriptPolicy::SetRequireStandard(bool require)
+{
+    requireStandard = require;
 }

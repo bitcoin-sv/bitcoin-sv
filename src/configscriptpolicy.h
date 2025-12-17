@@ -43,6 +43,8 @@ struct ConfigScriptPolicy {
     virtual uint64_t GetMaxTxSize(ProtocolEra era, bool isConsensus) const;
     virtual uint64_t GetDataCarrierSize() const;
     virtual bool GetDataCarrier() const;
+    virtual bool GetAcceptNonStandardOutput(ProtocolEra era) const;
+    virtual bool GetRequireStandard() const;
 
     int32_t GetGenesisActivationHeight() const;
     int32_t GetChronicleActivationHeight() const;
@@ -63,6 +65,8 @@ struct ConfigScriptPolicy {
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr);
     void SetDataCarrierSize(uint64_t dataCarrierSize);
     void SetDataCarrier(bool dataCarrier);
+    void SetAcceptNonStandardOutput(bool accept);
+    void SetRequireStandard(bool require);
 
 private:
     uint64_t maxOpsPerScriptPolicy;
@@ -80,4 +84,6 @@ private:
     uint64_t maxTxSizePolicy;
     uint64_t dataCarrierSize;
     bool dataCarrier;
+    bool acceptNonStandardOutput;
+    bool requireStandard;
 };

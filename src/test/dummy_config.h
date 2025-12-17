@@ -383,10 +383,17 @@ public:
         return MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE;
     }
 
-    void SetAcceptNonStandardOutput(bool) override {}
+    void SetAcceptNonStandardOutput(bool accept) override
+    {
+        dummyPolicySettings.SetAcceptNonStandardOutput(accept);
+    }
     bool GetAcceptNonStandardOutput(ProtocolEra era) const override
     {
-        return IsProtocolActive(era, ProtocolName::Genesis) ? true : !fRequireStandard;
+        return dummyPolicySettings.GetAcceptNonStandardOutput(era);
+    }
+    void SetRequireStandard(bool require) override
+    {
+        dummyPolicySettings.SetRequireStandard(require);
     }
 
     bool SetMaxCoinsViewCacheSize(int64_t /*max*/, std::string* err) override
