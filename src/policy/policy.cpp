@@ -31,10 +31,10 @@
  * expensive-to-check-upon-redemption script like:
  *   DUP CHECKSIG DROP ... repeated 100 times... OP_1
  */
-bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScriptPubKeyHeight, txnouttype &whichType)
+bool IsStandard(const ConfigScriptPolicy &scriptPolicy, const CScript &scriptPubKey, int32_t nScriptPubKeyHeight, txnouttype &whichType)
 {
     std::vector<std::vector<uint8_t>> vSolutions;
-    if (!Solver(scriptPubKey, GetProtocolEra(config.GetConfigScriptPolicy(), nScriptPubKeyHeight), whichType, vSolutions)) {
+    if (!Solver(scriptPubKey, GetProtocolEra(scriptPolicy, nScriptPubKeyHeight), whichType, vSolutions)) {
         return false;
     }
 
@@ -46,7 +46,7 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScri
         if (n < 1 || n > 3) return false;
         if (m < 1 || m > n) return false;
     } else if (whichType == TX_NULL_DATA) {
-        if (!config.GetDataCarrier()) {
+        if (!scriptPolicy.GetDataCarrier()) {
             return false;
         }
     }
@@ -155,7 +155,7 @@ AnnotatedType<bool>  IsFreeConsolidationTxn(const Config &config, const CTransac
         // if not acceptnonstdconsolidationinput then check if inputs are standard
         // and fail otherwise
         txnouttype dummyType;
-        if (stdInputOnly  && !IsStandard(config, coin->GetTxOut().scriptPubKey, coinHeight, dummyType)) {
+        if (stdInputOnly  && !IsStandard(config.GetConfigScriptPolicy(), coin->GetTxOut().scriptPubKey, coinHeight, dummyType)) {
             return {false,
                  strprintf(
                      "Consolidation transaction %s has non-standard input from transaction %s and cannot be free."
@@ -194,21 +194,21 @@ AnnotatedType<bool>  IsFreeConsolidationTxn(const Config &config, const CTransac
         return {true, strprintf("free consolidation transaction: %s", tx.GetId().ToString())};
 }
 
-bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight, std::string &reason)
+bool IsStandardTx(const ConfigScriptPolicy &scriptPolicy, const CTransaction &tx, int32_t nHeight, std::string &reason)
 {
     if (tx.nVersion > CTransaction::MAX_STANDARD_VERSION || tx.nVersion < 1) {
         reason = "version";
         return false;
     }
 
-    ProtocolEra era { GetProtocolEra(config.GetConfigScriptPolicy(), nHeight) };
+    ProtocolEra era { GetProtocolEra(scriptPolicy, nHeight) };
 
     // Extremely large transactions with lots of inputs can cost the network
     // almost as much to process as they cost the sender in fees, because
     // computing signature hashes is O(ninputs*txsize). Limiting transactions
     // mitigates CPU exhaustion attacks.
     unsigned int sz = tx.GetTotalSize();
-    if (sz > config.GetMaxTxSize(era, false)) {
+    if (sz > scriptPolicy.GetMaxTxSize(era, false)) {
         reason = "tx-size";
         return false;
     }
@@ -234,7 +234,7 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight,
     txnouttype whichType;
     bool scriptpubkey = false;
     for (const CTxOut &txout : tx.vout) {
-        if (!::IsStandard(config, txout.scriptPubKey, nHeight, whichType)) {
+        if (!::IsStandard(scriptPolicy, txout.scriptPubKey, nHeight, whichType)) {
             scriptpubkey = true;
         }
 
@@ -250,11 +250,11 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight,
     }
 
     // cumulative size of all OP_RETURN txout should be smaller than -datacarriersize
-    if (nDataSize > config.GetDataCarrierSize()) {
+    if (nDataSize > scriptPolicy.GetDataCarrierSize()) {
         reason = "datacarrier-size-exceeded";
         return false;
     }
-    
+
     if(scriptpubkey)
     {
         reason = "scriptpubkey";
@@ -266,7 +266,7 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight,
 
 std::optional<bool> AreInputsStandard(
     const task::CCancellationToken& token,
-    const Config& config,
+    const ConfigScriptPolicy& scriptPolicy,
     const CTransaction& tx,
     const CCoinsViewCache &mapInputs,
     const int32_t mempoolHeight)
@@ -278,7 +278,7 @@ std::optional<bool> AreInputsStandard(
 
     constexpr bool consensus{};
     constexpr uint32_t flags{SCRIPT_VERIFY_NONE};
-    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, consensus)};
+    const auto params{make_eval_script_params(scriptPolicy, flags, consensus)};
 
     for (size_t i = 0; i < tx.vin.size(); i++) {
         auto prev = mapInputs.GetCoinWithScript( tx.vin[i].prevout );
@@ -290,7 +290,7 @@ std::optional<bool> AreInputsStandard(
         // get the scriptPubKey corresponding to this input:
         const CScript &prevScript = prev->GetTxOut().scriptPubKey;
 
-        if (!Solver(prevScript, prev.value().GetProtocolEra(config.GetConfigScriptPolicy(), mempoolHeight), whichType, vSolutions)) {
+        if (!Solver(prevScript, prev.value().GetProtocolEra(scriptPolicy, mempoolHeight), whichType, vSolutions)) {
             return false;
         }
 

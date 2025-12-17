@@ -824,7 +824,7 @@ private:
         std::chrono::milliseconds mMaxTxnChainValidationBudget;
 
         bool mValidationClockCPU;
-    
+
         PTVTaskScheduleStrategy mPTVTaskScheduleStrategy;
 
         bool mAcceptNonStandardOutput;

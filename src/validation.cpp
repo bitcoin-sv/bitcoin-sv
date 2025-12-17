@@ -1072,7 +1072,7 @@ CTxnValResult TxnValidation(
     //          but we will mine it nevertheless. Anyone can collect such
     //          coin by providing OP_1 unlock script
     std::string reason;
-    bool fStandard = IsStandardTx(config, tx, chainActive.Height() + 1, reason);
+    bool fStandard = IsStandardTx(config.GetConfigScriptPolicy(), tx, chainActive.Height() + 1, reason);
     if (fStandard) {
         state.SetStandardTx();
     }
@@ -1209,7 +1209,7 @@ CTxnValResult TxnValidation(
     if (!acceptNonStandardOutput)
     {
         auto res =
-            AreInputsStandard(source->GetToken(), config, tx, view, chainActive.Height() + 1);
+            AreInputsStandard(source->GetToken(), config.GetConfigScriptPolicy(), tx, view, chainActive.Height() + 1);
 
         if (!res.has_value())
         {
@@ -1227,7 +1227,7 @@ CTxnValResult TxnValidation(
     else if (fUseLimits && (TxValidationPriority::low != pTxInputData->GetTxValidationPriority()))
     {
         auto res =
-            AreInputsStandard(source->GetToken(), config, tx, view, chainActive.Height() + 1);
+            AreInputsStandard(source->GetToken(), config.GetConfigScriptPolicy(), tx, view, chainActive.Height() + 1);
         if (!res.has_value() || !res.value()) {
             state.SetValidationTimeoutExceeded();
             state.DoS(0, false, REJECT_NONSTANDARD, "too-long-validation-time");

@@ -221,25 +221,25 @@ BOOST_AUTO_TEST_CASE(multisig_IsStandard) {
     CScript a_and_b;
     a_and_b << OP_2 << ToByteVector(key[0].GetPubKey())
             << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
-    BOOST_CHECK(::IsStandard(config, a_and_b, 1, whichType));
+    BOOST_CHECK(::IsStandard(config.GetConfigScriptPolicy(), a_and_b, 1, whichType));
 
     CScript a_or_b;
     a_or_b << OP_1 << ToByteVector(key[0].GetPubKey())
            << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
-    BOOST_CHECK(::IsStandard(config, a_or_b, 1, whichType));
+    BOOST_CHECK(::IsStandard(config.GetConfigScriptPolicy(), a_or_b, 1, whichType));
 
     CScript escrow;
     escrow << OP_2 << ToByteVector(key[0].GetPubKey())
            << ToByteVector(key[1].GetPubKey())
            << ToByteVector(key[2].GetPubKey()) << OP_3 << OP_CHECKMULTISIG;
-    BOOST_CHECK(::IsStandard(config, escrow, 1, whichType));
+    BOOST_CHECK(::IsStandard(config.GetConfigScriptPolicy(), escrow, 1, whichType));
 
     CScript one_of_four;
     one_of_four << OP_1 << ToByteVector(key[0].GetPubKey())
                 << ToByteVector(key[1].GetPubKey())
                 << ToByteVector(key[2].GetPubKey())
                 << ToByteVector(key[3].GetPubKey()) << OP_4 << OP_CHECKMULTISIG;
-    BOOST_CHECK(!::IsStandard(config, one_of_four, 1, whichType));
+    BOOST_CHECK(!::IsStandard(config.GetConfigScriptPolicy(), one_of_four, 1, whichType));
 
     std::array<CScript, 6> malformed;
     malformed[0] << OP_3 << ToByteVector(key[0].GetPubKey())
@@ -260,7 +260,7 @@ BOOST_AUTO_TEST_CASE(multisig_IsStandard) {
                  << ToByteVector(key[1].GetPubKey());
 
     for (int i = 0; i < 6; i++)
-        BOOST_CHECK(!::IsStandard(config, malformed[i], 1, whichType));
+        BOOST_CHECK(!::IsStandard(config.GetConfigScriptPolicy(), malformed[i], 1, whichType));
 }
 
 BOOST_AUTO_TEST_CASE(multisig_Solver1) {

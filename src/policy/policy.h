@@ -16,6 +16,7 @@
 
 class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CCoinsViewCache;
+struct ConfigScriptPolicy;
 
 namespace task{class CCancellationToken;}
 
@@ -280,7 +281,7 @@ struct AnnotatedType {
 bool IsDustReturnTxn (const CTransaction &tx);
 AnnotatedType<bool> IsFreeConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight);
 
-bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScriptPubKeyHeight, txnouttype &whichType);
+bool IsStandard(const ConfigScriptPolicy &scriptPolicy, const CScript &scriptPubKey, int32_t nScriptPubKeyHeight, txnouttype &whichType);
 
 /**
  * Check for standard transaction types
@@ -289,7 +290,7 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScri
  * @return True if all outputs (scriptPubKeys) use only standard transaction
  * forms
  */
-bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight, std::string &reason);
+bool IsStandardTx(const ConfigScriptPolicy &scriptPolicy, const CTransaction &tx, int32_t nHeight, std::string &reason);
 
 /**
  * Check for standard transaction types
@@ -299,7 +300,7 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight,
  */
 std::optional<bool> AreInputsStandard(
     const task::CCancellationToken& token,
-    const Config& config,
+    const ConfigScriptPolicy& scriptPolicy,
     const CTransaction& tx,
     const CCoinsViewCache &mapInputs,
     const int32_t mempoolHeight);

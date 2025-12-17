@@ -327,7 +327,7 @@ bool CTimeLockedMempool::loadMempool(const task::CCancellationToken& shutdownTok
                 CJournalChangeSetPtr changeSet {nullptr};
 
                 std::string reason {};
-                bool standard { IsStandardTx(GlobalConfig::GetConfig(), *tx, chainActive.Tip()->GetHeight() + 1, reason) };
+                bool standard { IsStandardTx(GlobalConfig::GetConfig().GetConfigScriptPolicy(), *tx, chainActive.Tip()->GetHeight() + 1, reason) };
                 const CValidationState& state {
                     // Execute txn validation synchronously.
                     txValidator->processValidation(
@@ -641,7 +641,7 @@ void CTimeLockedMempool::periodicChecks()
             // This revalidation is mandatory as some of the transactions might become frozen
             // in the meantime
             std::string reason {};
-            bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, chainTip->GetHeight() + 1, reason) };
+            bool standard { IsStandardTx(GlobalConfig::GetConfig().GetConfigScriptPolicy(), *txn, chainTip->GetHeight() + 1, reason) };
             g_connman->EnqueueTxnForValidator(
                 std::make_shared<CTxInputData>(
                     pTxIdTracker,

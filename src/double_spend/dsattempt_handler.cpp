@@ -307,7 +307,7 @@ DSAttemptHandler::ScriptDetails DSAttemptHandler::GetScriptDetails(
     }
 
     txnouttype outType {};
-    bool isStandard { IsStandard(mConfig, scriptPubKey, coinHeight, outType) };
+    bool isStandard { IsStandard(mConfig.GetConfigScriptPolicy(), scriptPubKey, coinHeight, outType) };
 
     return { std::move(scriptPubKey), amount, coinHeight, spendHeight, isStandard };
 }

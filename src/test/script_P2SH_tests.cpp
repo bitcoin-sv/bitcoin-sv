@@ -102,10 +102,10 @@ BOOST_AUTO_TEST_CASE(sign) {
     }
     
     BOOST_CHECK(IsStandardTx(
-        testConfig, CTransaction(txFrom),
+        testConfig.GetConfigScriptPolicy(), CTransaction(txFrom),
         testConfig.GetGenesisActivationHeight() - 1, reason));
     BOOST_CHECK(!IsStandardTx(
-        testConfig, CTransaction(txFrom),
+        testConfig.GetConfigScriptPolicy(), CTransaction(txFrom),
         testConfig.GetGenesisActivationHeight(), reason));
 
     std::array<CMutableTransaction, 8> txTo; // Spending transactions
@@ -248,8 +248,8 @@ BOOST_AUTO_TEST_CASE(set) {
         txFrom.vout[i].scriptPubKey = outer[i];
         txFrom.vout[i].nValue = CENT;
     }
-    BOOST_CHECK(IsStandardTx(testConfig, CTransaction(txFrom), testConfig.GetGenesisActivationHeight() - 1, reason));
-    BOOST_CHECK(!IsStandardTx(testConfig, CTransaction(txFrom), testConfig.GetGenesisActivationHeight(), reason));
+    BOOST_CHECK(IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(txFrom), testConfig.GetGenesisActivationHeight() - 1, reason));
+    BOOST_CHECK(!IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(txFrom), testConfig.GetGenesisActivationHeight(), reason));
     BOOST_CHECK(reason == "scriptpubkey");
 
     // Spending transactions
@@ -281,11 +281,11 @@ BOOST_AUTO_TEST_CASE(set) {
                                           txTo[i], 0,
                                           SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));
-        BOOST_CHECK_MESSAGE(IsStandardTx(testConfig, CTransaction(txTo[i]),
+        BOOST_CHECK_MESSAGE(IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(txTo[i]),
                                          testConfig.GetGenesisActivationHeight(),
                                          reason),
                             strprintf("txTo[%d].IsStandard", i));
-        BOOST_CHECK_MESSAGE(IsStandardTx(testConfig, CTransaction(txTo[i]),
+        BOOST_CHECK_MESSAGE(IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(txTo[i]),
                                          testConfig.GetGenesisActivationHeight() - 1,
                                           reason),
                             strprintf("txTo[%d].IsStandard", i));
@@ -508,13 +508,13 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
 
     bool sigOpCountError{};
     activateGenesis();
-    const auto o{::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txTo), coins, 0)};
+    const auto o{::AreInputsStandard(source->GetToken(), testConfig.GetConfigScriptPolicy(), CTransaction(txTo), coins, 0)};
     assert(o);
     BOOST_CHECK(!o.value());
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txTo), coins, sigOpCountError), 0U);
     
     deactivateGenesis();
-    const auto o2{::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txTo), coins, 0)};
+    const auto o2{::AreInputsStandard(source->GetToken(), testConfig.GetConfigScriptPolicy(), CTransaction(txTo), coins, 0)};
     assert(o2);
     BOOST_CHECK(o2.value());
     // 22 P2SH sigops for all inputs (1 for vin[0], 6 for vin[3], 15 for vin[4]
@@ -531,13 +531,13 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
         << std::vector<uint8_t>(sixteenSigops.begin(), sixteenSigops.end());
 
     activateGenesis();
-    const auto o3{::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd1), coins, 0)};
+    const auto o3{::AreInputsStandard(source->GetToken(), testConfig.GetConfigScriptPolicy(), CTransaction(txToNonStd1), coins, 0)};
     assert(o3);
     BOOST_CHECK(!o3.value());
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd1), coins, sigOpCountError), 0U);
     
     deactivateGenesis();
-    const auto o4{::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd1), coins, 0)};
+    const auto o4{::AreInputsStandard(source->GetToken(), testConfig.GetConfigScriptPolicy(), CTransaction(txToNonStd1), coins, 0)};
     assert(o4);
     BOOST_CHECK(!o4.value());
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd1), coins, sigOpCountError), 16U);
@@ -553,13 +553,13 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
         << std::vector<uint8_t>(twentySigops.begin(), twentySigops.end());
 
     activateGenesis();
-    const auto o5{::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd2), coins, 0)};
+    const auto o5{::AreInputsStandard(source->GetToken(), testConfig.GetConfigScriptPolicy(), CTransaction(txToNonStd2), coins, 0)};
     assert(o5);
     BOOST_CHECK(!o5.value());
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd2), coins, sigOpCountError), 0U);
 
     deactivateGenesis();
-    const auto o6{::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd2), coins, 0)};
+    const auto o6{::AreInputsStandard(source->GetToken(), testConfig.GetConfigScriptPolicy(), CTransaction(txToNonStd2), coins, 0)};
     assert(o6);
     BOOST_CHECK(!o6.value());
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd2), coins, sigOpCountError), 20U);

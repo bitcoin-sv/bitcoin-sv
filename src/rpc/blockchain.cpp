@@ -2208,7 +2208,7 @@ void gettxouts(const Config& config,
                          ? (chainActive.Height() + 1)
                          : coin.GetHeight();
                 txnouttype txOutType;
-                jWriter.pushKV("isStandard", IsStandard(config, coin.GetTxOut().scriptPubKey, height, txOutType));
+                jWriter.pushKV("isStandard", IsStandard(config.GetConfigScriptPolicy(), coin.GetTxOut().scriptPubKey, height, txOutType));
             }
 
             if(returnFieldsFlags & confirmationsFlag)

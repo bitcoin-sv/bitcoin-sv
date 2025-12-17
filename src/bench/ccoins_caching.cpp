@@ -90,7 +90,7 @@ static void CCoinsCaching(benchmark::State &state) {
     while (state.KeepRunning()) {
         CTransaction t(t1);
         const auto o = AreInputsStandard(task::CCancellationSource::Make()->GetToken(),
-                                         GlobalConfig::GetConfig(),
+                                         GlobalConfig::GetConfig().GetConfigScriptPolicy(),
                                          t,
                                          coins,
                                          0);

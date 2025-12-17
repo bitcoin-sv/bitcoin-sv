@@ -128,10 +128,15 @@ public:
     void SetDataCarrierSize(uint64_t dataCarrierSizeIn) override
     {
         dataCarrierSize = dataCarrierSizeIn;
+        dummyPolicySettings.SetDataCarrierSize(dataCarrierSizeIn);
     }
 
     bool GetDataCarrier() const override { return dataCarrier; }
-    void SetDataCarrier(bool dataCarrierIn) override { dataCarrier = dataCarrierIn; }
+    void SetDataCarrier(bool dataCarrierIn) override
+    {
+        dataCarrier = dataCarrierIn;
+        dummyPolicySettings.SetDataCarrier(dataCarrierIn);
+    }
 
     bool SetLimitAncestorCount(int64_t /*limitAncestorCount*/,
                                std::string* /*err*/ = nullptr) override
