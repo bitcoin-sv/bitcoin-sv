@@ -1,6 +1,12 @@
 **Step 1: Analyze Changed Files**
 Use `gh pr diff --name-only $PR_NUMBER` to get the list of changed files.
 
+**IMPORTANT FOR SUBAGENTS:**
+Subagents inherit these tools: Read, Grep, Glob, Task, and limited gh commands.
+- Use `Read` tool to examine files (NOT cat or bash redirects)
+- Use `Grep` tool to search code (NOT grep command)
+- Do NOT use shell operators: `>`, `&&`, `|`, `--jq`
+
 **Step 2: Launch Specialized Subagents in Parallel**
 Based on file extensions, launch appropriate subagents:
 
