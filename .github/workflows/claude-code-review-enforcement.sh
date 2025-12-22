@@ -15,6 +15,30 @@ readonly pr=$PR_NUMBER
 readonly owner=${GITHUB_REPOSITORY%/*}
 readonly repo=${GITHUB_REPOSITORY#*/}
 
+# ─────────────────────────────────────────────────────────────────
+# Check for Claude's summary comment
+# The workflow uses use_sticky_comment: true, so Claude always posts
+# a summary on successful review. No summary = review failed.
+# ─────────────────────────────────────────────────────────────────
+
+printf "Checking for Claude summary comment...\n"
+
+summary_count=$(gh api "/repos/$owner/$repo/issues/$pr/comments" \
+  --jq '[.[] | select(.user.login == "claude[bot]" or .user.login == "github-actions[bot]")] | length')
+
+if [[ "$summary_count" -eq 0 ]]; then
+  printf "ERROR: No Claude summary comment found\n"
+  printf "The review did not complete successfully.\n"
+  printf "Check the action logs for permission denials or errors.\n"
+  gh api "repos/$owner/$repo/statuses/$sha" \
+    -f state=failure \
+    -f context="Claude Code Review" \
+    -f description="Review incomplete: no summary posted"
+  exit 1
+fi
+
+printf "✓ Summary comment found (%d comment(s))\n\n" "$summary_count"
+
 # Fetch review threads via GraphQL
 printf "Fetching review threads...\n"
 response=$(gh api graphql -f query="
