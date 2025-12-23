@@ -26,6 +26,7 @@
 #include "rpc/protocol.h"
 #include "rpc/server.h"
 #include "rpc/tojson.h"
+#include "script/standard.h"
 #include "streams.h"
 #include "sync.h"
 #include "taskcancellation.h"
@@ -2208,7 +2209,7 @@ void gettxouts(const Config& config,
                          ? (chainActive.Height() + 1)
                          : coin.GetHeight();
                 txnouttype txOutType;
-                jWriter.pushKV("isStandard", IsStandard(config.GetConfigScriptPolicy(), coin.GetTxOut().scriptPubKey, height, txOutType));
+                jWriter.pushKV("isStandard", IsStandardOutput(config.GetConfigScriptPolicy(), coin.GetTxOut().scriptPubKey, height, txOutType));
             }
 
             if(returnFieldsFlags & confirmationsFlag)

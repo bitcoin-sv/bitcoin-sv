@@ -14,11 +14,25 @@
 #include <boost/variant.hpp>
 
 #include <cstdint>
+#include <optional>
+#include <string>
 
 static const bool DEFAULT_ACCEPT_DATACARRIER = true;
 
+/** Maximum number of signature check operations in an IsStandardOutput() P2SH script
+ */
+static const unsigned int MAX_P2SH_SIGOPS = 15;
+
 class CKeyID;
 class CScript;
+class CCoinsViewCache;
+class CTransaction;
+struct ConfigScriptPolicy;
+
+namespace task{class CCancellationToken;}
+
+// Global variable for bare multisig standard policy
+extern bool fIsBareMultisigStd;
 
 /** A reference to a CScript: the Hash160 of its serialization (see script.h) */
 class CScriptID : public uint160 {
@@ -108,5 +122,42 @@ bool ExtractDestinations(const CScript &scriptPubKey, ProtocolEra era, txnouttyp
 CScript GetScriptForDestination(const CTxDestination &dest);
 CScript GetScriptForRawPubKey(const CPubKey &pubkey);
 CScript GetScriptForMultisig(int nRequired, const std::vector<CPubKey> &keys);
+
+/**
+ * Check if a scriptPubKey is standard.
+ * @param[in] scriptPolicy    Script policy configuration
+ * @param[in] scriptPubKey    The script to check
+ * @param[in] nScriptPubKeyHeight  Height at which the script was/will be created
+ * @param[out] whichType      The type of the script if standard
+ * @return True if the script is standard
+ */
+bool IsStandardOutput(const ConfigScriptPolicy &scriptPolicy, const CScript &scriptPubKey, int32_t nScriptPubKeyHeight, txnouttype &whichType);
+
+/**
+ * Check if a single transaction input is standard.
+ * @param[in] token           Cancellation token for async operations
+ * @param[in] params          Script evaluation parameters
+ * @param[in] scriptSig       The input's scriptSig
+ * @param[in] prevScript      The previous output's scriptPubKey
+ * @param[in] utxoEra         Protocol era of the UTXO being spent
+ * @param[in] flags           Script verification flags
+ * @return std::optional<bool> - true if standard, false if non-standard, nullopt if cancelled
+ */
+std::optional<bool> IsInputStandard(
+    const task::CCancellationToken& token,
+    const eval_script_params& params,
+    const CScript& scriptSig,
+    const CScript& prevScript,
+    ProtocolEra utxoEra,
+    uint32_t flags);
+
+/**
+ * Check for standard transaction types
+ * @param[in] nHeight represents the height that transactions was mined or the height that
+ * we expect transcation will be mined in (in case transcation is being added to mempool)
+ * @return True if all outputs (scriptPubKeys) use only standard transaction
+ * forms
+ */
+bool IsStandardTx(const ConfigScriptPolicy &scriptPolicy, const CTransaction &tx, int32_t nHeight, std::string &reason);
 
 #endif // BITCOIN_SCRIPT_STANDARD_H

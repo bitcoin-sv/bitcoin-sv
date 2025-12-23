@@ -12,6 +12,7 @@
 #include "rpc/http_protocol.h"
 #include "rpc/http_request.h"
 #include "rpc/http_response.h"
+#include "script/standard.h"
 #include "txdb.h"
 
 namespace
@@ -307,7 +308,7 @@ DSAttemptHandler::ScriptDetails DSAttemptHandler::GetScriptDetails(
     }
 
     txnouttype outType {};
-    bool isStandard { IsStandard(mConfig.GetConfigScriptPolicy(), scriptPubKey, coinHeight, outType) };
+    bool isStandard { IsStandardOutput(mConfig.GetConfigScriptPolicy(), scriptPubKey, coinHeight, outType) };
 
     return { std::move(scriptPubKey), amount, coinHeight, spendHeight, isStandard };
 }

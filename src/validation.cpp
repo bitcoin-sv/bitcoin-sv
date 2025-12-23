@@ -96,7 +96,6 @@ std::atomic_bool fReindex{ false };
 bool fTxIndex = false;
 bool fHavePruned = false;
 bool fPruneMode = false;
-bool fIsBareMultisigStd = DEFAULT_PERMIT_BAREMULTISIG;
 bool fCheckBlockIndex = false;
 bool fCheckpointsEnabled = DEFAULT_CHECKPOINTS_ENABLED;
 size_t nCoinCacheUsage = 5000 * 300;

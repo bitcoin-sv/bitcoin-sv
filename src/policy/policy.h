@@ -22,21 +22,21 @@ namespace task{class CCancellationToken;}
 
 /** Defaults for -excessiveblocksize and -blockmaxsize. The changed when we reach blocksize activation time.
  *
- * DEFAULT_MAX_GENERATED_BLOCK_SIZE_* represents default for -blockmaxsize, 
- * which controls the maximum size of block the mining code will create 
- * 
- * DEFAULT_MAX_BLOCK_SIZE_* represents default for -excessiveblocksize, which specifies the 
+ * DEFAULT_MAX_GENERATED_BLOCK_SIZE_* represents default for -blockmaxsize,
+ * which controls the maximum size of block the mining code will create
+ *
+ * DEFAULT_MAX_BLOCK_SIZE_* represents default for -excessiveblocksize, which specifies the
  * maximum allowed size for a block, in bytes. This is actually a consenus rule - if a node sets
- * this to a value lower than  -blockmaxsize of another node, it will start rejecting 
- * big another node. 
- * 
+ * this to a value lower than  -blockmaxsize of another node, it will start rejecting
+ * big another node.
+ *
  * Values bellow are also parsed by cdefs.py.
  */
 
 
 /** Default max block size parameters
  */
-static const uint64_t MAIN_DEFAULT_MAX_BLOCK_SIZE = INT64_MAX; 
+static const uint64_t MAIN_DEFAULT_MAX_BLOCK_SIZE = INT64_MAX;
 static const uint64_t REGTEST_DEFAULT_MAX_BLOCK_SIZE = INT64_MAX;
 static const uint64_t TESTNET_DEFAULT_MAX_BLOCK_SIZE = INT64_MAX;
 static const uint64_t STN_DEFAULT_MAX_BLOCK_SIZE = INT64_MAX;
@@ -48,11 +48,11 @@ static const uint64_t MAIN_NEW_BLOCKSIZE_ACTIVATION_TIME = 1563976800; // 2019-0
 static const uint64_t MAIN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE = 32 * ONE_MEGABYTE;
 static const uint64_t MAIN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER = 128 * ONE_MEGABYTE;
 
-static const uint64_t REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME = 1563976800; // 2019-07-24T14:00:00 
+static const uint64_t REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME = 1563976800; // 2019-07-24T14:00:00
 static const uint64_t REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE = 32 * ONE_MEGABYTE;
 static const uint64_t REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER = 128 * ONE_MEGABYTE;
 
-static const uint64_t TESTNET_NEW_BLOCKSIZE_ACTIVATION_TIME = 1563976800; // 2019-07-24T14:00:00 
+static const uint64_t TESTNET_NEW_BLOCKSIZE_ACTIVATION_TIME = 1563976800; // 2019-07-24T14:00:00
 static const uint64_t TESTNET_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE = 32 * ONE_MEGABYTE;
 static const uint64_t TESTNET_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER = 128 * ONE_MEGABYTE;
 
@@ -77,9 +77,6 @@ static const uint64_t DEFAULT_MIN_CONF_CONSOLIDATION_INPUT = 6;
 /** consolidation transaction with non standard inputs */
 static const bool DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT = false;
 
-/** Maximum number of signature check operations in an IsStandard() P2SH script
- */
-static const unsigned int MAX_P2SH_SIGOPS = 15;
 /** The maximum number of sigops we're willing to relay/mine in a single tx before Genesis */
 static const unsigned int MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS = MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS / 5;
 /** The maximum number of sigops we're willing to relay/mine in a single tx after Genesis */
@@ -136,7 +133,7 @@ static const int DEFAULT_GENESIS_GRACEFUL_ACTIVATION_PERIOD = 72;
 static const unsigned DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD = 72;
 
 /*
-* Maximum number of blocks for Genesis graceful period on either side of the Genesis 
+* Maximum number of blocks for Genesis graceful period on either side of the Genesis
 * activation block (span of ~100 days)
 */
 static const int MAX_GENESIS_GRACEFUL_ACTIVATION_PERIOD = 7200;
@@ -169,9 +166,9 @@ static const std::set<std::string> DEFAULT_CLIENTUA_BAN_PATTERNS {"abc","cash","
 * transaction for the block to be classified as selfishly mined */
 static constexpr int64_t DEFAULT_MIN_BLOCK_MEMPOOL_TIME_DIFFERENCE_SELFISH = 60;
 
-/** 
-* Percentage threshold of number of txs in mempool 
-* that are not included in received block for 
+/**
+* Percentage threshold of number of txs in mempool
+* that are not included in received block for
 * the block to be classified as selfishly mined */
 static constexpr uint64_t DEFAULT_SELFISH_TX_THRESHOLD_IN_PERCENT = 10;
 
@@ -279,18 +276,7 @@ struct AnnotatedType {
 
 /** Consolidation transactions are free */
 bool IsDustReturnTxn (const CTransaction &tx);
-AnnotatedType<bool> IsFreeConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight);
-
-bool IsStandard(const ConfigScriptPolicy &scriptPolicy, const CScript &scriptPubKey, int32_t nScriptPubKeyHeight, txnouttype &whichType);
-
-/**
- * Check for standard transaction types
- * @param[in] nHeight represents the height that transactions was mined or the height that
- * we expect transcation will be mined in (in case transcation is being added to mempool)
- * @return True if all outputs (scriptPubKeys) use only standard transaction
- * forms
- */
-bool IsStandardTx(const ConfigScriptPolicy &scriptPolicy, const CTransaction &tx, int32_t nHeight, std::string &reason);
+ AnnotatedType<bool> IsFreeConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight);
 
 /**
  * Check for standard transaction types

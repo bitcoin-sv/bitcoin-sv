@@ -9,6 +9,7 @@
 #include <net/net.h>
 #include <policy/policy.h>
 #include <scheduler.h>
+#include <script/standard.h>
 #include <time_locked_mempool.h>
 #include <txn_validator.h>
 

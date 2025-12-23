@@ -55,7 +55,7 @@ void ConfigScriptPolicy::ResetDefault(){
     maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
     dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
     dataCarrier = DEFAULT_ACCEPT_DATACARRIER;
-    acceptNonStandardOutput = false;
+    acceptNonStandardOutput = true;
     requireStandard = true;
 }
 
