@@ -16,8 +16,28 @@ readonly owner=${GITHUB_REPOSITORY%/*}
 readonly repo=${GITHUB_REPOSITORY#*/}
 
 # ─────────────────────────────────────────────────────────────────
+# Check that Claude review step completed successfully
+# ─────────────────────────────────────────────────────────────────
+
+printf "Checking Claude review execution status...\n"
+
+if [[ "${CLAUDE_CONCLUSION:-}" != "success" ]]; then
+  printf "ERROR: Claude review did not complete successfully (conclusion: %s)\n" \
+    "${CLAUDE_CONCLUSION:-unknown}"
+  printf "The review execution failed or was cancelled.\n"
+  printf "Check the action logs for errors or permission denials.\n"
+  gh api "repos/$owner/$repo/statuses/$sha" \
+    -f state=failure \
+    -f context="Claude Code Review" \
+    -f description="Review execution failed"
+  exit 1
+fi
+
+printf "✓ Claude execution completed successfully\n\n"
+
+# ─────────────────────────────────────────────────────────────────
 # Check for Claude's summary comment
-# The workflow uses use_sticky_comment: true, so Claude always posts
+# The workflow uses track_progress: true, so Claude always posts
 # a summary on successful review. No summary = review failed.
 # ─────────────────────────────────────────────────────────────────
 
