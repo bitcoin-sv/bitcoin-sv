@@ -2,10 +2,12 @@
 
 **Step 1: Load Threads to Verify**
 
-Load the threads from `/tmp/claude-actionable-threads.json`:
-```bash
-threads=$(cat /tmp/claude-actionable-threads.json)
+Use the `Read` tool to load threads from `/tmp/claude-actionable-threads.json`:
 ```
+Read tool with file_path: /tmp/claude-actionable-threads.json
+```
+
+**IMPORTANT:** Do NOT use bash `cat` command - use the `Read` tool instead.
 
 For each thread, note: thread_id, path, line, isResolved, issue description
 
