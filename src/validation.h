@@ -186,8 +186,6 @@ static const int64_t DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 50; // percent
 
 static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
 
-/** Default for -permitbaremultisig */
-static const bool DEFAULT_PERMIT_BAREMULTISIG = true;
 static const bool DEFAULT_CHECKPOINTS_ENABLED = true;
 static const bool DEFAULT_TXINDEX = false;
 static const unsigned int DEFAULT_BANSCORE_THRESHOLD = 100;
@@ -234,7 +232,6 @@ extern CConditionVariable cvBlockChange;
 extern std::atomic_bool fImporting;
 extern std::atomic_bool fReindex;
 extern bool fTxIndex;
-extern bool fIsBareMultisigStd;
 extern bool fCheckBlockIndex;
 extern bool fCheckpointsEnabled;
 extern size_t nCoinCacheUsage;

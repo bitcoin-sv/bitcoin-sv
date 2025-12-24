@@ -392,6 +392,9 @@ bool GlobalConfig::GetDataCarrier() const {
     return data->scriptPolicysettings.GetDataCarrier();
 }
 
+void GlobalConfig::SetPermitBareMultisig(bool permit) {
+    data->scriptPolicysettings.SetPermitBareMultisig(permit);
+}
 
 bool  GlobalConfig::SetLimitAncestorCount(int64_t limitAncestorCountIn, std::string* err) {
     if (limitAncestorCountIn <= 0)

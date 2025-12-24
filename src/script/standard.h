@@ -19,6 +19,9 @@
 
 static const bool DEFAULT_ACCEPT_DATACARRIER = true;
 
+/** Default for -permitbaremultisig */
+static const bool DEFAULT_PERMIT_BAREMULTISIG = true;
+
 /** Maximum number of signature check operations in an IsStandardOutput() P2SH script
  */
 static const unsigned int MAX_P2SH_SIGOPS = 15;
@@ -30,9 +33,6 @@ class CTransaction;
 struct ConfigScriptPolicy;
 
 namespace task{class CCancellationToken;}
-
-// Global variable for bare multisig standard policy
-extern bool fIsBareMultisigStd;
 
 /** A reference to a CScript: the Hash160 of its serialization (see script.h) */
 class CScriptID : public uint160 {

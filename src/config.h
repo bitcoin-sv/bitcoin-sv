@@ -235,6 +235,7 @@ public:
     virtual void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) = 0;
     virtual void SetDataCarrierSize(uint64_t dataCarrierSize) = 0;
     virtual void SetDataCarrier(bool dataCarrier) = 0;
+    virtual void SetPermitBareMultisig(bool permit) = 0;
     virtual bool SetLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr) = 0;
     virtual void SetTestBlockCandidateValidity(bool test) = 0;
     virtual void SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytes) = 0;
@@ -540,6 +541,7 @@ public:
     void SetAcceptNonStandardOutput(bool accept) override;
     bool GetAcceptNonStandardOutput(ProtocolEra era) const override;
     void SetRequireStandard(bool require) override;
+    void SetPermitBareMultisig(bool permit) override;
 
     bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) override;
     uint64_t GetMaxCoinsViewCacheSize() const override {return data->mMaxCoinsViewCacheSize;}

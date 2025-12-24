@@ -12,9 +12,6 @@
 
 typedef std::vector<uint8_t> valtype;
 
-// Global variable for bare multisig standard policy
-bool fIsBareMultisigStd = DEFAULT_PERMIT_BAREMULTISIG;
-
 CScriptID::CScriptID(const CScript &in)
     : uint160(Hash160(in.begin(), in.end())) {}
 
@@ -469,7 +466,7 @@ bool IsStandardTx(const ConfigScriptPolicy &scriptPolicy, const CTransaction &tx
 
         if (whichType == TX_NULL_DATA) {
             nDataSize += txout.scriptPubKey.size();
-        } else if ((whichType == TX_MULTISIG) && (!fIsBareMultisigStd)) {
+        } else if ((whichType == TX_MULTISIG) && (!scriptPolicy.GetPermitBareMultisig())) {
             reason = "bare-multisig";
             return false;
         } else if (txout.IsDust(era)) {

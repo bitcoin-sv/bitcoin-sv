@@ -45,6 +45,7 @@ struct ConfigScriptPolicy {
     virtual bool GetDataCarrier() const;
     virtual bool GetAcceptNonStandardOutput(ProtocolEra era) const;
     virtual bool GetRequireStandard() const;
+    virtual bool GetPermitBareMultisig() const;
 
     int32_t GetGenesisActivationHeight() const;
     int32_t GetChronicleActivationHeight() const;
@@ -67,6 +68,7 @@ struct ConfigScriptPolicy {
     void SetDataCarrier(bool dataCarrier);
     void SetAcceptNonStandardOutput(bool accept);
     void SetRequireStandard(bool require);
+    void SetPermitBareMultisig(bool permit);
 
 private:
     uint64_t maxOpsPerScriptPolicy;
@@ -86,4 +88,5 @@ private:
     bool dataCarrier;
     bool acceptNonStandardOutput;
     bool requireStandard;
+    bool permitBareMultisig;
 };

@@ -2999,8 +2999,8 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if (!CWallet::ParameterInteraction()) return false;
 #endif
 
-    fIsBareMultisigStd =
-        gArgs.GetBoolArg("-permitbaremultisig", DEFAULT_PERMIT_BAREMULTISIG);
+    config.SetPermitBareMultisig(
+        gArgs.GetBoolArg("-permitbaremultisig", DEFAULT_PERMIT_BAREMULTISIG));
     config.SetDataCarrier(gArgs.GetBoolArg("-datacarrier", DEFAULT_ACCEPT_DATACARRIER));
 
     // Option to startup with mocktime set (used for regression testing):

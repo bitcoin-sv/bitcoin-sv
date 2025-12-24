@@ -57,6 +57,7 @@ void ConfigScriptPolicy::ResetDefault(){
     dataCarrier = DEFAULT_ACCEPT_DATACARRIER;
     acceptNonStandardOutput = true;
     requireStandard = true;
+    permitBareMultisig = DEFAULT_PERMIT_BAREMULTISIG;
 }
 
 uint64_t ConfigScriptPolicy::GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const
@@ -480,4 +481,14 @@ bool ConfigScriptPolicy::GetRequireStandard() const
 void ConfigScriptPolicy::SetRequireStandard(bool require)
 {
     requireStandard = require;
+}
+
+bool ConfigScriptPolicy::GetPermitBareMultisig() const
+{
+    return permitBareMultisig;
+}
+
+void ConfigScriptPolicy::SetPermitBareMultisig(bool permit)
+{
+    permitBareMultisig = permit;
 }

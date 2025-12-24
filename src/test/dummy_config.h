@@ -395,6 +395,10 @@ public:
     {
         dummyPolicySettings.SetRequireStandard(require);
     }
+    void SetPermitBareMultisig(bool permit) override
+    {
+        dummyPolicySettings.SetPermitBareMultisig(permit);
+    }
 
     bool SetMaxCoinsViewCacheSize(int64_t /*max*/, std::string* err) override
     {
