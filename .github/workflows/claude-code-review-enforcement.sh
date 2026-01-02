@@ -15,15 +15,14 @@ readonly pr=$PR_NUMBER
 readonly owner=${GITHUB_REPOSITORY%/*}
 readonly repo=${GITHUB_REPOSITORY#*/}
 
-# ─────────────────────────────────────────────────────────────────
 # Check that Claude review step completed successfully
-# ─────────────────────────────────────────────────────────────────
 
 printf "Checking Claude review execution status...\n"
 
-if [[ "${CLAUDE_CONCLUSION:-}" != "success" ]]; then
-  printf "ERROR: Claude review did not complete successfully (conclusion: %s)\n" \
-    "${CLAUDE_CONCLUSION:-unknown}"
+# Check step outcome (built-in GitHub Actions variable)
+if [[ "${CLAUDE_OUTCOME:-}" != "success" ]]; then
+  printf "ERROR: Claude review step failed (outcome: %s)\n" \
+    "${CLAUDE_OUTCOME:-unknown}"
   printf "The review execution failed or was cancelled.\n"
   printf "Check the action logs for errors or permission denials.\n"
   gh api "repos/$owner/$repo/statuses/$sha" \
@@ -31,6 +30,30 @@ if [[ "${CLAUDE_CONCLUSION:-}" != "success" ]]; then
     -f context="Claude Code Review" \
     -f description="Review execution failed"
   exit 1
+fi
+
+# Check execution file for detailed error information
+if [[ -n "${EXECUTION_FILE:-}" && -f "${EXECUTION_FILE}" ]]; then
+  printf "Parsing execution file: %s\n" "$EXECUTION_FILE"
+
+  # Extract result message from execution file
+  is_error=$(jq -r 'map(select(.type == "result")) | last | .is_error | if . == null then "unknown" else tostring end' "$EXECUTION_FILE" 2>/dev/null || echo "unknown")
+  denials=$(jq -r 'map(select(.type == "result")) | last | .permission_denials | length' "$EXECUTION_FILE" 2>/dev/null || echo "0")
+
+  if [[ "$is_error" == "true" ]]; then
+    printf "ERROR: Claude review completed with errors\n"
+    gh api "repos/$owner/$repo/statuses/$sha" \
+      -f state=failure \
+      -f context="Claude Code Review" \
+      -f description="Review completed with errors"
+    exit 1
+  fi
+
+  if [[ "$denials" -gt 0 ]]; then
+    printf "WARNING: Claude had %s permission denial(s)\n" "$denials"
+  fi
+else
+  printf "Note: Execution file not found, skipping detailed error check\n"
 fi
 
 printf "✓ Claude execution completed successfully\n\n"

@@ -164,6 +164,7 @@ jobs:
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          CLAUDE_CONCLUSION: ${{ steps.claude-review.outputs.conclusion }}
+          CLAUDE_OUTCOME: ${{ steps.claude-review.outcome }}
+          EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
         run: .github/workflows/claude-code-review-enforcement.sh
 
