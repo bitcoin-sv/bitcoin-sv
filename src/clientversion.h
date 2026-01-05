@@ -27,7 +27,7 @@
  * Copyright year (2009-this)
  * Todo: update this when changing our copyright comments in the source
  */
-#define COPYRIGHT_YEAR 2025
+#define COPYRIGHT_YEAR 2026
 
 #endif // HAVE_CONFIG_H
 
