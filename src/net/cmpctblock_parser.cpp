@@ -61,9 +61,8 @@ size_t cmpctblock_parser::read(size_t read_pos, span<uint8_t> s)
         }
         else if(read_pos < header_parser_.size() + shortid_parser_.size())
         {
-            const size_t bytes_read = ::read(shortid_parser_, 
-                                             read_pos - header_parser_.size(),
-                                             s);
+            const size_t bytes_read{shortid_parser_.read(read_pos - header_parser_.size(),
+                                                         s)};
             read_pos += bytes_read;
             total_bytes_read += bytes_read;
             s = s.subspan(bytes_read);
