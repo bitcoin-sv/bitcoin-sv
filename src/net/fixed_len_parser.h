@@ -35,8 +35,6 @@ public:
     auto begin() const { return buffer_.begin(); };
     auto end() const { return buffer_.end(); };
 
-    void reset();
-
 private:
     value_type buffer_;
 };
