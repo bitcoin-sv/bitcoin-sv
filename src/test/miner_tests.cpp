@@ -15,16 +15,13 @@
 #include "consensus/validation.h"
 #include "policy/policy.h"
 #include "pow.h"
-#include "pubkey.h"
-#include "script/script_num.h"
 #include "script/standard.h"
+#include "testutil.h"
 #include "txmempool.h"
 #include "uint256.h"
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validation.h"
-
-#include "mempool_test_access.h"
 
 #include "test/test_bitcoin.h"
 
@@ -36,18 +33,16 @@ using mining::BlockAssemblerRef;
 using mining::CBlockTemplate;
 using mining::JournalingBlockAssembler;
 
+class JournalingTestingSetup : public TestingSetup
+{
+public:
+    JournalingTestingSetup()
+        : TestingSetup(CBaseChainParams::MAIN, mining::CMiningFactory::BlockAssemblerType::JOURNALING)
+    {}
+};
+
 namespace
 {
-    mining::CJournalChangeSetPtr nullChangeSet {nullptr};
-    
-    class JournalingTestingSetup : public TestingSetup
-    {
-    public:
-        JournalingTestingSetup()
-            : TestingSetup(CBaseChainParams::MAIN, mining::CMiningFactory::BlockAssemblerType::JOURNALING)
-        {}
-    };
-
     class miner_tests_uid; // only used as unique identifier
 }
 
@@ -74,7 +69,7 @@ struct CoinsDB::UnitTestAccess<miner_tests_uid>
         CoinsDB& provider,
         const uint256& hashBlock)
     {
-        provider.hashBlock = hashBlock;
+        provider.hashBlock_ = hashBlock;
     }
 };
 using TestAccessCoinsDB = CoinsDB::UnitTestAccess<miner_tests_uid>;
@@ -83,11 +78,6 @@ template <>
 struct CBlockIndex::UnitTestAccess<miner_tests_uid>
 {
     UnitTestAccess() = delete;
-
-    static void SetTime( CBlockIndex& index, int64_t time)
-    {
-        index.nTime = time;
-    }
 
     static void AddTime( CBlockIndex& index, int64_t time)
     {
@@ -108,12 +98,15 @@ struct CBlockIndex::UnitTestAccess<miner_tests_uid>
 };
 using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<miner_tests_uid>;
 
-static CFeeRate blockMinFeeRate = CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE);
+static CFeeRate blockMinFeeRate = CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE); // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
-static struct {
+struct Nonce
+{
     uint8_t extranonce;
     uint32_t nonce;
-} blockinfo[] = {
+};
+static const std::array<Nonce, 110> blockinfo =
+{{
     {4, 0xa4a3e223}, {2, 0x15c32f9e}, {1, 0x0375b547}, {1, 0x7004a8a5},
     {2, 0xce440296}, {2, 0x52cfe198}, {1, 0x77a72cd0}, {2, 0xbb5d6f84},
     {2, 0x83f30c2c}, {1, 0x48a73d5b}, {1, 0xef7dcd01}, {2, 0x6809c6c4},
@@ -142,7 +135,7 @@ static struct {
     {1, 0x3141c7c1}, {1, 0xb3b595f4}, {1, 0x735abf08}, {5, 0x623bfbce},
     {2, 0xd351e722}, {1, 0xf4ca48c9}, {1, 0x5b19c670}, {1, 0xa164bf0e},
     {2, 0xbbbeb305}, {2, 0xfe1c810a},
-};
+}};
 
 bool TestSequenceLocks(const CTransaction &tx, const Config& config, int flags) {
     CoinsDBView view{ *pcoinsTip };
@@ -181,7 +174,8 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     // blocks :)
     int32_t baseheight = 0;
     std::vector<CTransactionRef> txFirst;
-    for (size_t i = 0; i < sizeof(blockinfo) / sizeof(*blockinfo); ++i) {
+    for (size_t i = 0; i < blockinfo.size(); ++i)
+    {
         // pointer for convenience.
         CBlockRef blockRef = pblocktemplate->GetBlockRef();
         CBlock *pblock = blockRef.get();
@@ -327,18 +321,6 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
 
     mempool.Clear();
 
-    // Invalid (pre-p2sh) txn in mempool, template creation fails.
-    std::array<int64_t, CBlockIndex::nMedianTimeSpan> times;
-    for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
-        // Trick the MedianTimePast.
-        times[i] = chainActive.Tip()
-                       ->GetAncestor(chainActive.Tip()->GetHeight() - i)
-                       ->GetBlockTime();
-        TestAccessCBlockIndex::SetTime(
-            *chainActive.Tip()->GetAncestor(chainActive.Tip()->GetHeight() - i),
-            P2SH_ACTIVATION_TIME);
-    }
-
     tx.vin[0].prevout = COutPoint(txFirst[0]->GetId(), 0);
     tx.vin[0].scriptSig = CScript() << OP_1;
     tx.vout[0].nValue = BLOCKSUBSIDY - LOWFEE;
@@ -360,16 +342,11 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         TxStorage::memory, nullChangeSet);
     testingSetup.testConfig.SetTestBlockCandidateValidity(false);
     BOOST_CHECK_NO_THROW(jba->CreateNewBlock(scriptPubKey, pindexPrev));
-    testingSetup.testConfig.SetTestBlockCandidateValidity(true);
-    BOOST_CHECK_THROW(jba->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
+
+    //testingSetup.testConfig.SetTestBlockCandidateValidity(true);
+    //BOOST_CHECK_THROW(jba->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
 
     mempool.Clear();
-    for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
-        // Restore the MedianTimePast.
-        TestAccessCBlockIndex::SetTime(
-            *chainActive.Tip()->GetAncestor(chainActive.Tip()->GetHeight() - i),
-            times[i]);
-    }
 
     // Double spend txn pair in mempool, template creation fails.
     tx.vin[0].prevout = COutPoint(txFirst[0]->GetId(), 0);
@@ -786,7 +763,7 @@ void Test_BlockAssembler_construction_activate_new_blocksize(TestingSetup& testi
 }
 
 
-void Test_JournalingBlockAssembler_Construction(TestingSetup& testingSetup)
+void Test_JournalingBlockAssembler_Construction(TestingSetup&)
 {
     CScript scriptPubKey =
         CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909"
@@ -828,7 +805,8 @@ void Test_CreateNewBlock_JBA_Config(TestingSetup& testingSetup)
 
     // We can't make transactions until we have inputs. Therefore, load 100 blocks
     std::vector<CTransactionRef> txFirst;
-    for (size_t i = 0; i < sizeof(blockinfo) / sizeof(*blockinfo); ++i) {
+    for (size_t i = 0; i < blockinfo.size(); ++i)
+    {
         // pointer for convenience.
         CBlockRef blockRef = pblocktemplate->GetBlockRef();
         CBlock *pblock = blockRef.get();

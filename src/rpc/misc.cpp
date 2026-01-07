@@ -3,7 +3,6 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include "rpc/misc.h"
 #include "base58.h"
 #include "block_index_store.h"
 #include "clientversion.h"
@@ -13,13 +12,15 @@
 #include "net/net.h"
 #include "net/netbase.h"
 #include "policy/policy.h"
+#include "protocol_era.h"
 #include "rpc/blockchain.h"
+#include "rpc/misc.h"
 #include "rpc/server.h"
+#include "script/interpreter.h"
 #include "timedata.h"
 #include "txdb.h"
 #include "util.h"
 #include "utilstrencodings.h"
-#include "validation.h"
 
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
@@ -160,7 +161,7 @@ public:
 
     DescribeAddressVisitor(CWallet *_pwallet) : pwallet(_pwallet) {}
 
-    UniValue operator()(const CNoDestination &dest) const {
+    UniValue operator()(const CNoDestination&) const {
         return UniValue(UniValue::VOBJ);
     }
 
@@ -185,8 +186,8 @@ public:
             int nRequired;
             // DescribeAddressVisitor is used by RPC call validateaddress, which only takes address as input. 
             // We have no block height available - treat all transactions as post-Genesis except P2SH to be able to spend them.
-            const bool isGenesisEnabled = !IsP2SH(subscript);
-            ExtractDestinations(subscript, isGenesisEnabled, whichType, addresses, nRequired);
+            ProtocolEra era { IsP2SH(subscript)? ProtocolEra::PreGenesis : ProtocolEra::PostGenesis };
+            ExtractDestinations(subscript, era, whichType, addresses, nRequired);
             obj.push_back(Pair("script", GetTxnOutputType(whichType)));
             obj.push_back(
                 Pair("hex", HexStr(subscript.begin(), subscript.end())));
@@ -377,8 +378,8 @@ CScript createmultisig_redeemScript(CWallet *const pwallet,
     return result;
 }
 
-static UniValue createmultisig(const Config &config,
-                               const JSONRPCRequest &request) {
+static UniValue createmultisig(const Config&, const JSONRPCRequest& request)
+{
 #ifdef ENABLE_WALLET
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
 #else
@@ -633,15 +634,6 @@ Examples:
     // Parse scripts argument
     struct ScriptToVerify
     {
-        ScriptToVerify(CMutableTransaction&& tx, uint32_t n, CScript&& txo_lock, Amount txo_value, uint32_t flags, bool reportflags)
-        : tx{std::move(tx)}
-        , n{n}
-        , txo_lock{std::move(txo_lock)}
-        , txo_value{std::move(txo_value)}
-        , flags{flags}
-        , reportflags{reportflags}
-        {}
-
         // Data needed by script verification
         CTransaction tx;
         uint32_t n;
@@ -821,13 +813,23 @@ Examples:
                 // If txo.height was specified (or we got it from coinsdb),
                 // it overrides per-input script verification flags.
                 flags &= ~SCRIPT_UTXO_AFTER_GENESIS;
-                if(IsGenesisEnabled(config, *txo_height))
+                flags &= ~SCRIPT_UTXO_AFTER_CHRONICLE;
+                if(IsProtocolActive(GetProtocolEra(config.GetConfigScriptPolicy(), *txo_height), ProtocolName::Genesis))
                 {
                     flags |= SCRIPT_UTXO_AFTER_GENESIS;
                 }
+                if(IsProtocolActive(GetProtocolEra(config.GetConfigScriptPolicy(), *txo_height), ProtocolName::Chronicle))
+                {
+                    flags |= SCRIPT_UTXO_AFTER_CHRONICLE;
+                }
             }
 
-            scripts_tmp.emplace_back(std::move(mtx), n, std::move(txo_lock), txo_value, flags, item["reportflags"].getBool());
+            scripts_tmp.emplace_back(CTransaction(std::move(mtx)),
+                                     n,
+                                     std::move(txo_lock),
+                                     txo_value,
+                                     flags,
+                                     item["reportflags"].getBool());
         }
 
         return scripts_tmp;
@@ -852,17 +854,17 @@ Examples:
             continue;
         }
 
-        CScriptCheck script_check{
-            config,
-            false, // consensus = false
-            scr.txo_lock,
-            scr.txo_value,
-            scr.tx,
-            scr.n,
-            scr.flags,
-            false, // no cache
-            PrecomputedTransactionData(scr.tx)
-        };
+        constexpr bool consensus{};
+        const auto params{make_verify_script_params(config.GetConfigScriptPolicy(), scr.flags, consensus)};
+
+        CScriptCheck script_check{params,
+                                  scr.txo_lock,
+                                  scr.txo_value,
+                                  scr.tx,
+                                  scr.n,
+                                  scr.flags,
+                                  false, // no cache
+                                  PrecomputedTransactionData(scr.tx)};
 
         auto t0 = std::chrono::steady_clock::now();
         auto res = script_check( task::CCancellationToken::JoinToken(
@@ -914,8 +916,8 @@ Examples:
     return result_json;
 }
 
-static UniValue signmessagewithprivkey(const Config &config,
-                                       const JSONRPCRequest &request) {
+static UniValue signmessagewithprivkey(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp || request.params.size() != 2) {
         throw std::runtime_error(
             "signmessagewithprivkey \"privkey\" \"message\"\n"
@@ -966,8 +968,8 @@ static UniValue signmessagewithprivkey(const Config &config,
     return EncodeBase64(&vchSig[0], vchSig.size());
 }
 
-static UniValue clearinvalidtransactions(const Config &config,
-                                         const JSONRPCRequest &request) {
+static UniValue clearinvalidtransactions(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp || request.params.size() != 0) {
         throw std::runtime_error(
             "clearinvalidtransactions\n\n"
@@ -1036,8 +1038,8 @@ static UniValue TouchedPagesInfo() {
     return obj;
 }
 
-static UniValue getmemoryinfo(const Config &config,
-                              const JSONRPCRequest &request) {
+static UniValue getmemoryinfo(const Config&, const JSONRPCRequest& request)
+{
     /* Please, avoid using the word "pool" here in the RPC interface or help,
      * as users will undoubtedly confuse it with the other "memory pool"
      */
@@ -1073,7 +1075,8 @@ static UniValue getmemoryinfo(const Config &config,
     return obj;
 }
 
-static UniValue echo(const Config &config, const JSONRPCRequest &request) {
+static UniValue echo(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp) {
         throw std::runtime_error(
             "echo|echojson \"message\" ...\n"
@@ -1087,7 +1090,7 @@ static UniValue echo(const Config &config, const JSONRPCRequest &request) {
     return request.params;
 }
 
-static UniValue activezmqnotifications(const Config &config, const JSONRPCRequest &request)
+static UniValue activezmqnotifications(const Config&, const JSONRPCRequest &request)
 {
     if (request.fHelp || request.params.size() != 0)
     {
@@ -1207,15 +1210,15 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
 
     obj.push_back(Pair("excessiveblocksize", config.GetMaxBlockSize()));
     obj.push_back(Pair("blockmaxsize", config.GetMaxGeneratedBlockSize()));
-    obj.push_back(Pair("maxtxsizepolicy", config.GetMaxTxSize(true, false)));
+    obj.push_back(Pair("maxtxsizepolicy", config.GetMaxTxSize(ProtocolEra::PostGenesis, false)));
     obj.push_back(Pair("maxorphantxsize", config.GetMaxOrphanTxSize()));
     obj.push_back(Pair("datacarriersize", config.GetDataCarrierSize()));
 
     obj.push_back(Pair("maxscriptsizepolicy", config.GetMaxScriptSize(true, false)));
     obj.push_back(Pair("maxopsperscriptpolicy", config.GetMaxOpsPerScript(true, false)));
-    obj.push_back(Pair("maxscriptnumlengthpolicy", config.GetMaxScriptNumLength(true, false)));
+    obj.push_back(Pair("maxscriptnumlengthpolicy", config.GetMaxScriptNumLength(GetProtocolEra(config.GetConfigScriptPolicy(), chainActive.Height()), false)));
     obj.push_back(Pair("maxpubkeyspermultisigpolicy", config.GetMaxPubKeysPerMultiSig(true, false)));
-    obj.push_back(Pair("maxtxsigopscountspolicy", config.GetMaxTxSigOpsCountPolicy(true)));
+    obj.push_back(Pair("maxtxsigopscountspolicy", config.GetMaxTxSigOpsCountPolicy(ProtocolEra::PostGenesis)));
     obj.push_back(Pair("maxstackmemoryusagepolicy", config.GetMaxStackMemoryUsage(true, false)));
     obj.push_back(Pair("maxstackmemoryusageconsensus", config.GetMaxStackMemoryUsage(true, true)));
 
@@ -1226,7 +1229,7 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
     obj.push_back(Pair("maxmempoolsizedisk", config.GetMaxMempoolSizeDisk()));
     obj.push_back(Pair("mempoolmaxpercentcpfp", config.GetMempoolMaxPercentCPFP()));
 
-    obj.push_back(Pair("acceptnonstdoutputs", config.GetAcceptNonStandardOutput(true)));
+    obj.push_back(Pair("acceptnonstdoutputs", config.GetAcceptNonStandardOutput(ProtocolEra::PostGenesis)));
     obj.push_back(Pair("datacarrier", config.GetDataCarrier()));
     obj.push_back(Pair("minminingtxfee", ValueFromAmount(mempool.GetBlockMinTxFee().GetFeePerK())));
     obj.push_back(Pair("maxstdtxvalidationduration", config.GetMaxStdTxnValidationDuration().count()));
@@ -1245,7 +1248,7 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
     return obj;
 }
 
-static UniValue dumpparameters(const Config &config, const JSONRPCRequest &request)
+static UniValue dumpparameters(const Config&, const JSONRPCRequest &request)
 {
 
     if (request.fHelp || request.params.size() != 0)
@@ -1294,6 +1297,8 @@ namespace
         {"SIGHASH_FORKID", SCRIPT_ENABLE_SIGHASH_FORKID},
         {"GENESIS", SCRIPT_GENESIS},
         {"UTXO_AFTER_GENESIS", SCRIPT_UTXO_AFTER_GENESIS},
+        {"CHRONICLE", SCRIPT_CHRONICLE},
+        {"UTXO_AFTER_CHRONICLE", SCRIPT_UTXO_AFTER_CHRONICLE},
     };
 }
 
@@ -1311,31 +1316,32 @@ std::optional<uint32_t> GetFlagNumber(const std::string& flagName, std::string& 
     return flagNumber;
 }
 
-// clang-format off
-static const CRPCCommand commands[] = {
-    //  category            name                      actor (function)        okSafeMode
-    //  ------------------- ------------------------  ----------------------  ----------
-    { "control",            "getinfo",                getinfo,                true,  {} }, /* uses wallet if enabled */
-    { "control",            "getmemoryinfo",          getmemoryinfo,          true,  {} },
-    { "control",            "dumpparameters",         dumpparameters,         true,  {} },
-    { "control",            "getsettings",            getsettings,            true,  {} },
-    { "control",            "activezmqnotifications", activezmqnotifications, true,  {} },
-    { "util",               "validateaddress",        validateaddress,        true,  {"address"} }, /* uses wallet if enabled */
-    { "util",               "createmultisig",         createmultisig,         true,  {"nrequired","keys"} },
-    { "util",               "verifymessage",          verifymessage,          true,  {"address","signature","message"} },
-    { "util",               "verifyscript",           verifyscript,           true,  {"scripts", "stopOnFirstInvalid", "totalTimeout"} },
-    { "util",               "signmessagewithprivkey", signmessagewithprivkey, true,  {"privkey","message"} },
+void RegisterMiscRPCCommands(CRPCTable& t)
+{
+    // clang-format off
+    static const CRPCCommand commands[] = {
+        //  category            name                      actor (function)        okSafeMode
+        //  ------------------- ------------------------  ----------------------  ----------
+        { "control",            "getinfo",                getinfo,                true,  {} }, /* uses wallet if enabled */
+        { "control",            "getmemoryinfo",          getmemoryinfo,          true,  {} },
+        { "control",            "dumpparameters",         dumpparameters,         true,  {} },
+        { "control",            "getsettings",            getsettings,            true,  {} },
+        { "control",            "activezmqnotifications", activezmqnotifications, true,  {} },
+        { "util",               "validateaddress",        validateaddress,        true,  {"address"} }, /* uses wallet if enabled */
+        { "util",               "createmultisig",         createmultisig,         true,  {"nrequired","keys"} },
+        { "util",               "verifymessage",          verifymessage,          true,  {"address","signature","message"} },
+        { "util",               "verifyscript",           verifyscript,           true,  {"scripts", "stopOnFirstInvalid", "totalTimeout"} },
+        { "util",               "signmessagewithprivkey", signmessagewithprivkey, true,  {"privkey","message"} },
 
-    { "util",               "clearinvalidtransactions",clearinvalidtransactions, true,  {} },
+        { "util",               "clearinvalidtransactions",clearinvalidtransactions, true,  {} },
 
-    /* Not shown in help */
-    { "hidden",             "setmocktime",            setmocktime,            true,  {"timestamp"}},
-    { "hidden",             "echo",                   echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
-    { "hidden",             "echojson",               echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
-};
-// clang-format on
+        /* Not shown in help */
+        { "hidden",             "setmocktime",            setmocktime,            true,  {"timestamp"}},
+        { "hidden",             "echo",                   echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
+        { "hidden",             "echojson",               echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
+    };
+    // clang-format on
 
-void RegisterMiscRPCCommands(CRPCTable &t) {
     for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++) {
         t.appendCommand(commands[vcidx].name, &commands[vcidx]);
     }

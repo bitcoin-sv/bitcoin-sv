@@ -3,7 +3,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "streams.h"
-#include "support/allocators/zeroafterfree.h"
 #include "test/test_bitcoin.h"
 
 #include <boost/assert.hpp>
@@ -17,7 +16,7 @@ BOOST_FIXTURE_TEST_SUITE(streams_tests, BasicTestingSetup)
 BOOST_AUTO_TEST_CASE(streams_vector_writer) {
     uint8_t a(1);
     uint8_t b(2);
-    uint8_t bytes[] = {3, 4, 5, 6};
+    std::array<uint8_t, 4> bytes = {3, 4, 5, 6};
     std::vector<uint8_t> vch;
 
     // Each test runs twice. Serializing a second time at the same starting
@@ -131,7 +130,7 @@ BOOST_AUTO_TEST_CASE(streams_empty_vector) {
     ds.insert(ds.begin(), vdata.begin(), vdata.end());
 
     // ... or an array.
-    const char adata[6] = {'f', 'o', 'o', 'b', 'a', 'r'};
+    const char adata[6] = {'f', 'o', 'o', 'b', 'a', 'r'}; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     ds.insert(ds.begin(), &adata[0], &adata[0]);
     ds.insert(ds.begin(), &adata[0], &adata[6]);
 }

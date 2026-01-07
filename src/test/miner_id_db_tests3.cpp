@@ -2,7 +2,6 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "block_index_store.h"
-#include "blockstreams.h"
 #include "config.h"
 #include "consensus/merkle.h"
 #include "merkletreestore.h"
@@ -12,13 +11,17 @@
 #include "miner_id/revokemid.h"
 #include "pow.h"
 #include "rpc/mining.h"
-#include "script/instruction_iterator.h"
 #include "txn_validator.h"
 
 #include "test/test_bitcoin.h"
+#include "test/testutil.h"
 
+#include <array>
 #include <boost/test/unit_test.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <crypto/sha256.h>
+#include <iterator>
+#include <span>
 
 namespace
 {
@@ -29,12 +32,14 @@ namespace
     const std::vector<uint8_t> MinerInfoProtocolPrefix { 0x60, 0x1d, 0xfa, 0xce };
     const std::vector<uint8_t> ProtocolIdVersion { 0x00 };
 
-    // v0.2 or v0.3
-    enum class MinerIDOrInfo { MINER_ID, MINER_INFO };
+}
 
-    // Additional fields for creating V3 coinbase documents
-    struct V3CoinbaseFields
-    {
+// v0.2 or v0.3
+enum class MinerIDOrInfo { MINER_ID, MINER_INFO };
+
+// Additional fields for creating V3 coinbase documents
+struct V3CoinbaseFields
+{
         V3CoinbaseFields() = default;
         V3CoinbaseFields(MinerIDOrInfo mioi) : idOrInfo{mioi} {}
         V3CoinbaseFields(MinerIDOrInfo mioi, const CKey& prevKey, const CKey& key, const std::optional<CoinbaseDocument::RevocationMessage>& rm)
@@ -51,8 +56,10 @@ namespace
         CPubKey revocationPubKey {};
         std::optional<CoinbaseDocument::RevocationMessage> revocationMessage { std::nullopt };
         std::optional<CKey> revocationCurrentMinerIdKey { std::nullopt };
-    };
+};
 
+namespace
+{
     // Dummy vctx for v0.2 miner IDs
     const std::string vctxid { "6839008199026098cc78bf5f34c9a6bdf7a8009c9f019f8399c7ca1945b4a4ff" };
 
@@ -62,7 +69,7 @@ namespace
         std::vector<CTxMemPoolEntry> contents {};
         for(const auto& entry : mempool.GetSnapshot())
         {
-            contents.push_back(std::move(entry));
+            contents.push_back(entry);
         }
         mempool.Clear();
 
@@ -78,7 +85,6 @@ namespace
     {
         mempool.Clear();
 
-        mining::CJournalChangeSetPtr nullChangeSet {nullptr};
         for(const auto& entry : contents)
         {
             mempool.AddUnchecked(entry.GetTxId(), entry, TxStorage::memory, nullChangeSet);
@@ -103,8 +109,10 @@ namespace
         {
             transform_hex(vctxid, back_inserter(dataToSign));
         }
-        uint8_t hashPrevSignature[CSHA256::OUTPUT_SIZE] {};
-        CSHA256().Write(reinterpret_cast<const uint8_t*>(&dataToSign[0]), dataToSign.size()).Finalize(hashPrevSignature);
+        std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashPrevSignature{};
+        CSHA256()
+            .Write(reinterpret_cast<const uint8_t*>(&dataToSign[0]), dataToSign.size())
+            .Finalize(hashPrevSignature);
         std::vector<uint8_t> prevMinerIdSignature {};
         BOOST_CHECK(prevMinerIdKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashPrevSignature), std::end(hashPrevSignature)}), prevMinerIdSignature));
         return HexStr(prevMinerIdSignature);
@@ -123,8 +131,10 @@ namespace
         transform_hex(hexEncodedPrevRevocationPubKey, back_inserter(dataToSign));
         transform_hex(hexEncodedRevocationPubKey, back_inserter(dataToSign));
 
-        uint8_t hashPrevSignature[CSHA256::OUTPUT_SIZE] {};
-        CSHA256().Write(reinterpret_cast<const uint8_t*>(&dataToSign[0]), dataToSign.size()).Finalize(hashPrevSignature);
+        std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashPrevSignature{};
+        CSHA256()
+            .Write(reinterpret_cast<const uint8_t*>(&dataToSign[0]), dataToSign.size())
+            .Finalize(hashPrevSignature);
         std::vector<uint8_t> prevRevocationKeySignature {};
         BOOST_CHECK(prevRevocationKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashPrevSignature), std::end(hashPrevSignature)}), prevRevocationKeySignature));
         return HexStr(prevRevocationKeySignature);
@@ -135,8 +145,10 @@ namespace
     std::vector<uint8_t> CreateSignatureOverDocument(const CKey& minerIdKey, const Document& document)
     {
         std::vector<uint8_t> documentBytes { document.begin(), document.end() };
-        uint8_t hashSignature[CSHA256::OUTPUT_SIZE] {};
-        CSHA256().Write(documentBytes.data(), documentBytes.size()).Finalize(hashSignature);
+        std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashSignature{};
+        CSHA256()
+            .Write(documentBytes.data(), documentBytes.size())
+            .Finalize(hashSignature);
         std::vector<uint8_t> signature {};
         BOOST_CHECK(minerIdKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashSignature), std::end(hashSignature)}), signature));
         return signature;
@@ -150,8 +162,10 @@ namespace
     {
         const std::vector<uint8_t> dataToSign { ParseHex(message.mCompromisedId) };
 
-        uint8_t hashForSigning[CSHA256::OUTPUT_SIZE] {};
-        CSHA256().Write(dataToSign.data(), dataToSign.size()).Finalize(hashForSigning);
+        std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashForSigning{};
+        CSHA256()
+            .Write(dataToSign.data(), dataToSign.size())
+            .Finalize(hashForSigning);
         std::vector<uint8_t> sig1 {};
         BOOST_CHECK(revocationKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashForSigning), std::end(hashForSigning)}), sig1));
         std::vector<uint8_t> sig2 {};
@@ -195,6 +209,7 @@ namespace
                 UniValue revocationMessage { UniValue::VOBJ };
                 revocationMessage.push_back(Pair("compromised_minerId", v3Params.revocationMessage->mCompromisedId));
                 document.push_back(Pair("revocationMessage", revocationMessage));
+                assert(v3Params.revocationCurrentMinerIdKey);
                 document.push_back(Pair("revocationMessageSig", CreateSignatureRevocationMessage(
                     v3Params.revocationMessage.value(), v3Params.revocationKey, v3Params.revocationCurrentMinerIdKey.value())));
             }
@@ -216,6 +231,7 @@ namespace
         {
             UniValue dataRefsJson { UniValue::VOBJ };
             UniValue dataRefsArray { UniValue::VARR };
+
             for(const auto& ref : *dataRefs)
             {
                 UniValue dataRefJson { UniValue::VOBJ };
@@ -317,21 +333,26 @@ namespace
         concatMerklePrevBlock.insert(concatMerklePrevBlock.end(), modifiedMerkleRoot.begin(), modifiedMerkleRoot.end());
         concatMerklePrevBlock.insert(concatMerklePrevBlock.end(), block.hashPrevBlock.begin(), block.hashPrevBlock.end());
 
-        uint8_t hashConcatMerklePrevBlock[CSHA256::OUTPUT_SIZE] {};
-        CSHA256().Write(reinterpret_cast<const uint8_t*>(concatMerklePrevBlock.data()), concatMerklePrevBlock.size()).Finalize(hashConcatMerklePrevBlock);
-        const std::vector<uint8_t> hashConcatMerklePrevBlockBytes { hashConcatMerklePrevBlock, hashConcatMerklePrevBlock + sizeof(hashConcatMerklePrevBlock) };
+        std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashConcatMerklePrevBlock{};
+        CSHA256()
+            .Write(reinterpret_cast<const uint8_t*>(concatMerklePrevBlock.data()),
+                   concatMerklePrevBlock.size())
+            .Finalize(hashConcatMerklePrevBlock);
+        const std::vector hashConcatMerklePrevBlockBytes(hashConcatMerklePrevBlock.begin(),
+                                                         hashConcatMerklePrevBlock.end());
 
-        std::vector<uint8_t> signature {};
-        BOOST_CHECK(minerKey.Sign(uint256 { hashConcatMerklePrevBlockBytes }, signature));
+        std::vector<uint8_t> signature{};
+        BOOST_CHECK(minerKey.Sign(uint256{ hashConcatMerklePrevBlockBytes }, signature));
 
         // Update coinbase
         coinbase.vout[1].scriptPubKey << hashConcatMerklePrevBlockBytes << signature;
         block.vtx[0] = MakeTransactionRef(std::move(coinbase));
     }
+}
 
-    // Testing fixture that creates a REGTEST-mode block chain with minerIDs
-    struct SetupMinerIDChain : public TestChain100Setup
-    {
+// Testing fixture that creates a REGTEST-mode block chain with minerIDs
+struct SetupMinerIDChain : public TestChain100Setup
+{
         SetupMinerIDChain() : TestChain100Setup{}
         {
 	    // Create dataref index
@@ -486,7 +507,7 @@ namespace
             }
 
             // Build and submit dataref txn to mempool
-            auto SubmitTxn = [this](const CTransactionRef& fundTxn, const std::string& dataRefJson)
+            auto SubmitTxn = [this](const CTransactionRef& fundTxn, const std::string& dataref_json)
             {
                 CMutableTransaction txn {};
                 txn.vin.resize(1);
@@ -494,7 +515,7 @@ namespace
                 txn.vout.resize(1);
                 txn.vout[0].nValue = Amount{0};
                 txn.vout[0].scriptPubKey = CScript() << OP_FALSE << OP_RETURN << MinerInfoProtocolPrefix
-                                                     << std::vector<uint8_t> { dataRefJson.begin(), dataRefJson.end() };
+                                                     << std::vector<uint8_t> { dataref_json.begin(), dataref_json.end() };
 
                 // Sign
                 std::vector<uint8_t> vchSig {};
@@ -566,6 +587,7 @@ namespace
             if(baseDocument)
             {
                 // Sign base document
+                assert(minerKey);
                 std::vector<uint8_t> signature { CreateSignatureOverDocument(*minerKey, baseDocument->write()) };
 
                 // Update coinbase to include miner ID or miner-info reference
@@ -628,29 +650,12 @@ namespace
         // Transactions containing dataRefs
         std::vector<CTransactionRef> dataRefTxns {};
         std::vector<std::string> dataRefTxnBrfcIds { "BrfcId1", "BrfcId2" };
-    };
+};
 
+namespace
+{
     // For ID only
     class miner_id_tests3_id;
-
-    // RAII class to instantiate global miner ID database
-    class MakeGlobalMinerIdDb
-    {
-      public:
-        MakeGlobalMinerIdDb()
-        {
-            g_minerIDs = std::make_unique<MinerIdDatabase>(GlobalConfig::GetConfig());
-        }
-        ~MakeGlobalMinerIdDb()
-        {
-            g_minerIDs.reset();
-        }
-
-        MakeGlobalMinerIdDb(const MakeGlobalMinerIdDb&) = delete;
-        MakeGlobalMinerIdDb(MakeGlobalMinerIdDb&&) = delete;
-        MakeGlobalMinerIdDb& operator=(const MakeGlobalMinerIdDb&) = delete;
-        MakeGlobalMinerIdDb& operator=(MakeGlobalMinerIdDb&&) = delete;
-    };
 }
 
 // MinerIdDatabase class inspection
@@ -682,17 +687,17 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests3_id>
 
     static MinerId GetLatestMinerIdByName(
         const MinerIdDatabase& db,
-        BlockIndexStore& mapBlockIndex,
+        BlockIndexStore& block_index_store,
         const std::string& name)
     {
         // Fetch from latest block from named miner
-        const auto& entry { GetMinerUUIdEntryByName(db, mapBlockIndex, name) };
-        CBlockIndex* blockindex { mapBlockIndex.Get(entry.second.mLastBlock) };
+        const auto& entry { GetMinerUUIdEntryByName(db, block_index_store, name) };
+        CBlockIndex* blockindex { block_index_store.Get(entry.second.mLastBlock) };
         BOOST_REQUIRE(blockindex);
         CBlock block {};
         BOOST_REQUIRE(blockindex->ReadBlockFromDisk(block, GlobalConfig::GetConfig()));
         std::optional<MinerId> minerId { FindMinerId(block, blockindex->GetHeight()) };
-        BOOST_REQUIRE(minerId);
+        assert(minerId);
         return *minerId;
     }
 
@@ -703,23 +708,23 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests3_id>
 
     static const MinerIdDatabase::MinerUUIdMap::value_type GetMinerUUIdEntryByName(
         const MinerIdDatabase& db,
-        BlockIndexStore& mapBlockIndex,
+        BlockIndexStore& block_index_store,
         const std::string& name)
     {
         for(const auto& entry : db.GetAllMinerUUIdsNL())
         {
             // Lookup last block we saw from this miner and extract the miner ID
-            CBlockIndex* blockindex { mapBlockIndex.Get(entry.second.mLastBlock) };
+            CBlockIndex* blockindex { block_index_store.Get(entry.second.mLastBlock) };
             BOOST_REQUIRE(blockindex);
             CBlock block {};
             BOOST_REQUIRE(blockindex->ReadBlockFromDisk(block, GlobalConfig::GetConfig()));
             std::optional<MinerId> minerID { FindMinerId(block, blockindex->GetHeight()) };
-            BOOST_REQUIRE(minerID);
+            assert(minerID);
 
             // Check for matching minerContact
             const CoinbaseDocument& cbd { minerID->GetCoinbaseDocument() };
             std::optional<UniValue> minerContact { cbd.GetMinerContact() };
-            BOOST_REQUIRE(minerContact);
+            assert(minerContact);
             const auto& minerName { (*minerContact)["name"] };
             BOOST_REQUIRE(minerName.isStr());
             if(minerName.get_str() == name)
@@ -734,11 +739,11 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests3_id>
 
     static const std::vector<MinerIdDatabase::MinerIdEntry> GetMinerIdsForMinerByName(
         const MinerIdDatabase& db,
-        BlockIndexStore& mapBlockIndex,
+        BlockIndexStore& block_index_store,
         const std::string& name)
     {
         // Get UUID for named miner
-        const MinerIdDatabase::MinerUUId& miner { GetMinerUUIdEntryByName(db, mapBlockIndex, name).first };
+        const MinerIdDatabase::MinerUUId& miner { GetMinerUUIdEntryByName(db, block_index_store, name).first };
 
         // Get all miner IDs for this miner
         return db.GetMinerIdsForMinerNL(miner);
@@ -746,11 +751,11 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests3_id>
 
     static size_t GetNumRecentBlocksForMinerByName(
         const MinerIdDatabase& db,
-        BlockIndexStore& mapBlockIndex,
+        BlockIndexStore& block_index_store,
         const std::string& name)
     {
         // Get UUID for named miner
-        const MinerIdDatabase::MinerUUId& miner { GetMinerUUIdEntryByName(db, mapBlockIndex, name).first };
+        const MinerIdDatabase::MinerUUId& miner { GetMinerUUIdEntryByName(db, block_index_store, name).first };
 
         // Get number of recent blocks from this miner
         return db.GetNumRecentBlocksForMinerNL(miner);
@@ -777,7 +782,7 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests3_id>
     static bool MinerIdIsRotated(const MinerIdEntry& id) { return id.mState == MinerIdEntry::State::ROTATED; }
     static bool MinerIdIsRevoked(const MinerIdEntry& id) { return id.mState == MinerIdEntry::State::REVOKED; }
 };
-using UnitTestAccess = MinerIdDatabase::UnitTestAccess<miner_id_tests3_id>;
+using UnitTestAccessMinerIdTests3 = MinerIdDatabase::UnitTestAccess<miner_id_tests3_id>;
 
 // RevokeMid class inspection
 template<>
@@ -811,11 +816,11 @@ BOOST_FIXTURE_TEST_CASE(InitialiseFromExistingChain, SetupMinerIDChain)
     // Check miner ID db contains the expected miner details
     auto dbCheckLambda = [this](const MinerIdDatabase& minerid_db)
     {
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4U);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 4U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 3U);
 
         // Check miner UUId entry for Miner1
-        const auto& miner1Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
+        const auto& miner1Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
         CBlockIndex* expectedFirstBlock { chainActive[104] };  // Miner1 first block was height 104
         CBlockIndex* expectedFirstBlock2ndId { chainActive[108] };  // Miner1 2nd key first block was height 107
         CBlockIndex* expectedLastBlock { chainActive[108] };  // Miner1 last block was height 108
@@ -825,13 +830,13 @@ BOOST_FIXTURE_TEST_CASE(InitialiseFromExistingChain, SetupMinerIDChain)
         BOOST_CHECK_EQUAL(miner1Details.second.mLatestMinerId, miner1IdPubKey2.GetHash());
 
         // Check miner ID entries for Miner1
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key1Details));
         BOOST_CHECK_EQUAL(expectedFirstBlock->GetBlockHash(), miner1Key1Details.mCreationBlock);
         BOOST_CHECK_EQUAL(miner1Key1Details.mPrevMinerId.GetHash(), miner1IdPubKey1.GetHash());
         BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash(), miner1IdPubKey2.GetHash());
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key2Details));
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key2Details));
         BOOST_CHECK_EQUAL(expectedFirstBlock2ndId->GetBlockHash(), miner1Key2Details.mCreationBlock);
         BOOST_CHECK_EQUAL(miner1Key2Details.mPrevMinerId.GetHash(), miner1IdPubKey1.GetHash());
         BOOST_CHECK(! miner1Key2Details.mNextMinerId);
@@ -841,11 +846,11 @@ BOOST_FIXTURE_TEST_CASE(InitialiseFromExistingChain, SetupMinerIDChain)
         BOOST_CHECK(! miner1Key2Details.mCoinbaseDoc.GetDataRefs());
 
         // Check recent block details for Miner1
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
-        BOOST_CHECK(MinerHasGoodReputation(minerid_db, UnitTestAccess::GetLatestMinerIdByName(minerid_db, mapBlockIndex, "Miner1")));
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
+        BOOST_CHECK(MinerHasGoodReputation(minerid_db, UnitTestAccessMinerIdTests3::GetLatestMinerIdByName(minerid_db, mapBlockIndex, "Miner1")));
 
         // Check miner UUId entry for Miner2
-        const auto& miner2Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner2") };
+        const auto& miner2Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner2") };
         expectedFirstBlock = chainActive[110];  // Miner2 first block was height 110
         expectedLastBlock = chainActive[110];  // Miner2 last block was height 110
         BOOST_CHECK_EQUAL(expectedFirstBlock->GetBlockHash(), miner2Details.second.mFirstBlock);
@@ -854,8 +859,8 @@ BOOST_FIXTURE_TEST_CASE(InitialiseFromExistingChain, SetupMinerIDChain)
         BOOST_CHECK_EQUAL(miner2Details.second.mLatestMinerId, miner2IdPubKey1.GetHash());
 
         // Check miner ID entries for Miner2
-        const auto& miner2Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner2IdPubKey1.GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner2Key1Details));
+        const auto& miner2Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner2IdPubKey1.GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner2Key1Details));
         BOOST_CHECK_EQUAL(expectedFirstBlock->GetBlockHash(), miner2Key1Details.mCreationBlock);
         BOOST_CHECK_EQUAL(miner2Key1Details.mPrevMinerId.GetHash(), miner2IdPubKey1.GetHash());
         BOOST_CHECK(! miner2Key1Details.mNextMinerId);
@@ -872,11 +877,11 @@ BOOST_FIXTURE_TEST_CASE(InitialiseFromExistingChain, SetupMinerIDChain)
         BOOST_CHECK_EQUAL(datarefs.value()[1].brfcIds[0], dataRefTxnBrfcIds[1]);
 
         // Check recent block details for Miner2
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), 1U);
-        BOOST_CHECK(! MinerHasGoodReputation(minerid_db, UnitTestAccess::GetLatestMinerIdByName(minerid_db, mapBlockIndex, "Miner2")));
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), 1U);
+        BOOST_CHECK(! MinerHasGoodReputation(minerid_db, UnitTestAccessMinerIdTests3::GetLatestMinerIdByName(minerid_db, mapBlockIndex, "Miner2")));
 
         // Check miner UUId entry for Miner4
-        const auto& miner4Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner4") };
+        const auto& miner4Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner4") };
         expectedFirstBlock = chainActive[112];  // Miner4 first block was height 112
         expectedLastBlock = chainActive[112];  // Miner4 last block was height 112
         BOOST_CHECK_EQUAL(expectedFirstBlock->GetBlockHash(), miner4Details.second.mFirstBlock);
@@ -885,36 +890,36 @@ BOOST_FIXTURE_TEST_CASE(InitialiseFromExistingChain, SetupMinerIDChain)
         BOOST_CHECK_EQUAL(miner4Details.second.mLatestMinerId, miner4IdPubKey1.GetHash());
 
         // Check miner ID entries for Miner4
-        const auto& miner4Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner4IdPubKey1.GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner4Key1Details));
+        const auto& miner4Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner4IdPubKey1.GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner4Key1Details));
         BOOST_CHECK_EQUAL(expectedFirstBlock->GetBlockHash(), miner4Key1Details.mCreationBlock);
         BOOST_CHECK_EQUAL(miner4Key1Details.mPrevMinerId.GetHash(), miner4IdPubKey1.GetHash());
         BOOST_CHECK(! miner4Key1Details.mNextMinerId);
         BOOST_CHECK_EQUAL(miner4Key1Details.mCoinbaseDoc.GetVersion(), "0.2");
 
         // Check recent block details for Miner4
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner4"), 1U);
-        BOOST_CHECK(! MinerHasGoodReputation(minerid_db, UnitTestAccess::GetLatestMinerIdByName(minerid_db, mapBlockIndex, "Miner4")));
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner4"), 1U);
+        BOOST_CHECK(! MinerHasGoodReputation(minerid_db, UnitTestAccessMinerIdTests3::GetLatestMinerIdByName(minerid_db, mapBlockIndex, "Miner4")));
     };
 
     {
         // Create a miner ID database which should build itself for the first time from the blockchain
         MinerIdDatabase minerid_db { GlobalConfig::GetConfig() };
-        UnitTestAccess::WaitForSync(minerid_db);
+        UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
         dbCheckLambda(minerid_db);
 
         // Check the db build progressed as expected
-        BOOST_CHECK(UnitTestAccess::GetStatus(minerid_db).mRebuiltFromBlockchain);
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::GetStatus(minerid_db).mRebuiltFromBlockchain);
     }
 
     {
         // Create a miner ID database which should restore itself from the new database file
         MinerIdDatabase minerid_db { GlobalConfig::GetConfig() };
-        UnitTestAccess::WaitForSync(minerid_db);
+        UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
         dbCheckLambda(minerid_db);
 
         // Check the db build progressed as expected
-        BOOST_CHECK(! UnitTestAccess::GetStatus(minerid_db).mRebuiltFromBlockchain);
+        BOOST_CHECK(! UnitTestAccessMinerIdTests3::GetStatus(minerid_db).mRebuiltFromBlockchain);
     }
 }
 
@@ -924,7 +929,7 @@ BOOST_FIXTURE_TEST_CASE(UpdatesToBlockchain, SetupMinerIDChain)
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
     MinerIdDatabase& minerid_db { *g_minerIDs };
-    UnitTestAccess::WaitForSync(minerid_db);
+    UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
 
     // Lambda for checking mempool filtering after reorgs
     auto CheckMempool = []() {
@@ -934,7 +939,7 @@ BOOST_FIXTURE_TEST_CASE(UpdatesToBlockchain, SetupMinerIDChain)
             bool containsMinerId {false};
             for(size_t i = 0; i < tx->vout.size(); i++)
             {
-                const span<const uint8_t> script { tx->vout[i].scriptPubKey };
+                const std::span<const uint8_t> script { tx->vout[i].scriptPubKey };
                 if(IsMinerId(script) || IsMinerInfo(script))
                 {
                     containsMinerId = true;
@@ -955,14 +960,14 @@ BOOST_FIXTURE_TEST_CASE(UpdatesToBlockchain, SetupMinerIDChain)
         CreateAndProcessBlock({}, baseDocument, miner1IdKey2);
 
         // Check the updates to the miner ID database
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4U);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 4U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 3U);
 
-        const auto& miner1Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
+        const auto& miner1Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
         CBlockIndex* expectedLastBlock { chainActive.Tip() };
         BOOST_CHECK_EQUAL(expectedLastBlock->GetBlockHash(), miner1Details.second.mLastBlock);
         miner1LastBlockId = miner1Details.second.mLastBlock;
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
         BOOST_CHECK_EQUAL(miner1Details.second.mLatestMinerId, miner1IdPubKey2.GetHash());
     }
 
@@ -984,14 +989,14 @@ BOOST_FIXTURE_TEST_CASE(UpdatesToBlockchain, SetupMinerIDChain)
         forkBlock = CreateAndProcessBlock(forkBlock.GetHash(), baseDocument, miner3IdKey1, MinerIDOrInfo::MINER_INFO, false, true);
 
         // Check the updates to the miner ID database
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 5U);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 4U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 5U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 4U);
 
-        const auto& miner3Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner3") };
+        const auto& miner3Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner3") };
         CBlockIndex* expectedLastBlock { chainActive.Tip() };
         BOOST_CHECK_EQUAL(expectedLastBlock->GetBlockHash(), miner3Details.second.mLastBlock);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner3"), 3U);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner3"), 3U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
         BOOST_CHECK_EQUAL(miner3Details.second.mLatestMinerId, miner3IdPubKey1.GetHash());
 
         CheckMempool();
@@ -1005,20 +1010,20 @@ BOOST_FIXTURE_TEST_CASE(UpdatesToBlockchain, SetupMinerIDChain)
             miner1IdKey2, chainActive.Height(), HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), "Miner1", {}, miner1V3Fields) };
         CBlock forkBlock { CreateAndProcessBlock(miner1LastBlockId, baseDocument, miner1IdKey2) };
         // Won't see new blocks from Miner1 until reorg happens
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
         baseDocument = CreateValidCoinbaseDocument(
             miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), "Miner1", {}, miner1V3Fields);
         forkBlock = CreateAndProcessBlock(forkBlock.GetHash(), baseDocument, miner1IdKey2);
 
         // Check the updates to the miner ID database
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 5U);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 4U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 5U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 4U);
 
-        const auto& miner1Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
+        const auto& miner1Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
         CBlockIndex* expectedLastBlock { chainActive.Tip() };
         BOOST_CHECK_EQUAL(expectedLastBlock->GetBlockHash(), miner1Details.second.mLastBlock);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 6U);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner3"), 0U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 6U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner3"), 0U);
         BOOST_CHECK_EQUAL(miner1Details.second.mLatestMinerId, miner1IdPubKey2.GetHash());
 
         CheckMempool();
@@ -1030,8 +1035,8 @@ BOOST_FIXTURE_TEST_CASE(UpdatesToBlockchain, SetupMinerIDChain)
             miner1IdKey1, chainActive.Height() + 1, HexStr(miner1IdPubKey1), HexStr(miner1IdPubKey1), "Miner1", {}, miner1V3Fields) };
         CreateAndProcessBlock({}, baseDocument, miner1IdKey1);
 
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 6U);
-        const auto& miner1Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 6U);
+        const auto& miner1Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
         BOOST_CHECK_EQUAL(chainActive.Tip()->GetPrev()->GetBlockHash(), miner1Details.second.mLastBlock);
     }
 
@@ -1040,8 +1045,8 @@ BOOST_FIXTURE_TEST_CASE(UpdatesToBlockchain, SetupMinerIDChain)
         UniValue baseDocument { CreateValidCoinbaseDocument(
             miner3IdKey1, chainActive.Height() + 1, HexStr(miner3IdPubKey1), HexStr(miner3IdPubKey1), "Miner3", {}, miner3V3Fields) };
         CreateAndProcessBlock({}, baseDocument, miner3IdKey1);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner3"), 1U);
-        const auto& miner3IdDetails { UnitTestAccess::GetMinerIdEntry(minerid_db, miner3IdPubKey1.GetHash()) };
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner3"), 1U);
+        const auto& miner3IdDetails { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner3IdPubKey1.GetHash()) };
         BOOST_CHECK_EQUAL(chainActive.Tip()->GetBlockHash(), miner3IdDetails.mCreationBlock);
     }
 }
@@ -1052,16 +1057,16 @@ BOOST_FIXTURE_TEST_CASE(KeyRotation, SetupMinerIDChain)
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
     MinerIdDatabase& minerid_db { *g_minerIDs };
-    UnitTestAccess::WaitForSync(minerid_db);
+    UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
 
     // Check initial state
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 3U);
 
     // Check miner IDs for Miner2
     auto checkIds = [&minerid_db, this](unsigned numRotations, const CPubKey& currentPubKey, const CPubKey* prevPubKey)
     {
-        const auto& minerIds { UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner2") };
+        const auto& minerIds { UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner2") };
 
         // There should be the initial id + however many new rotated keys we have made, upto the maximum kept
         uint64_t expectedNumIds { 1 + numRotations };
@@ -1074,25 +1079,25 @@ BOOST_FIXTURE_TEST_CASE(KeyRotation, SetupMinerIDChain)
             // All except the first listed key should be rotated out
             if(i == 0)
             {
-                BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(minerIds[i]));
+                BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(minerIds[i]));
             }
             else
             {
-                BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(minerIds[i]));
+                BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(minerIds[i]));
             }
         }
 
         // Check miner details track the latest miner ID
-        const auto& miner2Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner2") };
+        const auto& miner2Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner2") };
         BOOST_CHECK_EQUAL(miner2Details.second.mLatestMinerId, currentPubKey.GetHash());
 
         // Check next miner ID field is set and updated correctly
-        const auto& currMinerIdDetails { UnitTestAccess::GetMinerIdEntry(minerid_db, currentPubKey.GetHash()) };
+        const auto& currMinerIdDetails { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, currentPubKey.GetHash()) };
         BOOST_CHECK(! currMinerIdDetails.mNextMinerId);
         if(prevPubKey)
         {   
-            const auto& prevMinerIdDetails { UnitTestAccess::GetMinerIdEntry(minerid_db, prevPubKey->GetHash()) };
-            BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(prevMinerIdDetails));
+            const auto& prevMinerIdDetails { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, prevPubKey->GetHash()) };
+            BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(prevMinerIdDetails));
             BOOST_CHECK_EQUAL(prevMinerIdDetails.mNextMinerId->GetHash(), currentPubKey.GetHash());
         }
 
@@ -1155,13 +1160,13 @@ BOOST_FIXTURE_TEST_CASE(KeyRotation, SetupMinerIDChain)
 
     // Expected last block from this miner for the next few tests
     CBlockIndex* expectedLastBlock { chainActive.Tip() };
-    size_t expectedNumBlocks { UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2") };
+    size_t expectedNumBlocks { UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2") };
 
     // Check we reject use of a non-current miner ID
     {
         CKey oldKey { keys[keys.size() - 2] };
-        const auto& oldMinerIdDetails { UnitTestAccess::GetMinerIdEntry(minerid_db, oldKey.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(oldMinerIdDetails));
+        const auto& oldMinerIdDetails { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, oldKey.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(oldMinerIdDetails));
 
         CBlockIndex* prevTip { chainActive.Tip() };
         UniValue baseDocument { CreateValidCoinbaseDocument(
@@ -1169,18 +1174,18 @@ BOOST_FIXTURE_TEST_CASE(KeyRotation, SetupMinerIDChain)
         CreateAndProcessBlock({}, baseDocument, oldKey);
         BOOST_CHECK_EQUAL(chainActive.Tip()->GetPrev()->GetBlockHash(), prevTip->GetBlockHash());
 
-        const auto& miner2Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner2") };
+        const auto& miner2Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner2") };
         // We won't have accepted the last block as from Miner2
         BOOST_CHECK_EQUAL(expectedLastBlock->GetBlockHash(), miner2Details.second.mLastBlock);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), expectedNumBlocks);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), expectedNumBlocks);
     }
 
     // Check we reject an attempt to re-roll an already rotated miner ID
     {
-        CKey oldKey { keys[keys.size() - 2] };
-        const auto& oldMinerIdDetails { UnitTestAccess::GetMinerIdEntry(minerid_db, oldKey.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(oldMinerIdDetails));
-        const auto& oldMinerIds { UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner2") };
+        const CKey& oldKey { keys[keys.size() - 2] };
+        const auto& oldMinerIdDetails { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, oldKey.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(oldMinerIdDetails));
+        const auto& oldMinerIds { UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner2") };
 
         CKey newKey {};
         newKey.MakeNewKey(true);
@@ -1190,12 +1195,12 @@ BOOST_FIXTURE_TEST_CASE(KeyRotation, SetupMinerIDChain)
         CreateAndProcessBlock({}, baseDocument, newKey);
         BOOST_CHECK_EQUAL(chainActive.Tip()->GetPrev()->GetBlockHash(), prevTip->GetBlockHash());
 
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner2").size(), oldMinerIds.size());
-        BOOST_CHECK_THROW(UnitTestAccess::GetMinerIdEntry(minerid_db, newKey.GetPubKey().GetHash()), std::runtime_error);
-        const auto& miner2Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner2") };
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner2").size(), oldMinerIds.size());
+        BOOST_CHECK_THROW(UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, newKey.GetPubKey().GetHash()), std::runtime_error);
+        const auto& miner2Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner2") };
         // We won't have accepted the last block as from Miner2
         BOOST_CHECK_EQUAL(expectedLastBlock->GetBlockHash(), miner2Details.second.mLastBlock);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), expectedNumBlocks);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), expectedNumBlocks);
     }
 
     // Check we reject an invalid revocation key rotation attempt
@@ -1217,11 +1222,11 @@ BOOST_FIXTURE_TEST_CASE(KeyRotation, SetupMinerIDChain)
         CreateAndProcessBlock({}, baseDocument, currId);
         BOOST_CHECK_EQUAL(chainActive.Tip()->GetPrev()->GetBlockHash(), prevTip->GetBlockHash());
 
-        const auto& miner2Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner2") };
+        const auto& miner2Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner2") };
         BOOST_CHECK_EQUAL(miner2Details.second.mLatestMinerId, currId.GetPubKey().GetHash());
         // We won't have accepted the last block as from Miner2
         BOOST_CHECK_EQUAL(expectedLastBlock->GetBlockHash(), miner2Details.second.mLastBlock);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), expectedNumBlocks);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), expectedNumBlocks);
     }
 }
 
@@ -1231,11 +1236,11 @@ BOOST_FIXTURE_TEST_CASE(KeyRotationFork, SetupMinerIDChain)
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
     MinerIdDatabase& minerid_db { *g_minerIDs };
-    UnitTestAccess::WaitForSync(minerid_db);
+    UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
 
     // Check initial state
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 3U);
 
     CBlockIndex* oldTip { chainActive.Tip() };
     CBlockIndex* miner1LastBlock {nullptr};
@@ -1244,8 +1249,8 @@ BOOST_FIXTURE_TEST_CASE(KeyRotationFork, SetupMinerIDChain)
     {
         // Extend the fork to force a reorg
         CreateAndProcessBlock(forkBlockId, {}, {}, MinerIDOrInfo::MINER_INFO, false, true);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 5U);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 4U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 5U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 4U);
 
         // Perform a key rotation for miner 1 on the fork
         miner1LatestId.MakeNewKey(true);
@@ -1255,18 +1260,18 @@ BOOST_FIXTURE_TEST_CASE(KeyRotationFork, SetupMinerIDChain)
         miner1LastBlock = chainActive.Tip();
 
         // Check the updates to the miner ID database
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 6U);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 4U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 6U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 4U);
 
-        const auto& miner1Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
+        const auto& miner1Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
         BOOST_CHECK_EQUAL(miner1LastBlock->GetBlockHash(), miner1Details.second.mLastBlock);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
         BOOST_CHECK_EQUAL(miner1Details.second.mLatestMinerId, miner1LatestId.GetPubKey().GetHash());
 
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1LatestId.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key2Details));
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1LatestId.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key2Details));
         BOOST_CHECK_EQUAL(miner1Key2Details.mCreationBlock, miner1LastBlock->GetBlockHash());
     }
 
@@ -1287,33 +1292,33 @@ BOOST_FIXTURE_TEST_CASE(KeyRotationFork, SetupMinerIDChain)
 
         {
             // Check nodes that have seen both forks have the correct view
-            const auto& miner1Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
+            const auto& miner1Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
             BOOST_CHECK_EQUAL(chainActive.Tip()->GetBlockHash(), miner1Details.second.mLastBlock);
-            BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+            BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
             BOOST_CHECK_EQUAL(miner1Details.second.mLatestMinerId, miner1LatestId.GetPubKey().GetHash());
 
-            const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-            const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1LatestId.GetPubKey().GetHash()) };
-            BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
-            BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key2Details));
+            const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+            const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1LatestId.GetPubKey().GetHash()) };
+            BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key1Details));
+            BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key2Details));
             BOOST_CHECK_EQUAL(miner1Key2Details.mCoinbaseDoc.GetHeight(), chainActive.Height());
             BOOST_CHECK_EQUAL(miner1Key2Details.mCreationBlock, miner1LastBlock->GetBlockHash());
         }
 
         // Check nodes that have only seen the main chain have the correct view
         minerid_db.TriggerSync(true, true);
-        UnitTestAccess::WaitForSync(minerid_db);
+        UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
 
         {
-            const auto& miner1Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
+            const auto& miner1Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
             BOOST_CHECK_EQUAL(chainActive.Tip()->GetBlockHash(), miner1Details.second.mLastBlock);
-            BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+            BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
             BOOST_CHECK_EQUAL(miner1Details.second.mLatestMinerId, miner1LatestId.GetPubKey().GetHash());
 
-            const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-            const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1LatestId.GetPubKey().GetHash()) };
-            BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
-            BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key2Details));
+            const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+            const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1LatestId.GetPubKey().GetHash()) };
+            BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key1Details));
+            BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key2Details));
             BOOST_CHECK_EQUAL(miner1Key2Details.mCoinbaseDoc.GetHeight(), chainActive.Height());
             BOOST_CHECK_EQUAL(miner1Key2Details.mCreationBlock, miner1LastBlock->GetBlockHash());
         }
@@ -1329,14 +1334,14 @@ BOOST_FIXTURE_TEST_CASE(RecentBlocksTracking, SetupMinerIDChain)
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
     MinerIdDatabase& minerid_db { *g_minerIDs };
-    UnitTestAccess::WaitForSync(minerid_db);
+    UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
 
     // Check initial state
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), 1U);
-    auto blocksList { UnitTestAccess::GetRecentBlocksOrderedByHeight(minerid_db) };
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), 1U);
+    auto blocksList { UnitTestAccessMinerIdTests3::GetRecentBlocksOrderedByHeight(minerid_db) };
     size_t blockListStartSize { INITIAL_NUM_BLOCKS + 1 };   // Mined blocks + Genesis
     BOOST_REQUIRE_EQUAL(blocksList.size(), blockListStartSize);
     BOOST_CHECK_EQUAL(blocksList[0].mHeight, 0);
@@ -1347,8 +1352,8 @@ BOOST_FIXTURE_TEST_CASE(RecentBlocksTracking, SetupMinerIDChain)
         UniValue baseDocument { CreateValidCoinbaseDocument(
             miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), "Miner1", {}, miner1V3Fields) };
         CreateAndProcessBlock({}, baseDocument, miner1IdKey2);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
-        blocksList = UnitTestAccess::GetRecentBlocksOrderedByHeight(minerid_db);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+        blocksList = UnitTestAccessMinerIdTests3::GetRecentBlocksOrderedByHeight(minerid_db);
         BOOST_REQUIRE_EQUAL(blocksList.size(), blockListStartSize + 1);
         BOOST_CHECK_EQUAL(blocksList[blockListStartSize + 1 - 1].mHeight, static_cast<int32_t>(blockListStartSize + 1 - 1));
     }
@@ -1357,8 +1362,8 @@ BOOST_FIXTURE_TEST_CASE(RecentBlocksTracking, SetupMinerIDChain)
         UniValue baseDocument { CreateValidCoinbaseDocument(
             miner2IdKey1, chainActive.Height() + 1, HexStr(miner2IdPubKey1), HexStr(miner2IdPubKey1), "Miner2", {}, miner2V3Fields) };
         CreateAndProcessBlock({}, baseDocument, miner2IdKey1);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), 2U);
-        blocksList = UnitTestAccess::GetRecentBlocksOrderedByHeight(minerid_db);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), 2U);
+        blocksList = UnitTestAccessMinerIdTests3::GetRecentBlocksOrderedByHeight(minerid_db);
         BOOST_REQUIRE_EQUAL(blocksList.size(), blockListStartSize + 2);
         BOOST_CHECK_EQUAL(blocksList[blockListStartSize + 2 - 1].mHeight, static_cast<int32_t>(blockListStartSize + 2 - 1));
     }
@@ -1367,8 +1372,8 @@ BOOST_FIXTURE_TEST_CASE(RecentBlocksTracking, SetupMinerIDChain)
         UniValue baseDocument { CreateValidCoinbaseDocument(
             miner3IdKey1, chainActive.Height() + 1, HexStr(miner3IdPubKey1), HexStr(miner3IdPubKey1), "Miner3", {}, miner3V3Fields) };
         CreateAndProcessBlock({}, baseDocument, miner3IdKey1);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner3"), 1U);
-        blocksList = UnitTestAccess::GetRecentBlocksOrderedByHeight(minerid_db);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner3"), 1U);
+        blocksList = UnitTestAccessMinerIdTests3::GetRecentBlocksOrderedByHeight(minerid_db);
         BOOST_REQUIRE_EQUAL(blocksList.size(), blockListStartSize + 3);
         BOOST_CHECK_EQUAL(blocksList[blockListStartSize + 3 - 1].mHeight, static_cast<int32_t>(blockListStartSize + 3 - 1));
     }
@@ -1382,7 +1387,7 @@ BOOST_FIXTURE_TEST_CASE(RecentBlocksTracking, SetupMinerIDChain)
             miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), "Miner1", {}, miner1V3Fields) };
         CreateAndProcessBlock({}, baseDocument, miner1IdKey2);
     }
-    blocksList = UnitTestAccess::GetRecentBlocksOrderedByHeight(minerid_db);
+    blocksList = UnitTestAccessMinerIdTests3::GetRecentBlocksOrderedByHeight(minerid_db);
     BOOST_REQUIRE_EQUAL(blocksList.size(), GlobalConfig::GetConfig().GetMinerIdReputationN());
     BOOST_CHECK_EQUAL(blocksList.front().mHeight, 0);
     BOOST_CHECK_EQUAL(blocksList.back().mHeight, static_cast<int32_t>(GlobalConfig::GetConfig().GetMinerIdReputationN() - 1));
@@ -1391,7 +1396,7 @@ BOOST_FIXTURE_TEST_CASE(RecentBlocksTracking, SetupMinerIDChain)
     UniValue baseDocument { CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), "Miner1", {}, miner1V3Fields) };
     CreateAndProcessBlock({}, baseDocument, miner1IdKey2);
-    blocksList = UnitTestAccess::GetRecentBlocksOrderedByHeight(minerid_db);
+    blocksList = UnitTestAccessMinerIdTests3::GetRecentBlocksOrderedByHeight(minerid_db);
     BOOST_REQUIRE_EQUAL(blocksList.size(), GlobalConfig::GetConfig().GetMinerIdReputationN());
     BOOST_CHECK_EQUAL(blocksList.front().mHeight, 1);
     BOOST_CHECK_EQUAL(blocksList.back().mHeight, static_cast<int32_t>(GlobalConfig::GetConfig().GetMinerIdReputationN()));
@@ -1407,20 +1412,20 @@ BOOST_FIXTURE_TEST_CASE(InvalidBlock, SetupMinerIDChain)
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
     MinerIdDatabase& minerid_db { *g_minerIDs };
-    UnitTestAccess::WaitForSync(minerid_db);
+    UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
 
     // Check Miner1 has a good reputation before we ruin it
-    auto minerUUIdEntry { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second };
+    auto minerUUIdEntry { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second };
     BOOST_CHECK(! minerUUIdEntry.mReputation.mVoid);
-    BOOST_CHECK(MinerHasGoodReputation(minerid_db, UnitTestAccess::GetLatestMinerIdByName(minerid_db, mapBlockIndex, "Miner1")));
+    BOOST_CHECK(MinerHasGoodReputation(minerid_db, UnitTestAccessMinerIdTests3::GetLatestMinerIdByName(minerid_db, mapBlockIndex, "Miner1")));
 
     // First check we can't void a miners reputation using on old (non-current) ID
     UniValue baseDocument { CreateValidCoinbaseDocument(
         miner1IdKey1, chainActive.Height() + 1, HexStr(miner1IdPubKey1), HexStr(miner1IdPubKey1), "Miner1", {}, miner1V3Fields) };
     CreateAndProcessBlock({}, baseDocument, miner1IdKey1, MinerIDOrInfo::MINER_INFO, true);
-    minerUUIdEntry = UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second;
+    minerUUIdEntry = UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second;
     BOOST_CHECK(! minerUUIdEntry.mReputation.mVoid);
-    BOOST_CHECK(MinerHasGoodReputation(minerid_db, UnitTestAccess::GetLatestMinerIdByName(minerid_db, mapBlockIndex, "Miner1")));
+    BOOST_CHECK(MinerHasGoodReputation(minerid_db, UnitTestAccessMinerIdTests3::GetLatestMinerIdByName(minerid_db, mapBlockIndex, "Miner1")));
 
     // Miner1 now mines an invalid block using their current ID
     baseDocument = CreateValidCoinbaseDocument(
@@ -1428,10 +1433,12 @@ BOOST_FIXTURE_TEST_CASE(InvalidBlock, SetupMinerIDChain)
     CreateAndProcessBlock({}, baseDocument, miner1IdKey2, MinerIDOrInfo::MINER_INFO, true);
 
     // Reputation should now be voided
-    minerUUIdEntry = UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second;
+    minerUUIdEntry = UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second;
     BOOST_CHECK(minerUUIdEntry.mReputation.mVoid);
-    BOOST_CHECK_EQUAL(minerUUIdEntry.mReputation.mVoidingId->GetHash(), miner1IdPubKey2.GetHash());
-    BOOST_CHECK(! MinerHasGoodReputation(minerid_db, UnitTestAccess::GetLatestMinerIdByName(minerid_db, mapBlockIndex, "Miner1")));
+    const auto o{minerUUIdEntry.mReputation.mVoidingId};
+    assert(o);
+    BOOST_CHECK_EQUAL(o->GetHash(), miner1IdPubKey2.GetHash());
+    BOOST_CHECK(! MinerHasGoodReputation(minerid_db, UnitTestAccessMinerIdTests3::GetLatestMinerIdByName(minerid_db, mapBlockIndex, "Miner1")));
 }
 
 // Test switching from v0.2 to 0.3 without any rotation
@@ -1440,12 +1447,12 @@ BOOST_FIXTURE_TEST_CASE(SwitchVersion, SetupMinerIDChain)
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
     MinerIdDatabase& minerid_db { *g_minerIDs };
-    UnitTestAccess::WaitForSync(minerid_db);
+    UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
 
     // Check initial state
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner4"), 1U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner4"), 1U);
 
     // Miner4 attempt to switch from 0.2 to 0.3 but sets up bad (different) revocation key & previous revocation key
     CKey revocationKey {};
@@ -1458,8 +1465,8 @@ BOOST_FIXTURE_TEST_CASE(SwitchVersion, SetupMinerIDChain)
     CreateAndProcessBlock({}, baseDocument, miner4IdKey1, MinerIDOrInfo::MINER_INFO);
 
     // Check miner ID changes were rejected
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner4"), 1U);
-    auto miner4Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner4IdPubKey1.GetHash()) };
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner4"), 1U);
+    auto miner4Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner4IdPubKey1.GetHash()) };
     BOOST_CHECK_EQUAL(miner4Key1Details.mCoinbaseDoc.GetVersion(), "0.2");
 
     // Miner4 correctly switches from 0.2 to 0.3
@@ -1469,18 +1476,18 @@ BOOST_FIXTURE_TEST_CASE(SwitchVersion, SetupMinerIDChain)
     CreateAndProcessBlock({}, baseDocument, miner4IdKey1, MinerIDOrInfo::MINER_INFO);
 
     // Check the updates to the miner ID database
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 3U);
 
-    miner4Key1Details = UnitTestAccess::GetMinerIdEntry(minerid_db, miner4IdPubKey1.GetHash());
+    miner4Key1Details = UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner4IdPubKey1.GetHash());
     BOOST_CHECK_EQUAL(miner4Key1Details.mCoinbaseDoc.GetVersion(), "0.3");
     BOOST_CHECK_EQUAL(miner4Key1Details.mCoinbaseDoc.GetRevocationKey().GetHash(), miner4V3Fields.revocationPubKey.GetHash());
     BOOST_CHECK_EQUAL(miner4Key1Details.mCoinbaseDoc.GetPrevRevocationKey().GetHash(), miner4V3Fields.prevRevocationPubKey.GetHash());
 
-    const auto& miner4Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner4") };
+    const auto& miner4Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner4") };
     CBlockIndex* expectedLastBlock { chainActive.Tip() };
     BOOST_CHECK_EQUAL(expectedLastBlock->GetBlockHash(), miner4Details.second.mLastBlock);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner4"), 2U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner4"), 2U);
     BOOST_CHECK_EQUAL(miner4Details.second.mLatestMinerId, miner4IdPubKey1.GetHash());
 }
 
@@ -1490,12 +1497,12 @@ BOOST_FIXTURE_TEST_CASE(RotateVersion, SetupMinerIDChain)
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
     MinerIdDatabase& minerid_db { *g_minerIDs };
-    UnitTestAccess::WaitForSync(minerid_db);
+    UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
 
     // Check initial state
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner4"), 1U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner4"), 1U);
 
     // Create new key to rotate to
     CKey newKey {};
@@ -1513,18 +1520,18 @@ BOOST_FIXTURE_TEST_CASE(RotateVersion, SetupMinerIDChain)
     CreateAndProcessBlock({}, baseDocument, newKey, MinerIDOrInfo::MINER_INFO);
 
     // Check the updates to the miner ID database
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 5U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 5U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 3U);
 
-    const auto& miner4Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, newPubKey.GetHash()) };
+    const auto& miner4Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, newPubKey.GetHash()) };
     BOOST_CHECK_EQUAL(miner4Key2Details.mCoinbaseDoc.GetVersion(), "0.3");
     BOOST_CHECK_EQUAL(miner4Key2Details.mCoinbaseDoc.GetRevocationKey().GetHash(), miner4V3Fields.revocationPubKey.GetHash());
     BOOST_CHECK_EQUAL(miner4Key2Details.mCoinbaseDoc.GetPrevRevocationKey().GetHash(), miner4V3Fields.prevRevocationPubKey.GetHash());
 
-    const auto& miner4Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner4") };
+    const auto& miner4Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner4") };
     CBlockIndex* expectedLastBlock { chainActive.Tip() };
     BOOST_CHECK_EQUAL(expectedLastBlock->GetBlockHash(), miner4Details.second.mLastBlock);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner4"), 2U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner4"), 2U);
     BOOST_CHECK_EQUAL(miner4Details.second.mLatestMinerId, newPubKey.GetHash());
 }
 
@@ -1534,13 +1541,13 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocation, SetupMinerIDChain)
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
     MinerIdDatabase& minerid_db { *g_minerIDs };
-    UnitTestAccess::WaitForSync(minerid_db);
+    UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
 
     // Check initial state
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
 
     auto savedV3Fields { miner1V3Fields };
 
@@ -1551,17 +1558,19 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocation, SetupMinerIDChain)
     UniValue baseDocument { CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(key3.GetPubKey()), "Miner1", {}, miner1V3Fields) };
     CreateAndProcessBlock({}, baseDocument, key3);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
     {
         // Check state of all miner 1's IDs
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key2Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash(), miner1IdPubKey2.GetHash());
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key3Details));
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash(), miner1IdPubKey2.GetHash());
     }
 
     // Perform a partial revocation of key2 (and key3), rolling it to a new key4
@@ -1572,38 +1581,42 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocation, SetupMinerIDChain)
     baseDocument = CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(key4.GetPubKey()), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, key4);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 4U);
     {
         // Check state of all miner 1's IDs
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        const auto& miner1Key4Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key4.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key3Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key4Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash(), key4.GetPubKey().GetHash());
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        const auto& miner1Key4Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key4.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key3Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key4Details));
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash(), key4.GetPubKey().GetHash());
     }
 
     // Duplicate partial revocation of key2 is handled correctly
     baseDocument = CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(key4.GetPubKey()), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, key4);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 4U);
     {
         // Check state of all miner 1's IDs
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        const auto& miner1Key4Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key4.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key3Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key4Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash(), key4.GetPubKey().GetHash());
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        const auto& miner1Key4Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key4.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key3Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key4Details));
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash(), key4.GetPubKey().GetHash());
         BOOST_CHECK_EQUAL(miner1Key4Details.mCoinbaseDoc.GetHeight(), chainActive.Height());
     }
 
@@ -1619,12 +1632,12 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocation, SetupMinerIDChain)
     baseDocument = CreateValidCoinbaseDocument(
         key4, chainActive.Height() + 1, HexStr(key4.GetPubKey()), HexStr(key5.GetPubKey()), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, key5);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 4U);
     {
-        const auto& miner1Key4Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key4.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key4Details));
-        BOOST_CHECK_THROW(UnitTestAccess::GetMinerIdEntry(minerid_db, key5.GetPubKey().GetHash()), std::runtime_error);
+        const auto& miner1Key4Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key4.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key4Details));
+        BOOST_CHECK_THROW(UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key5.GetPubKey().GetHash()), std::runtime_error);
     }
     miner1V3Fields = savedV3Fields;
 
@@ -1638,12 +1651,12 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocation, SetupMinerIDChain)
     baseDocument = CreateValidCoinbaseDocument(
         key4, chainActive.Height() + 1, HexStr(key4.GetPubKey()), HexStr(key5.GetPubKey()), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, key5);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 4U);
     {
-        const auto& miner1Key4Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key4.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key4Details));
-        BOOST_CHECK_THROW(UnitTestAccess::GetMinerIdEntry(minerid_db, key5.GetPubKey().GetHash()), std::runtime_error);
+        const auto& miner1Key4Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key4.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key4Details));
+        BOOST_CHECK_THROW(UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key5.GetPubKey().GetHash()), std::runtime_error);
     }
     miner1V3Fields = savedV3Fields;
 
@@ -1656,12 +1669,12 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocation, SetupMinerIDChain)
     baseDocument = CreateValidCoinbaseDocument(
         key4, chainActive.Height() + 1, HexStr(key4.GetPubKey()), HexStr(key5.GetPubKey()), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, key5);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 4U);
     {
-        const auto& miner1Key4Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key4.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key4Details));
-        BOOST_CHECK_THROW(UnitTestAccess::GetMinerIdEntry(minerid_db, key5.GetPubKey().GetHash()), std::runtime_error);
+        const auto& miner1Key4Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key4.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key4Details));
+        BOOST_CHECK_THROW(UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key5.GetPubKey().GetHash()), std::runtime_error);
     }
     miner1V3Fields = savedV3Fields;
 
@@ -1671,12 +1684,12 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocation, SetupMinerIDChain)
     baseDocument = CreateValidCoinbaseDocument(
         key4, chainActive.Height() + 1, HexStr(key4.GetPubKey()), HexStr(key5.GetPubKey()), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, key5);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 4U);
     {
-        const auto& miner1Key4Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key4.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key4Details));
-        BOOST_CHECK_THROW(UnitTestAccess::GetMinerIdEntry(minerid_db, key5.GetPubKey().GetHash()), std::runtime_error);
+        const auto& miner1Key4Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key4.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key4Details));
+        BOOST_CHECK_THROW(UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key5.GetPubKey().GetHash()), std::runtime_error);
     }
     miner1V3Fields = savedV3Fields;
 
@@ -1692,12 +1705,12 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocation, SetupMinerIDChain)
     baseDocument = CreateValidCoinbaseDocument(
         key4, chainActive.Height() + 1, HexStr(key4.GetPubKey()), HexStr(key5.GetPubKey()), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, key5);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 4U);
     {
-        const auto& miner1Key4Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key4.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key4Details));
-        BOOST_CHECK_THROW(UnitTestAccess::GetMinerIdEntry(minerid_db, key5.GetPubKey().GetHash()), std::runtime_error);
+        const auto& miner1Key4Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key4.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key4Details));
+        BOOST_CHECK_THROW(UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key5.GetPubKey().GetHash()), std::runtime_error);
     }
     miner1V3Fields = savedV3Fields;
 
@@ -1705,7 +1718,7 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocation, SetupMinerIDChain)
     baseDocument = CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, miner1IdKey2);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
 }
 
 // Test partial revocation across a fork
@@ -1714,20 +1727,20 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocationFork, SetupMinerIDChain)
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
     MinerIdDatabase& minerid_db { *g_minerIDs };
-    UnitTestAccess::WaitForSync(minerid_db);
+    UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
 
     // Check initial state
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 3U);
 
     CBlockIndex* oldTip { chainActive.Tip() };
 
     // Extend the fork to force a reorg
     CreateAndProcessBlock(forkBlockId, {}, {}, MinerIDOrInfo::MINER_INFO, false, true);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 5U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 5U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
 
     // Perform a partial revocation of miner 1 key2 on the fork, rolling it to a new key3
     CKey key3 {};
@@ -1737,17 +1750,19 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocationFork, SetupMinerIDChain)
     UniValue baseDocument { CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(key3.GetPubKey()), "Miner1", {}, miner1V3Fields) };
     CreateAndProcessBlock({}, baseDocument, key3);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
     {
         // Check state of all miner 1's IDs
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash(), key3.GetPubKey().GetHash());
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key3Details));
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash(), key3.GetPubKey().GetHash());
     }
 
     // Reorg back to the main chain
@@ -1755,7 +1770,7 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocationFork, SetupMinerIDChain)
     lastBlock = CreateAndProcessBlock(lastBlock.GetHash(), {}, {}, MinerIDOrInfo::MINER_INFO, false, true);
     lastBlock = CreateAndProcessBlock(lastBlock.GetHash(), {}, {}, MinerIDOrInfo::MINER_INFO, false, true);
     BOOST_CHECK_EQUAL(chainActive.Tip()->GetBlockHash(), lastBlock.GetHash());
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 2U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 2U);
 
     // Reapply revocation on the main chain
     baseDocument = CreateValidCoinbaseDocument(
@@ -1764,19 +1779,21 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocationFork, SetupMinerIDChain)
 
     {
         // Check nodes that have seen both forks have the correct view
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
-        const auto& miner1Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+        const auto& miner1Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
         BOOST_CHECK_EQUAL(chainActive.Tip()->GetBlockHash(), miner1Details.second.mLastBlock);
         BOOST_CHECK_EQUAL(miner1Details.second.mLatestMinerId, key3.GetPubKey().GetHash());
 
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash(), key3.GetPubKey().GetHash());
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key3Details));
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash(), key3.GetPubKey().GetHash());
         BOOST_CHECK_EQUAL(miner1Key3Details.mCreationBlock, chainActive.Tip()->GetBlockHash());
         BOOST_CHECK_EQUAL(miner1Key3Details.mCoinbaseDoc.GetHeight(), chainActive.Height());
     }
@@ -1784,21 +1801,23 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocationFork, SetupMinerIDChain)
     {
         // Check nodes that have only seen the main chain have the correct view
         minerid_db.TriggerSync(true, true);
-        UnitTestAccess::WaitForSync(minerid_db);
+        UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
 
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
-        const auto& miner1Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+        const auto& miner1Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
         BOOST_CHECK_EQUAL(chainActive.Tip()->GetBlockHash(), miner1Details.second.mLastBlock);
         BOOST_CHECK_EQUAL(miner1Details.second.mLatestMinerId, key3.GetPubKey().GetHash());
 
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash(), key3.GetPubKey().GetHash());
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key3Details));
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash(), key3.GetPubKey().GetHash());
         BOOST_CHECK_EQUAL(miner1Key3Details.mCreationBlock, chainActive.Tip()->GetBlockHash());
         BOOST_CHECK_EQUAL(miner1Key3Details.mCoinbaseDoc.GetHeight(), chainActive.Height());
     }
@@ -1813,12 +1832,12 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocationPruned, SetupMinerIDChain)
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
     MinerIdDatabase& minerid_db { *g_minerIDs };
-    UnitTestAccess::WaitForSync(minerid_db);
+    UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
 
     // Check initial state
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner2").size(), 1U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner2").size(), 1U);
 
     // Perform some rotations
     std::vector<CKey> keys { miner2IdKey1 };
@@ -1834,11 +1853,11 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocationPruned, SetupMinerIDChain)
             prevKey, chainActive.Height() + 1, HexStr(prevKey.GetPubKey()), HexStr(newKey.GetPubKey()), "Miner2", {}, miner2V3Fields) };
         CreateAndProcessBlock({}, baseDocument, newKey);
     }
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner2").size(), 5U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner2").size(), 5U);
 
     // Allow database pruning to happen
     minerid_db.Prune();
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner2").size(), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner2").size(), 3U);
 
     // Partial revocation of all keys except our first; will need to revoke back beyond pruned IDs
     CKey newKey {};
@@ -1850,16 +1869,16 @@ BOOST_FIXTURE_TEST_CASE(PartialRevocationPruned, SetupMinerIDChain)
     UniValue baseDocument { CreateValidCoinbaseDocument(
         currKey, chainActive.Height() + 1, HexStr(currKey.GetPubKey()), HexStr(newKey.GetPubKey()), "Miner2", {}, miner2V3Fields) };
     CreateAndProcessBlock({}, baseDocument, newKey);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner2").size(), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner2").size(), 4U);
 
     // Check state of miner IDs for miner2
     unsigned currentCount {0};
-    for(const auto& idEntry : UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner2"))
+    for(const auto& idEntry : UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner2"))
     {
         // Every key we still have except the current one will be revoked
-        if(! UnitTestAccess::MinerIdIsCurrent(idEntry))
+        if(! UnitTestAccessMinerIdTests3::MinerIdIsCurrent(idEntry))
         {
-            BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(idEntry));
+            BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(idEntry));
         }
         else
         {
@@ -1875,13 +1894,13 @@ BOOST_FIXTURE_TEST_CASE(RevokemidRevocation, SetupMinerIDChain)
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
     MinerIdDatabase& minerid_db { *g_minerIDs };
-    UnitTestAccess::WaitForSync(minerid_db);
+    UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
 
     // Check initial state
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
 
     // Perform another ID rotation for miner 1 so we have 3 IDs for them. Key3 will be one
     // we didn't authorise, so indicates to us that key2 was compromised.
@@ -1890,17 +1909,19 @@ BOOST_FIXTURE_TEST_CASE(RevokemidRevocation, SetupMinerIDChain)
     UniValue baseDocument { CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(key3.GetPubKey()), "Miner1", {}, miner1V3Fields) };
     CreateAndProcessBlock({}, baseDocument, key3);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
     {
         // Check state of all miner 1's IDs
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key2Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key3Details));
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
     }
 
     // Send a revokemid message with the wrong revocation key
@@ -1910,14 +1931,16 @@ BOOST_FIXTURE_TEST_CASE(RevokemidRevocation, SetupMinerIDChain)
     BOOST_CHECK_THROW(minerid_db.ProcessRevokemidMessage(revokemidMsg), std::runtime_error);
     {
         // No change to the state of miner 1's IDs
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key2Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key3Details));
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
     }
 
     // Send a revokemid message with a bad signature
@@ -1926,14 +1949,16 @@ BOOST_FIXTURE_TEST_CASE(RevokemidRevocation, SetupMinerIDChain)
     BOOST_CHECK_THROW(minerid_db.ProcessRevokemidMessage(revokemidMsg), std::runtime_error);
     {
         // No change to the state of miner 1's IDs
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key2Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key3Details));
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
     }
 
     // Perform a partial revocation of key2 (and key3) via a revokemid msg
@@ -1941,23 +1966,25 @@ BOOST_FIXTURE_TEST_CASE(RevokemidRevocation, SetupMinerIDChain)
     BOOST_CHECK_NO_THROW(minerid_db.ProcessRevokemidMessage(revokemidMsg));
     {
         // Check revocation state of miner 1's IDs
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 2U);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 2U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key3Details));
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
     }
 
     // Check we can't now use revoked ID
     baseDocument = CreateValidCoinbaseDocument(
         key3, chainActive.Height() + 1, HexStr(key3.GetPubKey()), HexStr(key3.GetPubKey()), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, key3);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 2U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 2U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
 
     // Put revocation in a block on chain as well, that also rotates to new ID key4
     CKey key4 {};
@@ -1967,19 +1994,21 @@ BOOST_FIXTURE_TEST_CASE(RevokemidRevocation, SetupMinerIDChain)
     baseDocument = CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(key4.GetPubKey()), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, key4);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 4U);
     {
         // Check state of all miner 1's IDs
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        const auto& miner1Key4Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key4.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key3Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key4Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash().ToString(), key4.GetPubKey().GetHash().ToString());
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        const auto& miner1Key4Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key4.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key3Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key4Details));
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash().ToString(), key4.GetPubKey().GetHash().ToString());
     }
 }
 
@@ -1992,14 +2021,14 @@ BOOST_FIXTURE_TEST_CASE(RecoverReputation, SetupMinerIDChain)
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
     MinerIdDatabase& minerid_db { *g_minerIDs };
-    UnitTestAccess::WaitForSync(minerid_db);
+    UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
 
     // Check initial state
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
     BOOST_CHECK(! MinerHasGoodReputation(minerid_db, miner1IdPubKey2));
-    BOOST_CHECK(! UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second.mReputation.mVoid);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second.mReputation.mM,
+    BOOST_CHECK(! UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second.mReputation.mVoid);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second.mReputation.mM,
         GlobalConfig::GetConfig().GetMinerIdReputationM());
 
     // Mine enough blocks that miner 1 has a good reputation
@@ -2009,11 +2038,12 @@ BOOST_FIXTURE_TEST_CASE(RecoverReputation, SetupMinerIDChain)
             miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), "Miner1", {}, miner1V3Fields) };
         CreateAndProcessBlock({}, baseDocument, miner1IdKey2);
     }
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 5U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 5U);
     BOOST_CHECK(MinerHasGoodReputation(minerid_db, miner1IdPubKey2));
 
     // Check if GetMinerCoinbaseDocInfo function returns expected results.
     const auto& result { GetMinerCoinbaseDocInfo(minerid_db, miner1IdPubKey2) };
+    assert(result);
     const CoinbaseDocument& coinbaseDoc { result->first };
     BOOST_CHECK_EQUAL(coinbaseDoc.GetMinerId(), HexStr(miner1IdPubKey2));
     BOOST_CHECK_EQUAL(coinbaseDoc.GetPrevMinerId(), HexStr(miner1IdPubKey2));
@@ -2024,11 +2054,13 @@ BOOST_FIXTURE_TEST_CASE(RecoverReputation, SetupMinerIDChain)
     UniValue baseDocument { CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), "Miner1", {}, miner1V3Fields) };
     CreateAndProcessBlock({}, baseDocument, miner1IdKey2, MinerIDOrInfo::MINER_INFO, true);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 5U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 5U);
     BOOST_CHECK(! MinerHasGoodReputation(minerid_db, miner1IdPubKey2));
-    auto minerEntry { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second };
+    auto minerEntry { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second };
     BOOST_CHECK(minerEntry.mReputation.mVoid);
-    BOOST_CHECK_EQUAL(minerEntry.mReputation.mVoidingId->GetHash(), miner1IdPubKey2.GetHash());
+    const auto o{minerEntry.mReputation.mVoidingId};
+    assert(o);
+    BOOST_CHECK_EQUAL(o->GetHash(), miner1IdPubKey2.GetHash());
 
     // Revoke ID that produced bad block and rotate to new clean ID
     CKey key3 {};
@@ -2039,12 +2071,12 @@ BOOST_FIXTURE_TEST_CASE(RecoverReputation, SetupMinerIDChain)
     baseDocument = CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(key3.GetPubKey()), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, key3);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
     miner1V3Fields = savedFields;
 
     // Check miner reputation is no longer void
-    minerEntry = UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second;
+    minerEntry = UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second;
     BOOST_CHECK(! minerEntry.mReputation.mVoid);
     BOOST_CHECK(! minerEntry.mReputation.mVoidingId);
 
@@ -2059,11 +2091,11 @@ BOOST_FIXTURE_TEST_CASE(RecoverReputation, SetupMinerIDChain)
     // Mine enough blocks to take them up to M/N
     for(int i = 0; i < 4; ++i)
     {
-        UniValue baseDocument { CreateValidCoinbaseDocument(
+        UniValue base_document { CreateValidCoinbaseDocument(
             key3, chainActive.Height() + 1, HexStr(key3.GetPubKey()), HexStr(key3.GetPubKey()), "Miner1", {}, miner1V3Fields) };
-        CreateAndProcessBlock({}, baseDocument, key3);
+        CreateAndProcessBlock({}, base_document, key3);
     }
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 7U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 7U);
 
     // Check they again have a good reputation
     BOOST_CHECK(MinerHasGoodReputation(minerid_db, key3.GetPubKey()));
@@ -2071,7 +2103,7 @@ BOOST_FIXTURE_TEST_CASE(RecoverReputation, SetupMinerIDChain)
     // Move time on 24 hours & check M for this miner has decreased by 1
     SetMockTime( GetTime() + (60 * 60 * 24));
     minerid_db.Prune();
-    minerEntry = UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second;
+    minerEntry = UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second;
     expectedNewM -= 1;
     BOOST_CHECK_EQUAL(minerEntry.mReputation.mM, expectedNewM);
     BOOST_CHECK(MinerHasGoodReputation(minerid_db, key3.GetPubKey()));
@@ -2079,13 +2111,13 @@ BOOST_FIXTURE_TEST_CASE(RecoverReputation, SetupMinerIDChain)
     // Move time on 12 hours & check M for this miner hasn't changed
     SetMockTime( GetTime() + (60 * 60 * 12));
     minerid_db.Prune();
-    minerEntry = UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second;
+    minerEntry = UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second;
     BOOST_CHECK_EQUAL(minerEntry.mReputation.mM, expectedNewM);
 
     // One more 12 hours and miner has reduced back to the configured M
     SetMockTime( GetTime() + (60 * 60 * 12));
     minerid_db.Prune();
-    minerEntry = UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second;
+    minerEntry = UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second;
     expectedNewM -= 1;
     BOOST_CHECK_EQUAL(minerEntry.mReputation.mM, expectedNewM);
     BOOST_CHECK_EQUAL(minerEntry.mReputation.mM, GlobalConfig::GetConfig().GetMinerIdReputationM());
@@ -2094,7 +2126,7 @@ BOOST_FIXTURE_TEST_CASE(RecoverReputation, SetupMinerIDChain)
     // Check another 24 hours doesn't reduce the M further
     SetMockTime( GetTime() + (60 * 60 * 24));
     minerid_db.Prune();
-    minerEntry = UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second;
+    minerEntry = UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1").second;
     BOOST_CHECK_EQUAL(minerEntry.mReputation.mM, GlobalConfig::GetConfig().GetMinerIdReputationM());
     BOOST_CHECK(MinerHasGoodReputation(minerid_db, key3.GetPubKey()));
 }
@@ -2105,13 +2137,13 @@ BOOST_FIXTURE_TEST_CASE(FullRevocation, SetupMinerIDChain)
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
     MinerIdDatabase& minerid_db { *g_minerIDs };
-    UnitTestAccess::WaitForSync(minerid_db);
+    UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
 
     // Check initial state
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
 
     auto savedV3Fields { miner1V3Fields };
 
@@ -2122,17 +2154,19 @@ BOOST_FIXTURE_TEST_CASE(FullRevocation, SetupMinerIDChain)
     UniValue baseDocument { CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(key3.GetPubKey()), "Miner1", {}, miner1V3Fields) };
     CreateAndProcessBlock({}, baseDocument, key3);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
     {
         // Check state of all miner 1's IDs
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRotated(miner1Key2Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
-        BOOST_CHECK_EQUAL(miner1Key1Details.mNextMinerId->GetHash(), miner1IdPubKey2.GetHash());
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key3Details));
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash(), miner1IdPubKey2.GetHash());
     }
 
     // Check a full revocation attempt using a wrong (completely unknown) revocation key is rejected
@@ -2145,11 +2179,11 @@ BOOST_FIXTURE_TEST_CASE(FullRevocation, SetupMinerIDChain)
     baseDocument = CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, miner1IdKey2);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
     {
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key3Details));
     }
     miner1V3Fields = savedV3Fields;
 
@@ -2163,11 +2197,11 @@ BOOST_FIXTURE_TEST_CASE(FullRevocation, SetupMinerIDChain)
     baseDocument = CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, miner1IdKey2);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
     {
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key3Details));
     }
     miner1V3Fields = savedV3Fields;
 
@@ -2180,11 +2214,11 @@ BOOST_FIXTURE_TEST_CASE(FullRevocation, SetupMinerIDChain)
     baseDocument = CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, miner1IdKey2);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
     {
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key3Details));
     }
     miner1V3Fields = savedV3Fields;
 
@@ -2194,11 +2228,11 @@ BOOST_FIXTURE_TEST_CASE(FullRevocation, SetupMinerIDChain)
     baseDocument = CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, miner1IdKey2);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
     {
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key3Details));
     }
     miner1V3Fields = savedV3Fields;
 
@@ -2214,11 +2248,11 @@ BOOST_FIXTURE_TEST_CASE(FullRevocation, SetupMinerIDChain)
     baseDocument = CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, miner1IdKey2);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
     {
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsCurrent(miner1Key3Details));
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key3Details));
     }
     miner1V3Fields = savedV3Fields;
 
@@ -2228,15 +2262,15 @@ BOOST_FIXTURE_TEST_CASE(FullRevocation, SetupMinerIDChain)
     baseDocument = CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, miner1IdKey2);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 0U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 0U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
     {
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key3Details));
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key3Details));
     }
     miner1V3Fields = savedV3Fields;
 
@@ -2246,15 +2280,15 @@ BOOST_FIXTURE_TEST_CASE(FullRevocation, SetupMinerIDChain)
     baseDocument = CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), "Miner1", {}, miner1V3Fields);
     CreateAndProcessBlock({}, baseDocument, miner1IdKey2);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 0U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 0U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
     {
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        const auto& miner1Key3Details { UnitTestAccess::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key3Details));
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key3Details));
     }
     miner1V3Fields = savedV3Fields;
 }
@@ -2265,20 +2299,20 @@ BOOST_FIXTURE_TEST_CASE(FullRevocationFork, SetupMinerIDChain)
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
     MinerIdDatabase& minerid_db { *g_minerIDs };
-    UnitTestAccess::WaitForSync(minerid_db);
+    UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
 
     // Check initial state
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 3U);
 
     CBlockIndex* oldTip { chainActive.Tip() };
 
     // Extend the fork to force a reorg
     CreateAndProcessBlock(forkBlockId, {}, {}, MinerIDOrInfo::MINER_INFO, false, true);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerIds(minerid_db), 5U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumMinerUUIds(minerid_db), 4U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerIds(minerid_db), 5U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumMinerUUIds(minerid_db), 4U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
 
     // Perform a full revocation for Miner1 on the fork
     miner1V3Fields.revocationMessage = CoinbaseDocument::RevocationMessage { miner1IdPubKey1 };
@@ -2286,14 +2320,14 @@ BOOST_FIXTURE_TEST_CASE(FullRevocationFork, SetupMinerIDChain)
     UniValue baseDocument { CreateValidCoinbaseDocument(
         miner1IdKey2, chainActive.Height() + 1, HexStr(miner1IdPubKey2), HexStr(miner1IdPubKey2), "Miner1", {}, miner1V3Fields) };
     CreateAndProcessBlock({}, baseDocument, miner1IdKey2);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 0U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 0U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
     {
         // Check state of all miner 1's IDs
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key2Details));
     }
 
     // Reorg back to the main chain
@@ -2301,14 +2335,14 @@ BOOST_FIXTURE_TEST_CASE(FullRevocationFork, SetupMinerIDChain)
     lastBlock = CreateAndProcessBlock(lastBlock.GetHash(), {}, {}, MinerIDOrInfo::MINER_INFO, false, true);
     lastBlock = CreateAndProcessBlock(lastBlock.GetHash(), {}, {}, MinerIDOrInfo::MINER_INFO, false, true);
     BOOST_CHECK_EQUAL(chainActive.Tip()->GetBlockHash(), lastBlock.GetHash());
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 0U);
-    BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 0U);
+    BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
     {
         // Check state of all miner 1's IDs
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key2Details));
     }
 
     // Reapply revocation on the main chain
@@ -2318,31 +2352,31 @@ BOOST_FIXTURE_TEST_CASE(FullRevocationFork, SetupMinerIDChain)
 
     {
         // Check nodes that have seen both forks have the correct view
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 0U);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
-        const auto& miner1Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 0U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
+        const auto& miner1Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
         BOOST_CHECK_EQUAL(chainActive.Tip()->GetBlockHash(), miner1Details.second.mLastBlock);
 
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key2Details));
     }
 
     {
         // Check nodes that have only seen the main chain have the correct view
         minerid_db.TriggerSync(true, true);
-        UnitTestAccess::WaitForSync(minerid_db);
+        UnitTestAccessMinerIdTests3::WaitForSync(minerid_db);
 
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 0U);
-        BOOST_CHECK_EQUAL(UnitTestAccess::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
-        const auto& miner1Details { UnitTestAccess::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 0U);
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 2U);
+        const auto& miner1Details { UnitTestAccessMinerIdTests3::GetMinerUUIdEntryByName(minerid_db, mapBlockIndex, "Miner1") };
         BOOST_CHECK_EQUAL(chainActive.Tip()->GetBlockHash(), miner1Details.second.mLastBlock);
 
-        const auto& miner1Key1Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
-        const auto& miner1Key2Details { UnitTestAccess::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key1Details));
-        BOOST_CHECK(UnitTestAccess::MinerIdIsRevoked(miner1Key2Details));
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRevoked(miner1Key2Details));
     }
 }
 

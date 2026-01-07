@@ -28,20 +28,14 @@ using namespace std;
 
 BOOST_FIXTURE_TEST_SUITE(minerid_tests, BasicTestingSetup)
 
-vector<uint8_t> protocolPrefix{0xac, 0x1e, 0xed, 0x88};
-
-template <typename O>
-void hash_sha256(const string_view msg, O o)
-{
-    CSHA256()
-        .Write(reinterpret_cast<const uint8_t*>(msg.data()), msg.size())
-        .Finalize(o);
-}
+vector<uint8_t> protocolPrefix{0xac, 0x1e, 0xed, 0x88}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 bool sign(const string_view msg, const CKey& key, vector<uint8_t>& signature)
 {
-    array<uint8_t, CSHA256::OUTPUT_SIZE> hash;
-    hash_sha256(msg, hash.data());
+    array<uint8_t, CSHA256::OUTPUT_SIZE> hash{};
+    CSHA256()
+        .Write(reinterpret_cast<const uint8_t*>(msg.data()), msg.size()) // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+        .Finalize(hash);
 
     return key.Sign(uint256(vector<uint8_t>{begin(hash), end(hash)}),
                     signature);
@@ -251,6 +245,7 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
         CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid1)}, 0, ""},
         CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid2)}, 0, ""}};
     expected_cd.SetDataRefs(comparingDataRefs);
+    assert(minerId);
     BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), expected_cd);
     auto actual_cd{minerId.value().GetCoinbaseDocument()};
     BOOST_CHECK_EQUAL(actual_cd, expected_cd);
@@ -304,6 +299,7 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
     block.vtx[0] = MakeTransactionRef(tx);
     minerId = FindMinerId(block, block_height);
     expected_cd.SetDataRefs(nullopt);
+    assert(minerId);
     BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), expected_cd);
     actual_cd = minerId.value().GetCoinbaseDocument();
     BOOST_CHECK_EQUAL(actual_cd, expected_cd);
@@ -346,6 +342,7 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
     prepareTransactionOutputStatic(coinbase_doc, signature, tx, 2);
     block.vtx[0] = MakeTransactionRef(tx);
     minerId = FindMinerId(block, block_height);
+    assert(minerId);
     expected_cd.SetDataRefs(comparingDataRefs);
     BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), expected_cd);
     actual_cd = minerId.value().GetCoinbaseDocument();
@@ -365,6 +362,7 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v1)
     prepareTransactionOutputStatic(coinbase_doc, signature, tx, 3, true);
     block.vtx[0] = MakeTransactionRef(tx);
     minerId = FindMinerId(block, block_height);
+    assert(minerId);
     BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), expected_cd);
     actual_cd = minerId.value().GetCoinbaseDocument();
     BOOST_CHECK_EQUAL(actual_cd, expected_cd);
@@ -417,7 +415,7 @@ BOOST_AUTO_TEST_CASE(staticMinerId_v2)
     block.vtx[0] = MakeTransactionRef(tx);
     const optional<MinerId> minerId =
         FindMinerId(block, block_height);
-    BOOST_CHECK(minerId);
+    assert(minerId);
 
     CoinbaseDocument expected_cd{"",
                                  "0.2",
@@ -502,6 +500,7 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId)
     // Check with valid dynamic document
     block.vtx[0] = MakeTransactionRef(tx);
     optional<MinerId> minerId = FindMinerId(block, block_height);
+    BOOST_CHECK(minerId);
     CoinbaseDocument expected_cd{"",
                                  "0.1",
                                  block_height,
@@ -513,6 +512,7 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId)
         CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid1)}, 0, ""},
         CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid2)}, 0, ""}};
     expected_cd.SetDataRefs(comparingDataRefs);
+    assert(minerId);
     BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), expected_cd);
 
     // Static document has no dataRefs
@@ -539,6 +539,7 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId)
                                     dynamicSignature);
     block.vtx[0] = MakeTransactionRef(tx);
     minerId = FindMinerId(block, block_height);
+    assert(minerId);
     comparingDataRefs = {
         CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid1D)}, 0, ""},
         CoinbaseDocument::DataRef{{"id1", "id2"}, TxId{uint256S(txid2D)}, 0, ""}};
@@ -567,6 +568,8 @@ BOOST_AUTO_TEST_CASE(dynamicMinerId)
                                     dynamicSignature);
     block.vtx[0] = MakeTransactionRef(tx);
     minerId = FindMinerId(block, block_height);
+    assert(minerId);
+    BOOST_CHECK(minerId);
     BOOST_CHECK_EQUAL(minerId.value().GetCoinbaseDocument(), expected_cd);
 
     // Pass empty dynamic document (but with correct signature) : invalid result
@@ -636,7 +639,7 @@ BOOST_AUTO_TEST_CASE(v1_mainet_block_624455)
     constexpr auto block_height{624455};
     block.vtx[0] = MakeTransactionRef(tx);
     optional<MinerId> minerId = FindMinerId(block, block_height);
-    BOOST_CHECK(minerId);
+    assert(minerId);
 
     const string minerIdPubKey =
         "022604665d3a186be9690231a279f8e18b800f4ce78caac2d51940c8c1c92a8354";
@@ -697,7 +700,7 @@ BOOST_AUTO_TEST_CASE(v1_mainet_block_697014)
     constexpr auto block_height{697014};
     block.vtx[0] = MakeTransactionRef(tx);
     optional<MinerId> minerId = FindMinerId(block, block_height);
-    BOOST_CHECK(minerId);
+    assert(minerId);
 
     //    const string minerIdPubKey =
     //        "022604665d3a186be9690231a279f8e18b800f4ce78caac2d51940c8c1c92a8354";
@@ -765,7 +768,7 @@ BOOST_AUTO_TEST_CASE(v2_stn_block_12170)
     constexpr auto block_height{12170};
     block.vtx[0] = MakeTransactionRef(tx);
     optional<MinerId> minerId = FindMinerId(block, block_height);
-    BOOST_CHECK(minerId);
+    assert(minerId);
 
     //    const string minerIdPubKey =
     //        "022604665d3a186be9690231a279f8e18b800f4ce78caac2d51940c8c1c92a8354";
@@ -821,7 +824,7 @@ BOOST_AUTO_TEST_CASE(ri)
     constexpr auto block_height{42};
     block.vtx[0] = MakeTransactionRef(tx);
     optional<MinerId> minerId = FindMinerId(block, block_height);
-    BOOST_CHECK(minerId);
+    assert(minerId);
 
     //    const string minerIdPubKey =
     //        "022604665d3a186be9690231a279f8e18b800f4ce78caac2d51940c8c1c92a8354";

@@ -4,6 +4,7 @@
 #include "frozentxo_logging.h"
 
 #include "logging.h"
+#include "logging_impl.h"
 #include "core_io.h"
 
 #include "boost/date_time/posix_time/posix_time.hpp"
@@ -26,10 +27,10 @@ void CFrozenTXOLogger::Init()
     log.logger = std::unique_ptr<BCLog::Logger>(new BCLog::Logger("blacklist.log"));
 
     // Set required Logger options
-    log.logger->fPrintToDebugLog = true; // always log to file
-    log.logger->fPrintToConsole = false; // never log to console since all log entries are always also written to standard log file in addition to blacklist.log
-    log.logger->fLogTimestamps = true; // timestamps must always be included in log entries
-    log.logger->fLogTimeMicros = GetLogger().fLogTimeMicros; // use same precision for timestamps as in default logger
+    log.logger->SetPrintToDebugLog(true); // always log to file
+    log.logger->SetPrintToConsole(false); // never log to console since all log entries are always also written to standard log file in addition to blacklist.log
+    log.logger->SetLogTimestamps(true); // timestamps must always be included in log entries
+    log.logger->SetLogTimeMicros(GetLogger().LogTimeMicros()); // use same precision for timestamps as in default logger
 
     // Open the log file
     log.logger->OpenDebugLog();

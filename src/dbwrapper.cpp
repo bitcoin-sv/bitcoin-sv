@@ -5,9 +5,13 @@
 #include "dbwrapper.h"
 #include "random.h"
 #include "util.h"
-#include <boost/filesystem.hpp>
+
 #include <algorithm>
+#include <array>
 #include <cstdint>
+
+#include <boost/filesystem.hpp>
+
 #include <leveldb/cache.h>
 #include <leveldb/env.h>
 #include <leveldb/filter_policy.h>
@@ -22,28 +26,32 @@ public:
         if (!LogAcceptCategory(BCLog::LEVELDB)) {
             return;
         }
-        char buffer[500];
+        std::array<char, 500> buffer{};
         for (int iter = 0; iter < 2; iter++) {
-            char *base;
-            int bufsize;
+            char* base{};
+            int bufsize{};
             if (iter == 0) {
                 bufsize = sizeof(buffer);
-                base = buffer;
+                base = buffer.data();
             } else {
                 bufsize = 30000;
+                // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
                 base = new char[bufsize];
             }
             char *p = base;
+            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             char *limit = base + bufsize;
 
             // Print the message
             if (p < limit) {
-                va_list backup_ap;
-                va_copy(backup_ap, ap);
+                va_list backup_ap; // NOLINT(cppcoreguidelines-pro-type-vararg)
+                // NOLINTBEGIN(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+                va_copy(backup_ap, ap); 
                 // Do not use vsnprintf elsewhere in bitcoin source code, see
                 // above.
                 p += vsnprintf(p, limit - p, format, backup_ap);
                 va_end(backup_ap);
+                // NOLINTEND(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
             }
 
             // Truncate to available space if necessary
@@ -62,23 +70,27 @@ public:
 
             assert(p <= limit);
             base[std::min(bufsize - 1, (int)(p - base))] = '\0';
+            // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             LogPrintf("leveldb: %s", base);
-            if (base != buffer) {
-                delete[] base;
+            if (base != buffer.data()) {
+                delete[] base; // NOLINT(cppcoreguidelines-owning-memory)
             }
             break;
         }
     }
 };
 
-static leveldb::Options GetOptions(size_t nCacheSize, size_t nMaxFiles) {
+static leveldb::Options GetOptions(size_t nCacheSize, size_t nMaxFileSize, size_t nMaxFiles)
+{
     leveldb::Options options;
     options.block_cache = leveldb::NewLRUCache(nCacheSize / 2);
     // up to two write buffers may be held in memory simultaneously
     options.write_buffer_size = nCacheSize / 4;
     options.filter_policy = leveldb::NewBloomFilterPolicy(10);
     options.compression = leveldb::kNoCompression;
-    options.max_open_files = nMaxFiles;
+    options.max_open_files = nMaxFiles; // NOLINT(*-narrowing-conversions)
+    options.max_file_size = nMaxFileSize;
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     options.info_log = new CBitcoinLevelDBLogger();
     if (leveldb::kMajorVersion > 1 ||
         (leveldb::kMajorVersion == 1 && leveldb::kMinorVersion >= 16)) {
@@ -89,14 +101,37 @@ static leveldb::Options GetOptions(size_t nCacheSize, size_t nMaxFiles) {
     return options;
 }
 
-CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize, bool fMemory,
-                       bool fWipe, bool obfuscate, MaxFiles maxFiles) {
-    penv = nullptr;
+//! the key under which the obfuscation key is stored
+// Prefixed with null character to avoid collisions with other keys
+//
+// We must use a string constructor which specifies length so that we copy past
+// the null-terminator.
+// NOLINTNEXTLINE(cert-err58-cpp)
+static const std::string OBFUSCATE_KEY_KEY("\000obfuscate_key", 14);
+
+// The length of the obfuscate key in number of bytes
+static constexpr unsigned int OBFUSCATE_KEY_NUM_BYTES{8};
+
+/**
+ * Returns a string (consisting of 8 random bytes) suitable for use as an
+ * obfuscating XOR key.
+ */
+static std::vector<uint8_t> CreateObfuscateKey()
+{
+    std::vector<uint8_t> buff(OBFUSCATE_KEY_NUM_BYTES);
+    GetRandBytes(buff.data(), OBFUSCATE_KEY_NUM_BYTES);
+    return buff;
+}
+
+CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize,
+                       bool fMemory, bool fWipe, bool obfuscate,
+                       MaxFiles maxFiles, size_t nMaxFileSize)
+{
     readoptions.verify_checksums = true;
     iteroptions.verify_checksums = true;
     iteroptions.fill_cache = false;
     syncoptions.sync = true;
-    options = GetOptions(nCacheSize, maxFiles.maxFiles);
+    options = GetOptions(nCacheSize, nMaxFileSize, maxFiles.maxFiles);
     options.create_if_missing = true;
     if (fMemory) {
         penv = leveldb::NewMemEnv(leveldb::Env::Default());
@@ -168,24 +203,6 @@ bool CDBWrapper::WriteBatch(CDBBatch &batch, bool fSync) {
         pdb->Write(fSync ? syncoptions : writeoptions, &batch.batch);
     dbwrapper_private::HandleError(status);
     return true;
-}
-
-// Prefixed with null character to avoid collisions with other keys
-//
-// We must use a string constructor which specifies length so that we copy past
-// the null-terminator.
-const std::string CDBWrapper::OBFUSCATE_KEY_KEY("\000obfuscate_key", 14);
-
-const unsigned int CDBWrapper::OBFUSCATE_KEY_NUM_BYTES = 8;
-
-/**
- * Returns a string (consisting of 8 random bytes) suitable for use as an
- * obfuscating XOR key.
- */
-std::vector<uint8_t> CDBWrapper::CreateObfuscateKey() const {
-    uint8_t buff[OBFUSCATE_KEY_NUM_BYTES];
-    GetRandBytes(buff, OBFUSCATE_KEY_NUM_BYTES);
-    return std::vector<uint8_t>(&buff[0], &buff[OBFUSCATE_KEY_NUM_BYTES]);
 }
 
 bool CDBWrapper::IsEmpty() {

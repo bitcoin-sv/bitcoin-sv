@@ -4,7 +4,9 @@
 #include "mempool_test_access.h"
 
 #include "test/test_bitcoin.h"
+#include "testutil.h"
 
+#include <boost/random.hpp>
 #include <boost/test/unit_test.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -17,10 +19,9 @@
 #include <vector>
 
 
-namespace {
-    mining::CJournalChangeSetPtr nullChangeSet{nullptr};
-
-    std::vector<CTxMemPoolEntry> GetABunchOfEntries(int howMany)
+namespace
+{
+    std::vector<CTxMemPoolEntry> MakeMempoolTxDbEntries(int howMany)
     {
         TestMemPoolEntryHelper entry;
         std::vector<CTxMemPoolEntry> result;
@@ -56,210 +57,13 @@ CTxMemPool& globalMempool()
 
 
 BOOST_FIXTURE_TEST_SUITE(mempooltxdb_tests, TestingSetup)
-BOOST_AUTO_TEST_CASE(WriteToTxDB)
-{
-    const auto entries = GetABunchOfEntries(11);
-
-    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0U);
-
-    // Write the entries to the database.
-    for (const auto& e : entries)
-    {
-        BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
-    }
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
-
-    // Check that all transactions are in the database.
-    for (const auto& e : entries)
-    {
-        CTransactionRef _;
-        BOOST_CHECK(txdb.GetTransaction(e.GetTxId(), _));
-    }
-}
-
-BOOST_AUTO_TEST_CASE(DoubleWriteToTxDB)
-{
-    const auto entries = GetABunchOfEntries(13);
-
-    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0U);
-
-    // Write the entries to the database.
-    for (const auto& e : entries)
-    {
-        BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
-    }
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
-
-    // Check that all transactions are in the database.
-    for (const auto& e : entries)
-    {
-        CTransactionRef _;
-        BOOST_CHECK(txdb.GetTransaction(e.GetTxId(), _));
-    }
-
-    // Write and check again.
-    for (const auto& e : entries)
-    {
-        BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
-    }
-    BOOST_WARN_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
-    BOOST_WARN_EQUAL(txdb.GetTxCount(), entries.size());
-    BOOST_CHECK_GE(txdb.GetDiskUsage(), totalSize(entries));
-    BOOST_CHECK_GE(txdb.GetTxCount(), entries.size());
-    for (const auto& e : entries)
-    {
-        CTransactionRef _;
-        BOOST_CHECK(txdb.GetTransaction(e.GetTxId(), _));
-    }
-}
-
-BOOST_AUTO_TEST_CASE(DeleteFromTxDB)
-{
-    const auto entries = GetABunchOfEntries(17);
-
-    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0U);
-
-    // Write the entries to the database.
-    for (const auto& e : entries)
-    {
-        BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
-    }
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
-
-    // Remove transactions from the database one by one.
-    for (const auto& e : entries)
-    {
-        BOOST_CHECK(txdb.RemoveTransactions({{e.GetTxId(), e.GetTxSize()}}));
-    }
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0U);
-    for (const auto& e : entries)
-    {
-        CTransactionRef _;
-        BOOST_CHECK(!txdb.GetTransaction(e.GetTxId(), _));
-    }
-}
-
-BOOST_AUTO_TEST_CASE(BatchDeleteFromTxDB)
-{
-    const auto entries = GetABunchOfEntries(19);
-
-    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0U);
-
-    // Write the entries to the database.
-    std::vector<CMempoolTxDB::TxData> txdata;
-    for (const auto& e : entries)
-    {
-        txdata.emplace_back(e.GetTxId(), e.GetTxSize());
-        BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
-    }
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
-
-    // Remove all transactions from the database at once.
-    BOOST_CHECK(txdb.RemoveTransactions(txdata));
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0U);
-    for (const auto& e : entries)
-    {
-        CTransactionRef _;
-        BOOST_CHECK(!txdb.GetTransaction(e.GetTxId(), _));
-    }
-}
-
-BOOST_AUTO_TEST_CASE(BadDeleteFromTxDB)
-{
-    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0U);
-
-    // Remove nonexistent transactions.
-    const auto e = GetABunchOfEntries(3);
-    BOOST_CHECK(txdb.RemoveTransactions({
-                {e[0].GetTxId(), e[0].GetTxSize()},
-                {e[1].GetTxId(), e[1].GetTxSize()},
-                {e[2].GetTxId(), e[2].GetTxSize()}
-            }));
-    BOOST_WARN_EQUAL(txdb.GetDiskUsage(), 0U);
-    BOOST_WARN_EQUAL(txdb.GetTxCount(), 0U);
-}
-
-BOOST_AUTO_TEST_CASE(ClearTxDB)
-{
-    const auto entries = GetABunchOfEntries(23);
-
-    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0U);
-
-    // Write the entries to the database.
-    for (const auto& e : entries)
-    {
-        BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
-    }
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
-
-    // Clear the database and check that it's empty.
-    txdb.ClearDatabase();
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0U);
-    for (const auto& e : entries)
-    {
-        CTransactionRef _;
-        BOOST_CHECK(!txdb.GetTransaction(e.GetTxId(), _));
-    }
-}
-
-BOOST_AUTO_TEST_CASE(GetContentsOfTxDB)
-{
-    const auto entries = GetABunchOfEntries(29);
-
-    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0U);
-
-    // Write the entries to the database.
-    for (const auto& e : entries)
-    {
-        BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
-    }
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
-
-    // Check that all transactions are in the database and only the ones we wrote.
-    auto keys = txdb.GetKeys();
-    BOOST_CHECK_EQUAL(keys.size(), 29U);
-    for (const auto& e : entries)
-    {
-        auto iter = keys.find(e.GetTxId());
-        BOOST_WARN(iter != keys.end());
-        if (iter != keys.end())
-        {
-            keys.erase(iter);
-        }
-    }
-    // We should have removed all the keys in the loop.
-    BOOST_CHECK_EQUAL(keys.size(), 0U);
-}
 
 namespace  {
     class DeterministicUUIDGenerator
     {
     private:
-        boost::mt19937 random_generator;
-        using uuid_random_generator_type = boost::uuids::basic_random_generator<boost::mt19937>;
+        boost::random::mt19937 random_generator;
+        using uuid_random_generator_type = boost::uuids::basic_random_generator<boost::random::mt19937>;
         uuid_random_generator_type uuid_random_generator;
 
     public:
@@ -305,31 +109,9 @@ BOOST_AUTO_TEST_CASE(RemoveXrefKey)
     BOOST_CHECK(!txdb.GetXrefKey(xref));
 }
 
-BOOST_AUTO_TEST_CASE(AutoRemoveXrefKey)
-{
-    DeterministicUUIDGenerator gen;
-    const auto uuid = gen();
-    auto xref = decltype(uuid)();
-    const auto entries = GetABunchOfEntries(1);
-    const auto& e = entries[0];
-
-    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
-    BOOST_CHECK(!txdb.GetXrefKey(xref));
-    BOOST_CHECK(txdb.SetXrefKey(uuid));
-    BOOST_CHECK(txdb.GetXrefKey(xref));
-    txdb.AddTransactions({e.GetSharedTx()});
-    BOOST_CHECK(!txdb.GetXrefKey(xref));
-
-    BOOST_CHECK(txdb.SetXrefKey(uuid));
-    BOOST_CHECK(txdb.GetXrefKey(xref));
-    txdb.RemoveTransactions({{e.GetTxId(), e.GetTxSize()}});
-    BOOST_CHECK(!txdb.GetXrefKey(xref));
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
-}
-
 BOOST_AUTO_TEST_CASE(BatchWriteWrite)
 {
-    const auto entries = GetABunchOfEntries(1);
+    const auto entries = MakeMempoolTxDbEntries(1);
     const auto& entry = entries[0];
 
     CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
@@ -353,7 +135,7 @@ BOOST_AUTO_TEST_CASE(BatchWriteWrite)
 
 BOOST_AUTO_TEST_CASE(BatchWriteRemove)
 {
-    const auto entries = GetABunchOfEntries(1);
+    const auto entries = MakeMempoolTxDbEntries(1);
     const auto& entry = entries[0];
 
     CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
@@ -377,7 +159,7 @@ BOOST_AUTO_TEST_CASE(BatchWriteRemove)
 
 BOOST_AUTO_TEST_CASE(BatchWriteRemoveWrite)
 {
-    const auto entries = GetABunchOfEntries(1);
+    const auto entries = MakeMempoolTxDbEntries(1);
     const auto& entry = entries[0];
 
     CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
@@ -400,37 +182,9 @@ BOOST_AUTO_TEST_CASE(BatchWriteRemoveWrite)
     BOOST_CHECK_EQUAL(counter, 1);
 }
 
-BOOST_AUTO_TEST_CASE(Write_BatchRemoveWrite)
-{
-    const auto entries = GetABunchOfEntries(1);
-    const auto& entry = entries[0];
-
-    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0U);
-
-    BOOST_CHECK(txdb.AddTransactions({entry.GetSharedTx()}));
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), entry.GetTxSize());
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 1U);
-
-    int counter = 0;
-    const auto update = [&entry, &counter](const TxId& txid) {
-        BOOST_CHECK_EQUAL(txid.ToString(), entry.GetTxId().ToString());
-        ++counter;
-    };
-
-    CMempoolTxDB::Batch batch;
-    batch.Remove(entry.GetTxId(), entry.GetTxSize());
-    batch.Add(entry.GetSharedTx(), update);
-    BOOST_CHECK(txdb.Commit(batch));
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), entry.GetTxSize());
-    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 1U);
-    BOOST_CHECK_EQUAL(counter, 0);
-}
-
 BOOST_AUTO_TEST_CASE(AsyncWriteToTxDB)
 {
-    const auto entries = GetABunchOfEntries(11);
+    const auto entries = MakeMempoolTxDbEntries(11);
 
     CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
@@ -456,7 +210,7 @@ BOOST_AUTO_TEST_CASE(AsyncWriteToTxDB)
 
 BOOST_AUTO_TEST_CASE(AsyncDeleteFromTxDB)
 {
-    const auto entries = GetABunchOfEntries(13);
+    const auto entries = MakeMempoolTxDbEntries(13);
 
     CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
@@ -471,9 +225,9 @@ BOOST_AUTO_TEST_CASE(AsyncDeleteFromTxDB)
     }
 
     // Remove all transactions from the database.
-    for (auto& td : txdata)
+    for(const auto& td : txdata)
     {
-        txdb.Remove(std::move(td));
+        txdb.Remove(td);
     }
     txdb.Sync();
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
@@ -488,7 +242,7 @@ BOOST_AUTO_TEST_CASE(AsyncDeleteFromTxDB)
 
 BOOST_AUTO_TEST_CASE(AsyncClearDB)
 {
-    const auto entries = GetABunchOfEntries(17);
+    const auto entries = MakeMempoolTxDbEntries(17);
 
     CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
@@ -514,7 +268,7 @@ BOOST_AUTO_TEST_CASE(AsyncClearDB)
 
 BOOST_AUTO_TEST_CASE(AsyncMultiWriteCoalesce)
 {
-    const auto entries = GetABunchOfEntries(1223);
+    const auto entries = MakeMempoolTxDbEntries(1223);
 
     CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
@@ -543,8 +297,8 @@ BOOST_AUTO_TEST_CASE(AsyncMultiWriteRemoveCoalesce)
 {
     std::mt19937 generator(insecure_rand());
 
-    auto entries = GetABunchOfEntries(541);
-    const auto middle = entries.begin() + entries.size() / 2;
+    auto entries = MakeMempoolTxDbEntries(541);
+    const auto middle = entries.begin() + ssize(entries) / 2;
 
     CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0U);
@@ -619,7 +373,7 @@ BOOST_AUTO_TEST_CASE(AsyncAutoRemoveXrefKey)
     DeterministicUUIDGenerator gen;
     const auto uuid = gen();
     auto xref = decltype(uuid)();
-    auto entries = GetABunchOfEntries(1);
+    auto entries = MakeMempoolTxDbEntries(1);
     auto& e = entries[0];
 
     CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
@@ -648,8 +402,9 @@ BOOST_AUTO_TEST_CASE(SaveOnFullMempool)
         txParent.vout[i].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
         txParent.vout[i].nValue = Amount(33000LL);
     }
-    CMutableTransaction txChild[3];
-    for (int i = 0; i < 3; i++) {
+    std::array<CMutableTransaction, 3> txChild;
+    for(size_t i = 0; i < txChild.size(); i++)
+    {
         txChild[i].vin.resize(1);
         txChild[i].vin[0].scriptSig = CScript() << OP_11;
         txChild[i].vin[0].prevout = COutPoint(txParent.GetId(), i);
@@ -657,8 +412,9 @@ BOOST_AUTO_TEST_CASE(SaveOnFullMempool)
         txChild[i].vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
         txChild[i].vout[0].nValue = Amount(11000LL);
     }
-    CMutableTransaction txGrandChild[3];
-    for (int i = 0; i < 3; i++) {
+    std::array<CMutableTransaction, 3> txGrandChild;
+    for(size_t i = 0; i < txGrandChild.size(); i++)
+    {
         txGrandChild[i].vin.resize(1);
         txGrandChild[i].vin[0].scriptSig = CScript() << OP_11;
         txGrandChild[i].vin[0].prevout = COutPoint(txChild[i].GetId(), 0);
@@ -681,8 +437,8 @@ BOOST_AUTO_TEST_CASE(SaveOnFullMempool)
     // Add transactions:
     testPool.AddUnchecked(txParent.GetId(), entry.FromTx(txParent), TxStorage::memory, nullChangeSet);
     for (int i = 0; i < 3; i++) {
-        testPool.AddUnchecked(txChild[i].GetId(), entry.FromTx(txChild[i]), TxStorage::memory, nullChangeSet);
-        testPool.AddUnchecked(txGrandChild[i].GetId(), entry.FromTx(txGrandChild[i]), TxStorage::memory, nullChangeSet);
+        testPool.AddUnchecked(txChild[i].GetId(), entry.FromTx(txChild[i]), TxStorage::memory, nullChangeSet); //NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        testPool.AddUnchecked(txGrandChild[i].GetId(), entry.FromTx(txGrandChild[i]), TxStorage::memory, nullChangeSet); //NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 
     // Saving transactions to disk doesn't change the mempool size:
@@ -701,10 +457,10 @@ BOOST_AUTO_TEST_CASE(SaveOnFullMempool)
     // Check that all transactions have been saved to disk:
     uint64_t sizeTxsAdded = 0;
     uint64_t countTxsAdded = 0;
-    for (const auto& entry : testPoolAccess.mapTx().get<entry_time>())
+    for (const auto& e : testPoolAccess.mapTx().get<entry_time>())
     {
-        BOOST_CHECK(!entry.IsInMemory());
-        sizeTxsAdded += entry.GetTxSize();
+        BOOST_CHECK(!e.IsInMemory());
+        sizeTxsAdded += e.GetTxSize();
         ++countTxsAdded;
     }
     BOOST_CHECK_EQUAL(diskUsage, sizeTxsAdded);
@@ -714,7 +470,7 @@ BOOST_AUTO_TEST_CASE(SaveOnFullMempool)
 
 BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrim)
 {
-    const auto entries = GetABunchOfEntries(6);
+    const auto entries = MakeMempoolTxDbEntries(6);
 
     CTxMemPool testPool;
     CTxMemPoolTestAccess testPoolAccess(testPool);
@@ -751,7 +507,7 @@ BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrimDoesNotConfuseJBA)
     CTxMemPoolTestAccess testPoolAccess(testPool);
 
     auto [totalSize_entries, count_entries] = ([&testPool] () {
-        auto entries = GetABunchOfEntries(6);
+        auto entries = MakeMempoolTxDbEntries(6);
 
         // Add transactions:
         for (auto& entry : entries) {
@@ -765,7 +521,7 @@ BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrimDoesNotConfuseJBA)
     BOOST_CHECK_EQUAL(poolSize, count_entries);
 
     auto jba = mining::g_miningFactory->GetAssembler();
-    CBlockIndex* bla;
+    CBlockIndex* bla; // NOLINT(cppcoreguidelines-init-variables)
 
     // Get a block template
     auto template1 = jba->CreateNewBlock(CScript{}, bla);
@@ -850,7 +606,8 @@ BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrimDoesNotConfuseJBA)
     BOOST_CHECK_EQUAL(vtx1.size(), vtx2.size());
     // check that both blocks share all the memory used by transactions
     auto set1 = std::set<CTransactionRef>(vtx1.cbegin(), vtx1.cend());
-    for(auto tx: vtx2) {
+    for(const auto& tx: vtx2)
+    {
         auto erased = set1.erase(tx);
         BOOST_CHECK(erased == 1);
     }
@@ -860,7 +617,7 @@ BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrimDoesNotConfuseJBA)
 BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
 {
     constexpr unsigned numberOfEntries = 6;
-    const auto entries = GetABunchOfEntries(numberOfEntries);
+    const auto entries = MakeMempoolTxDbEntries(numberOfEntries);
 
     CTxMemPool testPool;
     CTxMemPoolTestAccess testPoolAccess(testPool);
@@ -910,15 +667,15 @@ BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
 
 
 namespace {
-    CTransactionWrapperRef MakeTxWrapper(std::shared_ptr<CMempoolTxDBReader> txdb)
+    CTransactionWrapperRef MakeTxWrapper(const std::shared_ptr<CMempoolTxDBReader>& txdb)
     {
-        const auto entries = GetABunchOfEntries(1);
+        const auto entries = MakeMempoolTxDbEntries(1);
         return std::make_shared<CTransactionWrapper>(entries[0].GetSharedTx(), txdb);
     }
 
     struct FakeMempoolTxDB : CMempoolTxDBReader
     {
-        virtual bool GetTransaction(const uint256 &txid, CTransactionRef &tx) override
+        virtual bool GetTransaction(const uint256 &txid, CTransactionRef &tx) override // NOLINT(cppcoreguidelines-explicit-virtual-functions)
         {
             if (const auto it = database.find(txid); it != database.end())
             {
@@ -931,7 +688,7 @@ namespace {
             return false;
         }
 
-        virtual bool TransactionExists(const uint256 &txid) override
+        virtual bool TransactionExists(const uint256 &txid) override // NOLINT(cppcoreguidelines-explicit-virtual-functions)
         {
             return database.count(txid) > 0;
         }

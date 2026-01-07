@@ -5,6 +5,7 @@
 #include "test/scriptflags.h"
 
 #include "script/interpreter.h"
+#include "script/script_flags.h"
 
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -13,7 +14,7 @@
 #include <map>
 #include <vector>
 
-static std::map<std::string, uint32_t> mapFlagNames = {
+static std::map<std::string, uint32_t> mapFlagNames = { // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
     {"NONE", SCRIPT_VERIFY_NONE},
     {"P2SH", SCRIPT_VERIFY_P2SH},
     {"STRICTENC", SCRIPT_VERIFY_STRICTENC},
@@ -32,6 +33,8 @@ static std::map<std::string, uint32_t> mapFlagNames = {
     {"SIGHASH_FORKID", SCRIPT_ENABLE_SIGHASH_FORKID},
     {"GENESIS", SCRIPT_GENESIS},
     {"UTXO_AFTER_GENESIS", SCRIPT_UTXO_AFTER_GENESIS},
+    {"CHRONICLE", SCRIPT_CHRONICLE},
+    {"UTXO_AFTER_CHRONICLE", SCRIPT_UTXO_AFTER_CHRONICLE},
 };
 
 uint32_t ParseScriptFlags(std::string strFlags) {

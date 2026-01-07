@@ -32,6 +32,7 @@ void CEvictionCandidateTracker::ExpireEntry(const TxId& txId)
 void CEvictionCandidateTracker::PopExpired()
 {
     if((entries.size() == 0) || 
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         ((double(heap.size() - entries.size()) / entries.size()) >  MAX_INVALID_TO_VALID_RATIO))
     {
         heap.erase(
@@ -89,9 +90,10 @@ bool CEvictionCandidateTracker::HasChildren(CTxMemPool::txiter entry) const
     return !GetChildrenNoGroup(entry).empty();
 }
 
-CEvictionCandidateTracker::CEvictionCandidateTracker(CTxMemPool::txlinksMap& _links, Evaluator _evaluator)
-    : links{_links}
-    , evaluator{_evaluator}
+CEvictionCandidateTracker::CEvictionCandidateTracker(CTxMemPool::txlinksMap& _links,
+                                                     Evaluator _evaluator)
+    :links{_links},
+     evaluator{std::move(_evaluator)}
 {
     heap.reserve(links.get().size());
     entries.reserve(links.get().size());
@@ -113,7 +115,6 @@ CEvictionCandidateTracker::CEvictionCandidateTracker(CTxMemPool::txlinksMap& _li
     }
     std::make_heap(heap.begin(), heap.end(), CompareResult);
 }
-
 
 void CEvictionCandidateTracker::EntryAdded(CTxMemPool::txiter entry)
 {

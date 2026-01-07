@@ -12,7 +12,7 @@ from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import CScript, OP_TRUE, OP_ADD
 from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal, hashToHex
-from test_framework.comptool import TestManager, TestInstance, RejectResult
+from test_framework.comptool import RejectResult
 
 
 class BSVGenesisActivation(ComparisonTestFramework):
@@ -65,7 +65,7 @@ class BSVGenesisActivation(ComparisonTestFramework):
         assert_equal(node.getblock(node.getbestblockhash())['height'], 102)
 
         # transaction_op_add_accepted should not be in mempool (individual transactions are always checked against pushonly)
-        assert(transaction_op_add_accepted.hash not in set(node.getrawmempool()))
+        assert (transaction_op_add_accepted.hash not in set(node.getrawmempool()))
 
 
 if __name__ == '__main__':

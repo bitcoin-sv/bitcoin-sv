@@ -164,8 +164,6 @@ private:
     nodes_type mNodes{};
 };
 
-bool operator!=(const MerkleProof&, const MerkleProof&);
-
 inline bool contains_tx(const MerkleProof& mp)
 {
     return mp.Flags() & 0x1;

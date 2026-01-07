@@ -10,4 +10,10 @@
 
 void NegateSignatureS(std::vector<uint8_t> &vchSig);
 
+enum class TxDigestAlgorithm
+{   
+    ORIGINAL,
+    BIP_143
+};
+
 #endif // BITCOIN_TEST_SIGUTIL_H

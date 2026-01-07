@@ -11,6 +11,7 @@
 #include "util.h"
 
 #include <boost/thread.hpp>
+#include <crypto/sha256.h>
 
 namespace {
 
@@ -42,7 +43,7 @@ public:
             .Write(hash.begin(), 32)
             .Write(&pubkey[0], pubkey.size())
             .Write(&vchSig[0], vchSig.size())
-            .Finalize(entry.begin());
+            .Finalize(CSHA256::span{entry.begin(), CSHA256::OUTPUT_SIZE});
     }
 
     bool Get(const uint256 &entry, const bool erase) {

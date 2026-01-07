@@ -101,9 +101,7 @@ class DefaultStreamPolicy : public BasicStreamPolicy
     const std::string GetPolicyName() const override { return POLICY_NAME; }
 
     // Create the required streams for this policy
-    void SetupStreams(CConnman& connman, const CAddress& peerAddr,
-                      const AssociationIDPtr& assocID) override
-    {}
+    void SetupStreams(CConnman&, const CAddress&, const AssociationIDPtr&) override {}
 
     // Fetch the next message for processing
     std::pair<Stream::QueuedNetMessage, bool> GetNextMessage(StreamMap& streams) override;
@@ -114,7 +112,7 @@ class DefaultStreamPolicy : public BasicStreamPolicy
                          uint64_t nPayloadLength, uint64_t nTotalSize) override;
 
     // Get the stream type the given message category is sent over
-    StreamType GetStreamTypeForMessage(MessageType msgType) const override { return StreamType::GENERAL; }
+    StreamType GetStreamTypeForMessage(MessageType) const override { return StreamType::GENERAL; }
 };
 
 

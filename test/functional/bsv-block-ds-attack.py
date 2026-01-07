@@ -8,7 +8,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, connect_nodes_bi, connect_nodes, sync_blocks, disconnect_nodes_bi
 from test_framework.key import CECKey
 from test_framework.blocktools import create_block, create_coinbase
-from test_framework.script import hash160, CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL , SIGHASH_FORKID
+from test_framework.script import hash160, CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.mininode import CTransaction, CTxOut, CTxIn, COutPoint, ToHex
 from test_framework.authproxy import JSONRPCException
 
@@ -20,7 +20,7 @@ class User:
         self.key.set_secretbytes(secret_bytes)
         self.pubkey = self.key.get_pubkey()
 
-    def spend_to_pkh (self, node, spend_tx, n, amount, to_pubkey):
+    def spend_to_pkh(self, node, spend_tx, n, amount, to_pubkey):
         value = int(amount)
         scriptPubKey = CScript([OP_DUP, OP_HASH160, hash160(to_pubkey), OP_EQUALVERIFY, OP_CHECKSIG])
 
@@ -44,7 +44,7 @@ class User:
         return tx
 
     def __sign_tx(self, sign_tx, spend_tx, n):
-        sighash = SignatureHashForkId(spend_tx.vout[n].scriptPubKey, sign_tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
+        sighash = SignatureHash(spend_tx.vout[n].scriptPubKey, sign_tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
         sign_tx.vin[0].scriptSig = CScript([self.key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID])), self.pubkey])
 
 
@@ -70,7 +70,7 @@ class CompetingChainsTest(BitcoinTestFramework):
         conn_rpc.submitblock(ToHex(block))
         return coinbase_tx
 
-    def send_funds_to_attacker (self, node, attacker, coinbase_tx):
+    def send_funds_to_attacker(self, node, attacker, coinbase_tx):
         funding_amount = int(coinbase_tx.vout[0].nValue / self.nbDoubleSpends)
         funding_tx = CTransaction()
 
@@ -85,7 +85,7 @@ class CompetingChainsTest(BitcoinTestFramework):
         assert_equal(node.getrawmempool(), [funding_txid])
         return funding_tx
 
-    def contains_double_spends (self):
+    def contains_double_spends(self):
         spent_inputs = set([])
         seen_transactions = []
         ds_counter = 0
@@ -131,7 +131,7 @@ class CompetingChainsTest(BitcoinTestFramework):
         assert (node0.getblockcount() == self.FORK_ROOT_HEIGHT - 1)
 
         self.log.info("fund attacker")
-        funding_tx = self.send_funds_to_attacker (node0, attacker, coinbase_tx)
+        funding_tx = self.send_funds_to_attacker(node0, attacker, coinbase_tx)
         node0.generate(1)
         assert (node0.getblockcount() == self.FORK_ROOT_HEIGHT + 0)
 
@@ -159,7 +159,7 @@ class CompetingChainsTest(BitcoinTestFramework):
         assert (node1.getblockcount() == self.FORK_ROOT_HEIGHT + 1)
 
         self.log.info("check that funds have been double spent to different addresses")
-        assert(self.contains_double_spends () == self.nbDoubleSpends)
+        assert (self.contains_double_spends() == self.nbDoubleSpends)
 
         # Test 2.
         # 1. Progress the two competing chains in node0 and node1 to different lengths (configurable).
@@ -168,31 +168,31 @@ class CompetingChainsTest(BitcoinTestFramework):
         #    contain the doulbe-spends we have prapared.
         # 2. connect the nodes and sync them to force a reorg
         # 3. Assert that all double-spends disappeared - which nontheless means the attack succeeded.
-        assert(self.lenChain0 <= self.lenChain1)
+        assert (self.lenChain0 <= self.lenChain1)
         self.log.info("Mine lenChain0 blocks on node0")
 
         node0.generate(self.lenChain0 - 1)
-        assert(node0.getblockcount() == self.FORK_ROOT_HEIGHT + self.lenChain0)
+        assert (node0.getblockcount() == self.FORK_ROOT_HEIGHT + self.lenChain0)
 
         self.log.info("Mine competing lenChain1 blocks on node1")
         node1.generate(self.lenChain1 - 1)
-        assert(node1.getblockcount() == self.FORK_ROOT_HEIGHT + self.lenChain1)
+        assert (node1.getblockcount() == self.FORK_ROOT_HEIGHT + self.lenChain1)
 
         self.log.info("Connect nodes to force a reorg")
         connect_nodes(self.nodes, 1, 0)
         sync_blocks(self.nodes[0:2])
         if self.lenChain1 > self.lenChain0:
-            assert(node0.getblockcount() == self.FORK_ROOT_HEIGHT + self.lenChain1)
+            assert (node0.getblockcount() == self.FORK_ROOT_HEIGHT + self.lenChain1)
         else:
-            assert(node1.getblockcount() == self.FORK_ROOT_HEIGHT + self.lenChain0)
+            assert (node1.getblockcount() == self.FORK_ROOT_HEIGHT + self.lenChain0)
 
         self.log.info("check that both nodes have the same chains")
         lastblock0 = node0.getbestblockhash()
         lastblock1 = node1.getbestblockhash()
-        assert(lastblock0 == lastblock1)
+        assert (lastblock0 == lastblock1)
 
         self.log.info("check that double-spends have been removed")
-        assert (self.contains_double_spends () == 0)
+        assert (self.contains_double_spends() == 0)
 
         # Test 3: Assert that safemode has been reached
         try:
@@ -205,7 +205,7 @@ class CompetingChainsTest(BitcoinTestFramework):
         node0.invalidateblock(first_bad_block)
         node0.ignoresafemodeforblock(first_bad_block)
         balance = node0.rpc.getbalance()
-        assert (balance != None)
+        assert (balance is not None)
 
 
 if __name__ == '__main__':

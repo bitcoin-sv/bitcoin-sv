@@ -17,6 +17,7 @@ import random
 import re
 from subprocess import CalledProcessError
 import time
+from typing import Iterator
 
 from . import coverage
 from .authproxy import AuthServiceProxy, JSONRPCException
@@ -299,7 +300,7 @@ def get_rpc_proxy(url, node_number, timeout=None, coveragedir=None):
 
 
 def p2p_port(n):
-    assert(n <= MAX_NODES)
+    assert (n <= MAX_NODES)
     return PORT_MIN + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
 
 
@@ -308,8 +309,8 @@ def rpc_port(n):
 
 
 def zmq_port(n):
-    assert(n <= MAX_NODES)
-    return PORT_MIN + 2*PORT_RANGE + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
+    assert (n <= MAX_NODES)
+    return PORT_MIN + 2 * PORT_RANGE + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
 
 
 def rpc_url(datadir, i, rpchost=None):
@@ -363,7 +364,9 @@ def get_auth_cookie(datadir):
                 split_userpass = userpass.split(':')
                 user = split_userpass[0]
                 password = split_userpass[1]
-        except: pass # any failures while reading the cookie file are treated as if the file was not there
+        except Exception:
+            pass # any failures while reading the cookie file are treated as if the file was not there
+
     if user is None or password is None:
         raise ValueError("No RPC credentials")
     return user, password
@@ -445,7 +448,12 @@ def connect_nodes(nodes, from_node_num, to_node_num, wait_multistreams=True):
     subver = "testnode%d" % to_node_num
     # Number of streams between nodes that will be established
     number_of_streams = number_of_additional_streams(nodes[from_node_num], nodes[to_node_num]) + 1
-    wait_until(lambda: all(peer['version'] != 0 and (not multiStreamsEnabled or subver not in peer['subver'] or (peer['associd'] != 'Not-Set' and len(peer['streams']) == number_of_streams)) for peer in nodes[from_node_num].getpeerinfo()))
+    wait_until(lambda: all(peer['version'] != 0
+                           and (not multiStreamsEnabled
+                                or subver not in peer['subver']
+                                or (peer['associd'] != 'Not-Set'
+                                    and len(peer['streams']) == number_of_streams))
+                           for peer in nodes[from_node_num].getpeerinfo()))
 
 
 def connect_nodes_bi(nodes, a, b):
@@ -527,7 +535,7 @@ def check_mempool_equals(rpc, should_be_in_mempool, timeout=20, check_interval=0
     try:
         wait_until(lambda: set(rpc.getrawmempool()) == {t.hash for t in should_be_in_mempool},
                    timeout=timeout, check_interval=check_interval)
-    except:
+    except Exception:
         mempool = set(rpc.getrawmempool())
         expected = {t.hash for t in should_be_in_mempool}
         missing = expected - mempool
@@ -543,7 +551,7 @@ def check_mempool_equals(rpc, should_be_in_mempool, timeout=20, check_interval=0
 # The actual reject reason is checked if specified
 def wait_for_reject_message(conn, reject_reason=None, timeout=5):
     wait_until(lambda: ('reject' in list(conn.cb.last_message.keys())
-                        and (reject_reason == None or conn.cb.last_message['reject'].reason == reject_reason)),
+                        and (reject_reason is None or conn.cb.last_message['reject'].reason == reject_reason)),
                timeout=timeout)
     if conn.cb.last_message['reject'].message == b'tx':
         conn.rpc.log.info('Transaction rejected with ' + (conn.cb.last_message['reject'].reason).decode('utf8') + ' -- OK')
@@ -558,7 +566,7 @@ def ensure_no_rejection(conn):
     # wait 2 seconds for transaction/block before checking for reject message
     time.sleep(2)
     wait_until(lambda: not ('reject' in list(conn.cb.last_message.keys())) or conn.cb.last_message[
-        'reject'].reason == None, timeout=5)
+        'reject'].reason is None, timeout=5)
     conn.rpc.log.info('Not rejected -- OK')
 
 
@@ -583,7 +591,7 @@ def gather_inputs(from_node, amount_needed, confirmations_required=1):
     """
     Return a random set of unspent txouts that are enough to pay amount_needed
     """
-    assert(confirmations_required >= 0)
+    assert (confirmations_required >= 0)
     utxo = from_node.listunspent(confirmations_required)
     random.shuffle(utxo)
     inputs = []
@@ -719,7 +727,7 @@ def create_confirmed_utxos(fee, node, count, age=101, nodes=None):
         sync_blocks(nodes)
 
     utxos = node.listunspent()
-    assert(len(utxos) >= count)
+    assert (len(utxos) >= count)
     return utxos
 
 
@@ -848,49 +856,74 @@ def loghash(inhash=None):
         return inhash
 
 
-def check_for_log_msg(rpc, log_msg, node_dir=None):
+# Open the node log file
+def open_log_file(rpc, node_dir=None):
+    assert hasattr(rpc, "log")
+
+    if node_dir is None:
+        assert hasattr(rpc, "datadir")
+        logfile_path = os.path.join(rpc.datadir, "regtest", "bitcoind.log")
+    else:
+        logfile_path = glob.glob(rpc.options.tmpdir + node_dir + "/regtest/bitcoind.log")[0]
+
+    return open(logfile_path)
+
+
+# Generator to follow a log file and return lines
+def read_log_line(log) -> Iterator[str]:
+    line = ''
+    while True:
+        tmp = log.readline()
+        if tmp is not None and tmp != '':
+            line += tmp
+            if line.endswith('\n'):
+                yield line
+                line = ''
+        else:
+            return
+
+
+def check_for_log_msg(rpc, log_msg, node_dir=None, log_file=None):
     """
     Checks for occurrence of the log_msg in the bitcoind.log
     rpc can be any object which has .log member (logger)
     If node_dir is None, the rpc must be an TestNode instance and the logfile to search will be the one associated with this TestNode instance.
     """
-    assert hasattr(rpc, "log")
 
-    if node_dir is None:
-        assert hasattr(rpc, "datadir")
-        logfile_path = os.path.join(rpc.datadir, "regtest", "bitcoind.log")
-    else:
-        logfile_path = glob.glob(rpc.options.tmpdir + node_dir + "/regtest/bitcoind.log")[0]
-
-    with open(logfile_path) as f:
-        for line in f:
+    def search_for_line(log_msg, log_file):
+        for line in read_log_line(log_file):
             if log_msg in line:
                 rpc.log.info("Found line: %s", line.strip())
                 return True
-    return False
+        return False
+
+    if log_file:
+        return search_for_line(log_msg, log_file)
+    else:
+        with open_log_file(rpc, node_dir) as log_file:
+            return search_for_line(log_msg, log_file)
 
 
-def count_log_msg(rpc, log_msg, node_dir=None):
+def count_log_msg(rpc, log_msg, node_dir=None, log_file=None):
     """
     Checks for number of occurrences of the log_msg in the bitcoind.log
     rpc can be any object which has .log member (logger)
     If node_dir is None, the rpc must be an TestNode instance and the logfile to search will be the one associated with this TestNode instance.
     """
-    assert hasattr(rpc, "log")
 
-    if node_dir is None:
-        assert hasattr(rpc, "datadir")
-        logfile_path = os.path.join(rpc.datadir, "regtest", "bitcoind.log")
-    else:
-        logfile_path = glob.glob(rpc.options.tmpdir + node_dir + "/regtest/bitcoind.log")[0]
-
-    count = 0
-    with open(logfile_path) as f:
-        for line in f:
+    def search_for_line(log_msg, log_file):
+        count = 0
+        for line in read_log_line(log_file):
             if log_msg in line:
                 count += 1
-    rpc.log.info(f'String "{log_msg}"" found in {count} lines')
-    return count
+        rpc.log.info(f'String "{log_msg}"" found in {count} lines')
+        return count
+
+    if log_file:
+        return search_for_line(log_msg, log_file)
+    else:
+        with open_log_file(rpc, node_dir) as log_file:
+            return search_for_line(log_msg, log_file)
 
 
 def hashToHex(hash):
@@ -914,7 +947,7 @@ def check_zmq_test_requirements(configfile, skip_test_exception):
 
     # if we built bitcoind with ZMQ enabled, then we need zmq package to test its functionality
     try:
-        import zmq
+        import zmq  # noqa: F401
     except ImportError:
         raise Exception("pyzmq module not available.")
 

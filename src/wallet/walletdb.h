@@ -62,17 +62,21 @@ enum DBErrors {
 /* simple HD chain data model */
 class CHDChain {
 public:
-    uint32_t nExternalChainCounter;
-    uint32_t nInternalChainCounter;
+    uint32_t nExternalChainCounter{};
+    uint32_t nInternalChainCounter{};
     //!< master key hash160
     CKeyID masterKeyID;
 
     static const int VERSION_HD_BASE = 1;
     static const int VERSION_HD_CHAIN_SPLIT = 2;
     static const int CURRENT_VERSION = VERSION_HD_CHAIN_SPLIT;
-    int nVersion;
+    int nVersion{CHDChain::CURRENT_VERSION};
 
-    CHDChain() { SetNull(); }
+    CHDChain()
+    {
+        masterKeyID.SetNull();
+    }
+
     ADD_SERIALIZE_METHODS
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -83,13 +87,6 @@ public:
             READWRITE(nInternalChainCounter);
         }
     }
-
-    void SetNull() {
-        nVersion = CHDChain::CURRENT_VERSION;
-        nExternalChainCounter = 0;
-        nInternalChainCounter = 0;
-        masterKeyID.SetNull();
-    }
 };
 
 class CKeyMetadata {
@@ -97,18 +94,19 @@ public:
     static const int VERSION_BASIC = 1;
     static const int VERSION_WITH_HDDATA = 10;
     static const int CURRENT_VERSION = VERSION_WITH_HDDATA;
-    int nVersion;
+    int nVersion{CKeyMetadata::CURRENT_VERSION};
     // 0 means unknown.
-    int64_t nCreateTime;
+    int64_t nCreateTime{};
     // optional HD/bip32 keypath.
     std::string hdKeypath;
     // Id of the HD masterkey used to derive this key.
     CKeyID hdMasterKeyID;
 
-    CKeyMetadata() { SetNull(); }
-    CKeyMetadata(int64_t nCreateTime_) {
-        SetNull();
-        nCreateTime = nCreateTime_;
+    CKeyMetadata() { hdMasterKeyID.SetNull(); }
+
+    CKeyMetadata(int64_t nCreateTime_):nCreateTime{nCreateTime_}
+    {
+        hdMasterKeyID.SetNull();
     }
 
     ADD_SERIALIZE_METHODS
@@ -122,13 +120,6 @@ public:
             READWRITE(hdMasterKeyID);
         }
     }
-
-    void SetNull() {
-        nVersion = CKeyMetadata::CURRENT_VERSION;
-        nCreateTime = 0;
-        hdKeypath.clear();
-        hdMasterKeyID.SetNull();
-    }
 };
 
 /**
@@ -138,6 +129,7 @@ public:
  * scope.
  * Optionally (on by default) it will flush to disk as well.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CWalletDB {
 private:
     template <typename K, typename T>
@@ -263,6 +255,7 @@ public:
 
 private:
     CDB batch;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     CWalletDBWrapper &m_dbw;
 
     CWalletDB(const CWalletDB &);

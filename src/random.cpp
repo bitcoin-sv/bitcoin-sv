@@ -10,12 +10,22 @@
 #ifdef WIN32
 #include "compat.h" // for Windows API
 #include <wincrypt.h>
+#include "utiltime.h" // GetTime()
 #endif
-#include "util.h"             // for LogPrint()
+#include "logging.h"             // for LogPrint()
 #include <chrono>
 #include <cstdlib>
 #include <limits>
 #include <thread>
+
+#if defined(__EMSCRIPTEN__)
+#include <emscripten.h>
+#endif
+
+#if !defined(__EMSCRIPTEN__) && !defined(WIN32)
+#include <fcntl.h>
+#include <unistd.h>
+#endif
 
 #ifndef WIN32
 #include <sys/time.h>
@@ -185,20 +195,29 @@ static void RandAddSeedPerfmon() {
  *compatible way to get cryptographic randomness on UNIX-ish platforms.
  */
 void GetDevURandom(uint8_t *ent32) {
-    int f = open("/dev/urandom", O_RDONLY);
-    if (f == -1) {
-        RandFailure();
-    }
-    int have = 0;
-    do {
-        ssize_t n = read(f, ent32 + have, NUM_OS_RANDOM_BYTES - have);
-        if (n <= 0 || n + have > NUM_OS_RANDOM_BYTES) {
-            close(f);
+    assert(ent32 != nullptr);
+    #ifndef __EMSCRIPTEN__
+        int f = open("/dev/urandom", O_RDONLY);
+        if (f == -1) {
             RandFailure();
         }
-        have += n;
-    } while (have < NUM_OS_RANDOM_BYTES);
-    close(f);
+        int have = 0;
+        do {
+            ssize_t n = read(f, ent32 + have, NUM_OS_RANDOM_BYTES - have);
+            if (n <= 0 || n + have > NUM_OS_RANDOM_BYTES) {
+                close(f);
+                RandFailure();
+            }
+            have += n;
+        } while (have < NUM_OS_RANDOM_BYTES);
+        close(f);
+    #else
+        // Browser/WebAssembly version
+        EM_ASM({
+            var heap = new Uint8Array(HEAPU8.buffer, $0, $1);
+            crypto.getRandomValues(heap);
+        }, ent32, NUM_OS_RANDOM_BYTES);
+    #endif
 }
 #endif
 
@@ -377,7 +396,7 @@ uint256 GetRandHash() {
 
 void FastRandomContext::RandomSeed() {
     uint256 seed = GetRandHash();
-    rng.SetKey(seed.begin(), 32);
+    rng.SetKey(std::span{seed.begin(), 32});
     requires_seed = false;
 }
 
@@ -399,9 +418,12 @@ std::vector<uint8_t> FastRandomContext::randbytes(size_t len) {
     return ret;
 }
 
-FastRandomContext::FastRandomContext(const uint256 &seed)
-    : requires_seed(false), bytebuf_size(0), bitbuf_size(0) {
-    rng.SetKey(seed.begin(), 32);
+FastRandomContext::FastRandomContext(const uint256& seed)
+    : requires_seed(false),
+      bytebuf_size(0),
+      bitbuf_size(0)
+{
+    rng.SetKey(std::span{seed.begin(), 32});
 }
 
 bool Random_SanityCheck() {
@@ -459,7 +481,7 @@ FastRandomContext::FastRandomContext(bool fDeterministic)
         return;
     }
     uint256 seed;
-    rng.SetKey(seed.begin(), 32);
+    rng.SetKey(std::span{seed.begin(), 32});
 }
 
 void RandomInit() {

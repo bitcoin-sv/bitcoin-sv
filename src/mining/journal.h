@@ -127,7 +127,6 @@ class CJournal final
 
         Index& operator++();
         bool operator==(const Index& that) const { return (mCurrItem == that.mCurrItem); }
-        bool operator!=(const Index& that) const { return !(*this == that); }
 
       private:
 
@@ -148,10 +147,8 @@ class CJournal final
         ReadLock(const ReadLock&) = delete;
         ReadLock& operator=(const ReadLock&) = delete;
 
-        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
-        ReadLock(ReadLock&& that);
-        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
-        ReadLock& operator=(ReadLock&& that);
+        ReadLock(ReadLock&& that) noexcept;
+        ReadLock& operator=(ReadLock&& that) noexcept;
 
         // Get start/end indexes for our underlying sequence
         Index begin() const;

@@ -5,9 +5,11 @@
 
 #include "bitcoinconsensus.h"
 
+#include "config.h"
 #include "primitives/transaction.h"
 #include "pubkey.h"
 #include "script/interpreter.h"
+#include "script/script_error.h"
 #include "taskcancellation.h"
 #include "version.h"
 
@@ -67,11 +69,16 @@ static bool verify_flags(unsigned int flags) {
     return (flags & ~(bitcoinconsensus_SCRIPT_FLAGS_VERIFY_ALL)) == 0;
 }
 
-static int verify_script(const CScriptConfig& config, const uint8_t* scriptPubKey,
-                         unsigned int scriptPubKeyLen, Amount amount,
-                         const uint8_t* txTo, unsigned int txToLen,
-                         unsigned int nIn, unsigned int flags,
-                         bitcoinconsensus_error* err) {
+static int verify_script(const Config& config,
+                         const uint8_t* scriptPubKey,
+                         unsigned int scriptPubKeyLen,
+                         Amount amount,
+                         const uint8_t* txTo,
+                         unsigned int txToLen,
+                         unsigned int nIn,
+                         unsigned int flags,
+                         bitcoinconsensus_error* err)
+{
     if (!verify_flags(flags)) {
         return bitcoinconsensus_ERR_INVALID_FLAGS;
     }
@@ -89,37 +96,48 @@ static int verify_script(const CScriptConfig& config, const uint8_t* scriptPubKe
         PrecomputedTransactionData txdata(tx);
         auto source = task::CCancellationSource::Make();
 
-        auto res =
-          VerifyScript(
-              config, true,
-              source->GetToken(),
-              tx.vin[nIn].scriptSig,
-              CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), flags,
-              TransactionSignatureChecker(&tx, nIn, amount, txdata), nullptr);
+        constexpr bool consensus{true};
+        const auto params{make_verify_script_params(config.GetConfigScriptPolicy(), flags, consensus)};
+        const auto
+            res = VerifyScript(params,
+                               source->GetToken(),
+                               tx.vin[nIn].scriptSig,
+                               CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen),
+                               flags,
+                               TransactionSignatureChecker(&tx, nIn, amount, txdata));
 
-        return res.value();
-    } catch (const std::exception &) {
+        return (res == SCRIPT_ERR_OK);
+    }
+    catch (const std::exception &) {
         // Error deserializing
         return set_error(err, bitcoinconsensus_ERR_TX_DESERIALIZE);
     }
 }
 
-int bitcoinconsensus_verify_script_with_amount(
-    const CScriptConfig& config,
-    const uint8_t *scriptPubKey, unsigned int scriptPubKeyLen, int64_t amount,
-    const uint8_t *txTo, unsigned int txToLen, unsigned int nIn,
-    unsigned int flags, bitcoinconsensus_error *err) {
+int bitcoinconsensus_verify_script_with_amount(const Config& config,
+                                               const uint8_t* scriptPubKey,
+                                               unsigned int scriptPubKeyLen,
+                                               int64_t amount,
+                                               const uint8_t* txTo,
+                                               unsigned int txToLen,
+                                               unsigned int nIn,
+                                               unsigned int flags,
+                                               bitcoinconsensus_error* err)
+{
     Amount am(amount);
     return ::verify_script(config, scriptPubKey, scriptPubKeyLen, am, txTo, txToLen,
                            nIn, flags, err);
 }
 
-int bitcoinconsensus_verify_script(const CScriptConfig& config,
-                                   const uint8_t *scriptPubKey,
+int bitcoinconsensus_verify_script(const Config& config,
+                                   const uint8_t* scriptPubKey,
                                    unsigned int scriptPubKeyLen,
-                                   const uint8_t *txTo, unsigned int txToLen,
-                                   unsigned int nIn, unsigned int flags,
-                                   bitcoinconsensus_error *err) {
+                                   const uint8_t* txTo,
+                                   unsigned int txToLen,
+                                   unsigned int nIn,
+                                   unsigned int flags,
+                                   bitcoinconsensus_error* err)
+{
     if (flags & bitcoinconsensus_SCRIPT_ENABLE_SIGHASH_FORKID ||
         flags & bitcoinconsensus_SCRIPT_FLAGS_VERIFY_WITNESS_DEPRECATED) {
         return set_error(err, bitcoinconsensus_ERR_AMOUNT_REQUIRED);

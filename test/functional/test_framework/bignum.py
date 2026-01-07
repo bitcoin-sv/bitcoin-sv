@@ -29,10 +29,10 @@ def bn2bin(v):
 
 
 def bin2bn(s):
-    l = 0
+    i = 0
     for ch in s:
-        l = (l << 8) | ch
-    return l
+        i = (i << 8) | ch
+    return i
 
 
 def bn2mpi(v):

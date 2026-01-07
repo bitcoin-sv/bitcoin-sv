@@ -149,12 +149,6 @@ namespace bsv
             return span_.data() == other.span_.data() &&
                    span_.size() == other.span_.size();
         }
-
-        constexpr bool operator!=(const instruction_iterator& other) const
-            noexcept
-        {
-            return !(operator==(other));
-        }
     };
 
     inline std::string_view to_sv(std::span<const uint8_t> s)

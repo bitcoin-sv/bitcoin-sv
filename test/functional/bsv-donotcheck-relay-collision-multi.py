@@ -8,9 +8,14 @@ This is needed due to MAPI sending the same transaction to multiple nodes via se
 with parameter "donotcheckfee" set to True
 """
 
-from test_framework.mininode import *
+from test_framework.mininode import COIN, mininode_lock, NetworkThread, \
+    NodeConn, NodeConnCB
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_equal, create_confirmed_utxos, \
+    hashToHex, p2p_port, satoshi_round, sync_blocks
+
+from decimal import Decimal
+
 import time
 
 
@@ -43,7 +48,7 @@ class TestNode(NodeConnCB):
 class NoCheckCollisionTest(BitcoinTestFramework):
 
     def created_signed_transaction(self, sats, node):
-        utxo = create_confirmed_utxos(sats, node, 1, age=101)[0]
+        create_confirmed_utxos(sats, node, 1, age=101)
 
     def set_test_params(self):
         self.num_nodes = 2
@@ -52,13 +57,13 @@ class NoCheckCollisionTest(BitcoinTestFramework):
         self.extra_args = [
             [
                 "-whitelist=127.0.0.1",
-                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-                "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
+                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
+                "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats) / COIN),
             ],
             [
                 "-whitelist=127.0.0.1",
                 "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
-                "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats)/COIN),
+                "-minminingtxfee={}".format(Decimal(self.mining_relay_factor * self.minrelaytxfee_sats) / COIN),
             ]
         ]
 
@@ -84,7 +89,7 @@ class NoCheckCollisionTest(BitcoinTestFramework):
         high_fee_index = 3
         nb_test_transactions = 4
 
-        utxos = create_confirmed_utxos(Decimal(1000)/Decimal(COIN), node1, nb_test_transactions, age=101)
+        utxos = create_confirmed_utxos(Decimal(1000) / Decimal(COIN), node1, nb_test_transactions, age=101)
         sync_blocks(self.nodes)
         test_node.clear_invs()
 
@@ -116,12 +121,12 @@ class NoCheckCollisionTest(BitcoinTestFramework):
                 continue
 
             txid = node1.decoderawtransaction(signed_tx)["txid"]
-            rejected_txns = node1.sendrawtransactions([{'hex': signed_tx, 'dontcheckfee': donotcheck}])
+            node1.sendrawtransactions([{'hex': signed_tx, 'dontcheckfee': donotcheck}])
             txnids.append(txid)
             signed_txns.append(signed_tx)
 
         # Test that all transactions are relayed (skip dummy tx)
-        assert(allInvsMatch(txnids[dummy_index + 1:], test_node))
+        assert (allInvsMatch(txnids[dummy_index + 1:], test_node))
         test_node.clear_invs()
 
         # resend low_fee and low_fee_nocheck transactions to node0 via sendrawtransaction even though
@@ -129,13 +134,13 @@ class NoCheckCollisionTest(BitcoinTestFramework):
         # if donotcheck is False then transaction must be rejected
         # if donotcheck is True, resending must succeed
         try:
-            rejected_txns = node0.sendrawtransactions([{'hex':signed_txns[low_fee_index], 'dontcheckfee':False}]) # last param is donotcheck
-        except:
+            node0.sendrawtransactions([{'hex': signed_txns[low_fee_index], 'dontcheckfee': False}]) # last param is donotcheck
+        except Exception:
             self.log.info("test 0 - sent twice must be rejected:PASS")
 
         #low_fee_nocheck_txid_tmp = node0.sendrawtransaction(signed_txns[low_fee_nocheck_index], False, True)  # last param is donotcheck
         low_fee_nocheck_txid_tmp = node0.decoderawtransaction(signed_txns[low_fee_nocheck_index])["txid"]
-        rejected_txns = node0.sendrawtransactions([{'hex':signed_txns[low_fee_nocheck_index], 'dontcheckfee':True}])  # last param is donotcheck
+        node0.sendrawtransactions([{'hex': signed_txns[low_fee_nocheck_index], 'dontcheckfee': True}])  # last param is donotcheck
         assert (low_fee_nocheck_txid_tmp == txnids[low_fee_nocheck_index])
 
         # mine transactions in node0 and ensure that the low fee trasnaction with donotcheck equals true

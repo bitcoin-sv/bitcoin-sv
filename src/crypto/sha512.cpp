@@ -6,6 +6,7 @@
 
 #include "crypto/common.h"
 
+#include <array>
 #include <cassert>
 #include <cstring>
 
@@ -44,6 +45,7 @@ namespace sha512 {
 
     /** Initialize SHA-256 state. */
     inline void Initialize(uint64_t *s) {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         s[0] = 0x6a09e667f3bcc908ull;
         s[1] = 0xbb67ae8584caa73bull;
         s[2] = 0x3c6ef372fe94f82bull;
@@ -52,14 +54,19 @@ namespace sha512 {
         s[5] = 0x9b05688c2b3e6c1full;
         s[6] = 0x1f83d9abfb41bd6bull;
         s[7] = 0x5be0cd19137e2179ull;
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     /** Perform one SHA-512 transformation, processing a 128-byte chunk. */
-    void Transform(uint64_t *s, const uint8_t *chunk) {
+    void Transform(uint64_t *s, const uint8_t *chunk)
+    {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         uint64_t a = s[0], b = s[1], c = s[2], d = s[3], e = s[4], f = s[5],
                  g = s[6], h = s[7];
+        // NOLINTBEGIN(cppcoreguidelines-init-variables)
         uint64_t w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13,
             w14, w15;
+        // NOLINTEND(cppcoreguidelines-init-variables)
 
         Round(a, b, c, d, e, f, g, h, 0x428a2f98d728ae22ull,
               w0 = ReadBE64(chunk + 0));
@@ -234,6 +241,7 @@ namespace sha512 {
         s[5] += f;
         s[6] += g;
         s[7] += h;
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
 } // namespace sha512
@@ -242,57 +250,69 @@ namespace sha512 {
 
 ////// SHA-512
 
-CSHA512::CSHA512() : bytes(0) {
-    sha512::Initialize(s);
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+CSHA512::CSHA512() 
+{
+    sha512::Initialize(s.data());
 }
 
-CSHA512 &CSHA512::Write(const uint8_t *data, size_t len) {
-    if (len == 0) {
-        return *this;    
-    }
+CSHA512& CSHA512::Write(const uint8_t* data, size_t len)
+{
+    if(len == 0)
+        return *this;
+
     assert(data);
-    const uint8_t *end = data + len;
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    const uint8_t* end = data + len;
     size_t bufsize = bytes % 128;
-    if (bufsize && bufsize + len >= 128) {
+    if(bufsize && bufsize + len >= 128)
+    {
         // Fill the buffer, and process it.
-        memcpy(buf + bufsize, data, 128 - bufsize);
+        memcpy(buf.data() + bufsize, data, 128 - bufsize);
         bytes += 128 - bufsize;
         data += 128 - bufsize;
-        sha512::Transform(s, buf);
+        sha512::Transform(s.data(), buf.data());
         bufsize = 0;
     }
-    while (end >= data + 128) {
+
+    while(end >= data + 128)
+    {
         // Process full chunks directly from the source.
-        sha512::Transform(s, data);
+        sha512::Transform(s.data(), data);
         data += 128;
         bytes += 128;
     }
-    if (end > data) {
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
+    if(end > data)
+    {
         // Fill the buffer with what remains.
-        memcpy(buf + bufsize, data, end - data);
+        memcpy(buf.data() + bufsize, data, end - data);
         bytes += end - data;
     }
     return *this;
 }
 
-void CSHA512::Finalize(uint8_t hash[OUTPUT_SIZE]) {
-    static const uint8_t pad[128] = {0x80};
-    uint8_t sizedesc[16] = {0x00};
-    WriteBE64(sizedesc + 8, bytes << 3);
-    Write(pad, 1 + ((239 - (bytes % 128)) % 128));
-    Write(sizedesc, 16);
-    WriteBE64(hash, s[0]);
-    WriteBE64(hash + 8, s[1]);
-    WriteBE64(hash + 16, s[2]);
-    WriteBE64(hash + 24, s[3]);
-    WriteBE64(hash + 32, s[4]);
-    WriteBE64(hash + 40, s[5]);
-    WriteBE64(hash + 48, s[6]);
-    WriteBE64(hash + 56, s[7]);
+void CSHA512::Finalize(const span hash)
+{
+    static const std::array<uint8_t, 128> pad = {0x80};
+    std::array<uint8_t, 16> sizedesc = {0x00};
+    WriteBE64(sizedesc.data() + 8, bytes << 3);
+    Write(pad.data(), 1 + ((239 - (bytes % pad.size())) % pad.size()));
+    Write(sizedesc.data(), 16);
+    WriteBE64(hash.data(), s[0]);
+    WriteBE64(hash.data() + 8, s[1]);
+    WriteBE64(hash.data() + 16, s[2]);
+    WriteBE64(hash.data() + 24, s[3]);
+    WriteBE64(hash.data() + 32, s[4]);
+    WriteBE64(hash.data() + 40, s[5]);
+    WriteBE64(hash.data() + 48, s[6]);
+    WriteBE64(hash.data() + 56, s[7]);
 }
 
-CSHA512 &CSHA512::Reset() {
+CSHA512& CSHA512::Reset()
+{
     bytes = 0;
-    sha512::Initialize(s);
+    sha512::Initialize(s.data());
     return *this;
 }

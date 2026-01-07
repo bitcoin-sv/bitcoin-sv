@@ -21,7 +21,7 @@ BOOST_AUTO_TEST_CASE(construction)
     constexpr size_t arbitary_len{42};
     fixed_len_parser parser{arbitary_len};
     BOOST_CHECK(parser.empty());
-    BOOST_CHECK_EQUAL(0, parser.size());
+    BOOST_CHECK_EQUAL(0U, parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(fixed)
@@ -48,7 +48,7 @@ BOOST_AUTO_TEST_CASE(fixed)
         const std::span s{msg.data(), arbitary_len};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(arbitary_len, bytes_read);
-        BOOST_CHECK_EQUAL(0, bytes_reqd);
+        BOOST_CHECK_EQUAL(0U, bytes_reqd);
         BOOST_CHECK(!parser.empty());
         BOOST_CHECK_EQUAL(bytes_read, parser.size());
     }
@@ -59,7 +59,7 @@ BOOST_AUTO_TEST_CASE(fixed)
         const std::span s{msg.data(), arbitary_len + 1};
         const auto [bytes_read, bytes_reqd] = parser(s);
         BOOST_CHECK_EQUAL(arbitary_len, bytes_read);
-        BOOST_CHECK_EQUAL(0, bytes_reqd);
+        BOOST_CHECK_EQUAL(0U, bytes_reqd);
         BOOST_CHECK(!parser.empty());
         BOOST_CHECK_EQUAL(bytes_read, parser.size());
     }
@@ -74,9 +74,9 @@ BOOST_AUTO_TEST_CASE(byte_by_byte)
     fixed_len_parser parser{arbitary_len};
     for(size_t i{}; i < arbitary_len; ++i)
     {
-        const std::span s{msg.data() + i, 1};
+        const std::span s{msg.data() + i, 1}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
-        BOOST_CHECK_EQUAL(1, bytes_read);
+        BOOST_CHECK_EQUAL(1U, bytes_read);
         BOOST_CHECK_EQUAL(arbitary_len - i - 1, bytes_reqd);
         BOOST_CHECK(!parser.empty());
         BOOST_CHECK_EQUAL(i + 1, parser.size());

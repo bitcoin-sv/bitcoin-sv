@@ -83,13 +83,6 @@ enum RetFormat {
     RF_JSON,
 };
 
-static const struct {
-    enum RetFormat rf;
-    const char* name;
-} rf_names[] = {
-    {RF_UNDEF, ""}, {RF_BINARY, "bin"}, {RF_HEX, "hex"}, {RF_JSON, "json"},
-};
-
 class block_parse_error : public std::runtime_error
 {
 public:

@@ -5,14 +5,13 @@
 Check P2P message sendhdrsen
 """
 from test_framework.blocktools import create_block, create_coinbase, create_transaction, merkle_root_from_branch
-from test_framework.miner_id import MinerIdKeys, make_miner_id_block, create_dataref_txn
+from test_framework.miner_id import MinerIdKeys, make_miner_id_block
 from test_framework.mininode import COIN, CBlock, CInv, CTxOut, FromHex, mininode_lock, MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, msg_gethdrsen, msg_sendhdrsen, msg_sendheaders, NetworkThread, NodeConn, NodeConnCB, ToHex
 from test_framework.script import CScript, OP_FALSE, OP_RETURN, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, assert_greater_than, p2p_port, wait_until, sync_blocks
 
 import time
-import os
 
 
 class SPVNode(NodeConnCB):
@@ -33,7 +32,8 @@ class SPVNode(NodeConnCB):
         self.hdrsen.append(msg)
 
     def wait_for_hdrsen(self, timeout=5):
-        def test_function(): return len(self.hdrsen)>0
+        def test_function():
+            return len(self.hdrsen) > 0
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
         with mininode_lock:
             return self.hdrsen.pop(0)
@@ -42,7 +42,7 @@ class SPVNode(NodeConnCB):
         peers_info = node.getpeerinfo()
 
         # Find the element corresponding to info about this peer in peers_info
-        our_peer_info = [peer for peer in peers_info if ("addrlocal" in peer) and (peer["addrlocal"]==(self.connection.dstaddr+":"+str(self.connection.dstport)))]
+        our_peer_info = [peer for peer in peers_info if ("addrlocal" in peer) and (peer["addrlocal"] == (self.connection.dstaddr + ":" + str(self.connection.dstport)))]
         assert_equal(len(our_peer_info), 1)
 
         return our_peer_info[0]
@@ -52,7 +52,7 @@ class SendHdrsEnTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
-        self.extra_args = [['-genesisactivationheight=1']]*2 # Genesis must be activated so that we can send large transactions
+        self.extra_args = [['-genesisactivationheight=1']] * 2 # Genesis must be activated so that we can send large transactions
 
         # Setup miner ID keys and a single revocation key
         self.minerIdKey = MinerIdKeys("01")
@@ -81,7 +81,7 @@ class SendHdrsEnTest(BitcoinTestFramework):
     # Check contents of TSCMerkleProof object in enriched header
     def check_TSCMerkleProof(self, hdren):
         def check(txproof, expectedHash, expectedMerkleRoot):
-            assert(txproof)
+            assert (txproof)
             assert_equal(txproof.proof.flags, 0)
             assert_equal(txproof.proof.target, expectedHash)
             txproof.tx.rehash()
@@ -107,16 +107,16 @@ class SendHdrsEnTest(BitcoinTestFramework):
 
         # Create a block with CB transaction whose outputs we can spend later
         funding_tx = create_coinbase(node.getblockcount())
-        funding_tx.vout[0].nValue = 1*COIN
-        for i in range(1,50):
-            funding_tx.vout.append(CTxOut(1*COIN, CScript([OP_TRUE])))
+        funding_tx.vout[0].nValue = 1 * COIN
+        for i in range(1, 50):
+            funding_tx.vout.append(CTxOut(1 * COIN, CScript([OP_TRUE])))
         funding_tx.rehash()
         self.submit_block(node, funding_tx)
         node.generate(100)
         sync_blocks(self.nodes)
 
         # This is the initial block height before spv_node is started
-        start_height=102
+        start_height = 102
         assert_equal(node.getblockcount(), start_height)
         assert_equal(node1.getblockcount(), start_height)
         block0_hash = node.getbestblockhash()
@@ -149,13 +149,13 @@ class SendHdrsEnTest(BitcoinTestFramework):
         # We should now receive 'hdrsen' message when block is announced
         h = spv_node.wait_for_hdrsen()
         assert_equal(len(h.headers), 1) # should contain only one header
-        h0=h.headers[0]
-        assert(h0.coinbaseTxProof)
-        assert(not h0.minerInfoProof)
+        h0 = h.headers[0]
+        assert (h0.coinbaseTxProof)
+        assert (not h0.minerInfoProof)
         self.check_TSCMerkleProof(h0) # NOTE: Proof is checked first, since method also calculates hashes of block header transaction
         assert_equal(h0.hash, block2.hash) # should contain header of the block that was just generated
         assert_equal(h0.noMoreHeaders, 1)
-        assert(h0.coinbaseTxProof is not None)
+        assert (h0.coinbaseTxProof is not None)
         assert_equal(ToHex(block2.vtx[0]), ToHex(h.headers[0].coinbaseTxProof.tx)) # Contents of coinbase tx in hdrsen must be the same as in block
 
         # Create and submit block with coinbase transaction whose size is such that resulting hdrsen is just within the limit
@@ -175,9 +175,9 @@ class SendHdrsEnTest(BitcoinTestFramework):
         #           0 bytes for element data in field coinbase_merkle_proof.nodes
         #           1 byte for indication of following miner-info txn details
         HdrsEnSize = 152
-        coinbase_tx.vout.append(CTxOut(0, CScript([OP_FALSE, OP_RETURN] + [b"a" * (MAX_PROTOCOL_RECV_PAYLOAD_LENGTH-83-HdrsEnSize)])))
+        coinbase_tx.vout.append(CTxOut(0, CScript([OP_FALSE, OP_RETURN] + [b"a" * (MAX_PROTOCOL_RECV_PAYLOAD_LENGTH - 83 - HdrsEnSize)])))
         coinbase_tx.rehash()
-        assert_equal(len(coinbase_tx.serialize()), MAX_PROTOCOL_RECV_PAYLOAD_LENGTH-HdrsEnSize) # check that we have created transaction of correct size
+        assert_equal(len(coinbase_tx.serialize()), MAX_PROTOCOL_RECV_PAYLOAD_LENGTH - HdrsEnSize) # check that we have created transaction of correct size
         block3 = self.submit_block(node, coinbase_tx)
 
         # We should receive a 'hdrsen' message whose size is exactly MAX_PROTOCOL_RECV_PAYLOAD_LENGTH
@@ -186,7 +186,7 @@ class SendHdrsEnTest(BitcoinTestFramework):
 
         # Create and submit block with coinbase transaction whose size is such that resulting hdrsen is one byte over the limit
         coinbase_tx = create_coinbase(node.getblockcount())
-        coinbase_tx.vout.append(CTxOut(0, CScript([OP_FALSE, OP_RETURN] + [b"a" * (MAX_PROTOCOL_RECV_PAYLOAD_LENGTH-83-(HdrsEnSize-1))])))
+        coinbase_tx.vout.append(CTxOut(0, CScript([OP_FALSE, OP_RETURN] + [b"a" * (MAX_PROTOCOL_RECV_PAYLOAD_LENGTH - 83 - (HdrsEnSize - 1))])))
         coinbase_tx.rehash()
         block4 = self.submit_block(node, coinbase_tx)
 
@@ -199,33 +199,33 @@ class SendHdrsEnTest(BitcoinTestFramework):
         # We should receive a 'hdrsen' message whose size is one byte over the limit
         h = spv_node.wait_for_hdrsen()
         assert_equal(len(h.headers), 1)
-        h0=h.headers[0]
-        assert(h0.coinbaseTxProof)
-        assert(not h0.minerInfoProof)
+        h0 = h.headers[0]
+        assert (h0.coinbaseTxProof)
+        assert (not h0.minerInfoProof)
         self.check_TSCMerkleProof(h0)
         assert_equal(h0.hash, block4.hash)
-        assert_equal(len(h.serialize()), MAX_PROTOCOL_RECV_PAYLOAD_LENGTH+1)
+        assert_equal(len(h.serialize()), MAX_PROTOCOL_RECV_PAYLOAD_LENGTH + 1)
 
         # Create and mine a block with several transactions so that Merkle proof in hdrsen message is not empty
         txs = []
         for i in range(49):
-            txs.append(create_transaction(funding_tx, i, CScript(), 1*COIN))
+            txs.append(create_transaction(funding_tx, i, CScript(), 1 * COIN))
         # Also make this block a miner ID enabled one containing a miner-info txn
         minerIdParams = {
             'height': self.nodes[0].getblockcount() + 1,
             'minerKeys': self.minerIdKey,
             'revocationKeys': self.minerIdRevocationKey
         }
-        block5 = make_miner_id_block(node, minerIdParams, utxo={"txid" : funding_tx.hash, "vout" : 49, "amount" : 1.0}, txns=txs)
+        block5 = make_miner_id_block(node, minerIdParams, utxo={"txid": funding_tx.hash, "vout": 49, "amount": 1.0}, txns=txs)
         coinbase_tx = block5.vtx[0]
         miner_info_tx = block5.vtx[1 + len(txs)]
         node.submitblock(ToHex(block5))
 
         h = spv_node.wait_for_hdrsen()
         assert_equal(len(h.headers), 1)
-        h0=h.headers[0]
-        assert(h0.coinbaseTxProof)
-        assert(h0.minerInfoProof)
+        h0 = h.headers[0]
+        assert (h0.coinbaseTxProof)
+        assert (h0.minerInfoProof)
         self.check_TSCMerkleProof(h0)
         assert_equal(h0.hash, block5.hash)
         assert_equal(h0.noMoreHeaders, 1)
@@ -237,10 +237,10 @@ class SendHdrsEnTest(BitcoinTestFramework):
             block = self.generate_block(node)
             h = spv_node.wait_for_hdrsen()
             assert_equal(len(h.headers), 1)
-            h0=h.headers[0]
+            h0 = h.headers[0]
             self.check_TSCMerkleProof(h0)
-            assert(h0.coinbaseTxProof)
-            assert(not h0.minerInfoProof)
+            assert (h0.coinbaseTxProof)
+            assert (not h0.minerInfoProof)
             assert_equal(h0.hash, block.hash)
             assert_equal(h0.noMoreHeaders, 1)
 
@@ -256,13 +256,13 @@ class SendHdrsEnTest(BitcoinTestFramework):
         h = spv_node.wait_for_hdrsen()
         assert_equal(len(h.headers), 8)
         for i in range(8):
-            hi=h.headers[i]
-            assert(hi.coinbaseTxProof)
-            assert(not hi.minerInfoProof)
+            hi = h.headers[i]
+            assert (hi.coinbaseTxProof)
+            assert (not hi.minerInfoProof)
             self.check_TSCMerkleProof(hi)
             assert_equal(hi.hash, block_hashes[i])
-            assert(hi.coinbaseTxProof is not None) # coinbase data must be available in all headers in hdrsen message
-            if i==7:
+            assert (hi.coinbaseTxProof is not None) # coinbase data must be available in all headers in hdrsen message
+            if i == 7:
                 assert_equal(hi.noMoreHeaders, 1) # the last header must indicate that it is a tip
             else:
                 assert_equal(hi.noMoreHeaders, 0)
@@ -276,21 +276,21 @@ class SendHdrsEnTest(BitcoinTestFramework):
             block_hashes.append(node1.generate(1)[0])
 
         # Should receive an inv instead of hdrsen, because hdrsen message would contain more than 8 headers
-        spv_node.wait_for_inv([CInv(CInv.BLOCK, int(block_hashes[8],16))], 5)
+        spv_node.wait_for_inv([CInv(CInv.BLOCK, int(block_hashes[8], 16))], 5)
         assert_equal(spv_node.hdrsen, [])
-        assert_equal(node.getblockcount(), start_height+9)
+        assert_equal(node.getblockcount(), start_height + 9)
 
         # Send gethdrsen to get the missing headers
-        spv_node.gethdrsen(locator=[int(block0_hash,16), int(h.headers[7].hash,16)], hashstop=0) # NOTE: h still contains the last blocks announcement before reorg
+        spv_node.gethdrsen(locator=[int(block0_hash, 16), int(h.headers[7].hash, 16)], hashstop=0) # NOTE: h still contains the last blocks announcement before reorg
         h = spv_node.wait_for_hdrsen()
         assert_equal(len(h.headers), 9)
         for i in range(9):
-            hi=h.headers[i]
-            assert(hi.coinbaseTxProof)
-            assert(not hi.minerInfoProof)
+            hi = h.headers[i]
+            assert (hi.coinbaseTxProof)
+            assert (not hi.minerInfoProof)
             self.check_TSCMerkleProof(hi)
             assert_equal(hi.hash, block_hashes[i])
-            if i==8:
+            if i == 8:
                 assert_equal(hi.noMoreHeaders, 1)
             else:
                 assert_equal(hi.noMoreHeaders, 0)
@@ -300,13 +300,13 @@ class SendHdrsEnTest(BitcoinTestFramework):
         last_block_hash = node1.generate(1)[0] # should work the same even if block is mined by a different node
         h = spv_node.wait_for_hdrsen()
         assert_equal(len(h.headers), 1)
-        h0=h.headers[0]
-        assert(h0.coinbaseTxProof)
-        assert(not h0.minerInfoProof)
+        h0 = h.headers[0]
+        assert (h0.coinbaseTxProof)
+        assert (not h0.minerInfoProof)
         self.check_TSCMerkleProof(h0)
         assert_equal(h0.hash, last_block_hash)
         assert_equal(h0.noMoreHeaders, 1)
-        assert(h0.coinbaseTxProof is not None)
+        assert (h0.coinbaseTxProof is not None)
 
         # Message sendheaders should override sendhdrsen
         spv_node.send_and_ping(msg_sendheaders())

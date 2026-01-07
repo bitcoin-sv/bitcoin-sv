@@ -24,40 +24,24 @@ namespace memusage {
 static size_t MallocUsage(size_t alloc);
 
 /** Dynamic memory usage for built-in types is zero. */
-static inline size_t DynamicUsage(const int8_t &v) {
+static inline size_t DynamicUsage(const int8_t& /*v*/) { return 0; }
+static inline size_t DynamicUsage(const uint8_t& /*v*/) { return 0; }
+static inline size_t DynamicUsage(const int16_t& /*v*/) { return 0; }
+static inline size_t DynamicUsage(const uint16_t& /*v*/) { return 0; }
+static inline size_t DynamicUsage(const int32_t& /*v*/) { return 0; }
+static inline size_t DynamicUsage(const uint32_t& /*v*/) { return 0; }
+static inline size_t DynamicUsage(const int64_t& /*v*/) { return 0; }
+static inline size_t DynamicUsage(const uint64_t& /*v*/) { return 0; }
+static inline size_t DynamicUsage(const float& /*v*/) { return 0; }
+static inline size_t DynamicUsage(const double& /*v*/) { return 0; }
+template<typename X>
+static inline size_t DynamicUsage(X* const& /*v*/)
+{
     return 0;
 }
-static inline size_t DynamicUsage(const uint8_t &v) {
-    return 0;
-}
-static inline size_t DynamicUsage(const int16_t &v) {
-    return 0;
-}
-static inline size_t DynamicUsage(const uint16_t &v) {
-    return 0;
-}
-static inline size_t DynamicUsage(const int32_t &v) {
-    return 0;
-}
-static inline size_t DynamicUsage(const uint32_t &v) {
-    return 0;
-}
-static inline size_t DynamicUsage(const int64_t &v) {
-    return 0;
-}
-static inline size_t DynamicUsage(const uint64_t &v) {
-    return 0;
-}
-static inline size_t DynamicUsage(const float &v) {
-    return 0;
-}
-static inline size_t DynamicUsage(const double &v) {
-    return 0;
-}
-template <typename X> static inline size_t DynamicUsage(X *const &v) {
-    return 0;
-}
-template <typename X> static inline size_t DynamicUsage(const X *const &v) {
+template<typename X>
+static inline size_t DynamicUsage(const X* const& /*v*/)
+{
     return 0;
 }
 
@@ -119,8 +103,9 @@ static inline size_t DynamicUsage(const std::set<X, Y> &s) {
     return MallocUsage(sizeof(stl_tree_node<X>)) * s.size();
 }
 
-template <typename X, typename Y>
-static inline size_t IncrementalDynamicUsage(const std::set<X, Y> &s) {
+template<typename X, typename Y>
+static inline size_t IncrementalDynamicUsage(const std::set<X, Y>&)
+{
     return MallocUsage(sizeof(stl_tree_node<X>));
 }
 
@@ -129,8 +114,9 @@ static inline size_t DynamicUsage(const std::map<X, Y, Z> &m) {
     return MallocUsage(sizeof(stl_tree_node<std::pair<const X, Y>>)) * m.size();
 }
 
-template <typename X, typename Y, typename Z>
-static inline size_t IncrementalDynamicUsage(const std::map<X, Y, Z> &m) {
+template<typename X, typename Y, typename Z>
+static inline size_t IncrementalDynamicUsage(const std::map<X, Y, Z>&)
+{
     return MallocUsage(sizeof(stl_tree_node<std::pair<const X, Y>>));
 }
 
@@ -142,9 +128,10 @@ static inline size_t DynamicUsage(const indirectmap<X, Y> &m) {
            m.size();
 }
 
-template <typename X, typename Y>
-static inline size_t IncrementalDynamicUsage(const indirectmap<X, Y> &m) {
-    return MallocUsage(sizeof(stl_tree_node<std::pair<const X *, Y>>));
+template<typename X, typename Y>
+static inline size_t IncrementalDynamicUsage(const indirectmap<X, Y>&)
+{
+    return MallocUsage(sizeof(stl_tree_node<std::pair<const X*, Y>>));
 }
 
 template <typename X>

@@ -37,28 +37,32 @@ public:
     virtual void UnregisterValidationInterface() = 0;
 
 protected:
-    virtual void UpdatedBlockTip(const CBlockIndex *pindexNew,
-                                 const CBlockIndex *pindexFork,
-                                 bool fInitialDownload) {}
-    virtual void TransactionAddedToMempool(const CTransactionRef &ptxn) {}
-    virtual void TransactionRemovedFromMempool(const uint256& txid,
-                                               MemPoolRemovalReason reason,
-                                               const CTransactionConflict& conflictedWith) {}
-    virtual void TransactionRemovedFromMempoolBlock(const uint256& txid, MemPoolRemovalReason reason) {}
-    virtual void TransactionAdded(const CTransactionRef& ptxn) {}
-    virtual void BlockConnected(const std::shared_ptr<const CBlock> &block,
-                   const CBlockIndex *pindex,
-                   const std::vector<CTransactionRef> &txnConflicted) {}
-    virtual void BlockConnected2(const CBlockIndex* pindex, const std::vector<CTransactionRef>& txnNew) {}
-    virtual void BlockDisconnected(const std::shared_ptr<const CBlock> &block) {}
-    virtual void SetBestChain(const CBlockLocator &locator) {}
-    virtual void Inventory(const uint256 &hash) {}
-    virtual void ResendWalletTransactions(int64_t nBestBlockTime, CConnman *connman) {}
-    virtual void BlockChecked(const CBlock &, const CValidationState &) {}
-    virtual void GetScriptForMining(std::shared_ptr<CReserveScript> &){};
-    virtual void NewPoWValidBlock(const CBlockIndex *pindex, const std::shared_ptr<const CBlock> &block){};
-    // This function is called only when there is an active ZMQ subscription of invalid transacion ("-zmqpubinvalidtx")
-    virtual void InvalidTxMessageZMQ(std::string_view message) {};
+    virtual void UpdatedBlockTip(const CBlockIndex* /*pindexNew*/,
+                                 const CBlockIndex* /*pindexFork*/,
+                                 bool /*fInitialDownload*/) {}
+    virtual void TransactionAddedToMempool(const CTransactionRef&) {}
+    virtual void TransactionRemovedFromMempool(const uint256& /*txid*/,
+                                               MemPoolRemovalReason,
+                                               const CTransactionConflict&) {}
+    virtual void TransactionRemovedFromMempoolBlock(const uint256& /*txid*/,
+                                                    MemPoolRemovalReason) {}
+    virtual void TransactionAdded(const CTransactionRef&) {}
+    virtual void BlockConnected(const std::shared_ptr<const CBlock>&,
+                                const CBlockIndex*,
+                                const std::vector<CTransactionRef>& /*txnConflicted*/) {}
+    virtual void BlockConnected2(const CBlockIndex*,
+                                 const std::vector<CTransactionRef>& /*txnNew*/) {}
+    virtual void BlockDisconnected(const std::shared_ptr<const CBlock>&) {}
+    virtual void SetBestChain(const CBlockLocator&) {}
+    virtual void Inventory(const uint256& /*hash*/) {}
+    virtual void ResendWalletTransactions(int64_t /*nBestBlockTime*/, CConnman*) {}
+    virtual void BlockChecked(const CBlock&, const CValidationState&) {}
+    virtual void GetScriptForMining(std::shared_ptr<CReserveScript>&) {};
+    virtual void NewPoWValidBlock(const CBlockIndex*,
+                                  const std::shared_ptr<const CBlock>&) {};
+    // This function is called only when there is an active ZMQ subscription of invalid
+    // transacion ("-zmqpubinvalidtx")
+    virtual void InvalidTxMessageZMQ(std::string_view /*message*/) {};
 
     friend void ::UnregisterAllValidationInterfaces();
 };

@@ -7,8 +7,9 @@
 #include "block_hasher.h"
 #include "validation.h"
 #include "merkletree.h"
-#include "fs.h"
 #include "merkletreedb.h"
+#include "cfile_util.h"
+
 #include <queue>
 
 typedef std::unordered_map<uint256, MerkleTreeDiskPosition, BlockHasher> MerkleTreeDiskPositionMap;
@@ -84,7 +85,8 @@ private:
      * Returns handle to a file with specified number suffix at byte offset
      * Returns nullptr in case of issues
      */
-    FILE* OpenMerkleTreeFile(const MerkleTreeDiskPosition& merkleTreeDiskPosition, bool fReadOnly = false) const;
+    UniqueCFile OpenMerkleTreeFile(const MerkleTreeDiskPosition&,
+                                   bool fReadOnly = false) const;
 
     /*
      * Removes all data file's disk positions for the removed file specified by fileInfoToRemove
@@ -214,7 +216,7 @@ private:
      * -maxmerkletreememcachesize. If cache size limitation is reached,
      * Merkle Trees that were added first are removed (FIFO).
      */
-    void Insert(const uint256& blockHash, CMerkleTreeRef merkleTree, const Config& config);
+    void Insert(const uint256& blockHash, const CMerkleTreeRef& merkleTree, const Config& config);
 };
 
 /** Access to global Merkle Tree factory */

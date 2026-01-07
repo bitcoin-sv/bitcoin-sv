@@ -5,7 +5,8 @@
 #include "ui_interface.h"
 #include "util.h"
 
-CClientUIInterface uiInterface;
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+CClientUIInterface uiInterface; // NOLINT(cert-err58-cpp)
 
 bool InitError(const std::string &str) {
     uiInterface.ThreadSafeMessageBox(str, "", CClientUIInterface::MSG_ERROR);

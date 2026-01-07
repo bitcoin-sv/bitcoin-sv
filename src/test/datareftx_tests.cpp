@@ -83,8 +83,8 @@ namespace
 
 std::ostream& operator<<(std::ostream& str, const DataRefTx& msg)
 {
-    str << "TxnId: " << msg.GetTxn()->GetId().ToString() << std::endl;
-    str << "MerkleProof: " << msg.GetProof().ToJSON().write() << std::endl;
+    str << "TxnId: " << msg.GetTxn()->GetId().ToString() << '\n'; 
+    str << "MerkleProof: " << msg.GetProof().ToJSON().write() << '\n'; 
     return str;
 }
 

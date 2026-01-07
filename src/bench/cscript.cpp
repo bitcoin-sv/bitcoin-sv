@@ -3,6 +3,7 @@
 // LICENSE.
 
 #include "bench.h"
+#include "protocol_era.h"
 #include "test/script_macros.h"
 
 #include "script/script.h"
@@ -25,7 +26,7 @@ static void cscript_GetSigOpCount(benchmark::State& state)
     bool b{};
     while(state.KeepRunning())
     {
-        script.GetSigOpCount(true, true, b);
+        script.GetSigOpCount(true, ProtocolEra::PostGenesis, b);
     }
 }
 BENCHMARK(cscript_GetSigOpCount);
@@ -37,10 +38,9 @@ static void cscript_GetSigOpCount_p2sh_multisig_locking_20(benchmark::State& sta
     bool error{false};
     std::vector<uint8_t> ip{OP_PUSHDATA2, 0xac, 0x2, MULTISIG_LOCKING_20}; 
     const CScript redeem_script{begin(ip), end(ip)};
-    constexpr bool genesis_enabled{false};
     while(state.KeepRunning())
     {
-        p2sh_script.GetSigOpCount(redeem_script, genesis_enabled, error);
+        p2sh_script.GetSigOpCount(redeem_script, ProtocolEra::PreGenesis, error);
     }
 }
 

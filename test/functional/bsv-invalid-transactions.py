@@ -8,7 +8,7 @@ import socket
 from test_framework.blocktools import create_block, create_coinbase
 from test_framework.key import CECKey
 from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block
-from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
+from test_framework.script import CScript, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_mempool_equals
 
@@ -17,13 +17,15 @@ _lan_ip = None
 
 def get_lan_ip():
     global _lan_ip
-    if _lan_ip: return _lan_ip
+    if _lan_ip:
+        return _lan_ip
+
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         # doesn't even have to be reachable
         s.connect(('10.255.255.255', 1))
         _lan_ip = s.getsockname()[0]
-    except:
+    except Exception:
         _lan_ip = '127.0.0.1'
     finally:
         s.close()
@@ -61,13 +63,13 @@ def create_parent_tx(tx_to_spend, key_for_tx_to_spend, n_outputs, invalidity=Non
     for i in range(n_outputs):
         k = CECKey()
         keys.append(k)
-        k.set_secretbytes(b"x" * (i+1))
+        k.set_secretbytes(b"x" * (i + 1))
         tx.vout.append(CTxOut(amount_per_output, CScript([k.get_pubkey(), OP_CHECKSIG])))
 
     if invalidity == "bad_signature":
         sighash = b"\xff" * 32
     else:
-        sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
+        sighash = SignatureHash(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
 
     tx.vin[0].scriptSig = CScript([key_for_tx_to_spend.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
@@ -88,18 +90,18 @@ def create_children_txs(parent_tx1, keys1, parent_tx2, keys2, invalidity=None):
         tx.vin.append(CTxIn(COutPoint(parent_tx2.sha256, n), b"", 0xffffffff))
 
         k = CECKey()
-        k.set_secretbytes(b"x" * (n+1))
+        k.set_secretbytes(b"x" * (n + 1))
         tx.vout.append(CTxOut(amount, CScript([k.get_pubkey(), OP_CHECKSIG])))
         tx.calc_sha256()
 
-        sighash1 = SignatureHashForkId(parent_tx1.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, parent_tx1.vout[n].nValue)
+        sighash1 = SignatureHash(parent_tx1.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, parent_tx1.vout[n].nValue)
         tx.vin[0].scriptSig = CScript([key1.sign(sighash1) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
         if invalidity == "bad_signature":
             sighash2 = b"\xff" * 32
         else:
-            sighash2 = SignatureHashForkId(parent_tx2.vout[n].scriptPubKey, tx, 1, SIGHASH_ALL | SIGHASH_FORKID,
-                                           parent_tx2.vout[n].nValue)
+            sighash2 = SignatureHash(parent_tx2.vout[n].scriptPubKey, tx, 1, SIGHASH_ALL | SIGHASH_FORKID,
+                                     parent_tx2.vout[n].nValue)
 
         tx.vin[1].scriptSig = CScript([key2.sign(sighash2) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
@@ -195,7 +197,7 @@ class InvalidTx(BitcoinTestFramework):
             sleep(1) #give time to relay
             assert len(relayed_txs) == 0, "No transaction should be relayed."
 
-        with self.run_node_with_connections("Scenario 2: Low fee, whitelisted peer", 0, [f'-whitelist={get_lan_ip()}','-mindebugrejectionfee=0.0000025'],
+        with self.run_node_with_connections("Scenario 2: Low fee, whitelisted peer", 0, [f'-whitelist={get_lan_ip()}', '-mindebugrejectionfee=0.0000025'],
                                             number_of_connections=2, ip=get_lan_ip()) as (sending_conn, receiving_conn):
 
             low_fee_tx, rejected_txs, relayed_txs = self.prepare_invalid_tx(sending_conn, receiving_conn, "low_fee")
@@ -205,7 +207,7 @@ class InvalidTx(BitcoinTestFramework):
             self.check_rejected(rejected_txs, [low_fee_tx]) # tx is rejected, but
             self.check_relayed(relayed_txs, [low_fee_tx])   # it is relayed as we are whitelisted
 
-        with self.run_node_with_connections("Scenario 3: Bad signature, big banscore", 0, ['-banscore=10000000','-mindebugrejectionfee=0.0000025'],
+        with self.run_node_with_connections("Scenario 3: Bad signature, big banscore", 0, ['-banscore=10000000', '-mindebugrejectionfee=0.0000025'],
                                             number_of_connections=2, ip=get_lan_ip()) as (sending_conn, receiving_conn):
             tx, rejected_txs, relayed_txs = self.prepare_invalid_tx(sending_conn, receiving_conn, "bad_signature")
 
@@ -216,7 +218,7 @@ class InvalidTx(BitcoinTestFramework):
             assert len(relayed_txs) == 0, "No tx should be relayed."
             assert sending_conn.connected, "Should not be banned."
 
-        with self.run_node_with_connections("Scenario 4: Bad signature, small banscore", 0, ['-banscore=1','-mindebugrejectionfee=0.0000025'],
+        with self.run_node_with_connections("Scenario 4: Bad signature, small banscore", 0, ['-banscore=1', '-mindebugrejectionfee=0.0000025'],
                                             number_of_connections=2, ip=get_lan_ip()) as (sending_conn, receiving_conn):
             tx, rejected_txs, relayed_txs = self.prepare_invalid_tx(sending_conn, receiving_conn, "bad_signature")
 
@@ -311,7 +313,7 @@ class InvalidTx(BitcoinTestFramework):
 
         # the banscore is set to 101 because rejection of the tx with invalid signature brings 100 points,
         # we don't want to be banned as result of only one tx
-        with self.run_node_with_connections("Scenario 4: bad signature parent", 0, ['-banscore=101','-mindebugrejectionfee=0.0000025'],
+        with self.run_node_with_connections("Scenario 4: bad signature parent", 0, ['-banscore=101', '-mindebugrejectionfee=0.0000025'],
                                             number_of_connections=1, ip=get_lan_ip()) as (conn,):
 
             valid_parent_tx, invalid_parent_tx, orphans, rejected_txs = self.prepare_parents_and_children(conn,

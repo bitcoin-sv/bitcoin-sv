@@ -31,6 +31,7 @@
 #include "validationinterface.h"
 #include "invalid_txn_publisher.h"
 #include "rpc/http_protocol.h"
+#include <primitives/block.h>
 #include <univalue.h>
 #include <cstdint>
 #include <memory>
@@ -110,8 +111,8 @@ static UniValue GetNetworkHashPS(int lookup, int32_t height) {
     return workDiff.getdouble() / timeDiff;
 }
 
-static UniValue getnetworkhashps(const Config &config,
-                                 const JSONRPCRequest &request) {
+static UniValue getnetworkhashps(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp || request.params.size() > 2) {
         throw std::runtime_error(
             "getnetworkhashps ( nblocks height )\n"
@@ -304,8 +305,8 @@ static UniValue getmininginfo(const Config &config,
 
 // NOTE: Unlike wallet RPC (which use BSV values), mining RPCs follow GBT (BIP
 // 22) in using satoshi amounts
-static UniValue prioritisetransaction(const Config &config,
-                                      const JSONRPCRequest &request) {
+static UniValue prioritisetransaction(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp || request.params.size() != 3) {
         throw std::runtime_error(
             "prioritisetransaction <txid> <priority delta> <fee delta>\n"
@@ -340,8 +341,8 @@ static UniValue prioritisetransaction(const Config &config,
 
 // NOTE: Assumes a conclusive result; if result is inconclusive, it must be
 // handled by caller
-static UniValue BIP22ValidationResult(const Config &config,
-                                      const CValidationState &state) {
+static UniValue BIP22ValidationResult(const Config&, const CValidationState& state)
+{
     if (state.IsValid()) {
         return NullUniValue;
     }
@@ -481,7 +482,7 @@ void getblocktemplate(const Config& config,
     std::set<std::string> setClientRules;
     if (request.params.size() > 0) {
         const UniValue &oparam = request.params[0].get_obj();
-        const UniValue &modeval = find_value(oparam, "mode");
+        const UniValue modeval = find_value(oparam, "mode");
         if (modeval.isStr()) {
             strMode = modeval.get_str();
         } else if (modeval.isNull()) {
@@ -492,7 +493,7 @@ void getblocktemplate(const Config& config,
         lpval = find_value(oparam, "longpollid");
 
         if (strMode == "proposal") {
-            const UniValue &dataval = find_value(oparam, "data");
+            const UniValue dataval = find_value(oparam, "data");
             if (!dataval.isStr()) {
                 throw JSONRPCError(RPC_TYPE_ERROR,
                                    "Missing data String key for proposal");
@@ -896,9 +897,9 @@ static UniValue verifyblockcandidate(const Config &config,
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
     }
 
-    auto verifyBlock = [](const Config& config , const std::shared_ptr<CBlock>& blockptr)
+    auto verifyBlock = [](const Config& cfg, const std::shared_ptr<CBlock>& sp_block)
     {
-        return VerifyNewBlock(config, blockptr);
+        return VerifyNewBlock(cfg, *sp_block);
     };
     return processBlock(config, blockptr, verifyBlock);
 }
@@ -934,30 +935,32 @@ static UniValue submitblock(const Config &config,
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
     }
 
-    auto submitBlock = [](const Config& config , const std::shared_ptr<CBlock>& blockptr)
+    auto submitBlock = [](const Config& cfg , const std::shared_ptr<CBlock>& sp_block)
     {
-        CScopedBlockOriginRegistry reg(blockptr->GetHash(), "submitblock");
-        return ProcessNewBlock(config, blockptr, true, nullptr, CBlockSource::MakeRPC());
+        CScopedBlockOriginRegistry reg(sp_block->GetHash(), "submitblock");
+        return ProcessNewBlock(cfg, sp_block, true, nullptr, CBlockSource::MakeRPC());
     };
     return processBlock(config, blockptr, submitBlock);
 }
 
-// clang-format off
-static const CRPCCommand commands[] = {
-    //  category   name                     actor (function)       okSafeMode
-    //  ---------- ------------------------ ---------------------- ----------
-    {"mining",     "getnetworkhashps",      getnetworkhashps,      true, {"nblocks", "height"}},
-    {"mining",     "getmininginfo",         getmininginfo,         true, {}},
-    {"mining",     "prioritisetransaction", prioritisetransaction, true, {"txid", "priority_delta", "fee_delta"}},
-    {"mining",     "getblocktemplate",      getblocktemplate,      true, {"template_request"}},
-    {"mining",     "verifyblockcandidate",  verifyblockcandidate,  true, {"hexdata", "parameters"}},
-    {"mining",     "submitblock",           submitblock,           true, {"hexdata", "parameters"}},
+void RegisterMiningRPCCommands(CRPCTable& t)
+{
+    // clang-format off
+    static const CRPCCommand commands[] = {
+        //  category   name                     actor (function)       okSafeMode
+        //  ---------- ------------------------ ---------------------- ----------
+        {"mining",     "getnetworkhashps",      getnetworkhashps,      true, {"nblocks", "height"}},
+        {"mining",     "getmininginfo",         getmininginfo,         true, {}},
+        {"mining",     "prioritisetransaction", prioritisetransaction, true, {"txid", "priority_delta", "fee_delta"}},
+        {"mining",     "getblocktemplate",      getblocktemplate,      true, {"template_request"}},
+        {"mining",     "verifyblockcandidate",  verifyblockcandidate,  true, {"hexdata", "parameters"}},
+        {"mining",     "submitblock",           submitblock,           true, {"hexdata", "parameters"}},
 
-    {"generating", "generatetoaddress",     generatetoaddress,     true, {"nblocks", "address", "maxtries"}},
-};
-// clang-format on
+        {"generating", "generatetoaddress",     generatetoaddress,     true, {"nblocks", "address", "maxtries"}},
+    };
+    // clang-format on
 
-void RegisterMiningRPCCommands(CRPCTable &t) {
     for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
         t.appendCommand(commands[vcidx].name, &commands[vcidx]);
 }
+

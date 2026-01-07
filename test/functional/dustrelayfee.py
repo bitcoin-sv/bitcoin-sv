@@ -24,7 +24,7 @@ def create_zero_fee_tx_funded_from(node, tx_id, small_value):
             n = vout['n']
             break
 
-    assert(n > -1)
+    assert (n > -1)
 
     inputs = [{'txid': tx_id, 'vout': n}]
     small_value = float(small_value)
@@ -56,14 +56,14 @@ class DustRelayFeeTest(BitcoinTestFramework):
             "-acceptnonstdtxn=0"])
 
         dust_threshold_sats = 1
-        amount_is_not_dust = Decimal(dust_threshold_sats)/COIN
+        amount_is_not_dust = Decimal(dust_threshold_sats) / COIN
         amount_is_dust = Decimal(0.0)
 
         # Test: Wallet will allow sending amount which meets dust threshold
         addr = node.getnewaddress()
         addr2 = node.getnewaddress()
         txid = node.sendtoaddress(addr, amount_is_not_dust)
-        assert(txid in node.getrawmempool())
+        assert (txid in node.getrawmempool())
 
         tx_id = node.sendtoaddress(addr, 1.0)
 
@@ -88,7 +88,7 @@ class DustRelayFeeTest(BitcoinTestFramework):
         tx_hex = node.signrawtransaction(raw_tx)["hex"]
         txid = node.decoderawtransaction(tx_hex)["txid"]
         assert_raises_rpc_error(-26, "64: dust", node.sendrawtransaction, tx_hex)
-        assert(txid not in node.getrawmempool())
+        assert (txid not in node.getrawmempool())
 
         # Test: update output value so it meets dust threshold and tx is accepted
         outputs[addr] = amount_is_not_dust
@@ -96,7 +96,7 @@ class DustRelayFeeTest(BitcoinTestFramework):
         raw_tx = node.createrawtransaction(inputs, outputs)
         tx_hex = node.signrawtransaction(raw_tx)["hex"]
         txid = node.sendrawtransaction(tx_hex)
-        assert(txid in node.getrawmempool())
+        assert (txid in node.getrawmempool())
 
     def run_test(self):
         self.nodes[0].generate(120)

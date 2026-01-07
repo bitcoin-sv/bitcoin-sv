@@ -4,6 +4,7 @@
 #include "processing_block_index.h"
 
 #include "config.h"
+#include "protocol_era.h"
 
 DisconnectResult ProcessingBlockIndex::ApplyBlockUndo(const CBlockUndo &blockUndo,
                                 const CBlock &block,
@@ -33,7 +34,7 @@ DisconnectResult ProcessingBlockIndex::ApplyBlockUndo(const CBlockUndo &blockUnd
         // Check that all outputs are available and match the outputs in the
         // block itself exactly.
         for (size_t o = 0; o < tx.vout.size(); o++) {
-            if (tx.vout[o].scriptPubKey.IsUnspendable(IsGenesisEnabled(config, mIndex.GetHeight()))) {
+            if (tx.vout[o].scriptPubKey.IsUnspendable(GetProtocolEra(config.GetConfigScriptPolicy(), mIndex.GetHeight()))) {
                 continue;
             }
 

@@ -7,6 +7,7 @@
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
+#include <crypto/sha256.h>
 
 namespace
 {
@@ -30,9 +31,14 @@ namespace
             assert(encodedRevocationMessage.size() == 33);
 
             // Hash revocation message
-            uint8_t hashRevocationMessageBytes[CSHA256::OUTPUT_SIZE] {};
-            CSHA256().Write(reinterpret_cast<const uint8_t*>(encodedRevocationMessage.data()), encodedRevocationMessage.size()).Finalize(hashRevocationMessageBytes);
-            const uint256 hashRevocationMessage { std::vector<uint8_t> {std::begin(hashRevocationMessageBytes), std::end(hashRevocationMessageBytes)} };
+            std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashRevocationMessageBytes{};
+            CSHA256()
+                .Write(reinterpret_cast<const uint8_t*>(encodedRevocationMessage.data()),
+                       encodedRevocationMessage.size())
+                .Finalize(hashRevocationMessageBytes);
+            const uint256 hashRevocationMessage{
+                std::vector<uint8_t>{std::begin(hashRevocationMessageBytes),
+                                     std::end(hashRevocationMessageBytes)}};
 
             // Create signatures over hash of revocation message
             std::vector<uint8_t> sig1 {};
@@ -134,19 +140,14 @@ BOOST_AUTO_TEST_CASE(key_construction)
 // Serialisation/deserialisation
 BOOST_AUTO_TEST_CASE(serialisation)
 {
-    auto Check = [](bool makeWithSig) {
-        // Create revokemid msg
-        RevokeMid msg { MakeRevokeMid() };
+    // Create revokemid msg
+    RevokeMid msg { MakeRevokeMid() };
 
-        CDataStream ss { SER_NETWORK, 0 };
-        ss << msg;
-        RevokeMid deserialised {};
-        ss >> deserialised;
-        BOOST_CHECK_EQUAL(msg, deserialised);
-    };
-
-    Check(false);
-    Check(true);
+    CDataStream ss { SER_NETWORK, 0 };
+    ss << msg;
+    RevokeMid deserialised {};
+    ss >> deserialised;
+    BOOST_CHECK_EQUAL(msg, deserialised);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

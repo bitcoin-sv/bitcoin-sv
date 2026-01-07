@@ -4,12 +4,11 @@
 from time import sleep
 
 from test_framework.blocktools import create_block, create_coinbase
-from test_framework.cdefs import DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
 from test_framework.key import CECKey
 from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block, \
     msg_headers
 from test_framework.script import CScript, OP_DROP, OP_CHECKSIG, SIGHASH_ALL, SIGHASH_FORKID, \
-    SignatureHashForkId, OP_MUL
+    SignatureHash, OP_MUL
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_mempool_equals
 
@@ -78,11 +77,11 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
         tx = CTransaction()
         total_input = 0
         for parent_tx, n in outpoints:
-            tx.vin.append(CTxIn(COutPoint(parent_tx.sha256, n), CScript([b"0"*72]), 0xffffffff))
+            tx.vin.append(CTxIn(COutPoint(parent_tx.sha256, n), CScript([b"0" * 72]), 0xffffffff))
             total_input += parent_tx.vout[n].nValue
 
         for _ in range(noutput):
-            tx.vout.append(CTxOut(total_input//noutput, CScript(pre_script + [self.public_key, OP_CHECKSIG])))
+            tx.vout.append(CTxOut(total_input // noutput, CScript(pre_script + [self.public_key, OP_CHECKSIG])))
 
         tx.rehash()
 
@@ -92,9 +91,9 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
         for output in tx.vout:
             output.nValue -= fee_per_output
 
-        for input,(parent_tx, n) in zip(tx.vin, outpoints):
-            sighash = SignatureHashForkId(parent_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
-                                          parent_tx.vout[n].nValue)
+        for input, (parent_tx, n) in zip(tx.vin, outpoints):
+            sighash = SignatureHash(parent_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
+                                    parent_tx.vout[n].nValue)
             input.scriptSig = CScript([self.private_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
         tx.rehash()
@@ -166,12 +165,12 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
 
             # create all blocks needed for this test
             block_a1 = self.make_block(a1_txs, root_hash, root_height, root_time)
-            block_b1 = self.make_block(long_eval_txs[0*TX_COUNT: 1*TX_COUNT], root_hash, root_height, root_time)
-            block_b2 = self.make_block(long_eval_txs[1*TX_COUNT: 2*TX_COUNT], block_b1.hash, root_height+1, root_time+100)
-            block_c1 = self.make_block(long_eval_txs[2*TX_COUNT: 3*TX_COUNT], root_hash, root_height, root_time)
-            block_c2 = self.make_block(long_eval_txs[3*TX_COUNT: 4*TX_COUNT], block_c1.hash, root_height+1, root_time+101)
-            block_d1 = self.make_block(long_eval_txs[4*TX_COUNT: 5*TX_COUNT], root_hash, root_height, root_time)
-            block_d2 = self.make_block(long_eval_txs[5*TX_COUNT: 6*TX_COUNT], block_d1.hash, root_height+1, root_time+102)
+            block_b1 = self.make_block(long_eval_txs[0 * TX_COUNT: 1 * TX_COUNT], root_hash, root_height, root_time)
+            block_b2 = self.make_block(long_eval_txs[1 * TX_COUNT: 2 * TX_COUNT], block_b1.hash, root_height + 1, root_time + 100)
+            block_c1 = self.make_block(long_eval_txs[2 * TX_COUNT: 3 * TX_COUNT], root_hash, root_height, root_time)
+            block_c2 = self.make_block(long_eval_txs[3 * TX_COUNT: 4 * TX_COUNT], block_c1.hash, root_height + 1, root_time + 101)
+            block_d1 = self.make_block(long_eval_txs[4 * TX_COUNT: 5 * TX_COUNT], root_hash, root_height, root_time)
+            block_d2 = self.make_block(long_eval_txs[5 * TX_COUNT: 6 * TX_COUNT], block_d1.hash, root_height + 1, root_time + 102)
 
             conn.send_message(msg_block(block_a1))
             wait_until(lambda: conn.rpc.getbestblockhash() == block_a1.hash, check_interval=0.3)
@@ -188,7 +187,7 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
                                              '-genesisactivationheight=1',
                                              '-maxstackmemoryusageconsensus=2GB',
                                              "-maxscriptsizepolicy=2GB",
-                                             "-acceptnonstdoutputs=1",],
+                                             "-acceptnonstdoutputs=1", ],
                                             number_of_connections=1) as (conn,):
 
             # send all transactions form block a1 at once and flood the PTV
@@ -231,7 +230,7 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
                                              '-genesisactivationheight=1',
                                              '-maxstackmemoryusageconsensus=2GB',
                                              "-maxscriptsizepolicy=2GB",
-                                             "-acceptnonstdoutputs=1",],
+                                             "-acceptnonstdoutputs=1", ],
                                             number_of_connections=1) as (conn,):
 
             # see if everything is still as expected
@@ -278,7 +277,7 @@ class MemepoolAcceptingTransactionsDuringReorg(BitcoinTestFramework):
                                              '-genesisactivationheight=1',
                                              '-maxstackmemoryusageconsensus=2GB',
                                              "-maxscriptsizepolicy=2GB",
-                                             "-acceptnonstdoutputs=1",],
+                                             "-acceptnonstdoutputs=1", ],
                                             number_of_connections=1) as (conn,):
 
             # see if everything is still as expected

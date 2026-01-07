@@ -20,13 +20,13 @@
 # 14. Invalidate block on height 104. tx5 and tx6 are in mempool.
 # 15. Invalidate block on height 103. tx5 and tx6 are deleted from mempool.
 
+from test_framework.blocktools import create_transaction, create_block, \
+    create_coinbase, prepare_init_chain
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.script import *
-from test_framework.blocktools import create_transaction, create_block, create_coinbase, prepare_init_chain
-from test_framework.util import assert_equal, hashToHex, wait_until
-from test_framework.comptool import TestInstance
+from test_framework.script import CScript, OP_0, OP_1, OP_2, OP_2MUL, \
+    OP_ELSE, OP_ENDIF, OP_IF, OP_TRUE
 from test_framework.mininode import msg_tx, msg_block, mininode_lock
-from time import sleep
+from test_framework.util import assert_equal, hashToHex, wait_until
 
 
 def add_tx_to_block(block, txs):
@@ -93,7 +93,7 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
 
         # Now send tx1 and tx2 again, but this time in block. Block should be rejected.
         block = create_block(int("0x" + node.getbestblockhash(), 16), create_coinbase(height=1, outputValue=25))
-        add_tx_to_block(block, [tx1,tx2])
+        add_tx_to_block(block, [tx1, tx2])
 
         rejected_blocks = []
         rejected_txs = []
@@ -101,7 +101,7 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         def on_reject(conn, msg):
             if (msg.message == b'block'):
                 rejected_blocks.append(msg)
-                assert(msg.reason.startswith(b'blk-bad-inputs'))
+                assert (msg.reason.startswith(b'blk-bad-inputs'))
 
             if msg.message == b'tx':
                 rejected_txs.append(msg)

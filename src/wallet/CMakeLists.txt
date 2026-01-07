@@ -1,7 +1,5 @@
 # Copyright (c) 2017 The Bitcoin developers
 
-project(wallet)
-
 # Add Berkeley DB dependency.
 find_package(BerkeleyDB REQUIRED)
 
@@ -18,6 +16,8 @@ add_library(wallet
 	wallet.cpp
 	walletdb.cpp
 )
+
+enable_coverage(wallet)
 
 target_link_libraries(wallet util univalue ${BDBXX_LIBRARY} ${EVENT_LIBRARY})
 

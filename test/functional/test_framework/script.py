@@ -20,9 +20,11 @@ bord = ord
 if sys.version > '3':
     long = int
 
-    def bchr(x): return bytes([x])
+    def bchr(x): # noqa: F811
+        return bytes([x])
 
-    def bord(x): return x
+    def bord(x): # noqa: F811
+        return x
 
 MAX_SCRIPT_SIZE = 10000
 MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS = 520
@@ -232,11 +234,11 @@ OP_CHECKMULTISIGVERIFY = CScriptOp(0xaf)
 OP_NOP1 = CScriptOp(0xb0)
 OP_CHECKLOCKTIMEVERIFY = CScriptOp(0xb1)
 OP_CHECKSEQUENCEVERIFY = CScriptOp(0xb2)
-OP_NOP4 = CScriptOp(0xb3)
-OP_NOP5 = CScriptOp(0xb4)
-OP_NOP6 = CScriptOp(0xb5)
-OP_NOP7 = CScriptOp(0xb6)
-OP_NOP8 = CScriptOp(0xb7)
+OP_SUBSTR = CScriptOp(0xb3)
+OP_LEFT = CScriptOp(0xb4)
+OP_RIGHT = CScriptOp(0xb5)
+OP_LSHIFTNUM = CScriptOp(0xb6)
+OP_RSHIFTNUM = CScriptOp(0xb7)
 OP_NOP9 = CScriptOp(0xb8)
 OP_NOP10 = CScriptOp(0xb9)
 
@@ -359,11 +361,11 @@ VALID_OPCODES = {
     OP_NOP1,
     OP_CHECKLOCKTIMEVERIFY,
     OP_CHECKSEQUENCEVERIFY,
-    OP_NOP4,
-    OP_NOP5,
-    OP_NOP6,
-    OP_NOP7,
-    OP_NOP8,
+    OP_SUBSTR,
+    OP_LEFT,
+    OP_RIGHT,
+    OP_LSHIFTNUM,
+    OP_RSHIFTNUM,
     OP_NOP9,
     OP_NOP10,
 
@@ -478,11 +480,11 @@ OPCODE_NAMES.update({
     OP_NOP1: 'OP_NOP1',
     OP_CHECKLOCKTIMEVERIFY: 'OP_CHECKLOCKTIMEVERIFY',
     OP_CHECKSEQUENCEVERIFY: 'OP_CHECKSEQUENCEVERIFY',
-    OP_NOP4: 'OP_NOP4',
-    OP_NOP5: 'OP_NOP5',
-    OP_NOP6: 'OP_NOP6',
-    OP_NOP7: 'OP_NOP7',
-    OP_NOP8: 'OP_NOP8',
+    OP_SUBSTR: 'OP_SUBSTR',
+    OP_LEFT: 'OP_LEFT',
+    OP_RIGHT: 'OP_RIGHT',
+    OP_LSHIFTNUM: 'OP_LSHIFTNUM',
+    OP_RSHIFTNUM: 'OP_RSHIFTNUM',
     OP_NOP9: 'OP_NOP9',
     OP_NOP10: 'OP_NOP10',
     OP_SMALLINTEGER: 'OP_SMALLINTEGER',
@@ -597,11 +599,11 @@ OPCODES_BY_NAME = {
     'OP_NOP1': OP_NOP1,
     'OP_CHECKLOCKTIMEVERIFY': OP_CHECKLOCKTIMEVERIFY,
     'OP_CHECKSEQUENCEVERIFY': OP_CHECKSEQUENCEVERIFY,
-    'OP_NOP4': OP_NOP4,
-    'OP_NOP5': OP_NOP5,
-    'OP_NOP6': OP_NOP6,
-    'OP_NOP7': OP_NOP7,
-    'OP_NOP8': OP_NOP8,
+    'OP_SUBSTR': OP_SUBSTR,
+    'OP_LEFT': OP_LEFT,
+    'OP_RIGHT': OP_RIGHT,
+    'OP_LSHIFTNUM': OP_LSHIFTNUM,
+    'OP_RSHIFTNUM': OP_RSHIFTNUM,
     'OP_NOP9': OP_NOP9,
     'OP_NOP10': OP_NOP10,
     'OP_SMALLINTEGER': OP_SMALLINTEGER,
@@ -839,6 +841,7 @@ class CScript(bytes):
 SIGHASH_ALL = 1
 SIGHASH_NONE = 2
 SIGHASH_SINGLE = 3
+SIGHASH_CHRONICLE = 0x20
 SIGHASH_FORKID = 0x40
 SIGHASH_ANYONECANPAY = 0x80
 
@@ -861,7 +864,7 @@ def FindAndDelete(script, sig):
     return CScript(r)
 
 
-def SignatureHash(script, txTo, inIdx, hashtype):
+def SignatureHash_OTDA(script, txTo, inIdx, hashtype):
     """Consensus-correct SignatureHash
 
     Returns (hash, err) to precisely match the consensus-critical behavior of
@@ -908,17 +911,15 @@ def SignatureHash(script, txTo, inIdx, hashtype):
     s = txtmp.serialize()
     s += struct.pack(b"<I", hashtype)
 
-    hash = hash256(s)
+    return hash256(s)
 
-    return (hash, None)
 
 # TODO: Allow cached hashPrevouts/hashSequence/hashOutputs to be provided.
 # Performance optimization probably not necessary for python tests, however.
 # Note that this corresponds to sigversion == 1 in EvalScript, which is used
 # for version 0 witnesses.
 
-
-def SignatureHashForkId(script, txTo, inIdx, hashtype, amount):
+def SignatureHash_NTDA(script, txTo, inIdx, hashtype, amount):
 
     hashPrevouts = 0
     hashSequence = 0
@@ -958,3 +959,13 @@ def SignatureHashForkId(script, txTo, inIdx, hashtype, amount):
     ss += struct.pack("<I", hashtype)
 
     return hash256(ss)
+
+
+def SignatureHash(script, txTo, inIdx, hashtype, amount=None):
+    use_forkid_tda = (hashtype & SIGHASH_FORKID) and not (hashtype & SIGHASH_CHRONICLE)
+    if use_forkid_tda:
+        if amount is None:
+            raise ValueError("Amount must be provided for NTDA signature hash")
+        return SignatureHash_NTDA(script, txTo, inIdx, hashtype, amount)
+    else:
+        return SignatureHash_OTDA(script, txTo, inIdx, hashtype)

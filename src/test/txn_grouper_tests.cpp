@@ -7,6 +7,8 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <ranges>
+
 namespace
 {
     // Random TxId
@@ -16,7 +18,7 @@ namespace
     }
     
     // Make random transaction
-    CTransactionRef CreateRandomTransaction(std::vector<COutPoint> spends)
+    CTransactionRef CreateSharedRandomTransaction(std::vector<COutPoint> spends)
     {
         static uint32_t sequence {0};
         CMutableTransaction txn {};
@@ -51,28 +53,16 @@ namespace
 
     bool CheckTxnOrdering(const std::vector<TxnGrouper::UPtrTxnGroup>& groups)
     {
-        for(const auto& group : groups)
-        {
-            ssize_t lastIndex {-1};
-            for(const auto& txn : *group)
-            {
-                if(static_cast<ssize_t>(txn.mIndex) <= lastIndex)
-                {
-                    return false;
-                }
-                lastIndex = txn.mIndex;
-            }
-        }
-
-        return true;
+        return std::ranges::all_of(groups,
+            [](const auto& group) { return std::ranges::is_sorted(*group); });
     }
-
-    struct RandomContextFixture {
-        RandomContextFixture() {
-            ResetGlobalRandomContext();
-        }
-    };
 }
+
+struct RandomContextFixture {
+    RandomContextFixture() {
+        ResetGlobalRandomContext();
+    }
+};
 
 BOOST_FIXTURE_TEST_SUITE(txn_grouper, RandomContextFixture)
 
@@ -95,11 +85,12 @@ BOOST_AUTO_TEST_CASE(empty)
 // Simple case where no transactions share any dependencies
 BOOST_AUTO_TEST_CASE(independent_groups)
 {
-    std::vector<CTransactionRef> vtx {};
     constexpr size_t NumTxns {10};
+    std::vector<CTransactionRef> vtx{};
+    vtx.reserve(NumTxns);
     for(size_t i = 0; i < NumTxns; ++i)
     {
-        vtx.push_back(CreateRandomTransaction({}));
+        vtx.push_back(CreateSharedRandomTransaction({}));
     }
 
     {
@@ -141,19 +132,20 @@ BOOST_AUTO_TEST_CASE(independent_groups)
 // Some transactions share a single dependency
 BOOST_AUTO_TEST_CASE(single_dependency)
 {
-    std::vector<CTransactionRef> vtx {};
     constexpr size_t NumBaseTxns {10};
+    std::vector<CTransactionRef> vtx{};
+    vtx.reserve(NumBaseTxns);
     for(size_t i = 0; i < NumBaseTxns; ++i)
     {
-        vtx.push_back(CreateRandomTransaction({}));
+        vtx.push_back(CreateSharedRandomTransaction({}));
     }
 
     // Txn that spends a previous output
-    vtx.push_back(CreateRandomTransaction({vtx[0]->vin[0].prevout}));
+    vtx.push_back(CreateSharedRandomTransaction({vtx[0]->vin[0].prevout}));
     // Txn that spends multiple outputs from the same previous txn
-    vtx.push_back(CreateRandomTransaction({ {vtx[1]->vin[0].prevout.GetTxId(), 0}, {vtx[1]->vin[0].prevout.GetTxId(), 1} }));
+    vtx.push_back(CreateSharedRandomTransaction({ {vtx[1]->vin[0].prevout.GetTxId(), 0}, {vtx[1]->vin[0].prevout.GetTxId(), 1} }));
     // Txn that spends a previous output plus a new output we don't currently know about
-    vtx.push_back(CreateRandomTransaction({ {vtx[2]->vin[0].prevout}, {GetRandTxId(), 0} }));
+    vtx.push_back(CreateSharedRandomTransaction({ {vtx[2]->vin[0].prevout}, {GetRandTxId(), 0} }));
 
     {
         TxnGrouper grouper {};
@@ -173,18 +165,19 @@ BOOST_AUTO_TEST_CASE(single_dependency)
 // Some transactions have multiple dependencies requiring groups to be combined
 BOOST_AUTO_TEST_CASE(multi_dependency)
 {
-    std::vector<CTransactionRef> vtx {};
     constexpr size_t NumBaseTxns {10};
+    std::vector<CTransactionRef> vtx{};
+    vtx.reserve(NumBaseTxns);
     for(size_t i = 0; i < NumBaseTxns; ++i)
     {
-        vtx.push_back(CreateRandomTransaction({}));
+        vtx.push_back(CreateSharedRandomTransaction({}));
     }
 
-    size_t oldGroupCount;
+    size_t oldGroupCount; // NOLINT(cppcoreguidelines-init-variables)
 
     {
         // Txn that spends 2 previous txns -> All 3 txns in group A
-        vtx.push_back(CreateRandomTransaction({ {vtx[0]->vin[0].prevout.GetTxId(), 0}, {vtx[1]->vin[0].prevout.GetTxId(), 0} }));
+        vtx.push_back(CreateSharedRandomTransaction({ {vtx[0]->vin[0].prevout.GetTxId(), 0}, {vtx[1]->vin[0].prevout.GetTxId(), 0} }));
 
         {
             TxnGrouper grouper {};
@@ -205,7 +198,7 @@ BOOST_AUTO_TEST_CASE(multi_dependency)
 
     {
         // Txn that spends 2 different previous txns -> All 3 txns in group B
-        vtx.push_back(CreateRandomTransaction({ {vtx[2]->vin[0].prevout.GetTxId(), 0}, {vtx[3]->vin[0].prevout.GetTxId(), 0} }));
+        vtx.push_back(CreateSharedRandomTransaction({ {vtx[2]->vin[0].prevout.GetTxId(), 0}, {vtx[3]->vin[0].prevout.GetTxId(), 0} }));
 
         {
             TxnGrouper grouper {};
@@ -226,7 +219,7 @@ BOOST_AUTO_TEST_CASE(multi_dependency)
 
     {
         // Another txn that spends one of the previous txns now in group A -> Txn goes in group A
-        vtx.push_back(CreateRandomTransaction({ {vtx[0]->GetId(), 0} }));
+        vtx.push_back(CreateSharedRandomTransaction({ {vtx[0]->GetId(), 0} }));
 
         {
             TxnGrouper grouper {};
@@ -245,7 +238,7 @@ BOOST_AUTO_TEST_CASE(multi_dependency)
 
     {
         // Txn that spends a txn in group A, and a dependencey of a txn in group B, and a new unknown input -> All txns in a new group C
-        vtx.push_back(CreateRandomTransaction({ {vtx[1]->GetId(), 0}, {vtx[2]->vin[0].prevout.GetTxId(), 1}, {GetRandTxId(), 0} }));
+        vtx.push_back(CreateSharedRandomTransaction({ {vtx[1]->GetId(), 0}, {vtx[2]->vin[0].prevout.GetTxId(), 1}, {GetRandTxId(), 0} }));
 
         {
             TxnGrouper grouper {};
@@ -261,6 +254,7 @@ BOOST_AUTO_TEST_CASE(multi_dependency)
             BOOST_CHECK(CheckTxnOrdering(groups));
         }
 
+        // NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores)
         oldGroupCount = oldGroupCount - 2 + 1;
     }
 }
@@ -269,13 +263,13 @@ BOOST_AUTO_TEST_CASE(multi_dependency)
 BOOST_AUTO_TEST_CASE(corner_cases)
 {
     std::vector<CTransactionRef> vtx {};
-    vtx.push_back(CreateRandomTransaction({}));
+    vtx.push_back(CreateSharedRandomTransaction({}));
 
-    size_t oldGroupCount;
+    size_t oldGroupCount; // NOLINT(cppcoreguidelines-init-variables)
 
     {
         // Block contains duplicate transaction
-        auto dupTxn { CreateRandomTransaction({}) };
+        auto dupTxn { CreateSharedRandomTransaction({}) };
         vtx.push_back(dupTxn);
         vtx.push_back(dupTxn);
 
@@ -296,8 +290,8 @@ BOOST_AUTO_TEST_CASE(corner_cases)
 
     {
         // Block contains out of order transactions
-        auto txn { CreateRandomTransaction({}) };
-        vtx.push_back(CreateRandomTransaction({ {txn->GetId(), 0} }));
+        auto txn { CreateSharedRandomTransaction({}) };
+        vtx.push_back(CreateSharedRandomTransaction({ {txn->GetId(), 0} }));
         vtx.push_back(txn);
 
         TxnGrouper grouper {};
@@ -312,6 +306,7 @@ BOOST_AUTO_TEST_CASE(corner_cases)
         // Check txn ordering
         BOOST_CHECK(CheckTxnOrdering(groups));
 
+        // NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores)
         oldGroupCount = oldGroupCount + 1;
     }
 }

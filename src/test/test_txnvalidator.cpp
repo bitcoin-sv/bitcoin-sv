@@ -5,16 +5,17 @@
 #include "config.h"
 #include "key.h"
 #include "pubkey.h"
+#include "test/mempool_test_access.h"
 #include "test/test_bitcoin.h"
+#include "testutil.h"
 #include "txmempool.h"
 #include "txn_validator.h"
-#include "test/mempool_test_access.h"
 
 #include <algorithm>
 #include <boost/test/unit_test.hpp>
 
 namespace {
-    std::vector<TxSource> vTxSources {
+    std::vector<TxSource> vTxSources { // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
         TxSource::wallet,
         TxSource::rpc,
         TxSource::file,
@@ -28,12 +29,7 @@ namespace {
         static std::string expectedException("GetValueOut: value out of range");
         return expectedException == e.what();
     }
-    // Support for P2P node.
-    CService ip(uint32_t i) {
-        struct in_addr s;
-        s.s_addr = i;
-        return CService(CNetAddr(s), Params().GetDefaultPort());
-    }
+
     // Create scriptPubKey from a given key
     CScript GetScriptPubKey(CKey& key) {
         CScript scriptPubKey = CScript() << ToByteVector(key.GetPubKey())
@@ -106,8 +102,10 @@ namespace {
                                                       CKey& key,
                                                       CScript& scriptPubKey) {
         // Create txns spending the same coinbase txn.
-        std::vector<CMutableTransaction> spends {};
-        for (size_t i=0; i<nSpendTxns; i++) {
+        std::vector<CMutableTransaction> spends{};
+        spends.reserve(nSpendTxns);
+        for(size_t i=0; i<nSpendTxns; i++)
+        {
             spends.emplace_back(CreateDoubleSpendTxn(fundTxn, key, scriptPubKey));
         };
         return spends;
@@ -116,7 +114,7 @@ namespace {
     // Create txn input data for a given txn and source
     TxInputDataSPtr TxInputData(TxSource source,
                                 CMutableTransaction& spend,
-                                std::shared_ptr<CNode> pNode = nullptr,
+                                const std::shared_ptr<CNode>& pNode = nullptr,
                                 TxValidationPriority priority = TxValidationPriority::normal) {
         // Return txn's input data
         return std::make_shared<CTxInputData>(
@@ -129,12 +127,14 @@ namespace {
                    Amount(0), // nAbsurdFee
                    pNode);   // pNode
     }
+
     // Create a vector with input data for a given txn and source
     std::vector<TxInputDataSPtr> TxInputDataVec(TxSource source,
                                                 const std::vector<CMutableTransaction>& spends,
-                                                std::shared_ptr<CNode> pNode = nullptr,
+                                                const std::shared_ptr<CNode>& pNode = nullptr,
                                                 TxValidationPriority priority = TxValidationPriority::normal) {
         std::vector<TxInputDataSPtr> vTxInputData {};
+        vTxInputData.reserve(spends.size());
         // Get a pointer to the TxIdTracker.
         const TxIdTrackerSPtr& pTxIdTracker = g_connman->GetTxIdTracker();
         for (auto& elem : spends) {
@@ -152,13 +152,14 @@ namespace {
         }
         return vTxInputData;
     }
+
     // Validate txn using asynchronous validation interface
-    void ProcessTxnsAsynchApi(
-        const Config& config,
-        CTxMemPool& pool,
-        std::vector<CMutableTransaction>& spends,
-        TxSource source,
-        std::shared_ptr<CNode> pNode = nullptr) {
+    void ProcessTxnsAsynchApi(const Config& config,
+                              CTxMemPool& pool,
+                              std::vector<CMutableTransaction>& spends,
+                              TxSource source,
+                              const std::shared_ptr<CNode>& pNode = nullptr)
+    {
 
         // Create txn validator
         std::shared_ptr<CTxnValidator> txnValidator {
@@ -175,13 +176,14 @@ namespace {
         // Wait for the Validator to process all queued txns.
         txnValidator->waitForEmptyQueue();
     }
+
     // Validate a single txn using synchronous validation interface
-    CValidationState ProcessTxnSynchApi(
-        const Config& config,
-        CTxMemPool& pool,
-        CMutableTransaction& spend,
-        TxSource source,
-        std::shared_ptr<CNode> pNode = nullptr) {
+    CValidationState ProcessTxnSynchApi(const Config& config,
+                                        CTxMemPool& pool,
+                                        CMutableTransaction& spend,
+                                        TxSource source,
+                                        const std::shared_ptr<CNode>& pNode = nullptr)
+    {
 
         // Create txn validator
         std::shared_ptr<CTxnValidator> txnValidator {
@@ -197,14 +199,15 @@ namespace {
         mining::CJournalChangeSetPtr changeSet {nullptr};
         return txnValidator->processValidation(TxInputData(source, spend, pNode), changeSet);
     }
+
     // Validate txn using synchronous validation interface
     void ProcessTxnsSynchApi(
         const Config& config,
         CTxMemPool& pool,
         std::vector<CMutableTransaction>& spends,
         TxSource source,
-        std::shared_ptr<CNode> pNode = nullptr) {
-
+        const std::shared_ptr<CNode>& pNode = nullptr)
+    {
         // Create txn validator
         std::shared_ptr<CTxnValidator> txnValidator {
             std::make_shared<CTxnValidator>(
@@ -227,13 +230,15 @@ namespace {
         result = txnValidator->processValidation(TxInputData(source, spends[1], pNode), changeSet);
         BOOST_CHECK(!result.IsValid());
     }
+
     // Validate txns using synchronous batch validation interface
     CTxnValidator::RejectedTxns ProcessTxnsSynchBatchApi(
         const Config& config,
         CTxMemPool& pool,
         std::vector<CMutableTransaction>& spends,
         TxSource source,
-        std::shared_ptr<CNode> pNode = nullptr) {
+        const std::shared_ptr<CNode>& pNode = nullptr)
+    {
 
         // Create txn validator
         std::shared_ptr<CTxnValidator> txnValidator {
@@ -248,7 +253,10 @@ namespace {
         // Mempool Journal ChangeSet
         mining::CJournalChangeSetPtr changeSet {nullptr};
         // Validate the first txn
-        return txnValidator->processValidation(TxInputDataVec(source, spends, pNode), changeSet);
+        return txnValidator->processValidation(TxInputDataVec(source,
+                                                              spends,
+                                                              pNode),
+                                               changeSet);
     }
 
     CNodePtr DummyNode(ConfigInit& testConfig)
@@ -268,23 +276,24 @@ namespace {
                 "",
                 true);
     }
-    struct TestChain100Setup2 : TestChain100Setup {
-        CScript scriptPubKey {
-            GetScriptPubKey(coinbaseKey)
-        };
-        // twoDoubleSpend2Txns contains two txns spending the same coinbase txn
-        std::vector<CMutableTransaction> doubleSpend2Txns {
-            CreateDoubleSpendTxn(coinbaseTxns[0], coinbaseKey, scriptPubKey),
-            CreateDoubleSpendTxn(coinbaseTxns[0], coinbaseKey, scriptPubKey)
-        };
-        // doubleSpend10Txns contains 10 double spend txns spending the same coinbase txn
-        std::vector<CMutableTransaction> doubleSpend10Txns {
-            CreateNDoubleSpendTxns(10, coinbaseTxns[0], coinbaseKey, scriptPubKey)
-        };    
-    };
 }
 
-BOOST_FIXTURE_TEST_SUITE(test_txnvalidator, TestChain100Setup2)
+struct DoubleSpend100Fixture : TestChain100Setup {
+    CScript scriptPubKey {
+        GetScriptPubKey(coinbaseKey)
+    };
+    // twoDoubleSpend2Txns contains two txns spending the same coinbase txn
+    std::vector<CMutableTransaction> doubleSpend2Txns {
+        CreateDoubleSpendTxn(coinbaseTxns[0], coinbaseKey, scriptPubKey),
+        CreateDoubleSpendTxn(coinbaseTxns[0], coinbaseKey, scriptPubKey)
+    };
+    // doubleSpend10Txns contains 10 double spend txns spending the same coinbase txn
+    std::vector<CMutableTransaction> doubleSpend10Txns {
+        CreateNDoubleSpendTxns(10, coinbaseTxns[0], coinbaseKey, scriptPubKey)
+    };
+};
+
+BOOST_FIXTURE_TEST_SUITE(test_txnvalidator, DoubleSpend100Fixture)
 
 BOOST_AUTO_TEST_CASE(txn_validator_creation) {
     CTxMemPool pool;
@@ -435,7 +444,6 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
         int32_t height = 1;
         bool spendsCoinbase = false;
         LockPoints lp;
-        mining::CJournalChangeSetPtr nullChangeSet{nullptr};
         auto& tx = *txnsData[doubleSpendIdx]->GetTxnPtr();
         pool.AddUnchecked(
             tx.GetId(),

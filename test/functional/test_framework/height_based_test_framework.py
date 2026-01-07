@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from test_framework.blocktools import create_block, create_coinbase, create_transaction
 from test_framework.mininode import msg_block, msg_tx, ToHex, CTransaction, CTxIn, COutPoint, CTxOut, COIN
-from test_framework.script import CScript, OP_CHECKSIG, OP_TRUE, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, \
+from test_framework.script import CScript, OP_CHECKSIG, OP_TRUE, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID, \
     OP_FALSE, OP_RETURN
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, try_rpc, loghash
@@ -25,6 +25,7 @@ class TxCollection:
         self.block_invalid_txs = []
         self.p2p_valid_txs = []
         self.p2p_invalid_txs = []
+        self.p2p_timeout = 30
         self.mempool_txs = []
 
     @property
@@ -35,7 +36,7 @@ class TxCollection:
     def label(self):
         return self._label
 
-    def add_tx(self, tx, p2p_reject_reason=None, block_reject_reason=None):
+    def add_tx(self, tx, p2p_timeout=30, p2p_reject_reason=None, block_reject_reason=None):
         if p2p_reject_reason:
             self.p2p_invalid_txs.append((tx, p2p_reject_reason))
         else:
@@ -46,6 +47,8 @@ class TxCollection:
             self.block_invalid_txs.append((tx, block_reject_reason))
         else:
             self.block_valid_txs.append(tx)
+
+        self.p2p_timeout = p2p_timeout
 
     def add_mempool_tx(self, tx):
         self.mempool_txs.append(tx)
@@ -62,8 +65,8 @@ class HeightBasedTestsCase:
 
     _UTXO_KEY = None
     _NUMBER_OF_UTXOS_PER_HEIGHT = 24
-    TESTING_HEIGHTS = [(150,   None, "PREPARE"),
-                       (150, "TEST", None),]
+    TESTING_HEIGHTS = [(150, None, "PREPARE"),
+                       (150, "TEST", None), ]
 
     def __init__(self):
         self.utxos = defaultdict(list)
@@ -87,8 +90,8 @@ class HeightBasedTestsCase:
 
             if self.COINBASE_KEY:
                 tx.rehash()
-                sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
-                                              tx_to_spend.vout[0].nValue)
+                sighash = SignatureHash(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
+                                        tx_to_spend.vout[0].nValue)
                 sig = self._coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
                 tx.vin[0].scriptSig = CScript([sig])
             else:
@@ -122,7 +125,7 @@ class HeightBasedTestsCase:
 class SimpleTestDefinition:
 
     def __init__(self, utxo_label, locking_script, label, unlocking_script,
-                 p2p_reject_reason=None, block_reject_reason=None, test_tx_locking_script=None,
+                 p2p_reject_reason=None, block_reject_reason=None, p2p_timeout=30, test_tx_locking_script=None,
                  post_utxo_tx_creation=lambda tx: tx, post_test_tx_creation=lambda tx: tx):
         self.scenario = None
         self.label = label
@@ -131,6 +134,7 @@ class SimpleTestDefinition:
         self.utxo_label = utxo_label
         self.p2p_reject_reason = p2p_reject_reason
         self.block_reject_reason = block_reject_reason
+        self.p2p_timeout = p2p_timeout
         self.test_tx_locking_script = test_tx_locking_script or CScript([OP_FALSE, OP_RETURN])
         self.funding_tx = None
         self.test_tx = None
@@ -189,7 +193,7 @@ class HeightBasedSimpleTestsCase(HeightBasedTestsCase):
                 tx = t.make_test_tx()
                 tx.rehash()
                 self.log.info(f"Created Test Tx {loghash(tx.hash)} for scenario: \"{t.scenario or self.NAME}\" and for test_label: {t.label}")
-                tx_collection.add_tx(tx, t.p2p_reject_reason, t.block_reject_reason)
+                tx_collection.add_tx(tx, t.p2p_timeout, t.p2p_reject_reason, t.block_reject_reason)
 
 
 class SimplifiedTestFramework(BitcoinTestFramework):
@@ -236,7 +240,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
     def _make_first_block(self, connection):
         tip = connection.rpc.getblock(connection.rpc.getbestblockhash())
         if self.tip_time is None:
-            self.tip_time = tip["time"]+1
+            self.tip_time = tip["time"] + 1
         else:
             self.tip_time += 1
 
@@ -245,7 +249,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         wait_until(lambda: connection.rpc.getbestblockhash() == block.hash, timeout=10, check_interval=0.2)
         return block, coinbase_tx
 
-    def _new_block_check_reject(self, connection, txs, reasons, label="", block_txs=[]):
+    def _new_block_check_reject(self, connection, txs, reasons, label="", block_txs=[], block_reject_timeout=60):
         tip = connection.rpc.getblock(connection.rpc.getbestblockhash())
         rejects = []
 
@@ -255,26 +259,27 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         with connection.cb.temporary_override_callback(on_reject=on_reject):
             for tx, reason in zip(txs, reasons):
                 del rejects[:]
-                block, _ = self._new_block(connection, tip_hash=tip["hash"], tip_height=tip["height"], txs=block_txs+[tx])
+                block, _ = self._new_block(connection, tip_hash=tip["hash"], tip_height=tip["height"], txs=block_txs + [tx])
 
                 if tx:
                     blk_ht = tip["height"]
                     self.log.info(f"Created a block {loghash(block.hash)} to check rejects at height {blk_ht + 1}")
-                    for txn in block_txs+[tx]:
+                    for txn in block_txs + [tx]:
                         self.log.info(f".... and added transactions to block {loghash(txn.hash)}")
 
                 wait_until(lambda: len(rejects) == 1 and rejects[0].data == block.sha256,
-                           timeout=10, check_interval=0.2,
+                           timeout=(block_reject_timeout * self.options.timeoutfactor), check_interval=0.2,
                            label=f"Waiting for block with tx {tx.hash[8]}... and reject reason '{reason}' to be rejected " + label)
                 if reason:
                     self.log.info(f"Expect the block {loghash(block.hash)} to be rejected")
                     assert rejects[0].reason.startswith(reason), f"mismatching rejection reason: got {rejects[0].reason} expected {reason}"
 
-    def _new_block_check_accept(self, connection, txs=[], label="", remove_accepted_block=False):
+    def _new_block_check_accept(self, connection, txs=[], label="", block_accept_timeout=60, remove_accepted_block=False):
         tip = connection.rpc.getblock(connection.rpc.getbestblockhash())
         block, coinbase_tx = self._new_block(connection, tip_hash=tip["hash"], tip_height=tip["height"], txs=txs)
         wait_until(lambda: connection.rpc.getbestblockhash() == block.hash,
-                   timeout=60, check_interval=0.2, label="Waiting for block to become current tip " + label)
+                   timeout=(block_accept_timeout * self.options.timeoutfactor), check_interval=0.2,
+                   label="Waiting for block to become current tip " + label)
 
         blk_ht = connection.rpc.getblock(connection.rpc.getbestblockhash())["height"]
         if txs:
@@ -303,7 +308,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         # Observed data shows that during testing in debug mode it takes about 0.1s to process one block
         # We use double the amount of 0.2s plus extra 30s for good measure
         wait_until(lambda: connection.rpc.getbestblockhash() == block.hash,
-                   timeout=0.2*n_blocks+30, check_interval=0.2, label="Waiting for block to become current tip")
+                   timeout=0.2 * n_blocks + 30, check_interval=0.2, label="Waiting for block to become current tip")
 
         return coinbases, block
 
@@ -321,7 +326,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         for tx in to_accept:
             connection.rpc.sendrawtransaction(ToHex(tx)) # will raise if not successful
 
-    def _process_p2p_rejects(self, connection, to_reject, reasons, test_label, height_label):
+    def _process_p2p_rejects(self, connection, to_reject, reasons, test_label, height_label, p2p_reject_timeout):
         rejects = []
 
         def on_reject(_, msg):
@@ -333,7 +338,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                 del rejects[:]
                 connection.send_message(msg_tx(tx))
                 wait_until(lambda: (len(rejects) == 1) and rejects[0].data == tx.sha256,
-                           timeout=30, check_interval=0.2,
+                           timeout=(p2p_reject_timeout * self.options.timeoutfactor), check_interval=0.2,
                            label=f"Waiting tx to be rejected. Reason {reason} At {test_label} {height_label} tx:{tx.hash}")
                 if reason:
                     assert rejects[0].reason == reason, f"Mismatching rejection reason: got {rejects[0].reason} expected {reason}"
@@ -370,25 +375,25 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         tx_col = TxCollection(height=height, label=label)
         test.get_transactions_for_test(tx_col, self._get_new_coinbase)
 
-        if not(tx_col.mempool_txs or tx_col.p2p_invalid_txs or tx_col.p2p_valid_txs or tx_col.block_invalid_txs or tx_col.block_valid_txs):
+        if not tx_col.mempool_txs or tx_col.p2p_invalid_txs or tx_col.p2p_valid_txs or tx_col.block_invalid_txs or tx_col.block_valid_txs:
             self.log.info(f"No transactions to test at height {label} height={height}")
 
         if tx_col.mempool_txs:
-            self._process_p2p_accepts(conn, tx_col.mempool_txs, test_label=test.NAME, height_label=label + " ADDING MEMPOOL UTXOS", p2p_accept_timeout=test.P2P_ACCEPT_TIMEOUT)
+            self._process_p2p_accepts(conn, tx_col.mempool_txs, test_label=test.NAME, height_label=label + " ADDING MEMPOOL UTXOS", p2p_accept_timeout=tx_col.p2p_timeout)
 
         if tx_col.p2p_invalid_txs:
             txs, reasons = zip(*tx_col.p2p_invalid_txs)
-            self._process_p2p_rejects(conn, txs, reasons, test_label=test.NAME, height_label=label)
+            self._process_p2p_rejects(conn, txs, reasons, test_label=test.NAME, height_label=label, p2p_reject_timeout=tx_col.p2p_timeout)
 
         if tx_col.p2p_valid_txs:
-            self._process_p2p_accepts(conn, tx_col.p2p_valid_txs, test_label=test.NAME, height_label=label, p2p_accept_timeout=test.P2P_ACCEPT_TIMEOUT)
+            self._process_p2p_accepts(conn, tx_col.p2p_valid_txs, test_label=test.NAME, height_label=label, p2p_accept_timeout=tx_col.p2p_timeout)
 
         if tx_col.block_invalid_txs:
             txs, reasons = zip(*tx_col.block_invalid_txs)
-            self._new_block_check_reject(conn, txs=txs, reasons=reasons, label=f"At \"{test.NAME}\" {label}", block_txs=tx_col.mempool_txs)
+            self._new_block_check_reject(conn, txs=txs, reasons=reasons, label=f"At \"{test.NAME}\" {label}", block_txs=tx_col.mempool_txs, block_reject_timeout=tx_col.p2p_timeout)
 
         if tx_col.block_valid_txs:
-            self._new_block_check_accept(conn, txs=tx_col.mempool_txs+tx_col.block_valid_txs, label=f"At \"{test.NAME}\" {label}")
+            self._new_block_check_accept(conn, txs=tx_col.mempool_txs + tx_col.block_valid_txs, label=f"At \"{test.NAME}\" {label}", block_accept_timeout=tx_col.p2p_timeout)
             self.log.info(f"Invalidating the block {loghash(conn.rpc.getbestblockhash())} to confirm the txs are back to mempool")
             conn.rpc.invalidateblock(conn.rpc.getbestblockhash())
 
@@ -403,7 +408,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
 
         txs_to_be_in_the_next_block = transactions_for_next_block + tx_col.mempool_txs + tx_col.block_valid_txs
         if txs_to_be_in_the_next_block:
-            self._new_block_check_accept(conn, txs=txs_to_be_in_the_next_block, label=f"At \"{test.NAME}\" {label}")
+            self._new_block_check_accept(conn, txs=txs_to_be_in_the_next_block, label=f"At \"{test.NAME}\" {label}", block_accept_timeout=tx_col.p2p_timeout)
 
     def _do_prepare_for_height(self, conn, test, label, height, additional_conns):
         self.log.info(f"Preparing for {label} at height={height}")
@@ -415,7 +420,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
     def run_test(self):
 
         def multiplyArg(arg, factor):
-            return arg.split("=")[0] + "=" + str(int(int(arg.split("=")[1])*factor))
+            return arg.split("=")[0] + "=" + str(int(int(arg.split("=")[1]) * factor))
 
         self.stop_node(0)
         for test in self._gen_tests:
@@ -438,17 +443,17 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                     new_maxnonstdtxvalidationduration = new_maxnonstdtxvalidationduration[0]
                     if (DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION * 1000 <= new_maxnonstdtxvalidationduration):
                         self.log.info(f"Setting -maxtxnvalidatorasynctasksrunduration to {new_maxnonstdtxvalidationduration+1} ms.")
-                        test.ARGS.append("-maxtxnvalidatorasynctasksrunduration={}".format(new_maxnonstdtxvalidationduration+1))
+                        test.ARGS.append("-maxtxnvalidatorasynctasksrunduration={}".format(new_maxnonstdtxvalidationduration + 1))
 
             with self.run_node_with_connections(title=test.NAME,
                                                 node_index=0,
                                                 args=test.ARGS,
-                                                number_of_connections=1+len(test.ADDITIONAL_CONNECTIONS)) as conns:
+                                                number_of_connections=1 + len(test.ADDITIONAL_CONNECTIONS)) as conns:
 
                 self.log.info("")
-                self.log.info("*"*100)
+                self.log.info(" * " * 100)
                 self.log.info(f"Starting test \"{test.NAME}\"")
-                self.log.info("*"*100)
+                self.log.info(" * " * 100)
 
                 conn = conns[0]
                 additional_conns = {name: c for name, c in zip(test.ADDITIONAL_CONNECTIONS, conns)}
@@ -480,4 +485,4 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                 conn.rpc.invalidateblock(first_block.hash)
                 del self._coinbases[:]
                 self.log.info(f"Finishing test \"{test.NAME}\"")
-                self.log.info(f"="*100)
+                self.log.info("=" * 100)

@@ -39,8 +39,8 @@ class P2PSimpleAssociation(BitcoinTestFramework):
 
             # Check we got an association ID and some known stream policies back
             for association in associations:
-                assert(association.association_id)
-                assert(association.recvd_stream_policy_names)
+                assert (association.association_id)
+                assert (association.recvd_stream_policy_names)
 
             # Check nodes peer info looks correct
             peerinfo = self.nodes[0].getpeerinfo()

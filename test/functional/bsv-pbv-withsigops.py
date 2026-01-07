@@ -24,25 +24,18 @@ NOTE: Blocks have to be sent from the same node for the test to be deterministic
       otherwise it can happen that easier block is read from network before the
       hard one so the validation race condition can never (is harder to) occur
 """
-import time
 import glob
 
-from test_framework.blocktools import sign_tx
-from test_framework.blocktools import (create_block, create_coinbase, prepare_init_chain)
-from test_framework.mininode import (
-    NetworkThread,
-    NodeConn,
-    NodeConnCB,
-    msg_block,
-)
-from test_framework.test_framework import BitcoinTestFramework, ChainManager
-from test_framework.util import (
-    p2p_port,
-    assert_equal,
-    wait_until)
-from test_framework.script import *
-from test_framework.blocktools import create_transaction
+from test_framework.blocktools import create_transaction, prepare_init_chain, \
+    sign_tx
 from test_framework.key import CECKey
+from test_framework.mininode import CTransaction, msg_block, NetworkThread, \
+    NodeConn, NodeConnCB
+from test_framework.script import CScript, hash160, OP_CHECKSIG, OP_DROP, \
+    OP_DUP, OP_EQUALVERIFY, OP_HASH160, OP_TRUE, SIGHASH_FORKID, SIGHASH_ALL, \
+    SignatureHash
+from test_framework.test_framework import BitcoinTestFramework, ChainManager
+from test_framework.util import p2p_port, assert_equal, wait_until
 
 
 class PreviousSpendableOutput:
@@ -64,7 +57,7 @@ class PBVWithSigOps(BitcoinTestFramework):
         self.chain = ChainManager()
 
     def sign_expensive_tx(self, tx, spend_tx, n, sigChecks):
-        sighash = SignatureHashForkId(
+        sighash = SignatureHash(
             spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
 
         tx.vin[0].scriptSig = CScript(
@@ -170,7 +163,7 @@ class PBVWithSigOps(BitcoinTestFramework):
         text_block3 = "Verify 2000 txins"
         for line in open(glob.glob(self.options.tmpdir + "/node0" + "/regtest/bitcoind.log")[0]):
             if text_activation in line:
-                self.log.info(f"block2_hard was not activated as block3_easy won the validation race")
+                self.log.info("block2_hard was not activated as block3_easy won the validation race")
             elif text_block2 in line:
                 line = line.split()
                 self.log.info(f"block2_hard took {line[len(line) - 1]} to verify")

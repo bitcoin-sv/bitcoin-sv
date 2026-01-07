@@ -40,12 +40,14 @@ bip112txs_vary_OP_CSV_9 - 16 txs with nSequence = 9 evaluated against varying {r
 bip112tx_special - test negative argument to OP_CSV
 """
 
-from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import *
-from test_framework.mininode import ToHex, CTransaction, NetworkThread
+from test_framework.comptool import TestInstance
 from test_framework.blocktools import create_coinbase, create_block
-from test_framework.comptool import TestInstance, TestManager
-from test_framework.script import *
+from test_framework.mininode import ToHex, CTransaction
+from test_framework.script import CScript, OP_CHECKSEQUENCEVERIFY, OP_DROP
+from test_framework.test_framework import ComparisonTestFramework
+from test_framework.util import assert_equal, hex_str_to_bytes
+
+from decimal import Decimal
 from io import BytesIO
 import time
 
@@ -150,7 +152,7 @@ class BIP68_112_113Test(ComparisonTestFramework):
 
     def create_bip68txs(self, bip68inputs, txversion, locktime_delta=0):
         txs = []
-        assert(len(bip68inputs) >= 16)
+        assert (len(bip68inputs) >= 16)
         i = 0
         for b31 in range(2):
             b25txs = []
@@ -182,7 +184,7 @@ class BIP68_112_113Test(ComparisonTestFramework):
 
     def create_bip112txs(self, bip112inputs, varyOP_CSV, txversion, locktime_delta=0):
         txs = []
-        assert(len(bip112inputs) >= 16)
+        assert (len(bip112inputs) >= 16)
         i = 0
         for b31 in range(2):
             b25txs = []

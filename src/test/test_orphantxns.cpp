@@ -6,22 +6,20 @@
 #include "net/net_processing.h"
 #include "orphan_txns.h"
 #include "test/test_bitcoin.h"
+#include "test/testutil.h"
 
 #include <random>
 #include <boost/test/unit_test.hpp>
 
-namespace {
-
-    CService ip(uint32_t i) {
-        struct in_addr s;
-        s.s_addr = i;
-        return CService(CNetAddr(s), Params().GetDefaultPort());
-    }
+namespace
+{
     // Use a default configuration
+    // NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
     size_t maxExtraTxnsForCompactBlock = COrphanTxns::DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN;
     size_t maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
     size_t maxOrphanPercent = COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH;
     size_t maxInputsOutputs = COrphanTxns::DEFAULT_MAX_INPUTS_OUTPUTS_PER_TRANSACTION;
+    // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
     // Create txn inputs
     std::vector<CTxIn> CreateTxnInputs(size_t nNumOfInputs, uint256 txid=InsecureRand256()) {
@@ -65,10 +63,11 @@ namespace {
     TxInputDataSPtr CreateOrphanTxn(TxSource source,
                                     std::vector<CTxIn> vTxnInputs = CreateTxnInputs(1),
                                     std::vector<CTxOut> vTxnOutputs = CreateTxnOutputs(1),
-                                    std::shared_ptr<CNode> pNode=nullptr) {
+                                    const std::shared_ptr<CNode>& pNode=nullptr)
+    {
         CMutableTransaction tx;
-        tx.vin = vTxnInputs;
-        tx.vout = vTxnOutputs;
+        tx.vin = std::move(vTxnInputs);
+        tx.vout = std::move(vTxnOutputs);
         // Return txn's input data
         return std::make_shared<CTxInputData>(
                    g_connman->GetTxIdTracker(),
@@ -84,16 +83,18 @@ namespace {
     void OrphanTxnsObjectCreateNOrphanTxns(
         std::shared_ptr<COrphanTxns>& orphanTxns,
         TxSource source,
-        int32_t nOrphanTxnsCount,
+        const size_t nOrphanTxnsCount,
         CConnman::CAsyncTaskPool& asyncTaskPool,
         std::vector<CNodePtr>& nodes)
     {
+        assert(nOrphanTxnsCount <= std::numeric_limits<int64_t>::max());
         nodes.clear();
-        for (NodeId i = 0; i < nOrphanTxnsCount; i++) {
+        for(size_t i = 0; i < nOrphanTxnsCount; i++)
+        {
             CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
             CNodePtr pNode =
                 CNode::Make(
-                    i,
+                    static_cast<NodeId>(i),
                     NODE_NETWORK,
                     0,
                     INVALID_SOCKET,
@@ -137,7 +138,11 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_addtxn_erasetxns) {
     size_t nTxnsNumber=10;
     // Create orphan transactions:
     std::vector<CNodePtr> nodes {};
-    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool, nodes);
+    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns,
+                                      TxSource::p2p,
+                                      nTxnsNumber,
+                                      asyncTaskPool,
+                                      nodes);
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Erase all txns
@@ -159,7 +164,11 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_limit_txns_size) {
     CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
     // Create orphan transactions:
     std::vector<CNodePtr> nodes {};
-    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool, nodes);
+    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns,
+                                      TxSource::p2p,
+                                      nTxnsNumber,
+                                      asyncTaskPool,
+                                      nodes);
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Test limit function: (each generated transaction is 86 bytes long)
@@ -190,7 +199,11 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_checktxnexists) {
     size_t nTxnsNumber=10;
     // Create orphan transactions:
     std::vector<CNodePtr> nodes {};
-    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool, nodes);
+    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns,
+                                      TxSource::p2p,
+                                      nTxnsNumber,
+                                      asyncTaskPool,
+                                      nodes);
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Create a txns which is not present in queue
@@ -214,7 +227,11 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxn) {
     size_t nTxnsNumber=10;
     // Create orphan transactions:
     std::vector<CNodePtr> nodes {};
-    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool, nodes);
+    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns,
+                                      TxSource::p2p,
+                                      nTxnsNumber,
+                                      asyncTaskPool,
+                                      nodes);
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Create a txns which is not present in queue
@@ -241,21 +258,25 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxnfrompeer) {
                 maxInputsOutputs)
     };
     size_t nTxnsNumber=10;
-    size_t nNodesNumber=10;
     // Create orphan transactions:
     std::vector<CNodePtr> nodes {};
-    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool, nodes);
+    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns,
+                                      TxSource::p2p,
+                                      nTxnsNumber,
+                                      asyncTaskPool,
+                                      nodes);
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Erase txns from a node which is not connected (there are no orphan txns from this node)
-    orphanTxns->eraseTxnsFromPeer((NodeId)(nNodesNumber+1));
+    const NodeId nNodesNumber=10;
+    orphanTxns->eraseTxnsFromPeer(nNodesNumber+1);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Erase all txns from Node0
-    orphanTxns->eraseTxnsFromPeer((NodeId)(0));
+    orphanTxns->eraseTxnsFromPeer(0);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber-1);
     // Delete txns from all other nodes
-    for (NodeId nodeId=1; nodeId < (NodeId)nNodesNumber; nodeId++) {
-        orphanTxns->eraseTxnsFromPeer((NodeId)nodeId);
+    for(NodeId nodeId=1; nodeId < nNodesNumber; nodeId++) {
+        orphanTxns->eraseTxnsFromPeer(nodeId);
     }
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 0);
 }

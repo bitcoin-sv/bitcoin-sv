@@ -94,7 +94,7 @@ int CommandLineRPC(int argc, char *argv[]) {
             gArgs.ForceSetArg("-rpcpassword", rpcPass);
         }
         std::vector<std::string> args =
-            std::vector<std::string>(&argv[1], &argv[argc]); // NOLINT (cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            std::vector<std::string>(&argv[1], &argv[argc]); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         if (gArgs.GetBoolArg("-stdin", false)) {
             // Read one arg per line from stdin and append
             std::string line;
@@ -111,7 +111,7 @@ int CommandLineRPC(int argc, char *argv[]) {
         args.erase(args.begin());
 
         UniValue params;
-        // NOLINTNEXTLINE (bugprone-branch-clone)
+        // NOLINTNEXTLINE(bugprone-branch-clone)
         if (gArgs.GetBoolArg("-named", DEFAULT_NAMED)) {
             params = RPCConvertNamedValues(strMethod, args);
         } else {
@@ -120,14 +120,13 @@ int CommandLineRPC(int argc, char *argv[]) {
 
         // Execute and handle connection failures with -rpcwait
         const bool fWait = gArgs.GetBoolArg("-rpcwait", false);
-        // NOLINTNEXTLINE (cppcoreguidelines-avoid-do-while)
         do {
             try {
                 const UniValue reply = CallRPC(strMethod, params);
 
                 // Parse reply
-                const UniValue &result = find_value(reply, "result");
-                const UniValue &error = find_value(reply, "error");
+                const UniValue result = find_value(reply, "result");
+                const UniValue error = find_value(reply, "error");
 
                 if (!error.isNull()) {
                     // Error
@@ -185,18 +184,20 @@ int CommandLineRPC(int argc, char *argv[]) {
         throw;
     }
 
-    if (strPrint != "") {
-        // NOLINTNEXTLINE (cert-err33-c)
-        fprintf((nRet == 0 ? stdout : stderr), "%s\n", strPrint.c_str()); // NOLINT (cppcoreguidelines-pro-type-vararg)
+    if(strPrint != "")
+    {
+        std::ostream& os = (nRet == 0 ? std::cout : std::cerr);
+        os << strPrint << '\n';
     }
     return nRet;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     SetupEnvironment();
-    if (!SetupNetworking()) {
-        // NOLINTNEXTLINE (cert-err33-c)
-        fprintf(stderr, "Error: Initializing networking failed\n"); // NOLINT (cppcoreguidelines-pro-type-vararg)
+    if(!SetupNetworking())
+    {
+        std::cerr << "Error: Initializing networking failed\n";
         return EXIT_FAILURE;
     }
 

@@ -23,7 +23,7 @@ struct ProcessingBlockIndex::UnitTestAccess<undo_tests_uid>
                             const CBlock &block,
                             CBlockIndex* index,
                             CCoinsViewCache &view,
-                            const task::CCancellationToken& shutdownToken)
+                            const task::CCancellationToken&)
     {
         ProcessingBlockIndex idx{ *index };
         idx.ApplyBlockUndo(
@@ -47,13 +47,16 @@ struct CBlockIndex::UnitTestAccess<undo_tests_uid>
         index.nHeight = height;
     }
 };
-using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<undo_tests_uid>;
+using TestAccessCBlockIndexUndo = CBlockIndex::UnitTestAccess<undo_tests_uid>;
 
 BOOST_FIXTURE_TEST_SUITE(undo_tests, BasicTestingSetup)
 
-static void UpdateUTXOSet(const CBlock &block, CCoinsViewCache &view,
-                          CBlockUndo &blockundo,
-                          const CChainParams &chainparams, uint32_t nHeight) {
+static void UpdateUTXOSet(const CBlock& block,
+                          CCoinsViewCache& view,
+                          CBlockUndo& blockundo,
+                          const CChainParams&,
+                          int32_t nHeight)
+{
     auto &coinbaseTx = *block.vtx[0];
     UpdateCoins(coinbaseTx, view, nHeight);
 
@@ -67,13 +70,15 @@ static void UpdateUTXOSet(const CBlock &block, CCoinsViewCache &view,
     view.SetBestBlock(block.GetHash());
 }
 
-static void UndoBlock(const CBlock &block, CCoinsViewCache &view,
-                      const CBlockUndo &blockUndo,
-                      const CChainParams &chainparams, uint32_t nHeight) {
-
+static void UndoBlock(const CBlock& block,
+                      CCoinsViewCache& view,
+                      const CBlockUndo& blockUndo,
+                      const CChainParams&,
+                      int32_t nHeight)
+{
     CBlockIndex::TemporaryBlockIndex index{ {} };
 
-    TestAccessCBlockIndex::SetHeight( index, nHeight );
+    TestAccessCBlockIndexUndo::SetHeight( index, nHeight);
     TestAccessProcessingBlockIndex::ApplyBlockUndo(blockUndo, block, index.get(), view, task::CCancellationSource::Make()->GetToken());
 }
 

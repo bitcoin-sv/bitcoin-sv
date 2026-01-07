@@ -2,26 +2,35 @@
 // Copyright (c) 2018-2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include "test/test_bitcoin.h"
-
-#include "keystore.h"
+#include "config.h"
 #include "policy/policy.h"
+#include "protocol_era.h"
 #include "script/int_serialization.h"
-#include "script/interpreter.h"
+#include "script/limitedstack.h"
+#include "script/opcodes.h"
+#include "script/script_error.h"
+#include "script/script_flags.h"
 #include "script/script_num.h"
 #include "script/sign.h"
 #include "taskcancellation.h"
-#include "config.h"
-#include "script/limitedstack.h"
+#include "test/test_bitcoin.h"
 
+#include <boost/test/tools/old/interface.hpp>
 #include <boost/test/unit_test.hpp>
 
 #include <array>
+#include <cstdint>
+#include <tuple>
+#include <utility>
+#include <variant>
 
 typedef std::vector<uint8_t> valtype;
 typedef std::vector<valtype> stacktype;
 
-std::array<uint32_t, 3> flagset{{0, STANDARD_SCRIPT_VERIFY_FLAGS, MANDATORY_SCRIPT_VERIFY_FLAGS}};
+// Assume Post-Chronicle
+constexpr std::array<uint32_t, 3> flagset{{0,
+                                          static_cast<uint32_t>(ScriptVerifyFlags::POST_CHRONICLE_STANDARD_SCRIPT_VERIFY_FLAGS),
+                                          POST_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS}};
 
 BOOST_FIXTURE_TEST_SUITE(opcode_tests, BasicTestingSetup)
 
@@ -30,30 +39,30 @@ static void CheckStackSize(const std::vector<valtype> &original_stack_elements, 
 {
     Config& config = GlobalConfig::GetConfig();
     BaseSignatureChecker sigchecker;
-    ScriptError err = SCRIPT_ERR_OK;
     auto source = task::CCancellationSource::Make();
 
     LimitedStack stack = LimitedStack(original_stack_elements, maxStackSize);
-
-    auto r =
-        EvalScript(
-            config, true,
-            source->GetToken(),
-            stack,
-            script,
-            flagset[0] | 0,
-            sigchecker,
-            &err);
-
-    if (expected_error == SCRIPT_ERR_OK)
+                              
+    constexpr uint32_t flags{flagset[0]};
+    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, true)};
+    const auto r = EvalScript(params,
+                              source->GetToken(),
+                              stack,
+                              script,
+                              flags,
+                              sigchecker);
+    BOOST_REQUIRE(r);
+    if(expected_error == SCRIPT_ERR_OK)
     {
         LimitedStack expected = LimitedStack(expected_stack_elements, maxStackSize);
-        BOOST_CHECK(r.value());
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, r.value());
         BOOST_CHECK(stack == expected);
-    } else 
+    }
+    else 
     {
-        BOOST_CHECK(!r.value());
-        BOOST_CHECK_EQUAL(err, expected_error);
+
+        BOOST_CHECK(r.value() != SCRIPT_ERR_OK);
+        BOOST_CHECK_EQUAL(expected_error, r.value());
     }
    
 }
@@ -68,36 +77,34 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
     BaseSignatureChecker sigchecker;
     auto source = task::CCancellationSource::Make();
 
-    for (uint32_t flags : flagset) {
-        ScriptError err = SCRIPT_ERR_OK;
-
+    for (uint32_t flags : flagset)
+    {
         LimitedStack stack = LimitedStack(original_stack, UINT32_MAX);
         LimitedStack expectedStack = LimitedStack(expected, UINT32_MAX);
-        auto r =
-            EvalScript(
-                config, true,
-                source->GetToken(),
-                stack,
-                script,
-                flags | upgradeFlag,
-                sigchecker,
-                &err);
-        BOOST_CHECK(r.value());
+        const uint32_t flags_up{flags | upgradeFlag};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags_up, true)};
+        auto r = EvalScript(params,
+                            source->GetToken(),
+                            stack,
+                            script,
+                            flags_up,
+                            sigchecker);
+        BOOST_REQUIRE(r);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, r.value());
         BOOST_CHECK(stack == expectedStack);
 
         // Make sure that if we do not pass the upgrade flag, we get the same result
-        if (upgradeFlag) {
+        if (upgradeFlag)
+        {
             stack = LimitedStack(original_stack, UINT32_MAX);
-            r =
-                EvalScript(
-                    config, true,
-                    source->GetToken(),
-                    stack,
-                    script,
-                    flags,
-                    sigchecker,
-                    &err);
-            BOOST_CHECK(r.value());
+            r = EvalScript(params,
+                           source->GetToken(),
+                           stack,
+                           script,
+                           flags,
+                           sigchecker);
+            BOOST_REQUIRE(r);
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, r.value());
             BOOST_CHECK(stack == expectedStack);
         }
     }
@@ -107,38 +114,45 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
                        const CScript &script, ScriptError expected_error, uint32_t upgradeFlag = 0) {
     BaseSignatureChecker sigchecker;
     const Config& config = GlobalConfig::GetConfig();
-    ScriptError err = SCRIPT_ERR_OK;
     LimitedStack stack = LimitedStack(original_stack, UINT32_MAX);
 
+    const uint32_t flags_up{flags | upgradeFlag};
+    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags_up, true)};
     auto source = task::CCancellationSource::Make();
-    auto r =
-        EvalScript(
-            config, true,
-            source->GetToken(),
-            stack,
-            script,
-            flags | upgradeFlag,
-            sigchecker,
-            &err);
-    BOOST_CHECK(!r.value());
-
-    BOOST_CHECK_EQUAL(err, expected_error);
+    auto r = EvalScript(params,
+                        source->GetToken(),
+                        stack,
+                        script,
+                        flags_up,
+                        sigchecker);
+    BOOST_REQUIRE(r);
+    if(flags & SCRIPT_CHRONICLE)
+    {
+        if(expected_error != SCRIPT_ERR_SCRIPTNUM_MINENCODE)
+        {
+            BOOST_CHECK(r.value() != SCRIPT_ERR_OK);
+            BOOST_CHECK_EQUAL(expected_error, r.value());
+        }
+    }
+    else
+    {
+        BOOST_CHECK(r.value() != SCRIPT_ERR_OK);
+        BOOST_CHECK_EQUAL(expected_error, r.value());
+    }
 
     // Make sure that if we do not pass the opcodes flags, we get the same result
     if(upgradeFlag)
     {
         stack = LimitedStack(original_stack, UINT32_MAX);
-        r =
-            EvalScript(
-                config, true,
-                source->GetToken(),
-                stack,
-                script,
-                flags,
-                sigchecker,
-                &err);
-        BOOST_CHECK(!r.value());
-        BOOST_CHECK_EQUAL(err, expected_error);
+        r = EvalScript(params,
+                       source->GetToken(),
+                       stack,
+                       script,
+                       flags,
+                       sigchecker);
+        BOOST_REQUIRE(r);
+        BOOST_CHECK(r.value() != SCRIPT_ERR_OK);
+        BOOST_CHECK_EQUAL(expected_error, r.value());
     }
 }
 
@@ -183,19 +197,19 @@ static valtype to_bitpattern(const char *str) {
  
     valtype val((len - 1) / 8 + 1, 0); 
  
-    const char *pin = &str[len - 1]; 
+    const char *pin = &str[len - 1]; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     for (size_t i = 0; i < len; i++) {
-        int byte_idx = (len - 1 - i) / 8;
-        int bit_idx = i % 8; 
+        int byte_idx = (len - 1 - i) / 8; // NOLINT(*-narrowing-conversions)
+        int bit_idx = i % 8;              // NOLINT(*-narrowing-conversions)
  
-        int8_t mask = 1 << bit_idx; 
+        int8_t mask = 1 << bit_idx;       // NOLINT(*-narrowing-conversions)
  
         if (*pin == '0') {
             val[byte_idx] &= ~mask; 
         } else {
             val[byte_idx] |= mask; 
         } 
-        pin--; 
+        pin--; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     } 
     return val; 
 }
@@ -676,50 +690,48 @@ BOOST_AUTO_TEST_CASE(rshift_test)
 BOOST_AUTO_TEST_CASE(rshift_big_int)
 {
     constexpr std::vector<uint8_t>::size_type size{INT32_MAX};
-    std::vector<uint8_t> data(size + 1l, 0x00);
+    std::vector<uint8_t> data(size + 1L, 0x00);
     data[0] = 0x80;
 
     Config& config = GlobalConfig::GetConfig();
     BaseSignatureChecker sigchecker;
     auto source = task::CCancellationSource::Make();
-    ScriptError err = SCRIPT_ERR_OK;
 
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
-    auto r =
-        EvalScript(
-            config, true,
-            source->GetToken(),
-            stack,
-            CScript() << 1 << OP_RSHIFT,
-            flagset[0] | SCRIPT_UTXO_AFTER_GENESIS,
-            sigchecker,
-            &err);
-    BOOST_CHECK(r.value());
+    constexpr uint32_t flags{flagset[0] | SCRIPT_UTXO_AFTER_GENESIS};
+    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, true)};
+    const auto o = EvalScript(params,
+                              source->GetToken(),
+                              stack,
+                              CScript() << 1 << OP_RSHIFT,
+                              flags,
+                              sigchecker);
+    BOOST_REQUIRE(o);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, o.value());
     BOOST_CHECK(stack.front().GetElement()[0] == 0x40);
 }
 
 BOOST_AUTO_TEST_CASE(lshift_big_int)
 {
     constexpr std::vector<uint8_t>::size_type size{INT32_MAX};
-    std::vector<uint8_t> data(size + 2l, 0x00);
+    std::vector<uint8_t> data(size + 2L, 0x00);
     data[0] = 0x40;
 
     Config& config = GlobalConfig::GetConfig();
+    constexpr uint32_t flags{flagset[0] | SCRIPT_UTXO_AFTER_GENESIS};
+    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, true)};
     BaseSignatureChecker sigchecker;
     auto source = task::CCancellationSource::Make();
-    ScriptError err = SCRIPT_ERR_OK;
 
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
-    auto r =
-        EvalScript(
-            config, true,
-            source->GetToken(),
-            stack,
-            CScript() << 1 << OP_LSHIFT,
-            flagset[0] | SCRIPT_UTXO_AFTER_GENESIS,
-            sigchecker,
-            &err);
-    BOOST_CHECK(r.value());
+    const auto o = EvalScript(params,
+                              source->GetToken(),
+                              stack,
+                              CScript() << 1 << OP_LSHIFT,
+                              flags,
+                              sigchecker);
+    BOOST_REQUIRE(o);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, o.value());
     BOOST_CHECK(stack.front().GetElement()[0] == 0x80);
 }
 
@@ -737,26 +749,26 @@ static void CheckStringOp(const valtype &a, const valtype &b,
     CheckBinaryOp({}, b, OP_CAT, b);
 
     // Split n into a and b.
-    CheckTestResultForAllFlags({n}, CScript() << a.size() << OP_SPLIT, {a, b});
+    CheckTestResultForAllFlags({n}, CScript() << ssize(a) << OP_SPLIT, {a, b});
 
     // Combine split and cat.
-    CheckTestResultForAllFlags({n}, CScript() << a.size() << OP_SPLIT << OP_CAT,
+    CheckTestResultForAllFlags({n}, CScript() << ssize(a) << OP_SPLIT << OP_CAT,
                                {n});
     CheckTestResultForAllFlags(
-        {a, b}, CScript() << OP_CAT << a.size() << OP_SPLIT, {a, b});
+        {a, b}, CScript() << OP_CAT << ssize(a) << OP_SPLIT, {a, b});
 
     // Split away empty elements.
     CheckTestResultForAllFlags({a}, CScript() << 0 << OP_SPLIT, {{}, a});
     CheckTestResultForAllFlags({b}, CScript() << 0 << OP_SPLIT, {{}, b});
-    CheckTestResultForAllFlags({a}, CScript() << a.size() << OP_SPLIT, {a, {}});
-    CheckTestResultForAllFlags({b}, CScript() << b.size() << OP_SPLIT, {b, {}});
+    CheckTestResultForAllFlags({a}, CScript() << ssize(a) << OP_SPLIT, {a, {}});
+    CheckTestResultForAllFlags({b}, CScript() << ssize(b) << OP_SPLIT, {b, {}});
 
     // Out of bound split.
-    CheckErrorForAllFlags({a}, CScript() << (a.size() + 1) << OP_SPLIT,
+    CheckErrorForAllFlags({a}, CScript() << (ssize(a) + 1) << OP_SPLIT,
                           SCRIPT_ERR_INVALID_SPLIT_RANGE);
-    CheckErrorForAllFlags({b}, CScript() << (b.size() + 1) << OP_SPLIT,
+    CheckErrorForAllFlags({b}, CScript() << (ssize(b) + 1) << OP_SPLIT,
                           SCRIPT_ERR_INVALID_SPLIT_RANGE);
-    CheckErrorForAllFlags({n}, CScript() << (n.size() + 1) << OP_SPLIT,
+    CheckErrorForAllFlags({n}, CScript() << (ssize(n) + 1) << OP_SPLIT,
                           SCRIPT_ERR_INVALID_SPLIT_RANGE);
     CheckErrorForAllFlags({a}, CScript() << (-1) << OP_SPLIT,
                           SCRIPT_ERR_INVALID_SPLIT_RANGE);
@@ -820,7 +832,8 @@ BOOST_AUTO_TEST_CASE(string_opcodes_test) {
 
     BOOST_CHECK_EQUAL(n.size(), MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS);
 
-    for (size_t i = 0; i <= MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS; i++) {
+    for(decltype(n)::difference_type i = 0; i <= MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS; i++)
+    {
         valtype a(n.begin(), n.begin() + i);
         valtype b(n.begin() + i, n.end());
 
@@ -864,24 +877,24 @@ static void CheckTypeConversionOp(const valtype &bin, const valtype &num) {
         rebuilt_bin[rebuilt_bin.size() - 1] &= 0x7f;
     }
 
-    CheckTestResultForAllFlags({num}, CScript() << bin.size() << OP_NUM2BIN,
+    CheckTestResultForAllFlags({num}, CScript() << ssize(bin) << OP_NUM2BIN,
                                {rebuilt_bin});
 
     // Check roundtrip with NUM2BIN.
     CheckTestResultForAllFlags(
-        {bin}, CScript() << OP_BIN2NUM << bin.size() << OP_NUM2BIN,
+        {bin}, CScript() << OP_BIN2NUM << ssize(bin) << OP_NUM2BIN,
         {rebuilt_bin});
 
     // Grow and shrink back down using NUM2BIN.
     CheckTestResultForAllFlags({bin},
                                CScript()
                                    << MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS << OP_NUM2BIN
-                                   << bin.size() << OP_NUM2BIN,
+                                   << ssize(bin) << OP_NUM2BIN,
                                {rebuilt_bin});
     CheckTestResultForAllFlags({num},
                                CScript()
                                    << MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS << OP_NUM2BIN
-                                   << bin.size() << OP_NUM2BIN,
+                                   << ssize(bin) << OP_NUM2BIN,
                                {rebuilt_bin});
 
     // BIN2NUM is indempotent.
@@ -1126,7 +1139,7 @@ static void CheckDivMod(const valtype &a, const valtype &b,
     // Modulo identities
     // a % b % b = a % b
     CheckTestResultForAllFlags(
-        {a, b}, CScript() << OP_MOD << CScriptNum(b, true).getint() << OP_MOD,
+        {a, b}, CScript() << OP_MOD << CScriptNum(b, min_encoding_check::yes).getint() << OP_MOD,
         {modExpected});
 }
 
@@ -1192,7 +1205,7 @@ static uint64_t NonPushOpCodeCount(const CScript& script)
     CScript::const_iterator pc = script.begin(); 
     CScript::const_iterator pend = script.end(); 
     uint64_t cnt = 0;
-    opcodetype opcode; 
+    opcodetype opcode;  // NOLINT(cppcoreguidelines-init-variables)
     valtype value; 
     while (pc < pend) 
     { 
@@ -1201,8 +1214,8 @@ static uint64_t NonPushOpCodeCount(const CScript& script)
              ++cnt;
     }
     // Include multisig opcode count as well.
-    bool sigOpCountError;
-    return cnt + script.GetSigOpCount(true, false, sigOpCountError);
+    bool sigOpCountError {false};
+    return cnt + script.GetSigOpCount(true, ProtocolEra::PreGenesis, sigOpCountError);
 } 
  
 static void CheckTestForOpCodeLimit(const CScript &script,
@@ -1210,28 +1223,28 @@ static void CheckTestForOpCodeLimit(const CScript &script,
                                     const BaseSignatureChecker& sigchecker)
 { 
     const Config& config = GlobalConfig::GetConfig();
-    for (uint32_t flags : flagset) {
-        ScriptError err = SCRIPT_ERR_OK;
-
+    for(uint32_t flags : flagset)
+    {
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, true)};
         LimitedStack stack(UINT32_MAX);
-        auto r =
-            EvalScript(
-                config, true,
-                task::CCancellationSource::Make(),
-                stack,
-                script,
-                flags,
-                sigchecker,
-                &err);
+        const auto o = EvalScript(params,
+                                  task::CCancellationSource::Make(),
+                                  stack,
+                                  script,
+                                  flags,
+                                  sigchecker);
         uint64_t nonPushOpcodeCount = NonPushOpCodeCount(script);
 
-        // // flagset does not contain SCRIPT_UTXO_AFTER_GENESIS flag, so we will test with isGenesisEnabled=false in if
+        // flagset does not contain SCRIPT_UTXO_AFTER_GENESIS flag, so we will test with isGenesisEnabled=false in if
         BOOST_REQUIRE(!(flags & SCRIPT_UTXO_AFTER_GENESIS));
-        if (nonPushOpcodeCount > config.GetMaxOpsPerScript(false, true))
+        BOOST_REQUIRE(o);
+        if(nonPushOpcodeCount > config.GetMaxOpsPerScript(false, true))
         {
-            BOOST_CHECK(!r.value());
-        } else {
-            BOOST_CHECK(r.value());
+            BOOST_CHECK(o.value() != SCRIPT_ERR_OK);
+        }
+        else
+        {
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, o.value());
         }
         BOOST_CHECK(nonPushOpcodeCount == expNonPushOpcodeCount);
     }
@@ -1296,6 +1309,1410 @@ BOOST_AUTO_TEST_CASE(opcode_limit_tests)
     CheckTestForOpCodeLimit(add_op1_ntimes(testLimit-4) + dummy_multisig, testLimit, sigchecker);
     // test with MAX_OPS_PER_SCRIPT-3+4 opcodes, which is over MAX_OPS_PER_SCRIPT legacy limit
     CheckTestForOpCodeLimit(add_op1_ntimes(testLimit-3) + dummy_multisig, testLimit+1, sigchecker);
+}
+
+BOOST_AUTO_TEST_CASE(op_ver_pre_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    const vector<uint8_t> args{OP_VER};
+    CScript script(args.begin(), args.end());
+
+    const auto flags{SCRIPT_GENESIS};
+    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const auto o = EvalScript(params,
+                              source->GetToken(),
+                              stack,
+                              script,
+                              flags,
+                              BaseSignatureChecker{});
+    BOOST_REQUIRE(o);
+    BOOST_CHECK(o.value() != SCRIPT_ERR_OK);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_BAD_OPCODE, o.value());
+    BOOST_CHECK(stack.empty());
+}
+
+BOOST_AUTO_TEST_CASE(op_ver_post_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using test_args = tuple<int32_t,            // tx_version
+                            vector<uint8_t>,    // script
+                            bool,               // expected status
+                            vector<uint8_t>>;   // expected top of stack
+    const vector<test_args> test_data 
+    {
+      { 0, {OP_VER}, true, { 0, 0, 0, 0}},
+
+      { 1, {OP_VER}, true, { 1, 0, 0, 0 }},
+      { 0x12345678, {OP_VER}, true, { 0x78, 0x56, 0x34, 0x12 }},
+      { INT32_MAX, {OP_VER}, true, { 0xff, 0xff, 0xff, 0x7f }},
+
+      { -1, {OP_VER}, true, { 0xff, 0xff, 0xff, 0xff }},
+      { -2, {OP_VER}, true, { 0xfe, 0xff, 0xff, 0xff }},
+      { INT32_MIN, {OP_VER}, true, { 0x0, 0x0, 0x0, 0x80 }},
+    };
+
+    for(const auto& [tx_version, script, exp_status, exp_stack_top] : test_data)
+    {
+        const auto flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        CMutableTransaction mtx;
+        mtx.nVersion = tx_version;
+        MutableTransactionSignatureChecker checker{&mtx, 0, Amount{0}};
+
+        const auto o = EvalScript(params,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  checker);
+        BOOST_REQUIRE(o);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, o.value());
+        BOOST_CHECK_EQUAL(1U, stack.size());
+        const auto& actual{stack.stacktop(-1)};
+        BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top.begin(), exp_stack_top.end(),
+                                      actual.begin(), actual.end());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_verif_pre_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using test_args = tuple<int32_t,            // tx_version
+                            vector<uint8_t>,    // script
+                            int32_t,            // flags
+                            ScriptError>;       // expected scriptError
+    const vector<test_args> test_data
+    {
+      { 1, { OP_VERIF }, 0, SCRIPT_ERR_BAD_OPCODE },
+      { 1, { OP_VERIF },
+           SCRIPT_UTXO_AFTER_GENESIS, SCRIPT_ERR_BAD_OPCODE },
+      { 1, { OP_0,
+               OP_IF,
+                 OP_VERIF, // not executed
+               OP_ENDIF }, 0, SCRIPT_ERR_BAD_OPCODE },
+      { 1, { OP_0,
+               OP_IF,
+                 OP_VERIF, // not executed
+               OP_ENDIF },
+            SCRIPT_UTXO_AFTER_GENESIS, SCRIPT_ERR_OK },
+    };
+
+    for(const auto& [tx_version,
+                     script,
+                     flags,
+                     exp_error] : test_data)
+    {
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto o = EvalScript(params,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  BaseSignatureChecker{});
+        BOOST_REQUIRE(o);
+        if(exp_error == SCRIPT_ERR_OK)
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, o.value());
+        else
+        {
+            BOOST_CHECK(o.value() != SCRIPT_ERR_OK);
+            BOOST_CHECK_EQUAL(exp_error, o.value());
+        }
+        BOOST_CHECK(stack.empty());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_verif_post_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using exp_stack_top_type = std::optional<std::vector<uint8_t>>;
+    using test_args = tuple<int32_t,                    // tx_version
+                            vector<uint8_t>,            // script
+                            ScriptError,                // expected scriptError
+                            LimitedStack::size_type,    // expected stack size 
+                            exp_stack_top_type>;        // expected top of stack
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+    const vector<test_args> test_data 
+    {
+      // Unbalanced cases
+      { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_VERIF,
+              OP_2 }, 
+            SCRIPT_ERR_UNBALANCED_CONDITIONAL, 1, exp_stack_top_type{{2}} },
+      { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_VERIF,
+              OP_2,
+            OP_ELSE},
+            SCRIPT_ERR_UNBALANCED_CONDITIONAL, 1, exp_stack_top_type{{2}} },
+      
+      // Non-matching cases
+      // Too short
+      { 1, {OP_PUSHDATA1, 1, 1,
+            OP_VERIF, // no statements
+            OP_ENDIF}, SCRIPT_ERR_OK, 0, exp_stack_top_type{} },
+      { 1, {OP_PUSHDATA1, 1, 1,
+            OP_VERIF,
+              OP_2, // statement not executed
+            OP_ENDIF}, SCRIPT_ERR_OK, 0, exp_stack_top_type{} },
+      { 1, {OP_PUSHDATA1, 1, 1,
+            OP_VERIF,
+              OP_2,
+            OP_ELSE,
+              OP_3, // else executed 
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{3}} },
+      { 1, {OP_PUSHDATA1, 1, 1,
+            OP_VERIF,
+              OP_2,
+            OP_ELSE,
+              OP_3,
+              OP_NEGATE, // multiple statements
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{0x83}} },
+      { 1, {OP_PUSHDATA1, 2, 1, 0,
+            OP_VERIF,
+              OP_2,
+            OP_ELSE,
+              OP_3,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{3}} },
+      { 1, {OP_PUSHDATA1, 3, 1, 0, 0, 
+            OP_VERIF,
+              OP_2,
+            OP_ELSE,
+              OP_3, 
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{3}} },
+
+      { 1, {OP_PUSHDATA1, 5, 1, 0, 0, 0, 0, // Too long
+            OP_VERIF,
+              OP_2,
+            OP_ELSE,
+              OP_3,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{3}} },
+      { 1, {OP_PUSHDATA1, 4, 2, 0, 0, 0,    // Wrong value
+            OP_VERIF,
+              OP_2,
+            OP_ELSE,
+              OP_3,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{3}} },
+      { 1, {OP_PUSHDATA1, 4, 0, 0, 0, 1,    // Wrong endian
+            OP_VERIF,
+              OP_2,
+            OP_ELSE,
+              OP_3,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{3}} },
+      
+      // Matching cases
+      { 0, {OP_PUSHDATA1, 4, 0, 0, 0, 0,
+            OP_VERIF,
+              OP_2,
+            OP_ELSE,
+              OP_3,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
+      { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_VERIF,
+              OP_2,
+            OP_ELSE,
+              OP_3,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
+      { INT32_MAX, {OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0x7f,
+                    OP_VERIF,
+                      OP_2,
+                    OP_ELSE,
+                      OP_3,
+                    OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
+      { INT32_MIN, {OP_PUSHDATA1, 4, 0x0, 0x0, 0x0, 0x80,
+                    OP_VERIF,
+                      OP_2,
+                    OP_ELSE,
+                      OP_3,
+                    OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
+      { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_VERIF, // No statements
+            OP_ENDIF}, SCRIPT_ERR_OK, 0, exp_stack_top_type{} },
+      { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_VERIF,
+              OP_2,   // no else 
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
+      { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_VERIF,
+              OP_2, OP_NEGATE,  // multiple statements
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{0x82}} },
+      // nesting
+      { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_VERIF,
+              OP_VERIF,
+                OP_2,
+              OP_ENDIF,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
+      { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_PUSHDATA1, 4, 2, 0, 0, 0,
+            OP_VERIF,
+            OP_ELSE,
+              OP_VERIF,
+                OP_2,
+              OP_ENDIF,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
+      { 1, {OP_PUSHDATA1, 4, 2, 0, 0, 0,
+            OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_VERIF,
+              OP_VERIF,
+              OP_ELSE,
+                OP_2,
+              OP_ENDIF,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
+      { 1, {OP_PUSHDATA1, 4, 2, 0, 0, 0,
+            OP_PUSHDATA1, 4, 2, 0, 0, 0,
+            OP_VERIF,
+            OP_ELSE,
+              OP_VERIF,
+              OP_ELSE,
+                OP_2,
+              OP_ENDIF,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
+    };
+
+    for(const auto& [tx_version,
+                     script,
+                     exp_error,
+                     exp_stack_size,
+                     exp_stack_top] : test_data)
+    {
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        CMutableTransaction mtx;
+        mtx.nVersion = tx_version;
+        MutableTransactionSignatureChecker checker{&mtx, 0, Amount{0}};
+
+        const auto status = EvalScript(params,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       checker);
+        BOOST_REQUIRE(status);
+        if(exp_error == SCRIPT_ERR_OK)
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
+        else
+        {
+            BOOST_CHECK(status.value() != SCRIPT_ERR_OK);
+            BOOST_CHECK_EQUAL(exp_error, status.value());
+        }
+
+        BOOST_CHECK_EQUAL(exp_stack_size, stack.size());
+        BOOST_CHECK_EQUAL(exp_stack_size!=0, exp_stack_top.has_value());
+        if(exp_stack_top)
+        {
+            const auto& actual{stack.stacktop(-1)};
+            BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top->begin(), exp_stack_top->end(),
+                                          actual.begin(), actual.end());
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_vernotif_pre_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using test_args = tuple<int32_t,            // tx_version
+                            vector<uint8_t>,    // script
+                            int32_t,            // flags
+                            ScriptError>;       // expected scriptError
+    const vector<test_args> test_data
+    {
+      { 1, { OP_VERNOTIF }, 0, SCRIPT_ERR_BAD_OPCODE },
+      { 1, { OP_VERNOTIF },
+           SCRIPT_UTXO_AFTER_GENESIS, SCRIPT_ERR_BAD_OPCODE },
+      { 1, { OP_0,
+               OP_IF,
+                 OP_VERNOTIF, // not executed
+               OP_ENDIF }, 0, SCRIPT_ERR_BAD_OPCODE },
+      { 1, { OP_0,
+               OP_IF,
+                 OP_VERNOTIF, // not executed
+               OP_ENDIF },
+            SCRIPT_UTXO_AFTER_GENESIS, SCRIPT_ERR_OK },
+    };
+
+    for(const auto& [tx_version,
+                     script,
+                     flags,
+                     exp_error] : test_data)
+    {
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto o = EvalScript(params,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  BaseSignatureChecker{});
+        BOOST_REQUIRE(o);
+        if(exp_error == SCRIPT_ERR_OK)
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, o.value());
+        else
+        {
+            BOOST_CHECK(o.value() != SCRIPT_ERR_OK);
+            BOOST_CHECK_EQUAL(exp_error, o.value());
+        }
+        BOOST_CHECK(stack.empty());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_vernotif_post_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using exp_stack_top_type = std::optional<std::vector<uint8_t>>;
+    using test_args = tuple<int32_t,                    // tx_version
+                            vector<uint8_t>,            // script
+                            ScriptError,                // expected scriptError
+                            LimitedStack::size_type,    // expected stack size 
+                            exp_stack_top_type>;        // expected top of stack
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+    const vector<test_args> test_data = 
+    {
+      // Unbalanced cases
+      { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_VERNOTIF,
+              OP_2 }, SCRIPT_ERR_UNBALANCED_CONDITIONAL, 0, {} },
+      { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_VERNOTIF,
+              OP_2,
+            OP_ELSE}, SCRIPT_ERR_UNBALANCED_CONDITIONAL, 0, {} },
+      
+      // Too short
+      { 1, {OP_PUSHDATA1, 1, 1,
+            OP_VERNOTIF, // no statements
+            OP_ENDIF}, SCRIPT_ERR_OK, 0, {} },
+
+      { 1, {OP_PUSHDATA1, 1, 1,
+            OP_VERNOTIF,
+              OP_2, // statement executed
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{2}} },
+      { 1, {OP_PUSHDATA1, 1, 2,
+            OP_VERNOTIF,
+              OP_2,
+            OP_ELSE,
+              OP_3,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{2}} },
+      { 1, {OP_PUSHDATA1, 1, 1,
+            OP_VERNOTIF,
+              OP_2,
+              OP_NEGATE, // multiple statements
+            OP_ELSE,
+              OP_3,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{0x82}} },
+      { 1, {OP_PUSHDATA1, 2, 1, 0,
+            OP_VERNOTIF,
+              OP_2,
+            OP_ELSE,
+              OP_3,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{2}} },
+      { 1, {OP_PUSHDATA1, 3, 1, 0, 0, 
+            OP_VERNOTIF,
+                OP_2,
+            OP_ELSE,
+                OP_3, 
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{2}} },
+      { 1, {OP_PUSHDATA1, 5, 1, 0, 0, 0, 0,     // Too long
+            OP_VERNOTIF,
+                OP_2,
+            OP_ELSE,
+                OP_3,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{2}} },
+      { 1, {OP_PUSHDATA1, 4, 2, 0, 0, 0,        // Wrong value
+            OP_VERNOTIF,
+              OP_2,
+            OP_ELSE,
+              OP_3,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{2}} },
+      { 1, {OP_PUSHDATA1, 4, 0, 0, 0, 1,        // Wrong endian
+            OP_VERNOTIF,
+              OP_2,
+            OP_ELSE,
+              OP_3,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{2}} },
+
+      // Matching cases
+      { 0, {OP_PUSHDATA1, 4, 0, 0, 0, 0,
+            OP_VERNOTIF,
+              OP_2,
+            OP_ELSE,
+              OP_3,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{3}} },
+      { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_VERNOTIF,
+              OP_2,
+            OP_ELSE,
+              OP_3,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{3}} },
+      { INT32_MAX, {OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0x7f,
+                    OP_VERNOTIF,
+                      OP_2,
+                    OP_ELSE,
+                      OP_3,
+                    OP_ENDIF}, SCRIPT_ERR_OK, 1, {{3}} },
+      { INT32_MIN, {OP_PUSHDATA1, 4, 0x0, 0x0, 0x0, 0x80,
+                    OP_VERNOTIF,
+                      OP_2,
+                    OP_ELSE,
+                      OP_3,
+                    OP_ENDIF}, SCRIPT_ERR_OK, 1, {{3}} },
+
+      { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_VERNOTIF, // No statements
+            OP_ENDIF}, SCRIPT_ERR_OK, 0, {} },
+      { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_VERNOTIF,
+              OP_2,   // no else 
+            OP_ENDIF}, SCRIPT_ERR_OK, 0, {} },
+      { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_VERNOTIF,
+            OP_ELSE,
+              OP_2, OP_NEGATE,  // multiple statements
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{0x82}} },
+      // nesting
+      { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_VERNOTIF,
+              OP_ELSE,
+                OP_VERNOTIF,
+                OP_ELSE,
+                    OP_3,
+                OP_ENDIF,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{3}} },
+      { 1, {OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_PUSHDATA1, 4, 2, 0, 0, 0,
+            OP_VERNOTIF,
+              OP_VERNOTIF,
+                OP_ELSE,
+                OP_3,
+              OP_ENDIF,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{3}} },
+      { 1, {OP_PUSHDATA1, 4, 2, 0, 0, 0,
+            OP_PUSHDATA1, 4, 1, 0, 0, 0,
+            OP_VERNOTIF,
+                OP_ELSE,
+                OP_VERNOTIF,
+                  OP_3,
+                OP_ENDIF,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{3}} },
+      { 1, {OP_PUSHDATA1, 4, 2, 0, 0, 0,
+            OP_PUSHDATA1, 4, 2, 0, 0, 0,
+            OP_VERNOTIF,
+                OP_VERNOTIF,
+                  OP_3,
+                OP_ENDIF,
+            OP_ENDIF}, SCRIPT_ERR_OK, 1, {{3}} },
+    };
+
+    for(const auto& [tx_version,
+                     script,
+                     exp_error,
+                     exp_stack_size,
+                     exp_stack_top] : test_data)
+    {
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        CMutableTransaction mtx;
+        mtx.nVersion = tx_version;
+        MutableTransactionSignatureChecker checker{&mtx, 0, Amount{0}};
+        const auto status = EvalScript(params,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       checker);
+        BOOST_REQUIRE(status);
+        if(exp_error == SCRIPT_ERR_OK)
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
+        else
+        {
+            BOOST_CHECK(status.value() != SCRIPT_ERR_OK);
+            BOOST_CHECK_EQUAL(exp_error, status.value());
+        }
+        BOOST_CHECK_EQUAL(exp_stack_size, stack.size());
+        BOOST_CHECK_EQUAL(exp_stack_size!=0, exp_stack_top.has_value());
+        if(exp_stack_top)
+        {
+            const auto& actual{stack.stacktop(-1)};
+            BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top->begin(), exp_stack_top->end(),
+                                          actual.begin(), actual.end());
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_substr_pre_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using test_args = tuple<vector<uint8_t>,    // script
+                            int32_t,            // flags
+                            ScriptError>;       // expected scriptError
+    const vector<test_args> test_data
+    {
+        { {OP_NOP4}, 0, SCRIPT_ERR_OK },
+        { {OP_NOP4}, SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS, 
+                        SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS}
+    };
+
+    for(const auto& [script,
+                     flags,
+                     exp_error] : test_data)
+    {
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto o = EvalScript(params,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  BaseSignatureChecker{});
+        BOOST_REQUIRE(o);
+        if(exp_error == SCRIPT_ERR_OK)
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, o.value());
+        else
+        {
+            BOOST_CHECK(o.value() != SCRIPT_ERR_OK);
+            BOOST_CHECK_EQUAL(exp_error, o.value());
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_substr_post_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using exp_stack_top_type = std::optional<std::vector<uint8_t>>;
+    using test_args = tuple<vector<uint8_t>,            // script
+                            ScriptError,                // expected scriptError
+                            LimitedStack::size_type,    // expected stack size 
+                            exp_stack_top_type>;             // expected top of stack
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+    const vector<test_args> test_data
+    {
+      // Stack too small
+      { {OP_SUBSTR},
+            SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top_type{} },
+      { {OP_1, OP_SUBSTR},
+            SCRIPT_ERR_INVALID_STACK_OPERATION, 1, exp_stack_top_type{{1}} },
+      { {OP_1, OP_2, OP_SUBSTR},
+            SCRIPT_ERR_INVALID_STACK_OPERATION, 2, exp_stack_top_type{{2}} },
+      // negative start 
+      { {OP_1, OP_2, OP_PUSHDATA1, 1, 0x81, OP_SUBSTR},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top_type{{0x81}} },
+      // start out-of-bounds
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_3, OP_1, OP_SUBSTR},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top_type{{1}} },
+      // negative length 
+      { {OP_1, OP_PUSHDATA1, 1, 0x81, OP_3, OP_SUBSTR},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top_type{{3}} },
+      // length out-of-bounds
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0, OP_4, OP_SUBSTR},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top_type{{4}} },
+      // An empty stack element as input data is always an error - no valid start position
+      { {OP_0, OP_0, OP_0, OP_SUBSTR}, // empty stacktop
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top_type{std::in_place} },
+
+      // Success cases
+      // length zero 
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0, OP_0, OP_SUBSTR},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_1, OP_0, OP_SUBSTR},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_2, OP_0, OP_SUBSTR},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
+
+      // length one 
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0, OP_1, OP_SUBSTR},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0}} },
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_1, OP_1, OP_SUBSTR},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{1}} },
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_2, OP_1, OP_SUBSTR},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{2}} },
+      
+      // length two 
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0, OP_2, OP_SUBSTR},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0, 1}} },
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_1, OP_2, OP_SUBSTR},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{1, 2}} },
+    };
+
+    for(const auto& [script,
+                     exp_error,
+                     exp_stack_size,
+                     exp_stack_top] : test_data)
+    {
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto status = EvalScript(params,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        if(exp_error == SCRIPT_ERR_OK)
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
+        else 
+        {
+            BOOST_CHECK(status.value() != SCRIPT_ERR_OK);
+            BOOST_CHECK_EQUAL(exp_error, status.value());
+        }
+        BOOST_CHECK_EQUAL(exp_stack_size, stack.size());
+        BOOST_CHECK_EQUAL(exp_stack_size!=0, exp_stack_top.has_value());
+        if(exp_stack_top.has_value())
+        {
+            const auto& actual{stack.stacktop(-1)};
+            BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top->begin(), exp_stack_top->end(),
+                                          actual.begin(), actual.end());
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_left_pre_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using test_args = tuple<vector<uint8_t>,    // script
+                            int32_t,            // flags
+                            ScriptError>;       // expected scriptError
+    const vector<test_args> test_data 
+    {
+        { {OP_NOP5}, 0, SCRIPT_ERR_OK },
+        { {OP_NOP5}, SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS, 
+                        SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS}
+    };
+    for(const auto& [script,
+                     flags,
+                     exp_error] : test_data)
+    {
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto o = EvalScript(params,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  BaseSignatureChecker{});
+        BOOST_REQUIRE(o);
+        if(exp_error == SCRIPT_ERR_OK)
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, o.value());
+        else
+        {
+            BOOST_CHECK(o.value() != SCRIPT_ERR_OK);
+            BOOST_CHECK_EQUAL(exp_error, o.value());
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_left_post_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using exp_stack_top_type = std::optional<std::vector<uint8_t>>;
+    using test_args = tuple<vector<uint8_t>,            // script
+                            ScriptError,                // expected scriptError
+                            LimitedStack::size_type,    // expected stack size 
+                            exp_stack_top_type>;        // expected top of stack
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+    const vector<test_args> test_data
+    {
+      // Stack too small
+      { {OP_LEFT},
+            SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top_type{} },
+      { {OP_1, OP_LEFT},
+            SCRIPT_ERR_INVALID_STACK_OPERATION, 1, exp_stack_top_type{{1}} },
+      // negative length 
+      { {OP_1, OP_1, OP_NEGATE, OP_LEFT},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{0x81}} },
+      
+      // Empty string
+      { {OP_0, OP_0, OP_LEFT},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
+      { {OP_0, OP_1, OP_LEFT},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{1}} },
+     
+      // Single element
+      { {OP_PUSHDATA1, 1, 0, OP_0, OP_LEFT},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
+      { {OP_PUSHDATA1, 1, 0, OP_1, OP_LEFT},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0}} },
+      { {OP_PUSHDATA1, 1, 0, OP_2, OP_LEFT},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{2}} },
+     
+      // Multiple elements
+      { {OP_PUSHDATA1, 2, 0, 1, OP_0, OP_LEFT},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
+      { {OP_PUSHDATA1, 2, 0, 1, OP_1, OP_LEFT},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0}} },
+      { {OP_PUSHDATA1, 2, 0, 1, OP_2, OP_LEFT},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0, 1}} },
+      { {OP_PUSHDATA1, 2, 0, 1, OP_3, OP_LEFT}, // length out-of-bounds
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{3}} },
+    };
+
+    for(const auto& [script,
+                     exp_error,
+                     exp_stack_size,
+                     exp_stack_top] : test_data)
+    {
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto status = EvalScript(params,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        if(exp_error == SCRIPT_ERR_OK)
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
+        else
+        {
+            BOOST_CHECK(status.value() != SCRIPT_ERR_OK);
+            BOOST_CHECK_EQUAL(exp_error, status.value());
+        }
+        BOOST_CHECK_EQUAL(exp_stack_size, stack.size());
+        BOOST_CHECK_EQUAL(exp_stack_size!=0, exp_stack_top.has_value());
+        if(exp_stack_top.has_value())
+        {
+            const auto& actual{stack.stacktop(-1)};
+            BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top->begin(), exp_stack_top->end(),
+                                          actual.begin(), actual.end());
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_right_pre_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using test_args = tuple<vector<uint8_t>,    // script
+                            int32_t,            // flags
+                            ScriptError>;       // expected scriptError
+    const vector<test_args> test_data
+    {
+        { {OP_NOP6}, 0, SCRIPT_ERR_OK },
+        { {OP_NOP6}, SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS, 
+                        SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS}
+    };
+    for(const auto& [script,
+                     flags,
+                     exp_error] : test_data)
+    {
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto o = EvalScript(params,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  BaseSignatureChecker{});
+        BOOST_REQUIRE(o);
+        if(exp_error == SCRIPT_ERR_OK)
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, o.value());
+        else
+        {
+            BOOST_CHECK(o.value() != SCRIPT_ERR_OK);
+            BOOST_CHECK_EQUAL(exp_error, o.value());
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_right_post_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using exp_stack_top_type = std::optional<std::vector<uint8_t>>;
+    using test_args = tuple<vector<uint8_t>,            // script
+                            ScriptError,                // expected scriptError
+                            LimitedStack::size_type,    // expected stack size 
+                            exp_stack_top_type>;             // expected top of stack
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+    const vector<test_args> test_data
+    {
+      // Stack too small
+      { {OP_RIGHT},
+            SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top_type{} },
+      { {OP_1, OP_RIGHT},
+            SCRIPT_ERR_INVALID_STACK_OPERATION, 1, exp_stack_top_type{{1}} },
+      // negative length 
+      { {OP_1, OP_1, OP_NEGATE, OP_RIGHT},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{0x81}} },
+      
+      // Empty string
+      { {OP_0, OP_0, OP_RIGHT},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
+      { {OP_0, OP_1, OP_RIGHT},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{1}} },
+
+      // Single element
+      { {OP_PUSHDATA1, 1, 0, OP_0, OP_RIGHT},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
+      { {OP_PUSHDATA1, 1, 0, OP_1, OP_RIGHT},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0}} },
+      { {OP_PUSHDATA1, 1, 0, OP_2, OP_RIGHT},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{2}} },
+
+      // Multiple elements
+      { {OP_PUSHDATA1, 2, 0, 1, OP_0, OP_RIGHT},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{std::in_place} },
+      { {OP_PUSHDATA1, 2, 0, 1, OP_1, OP_RIGHT},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{1}} },
+      { {OP_PUSHDATA1, 2, 0, 1, OP_2, OP_RIGHT},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0, 1}} },
+      { {OP_PUSHDATA1, 2, 0, 1, OP_3, OP_RIGHT},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{3}} },
+    };
+
+    for(const auto& [script,
+                     exp_error,
+                     exp_stack_size,
+                     exp_stack_top] : test_data)
+    {
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto status = EvalScript(params,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        if(exp_error == SCRIPT_ERR_OK)
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
+        else
+        {
+            BOOST_CHECK(status.value() != SCRIPT_ERR_OK);
+            BOOST_CHECK_EQUAL(exp_error, status.value());
+        }
+        BOOST_CHECK_EQUAL(exp_stack_size, stack.size());
+        BOOST_CHECK_EQUAL(exp_stack_size!=0, exp_stack_top.has_value());
+        if(exp_stack_top.has_value())
+        {
+            const auto& actual{stack.stacktop(-1)};
+            BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top->begin(), exp_stack_top->end(),
+                                          actual.begin(), actual.end());
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_2mul_pre_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using test_args = tuple<vector<uint8_t>,    // script
+                            int32_t,            // flags
+                            ScriptError>;       // expected scriptError
+    const vector<test_args> test_data 
+    {
+        {{OP_2MUL}, 0, SCRIPT_ERR_DISABLED_OPCODE },
+        {{OP_2MUL}, SCRIPT_UTXO_AFTER_GENESIS, SCRIPT_ERR_DISABLED_OPCODE },
+        {{OP_0,
+            OP_IF,
+              OP_2MUL,  // not executed
+            OP_ENDIF}, 0, SCRIPT_ERR_DISABLED_OPCODE},
+        {{OP_0,
+            OP_IF,
+              OP_2MUL,  // not executed
+            OP_ENDIF}, SCRIPT_UTXO_AFTER_GENESIS, SCRIPT_ERR_OK},
+    };
+    for(const auto& [script,
+                     flags,
+                     exp_error] : test_data)
+    {
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto o = EvalScript(params,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  BaseSignatureChecker{});
+        BOOST_REQUIRE(o);
+        if(exp_error == SCRIPT_ERR_OK)
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, o.value());
+        else
+        {
+            BOOST_CHECK(o.value() != SCRIPT_ERR_OK);
+            BOOST_CHECK_EQUAL(exp_error, o.value());
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_2mul_post_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using exp_stack_top_type = std::optional<std::vector<uint8_t>>;
+    using test_args = tuple<vector<uint8_t>,            // script
+                            ScriptError,                // expected scriptError
+                            LimitedStack::size_type,    // expected stack size 
+                            exp_stack_top_type>;             // expected top of stack
+
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+    const vector<test_args> test_data 
+    {
+        // stack too small
+        {{OP_2MUL}, 
+                SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top_type{}},
+
+        // Happy cases
+        {{OP_0, OP_2MUL}, 
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ std::in_place }},
+        {{OP_1, OP_2MUL}, 
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {2} }},
+        {{OP_1, OP_NEGATE, OP_2MUL}, 
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {0x82} }},
+        {{OP_2, OP_2MUL}, 
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {4} } },
+        {{OP_2, OP_NEGATE, OP_2MUL}, 
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {0x84} }},
+
+        // byte boundary and sign convention 
+        {{OP_PUSHDATA1, 1, 0xff, OP_2, OP_MUL, // -127 * 2
+          OP_PUSHDATA1, 1, 0xff, OP_2MUL,      // -127 * 2
+          OP_2DUP,
+          OP_EQUALVERIFY}, 
+                SCRIPT_ERR_OK, 2, exp_stack_top_type{ {0xfe, 0x80} }},
+
+        // INT64_MAX
+        {{OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0x7f, OP_2MUL},
+
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {0xfe, 0xff, 0xff, 0xff, 0x0} }},
+        // INT64_MIN
+        {{OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0xff, OP_2MUL},
+
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {0xfe, 0xff, 0xff, 0xff, 0x80} }},
+
+        // conditionals 
+        {{OP_0,
+          OP_IF,
+            OP_1, OP_2MUL, // not executed
+          OP_ENDIF}, 
+                SCRIPT_ERR_OK, 0, exp_stack_top_type{}},
+        {{OP_1,
+          OP_IF,
+            OP_1, OP_2MUL,
+          OP_ENDIF}, 
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {2} }},
+    };
+    for(const auto& [script,
+                     exp_error,
+                     exp_stack_size,
+                     exp_stack_top] : test_data)
+    {
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto status = EvalScript(params,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        if(exp_error == SCRIPT_ERR_OK)
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
+        else
+        {
+            BOOST_CHECK(status.value() != SCRIPT_ERR_OK);
+            BOOST_CHECK_EQUAL(exp_error, status.value());
+        }
+        BOOST_CHECK_EQUAL(exp_stack_size, stack.size());
+        BOOST_CHECK_EQUAL(exp_stack_size!=0, exp_stack_top.has_value());
+        if(exp_stack_top.has_value())
+        {
+            const auto& actual{stack.stacktop(-1)};
+            BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top->begin(), exp_stack_top->end(),
+                                          actual.begin(), actual.end());
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_mul_len_invariant)
+{
+    using namespace std;
+
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const vector<uint8_t> script{ 1, 0x40, OP_2, OP_MUL };
+    const int64_t max_ops{1};
+    const int64_t max_scriptnum_len{1};
+    const eval_script_params params{max_ops, max_scriptnum_len, script.size(), 0};
+    const auto status = EvalScript(params,
+                                   source->GetToken(),
+                                   stack,
+                                   CScript{script.begin(), script.end()},
+                                   flags,
+                                   BaseSignatureChecker{});
+    BOOST_CHECK(status);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_SCRIPTNUM_OVERFLOW, *status);
+}
+
+BOOST_AUTO_TEST_CASE(op_2mul_len_invariant)
+{
+    using namespace std;
+
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const vector<uint8_t> script{ 1, 0x40, OP_2MUL };
+    const int64_t max_ops{1};
+    const int64_t max_scriptnum_len{1};
+    const eval_script_params params{max_ops, max_scriptnum_len, script.size(), 0};
+    const auto status = EvalScript(params,
+                                   source->GetToken(),
+                                   stack,
+                                   CScript{script.begin(), script.end()},
+                                   flags,
+                                   BaseSignatureChecker{});
+    BOOST_CHECK(status);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_SCRIPTNUM_OVERFLOW, *status);
+}
+
+BOOST_AUTO_TEST_CASE(op_add_len_invariant)
+{
+    using namespace std;
+
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const vector<uint8_t> script{ 1, 0x7f, 1, 0x7f, OP_ADD };
+    const int64_t max_ops{1};
+    const int64_t max_scriptnum_len{1};
+    const eval_script_params params{max_ops, max_scriptnum_len, script.size(), 0};
+    const auto status = EvalScript(params,
+                                   source->GetToken(),
+                                   stack,
+                                   CScript{script.begin(), script.end()},
+                                   flags,
+                                   BaseSignatureChecker{});
+    BOOST_CHECK(status);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_SCRIPTNUM_OVERFLOW, *status);
+}
+
+BOOST_AUTO_TEST_CASE(op_1add_len_invariant)
+{
+    using namespace std;
+
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const vector<uint8_t> script{ 1, 0x7f, OP_1ADD };
+    const int64_t max_ops{1};
+    const int64_t max_scriptnum_len{1};
+    const eval_script_params params{max_ops, max_scriptnum_len, script.size(), 0};
+    const auto status = EvalScript(params,
+                                   source->GetToken(),
+                                   stack,
+                                   CScript{script.begin(), script.end()},
+                                   flags,
+                                   BaseSignatureChecker{});
+    BOOST_CHECK(status);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_SCRIPTNUM_OVERFLOW, *status);
+}
+
+BOOST_AUTO_TEST_CASE(op_sub_len_invariant)
+{
+    using namespace std;
+
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const vector<uint8_t> script{ OP_1NEGATE, 1, 0x7f, OP_SUB };
+    const int64_t max_ops{1};
+    const int64_t max_scriptnum_len{1};
+    const eval_script_params params{max_ops, max_scriptnum_len, script.size(), 0};
+    const auto status = EvalScript(params,
+                                   source->GetToken(),
+                                   stack,
+                                   CScript{script.begin(), script.end()},
+                                   flags,
+                                   BaseSignatureChecker{});
+    BOOST_CHECK(status);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_SCRIPTNUM_OVERFLOW, *status);
+}
+
+BOOST_AUTO_TEST_CASE(op_1sub_len_invariant)
+{
+    using namespace std;
+
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const vector<uint8_t> script{ 1, 0x7f, OP_NEGATE, OP_1SUB };
+    const int64_t max_ops{2};
+    const int64_t max_scriptnum_len{1};
+    const eval_script_params params{max_ops, max_scriptnum_len, script.size(), 0};
+    const auto status = EvalScript(params,
+                                   source->GetToken(),
+                                   stack,
+                                   CScript{script.begin(), script.end()},
+                                   flags,
+                                   BaseSignatureChecker{});
+    BOOST_CHECK(status);
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_SCRIPTNUM_OVERFLOW, *status);
+}
+
+BOOST_AUTO_TEST_CASE(op_2div_pre_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+
+    using test_args = tuple<vector<uint8_t>,    // script
+                            int32_t,            // flags
+                            ScriptError>;       // expected scriptError
+    const vector<test_args> test_data 
+    {
+        {{OP_2DIV}, 0, SCRIPT_ERR_DISABLED_OPCODE },
+        {{OP_2DIV}, SCRIPT_UTXO_AFTER_GENESIS, SCRIPT_ERR_DISABLED_OPCODE },
+        {{OP_0,
+            OP_IF,
+              OP_2DIV,  // not executed
+            OP_ENDIF}, 0, SCRIPT_ERR_DISABLED_OPCODE},
+        {{OP_0,
+            OP_IF,
+              OP_2DIV,  // not executed
+            OP_ENDIF}, SCRIPT_UTXO_AFTER_GENESIS, SCRIPT_ERR_OK},
+    };
+    for(const auto& [script,
+                     flags,
+                     exp_error] : test_data)
+    {
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto o = EvalScript(params,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  BaseSignatureChecker{});
+        BOOST_REQUIRE(o);
+        if(exp_error == SCRIPT_ERR_OK)
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, o.value());
+        else
+        {
+            BOOST_CHECK(o.value() != SCRIPT_ERR_OK);
+            BOOST_CHECK_EQUAL(exp_error, o.value());
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_2div_post_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+    
+    using exp_stack_top_type = std::optional<std::vector<uint8_t>>;
+    using test_args = tuple<vector<uint8_t>,            // script
+                            ScriptError,                // expected scriptError
+                            LimitedStack::size_type,    // expected stack size 
+                            exp_stack_top_type>;             // expected top of stack
+
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+    const vector<test_args> test_data 
+    {
+        // stack too small
+        {{OP_2DIV}, 
+                SCRIPT_ERR_INVALID_STACK_OPERATION, 0, exp_stack_top_type{}},
+       
+        // Happy cases
+        {{OP_0, OP_2DIV}, 
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ std::in_place }},
+        {{OP_1, OP_2DIV}, 
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ std::in_place }},
+        {{OP_1, OP_NEGATE, OP_2DIV}, 
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ std::in_place }},
+        {{OP_2, OP_2DIV}, 
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {1} }},
+        {{OP_2, OP_NEGATE, OP_2DIV}, 
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {0x81} }},
+
+        // byte boundary and sign convention 
+        {{OP_PUSHDATA1, 2, 0xfe, 0x80, OP_2, OP_DIV, // -127 * 2
+          OP_PUSHDATA1, 2, 0xfe, 0x80, OP_2DIV,      // -127 * 2
+          OP_2DUP,
+          OP_EQUALVERIFY}, 
+                SCRIPT_ERR_OK, 2, exp_stack_top_type{ {0xff} }},
+
+        // INT64_MAX
+        {{OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0x7f, OP_2DIV},
+                
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {0xff, 0xff, 0xff, 0x3f} }},
+        // INT64_MIN
+        {{OP_PUSHDATA1, 4, 0xff, 0xff, 0xff, 0xff, OP_2DIV},
+                
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {0xff, 0xff, 0xff, 0xbf} }},
+
+        // conditionals 
+        {{OP_0,
+          OP_IF,
+            OP_2, OP_2DIV, // not executed
+          OP_ENDIF}, 
+                SCRIPT_ERR_OK, 0, exp_stack_top_type{}},
+        {{OP_1,
+          OP_IF,
+            OP_2, OP_2DIV,
+          OP_ENDIF}, 
+                SCRIPT_ERR_OK, 1, exp_stack_top_type{ {1} }},
+    };
+    for(const auto& [script,
+                     exp_error,
+                     exp_stack_size,
+                     exp_stack_top] : test_data)
+    {
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto status = EvalScript(params,
+                                       source->GetToken(),
+                                       stack,
+                                       CScript{script.begin(), script.end()},
+                                       flags,
+                                       BaseSignatureChecker{});
+        BOOST_CHECK(status.has_value());
+        if(exp_error == SCRIPT_ERR_OK)
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, status.value());
+        else
+        {
+            BOOST_CHECK(status.value() != SCRIPT_ERR_OK);
+            BOOST_CHECK_EQUAL(exp_error, status.value());
+        }
+        BOOST_CHECK_EQUAL(exp_stack_size, stack.size());
+        BOOST_CHECK_EQUAL(exp_stack_size!=0, exp_stack_top.has_value());
+        if(exp_stack_top.has_value())
+        {
+            const auto& actual{stack.stacktop(-1)};
+            BOOST_CHECK_EQUAL_COLLECTIONS(exp_stack_top->begin(), exp_stack_top->end(),
+                                          actual.begin(), actual.end());
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(EvalScript_flag_check_post_chronicle)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+    constexpr uint32_t flags{SCRIPT_UTXO_AFTER_CHRONICLE}; // <- NO SCRIPT_UTXO_AFTER_GENESIS
+    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack(UINT32_MAX);
+    const auto o = EvalScript(params,
+                              source->GetToken(),
+                              stack,
+                              CScript{},
+                              flags,
+                              BaseSignatureChecker{});
+    BOOST_REQUIRE(o);
+    BOOST_CHECK_EQUAL(ScriptError::SCRIPT_ERR_INVALID_FLAGS, o.value());
+    BOOST_CHECK_EQUAL(0U, stack.size());
+}
+
+BOOST_AUTO_TEST_CASE(op_2rot)
+{
+    using namespace std;
+
+    const Config& config = GlobalConfig::GetConfig();
+    
+    using test_args = tuple<vector<uint8_t>,            // script
+                            ScriptError,                // expected scriptError
+                            vector<uint8_t>>;           // expected stack
+    const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
+    const vector<test_args> test_data 
+    {
+        // stack too small
+        {{OP_5, OP_4, OP_3, OP_2, OP_1, OP_2ROT}, 
+                SCRIPT_ERR_INVALID_STACK_OPERATION, {1, 2, 3, 4, 5}},
+       
+        // Happy case
+        {{OP_6, OP_5, OP_4, OP_3, OP_2, OP_1, OP_2ROT}, 
+                SCRIPT_ERR_OK, {5, 6, 1, 2, 3, 4}},
+    };
+    for(const auto& [script,
+                     exp_error,
+                     exp_stack] : test_data)
+    {
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, false)};
+        auto source = task::CCancellationSource::Make();
+        LimitedStack stack(UINT32_MAX);
+        const auto o = EvalScript(params,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript{script.begin(), script.end()},
+                                  flags,
+                                  BaseSignatureChecker{});
+        BOOST_REQUIRE(o);
+        if(exp_error == SCRIPT_ERR_OK)
+            BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, o.value());
+        else
+        {
+            BOOST_CHECK(o.value() != SCRIPT_ERR_OK);
+            BOOST_CHECK_EQUAL(exp_error, o.value());
+        }
+
+        for(auto i=1u; i <= exp_stack.size(); ++i)
+            BOOST_CHECK_EQUAL(exp_stack[i-1],
+                              stack.stacktop(-1 * i).front());
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

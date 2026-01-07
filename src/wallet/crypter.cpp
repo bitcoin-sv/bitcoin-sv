@@ -76,7 +76,9 @@ bool CCrypter::Encrypt(const CKeyingMaterial &vchPlaintext,
     // n + AES_BLOCKSIZE bytes
     vchCiphertext.resize(vchPlaintext.size() + AES_BLOCKSIZE);
 
-    AES256CBCEncrypt enc(vchKey.data(), vchIV.data(), true);
+    AES256CBCEncrypt enc(AES256CBCEncrypt::key_span{vchKey},
+                         AES256CBCEncrypt::block_span{vchIV},
+                         true);
     size_t nLen =
         enc.Encrypt(&vchPlaintext[0], vchPlaintext.size(), &vchCiphertext[0]);
     if (nLen < vchPlaintext.size()) return false;
@@ -94,7 +96,9 @@ bool CCrypter::Decrypt(const std::vector<uint8_t> &vchCiphertext,
 
     vchPlaintext.resize(nLen);
 
-    AES256CBCDecrypt dec(vchKey.data(), vchIV.data(), true);
+    AES256CBCDecrypt dec(AES256CBCDecrypt::key_span{vchKey},
+                         AES256CBCDecrypt::block_span{vchIV},
+                         true);
     nLen =
         dec.Decrypt(&vchCiphertext[0], vchCiphertext.size(), &vchPlaintext[0]);
     if (nLen == 0) return false;

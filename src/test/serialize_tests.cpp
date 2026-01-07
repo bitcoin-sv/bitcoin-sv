@@ -7,6 +7,7 @@
 #include "serialize.h"
 #include "streams.h"
 #include "test/test_bitcoin.h"
+#include "test/testutil.h"
 #include "protocol.h"
 
 #include <cstdint>
@@ -35,22 +36,29 @@ namespace
 
 BOOST_FIXTURE_TEST_SUITE(serialize_tests, BasicTestingSetup)
 
-class CSerializeMethodsTestSingle {
+class CSerializeMethodsTestSingle
+{
 protected:
-    int intval;
-    bool boolval;
+    int intval{};
+    bool boolval{};
     std::string stringval;
-    const char *charstrval;
+    const char* charstrval{nullptr};
     CTransactionRef txval;
 
 public:
     CSerializeMethodsTestSingle() = default;
-    CSerializeMethodsTestSingle(int intvalin, bool boolvalin,
+    CSerializeMethodsTestSingle(int intvalin,
+                                bool boolvalin,
                                 std::string stringvalin,
-                                const char *charstrvalin, CTransaction txvalin)
-        : intval(intvalin), boolval(boolvalin),
-          stringval(std::move(stringvalin)), charstrval(charstrvalin),
-          txval(MakeTransactionRef(txvalin)) {}
+                                const char* charstrvalin,
+                                const CTransaction& txvalin)
+        : intval(intvalin),
+          boolval(boolvalin),
+          stringval(std::move(stringvalin)),
+          charstrval(charstrvalin),
+          txval(MakeTransactionRef(txvalin))
+    {}
+
     ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
@@ -172,7 +180,7 @@ BOOST_AUTO_TEST_CASE(floats) {
 
     // decode
     for (int i = 0; i < 1000; i++) {
-        float j;
+        float j; // NOLINT(cppcoreguidelines-init-variables)
         ss >> j;
         BOOST_CHECK_MESSAGE(i == j, "decoded:" << j << " expected:" << i);
     }
@@ -190,7 +198,7 @@ BOOST_AUTO_TEST_CASE(doubles) {
 
     // decode
     for (int i = 0; i < 1000; i++) {
-        double j;
+        double j; // NOLINT(cppcoreguidelines-init-variables)
         ss >> j;
         BOOST_CHECK_MESSAGE(i == j, "decoded:" << j << " expected:" << i);
     }
@@ -315,7 +323,7 @@ static bool isTooLargeWriteException(const std::ios_base::failure &ex) {
 
 BOOST_AUTO_TEST_CASE(compactsize) {
     CDataStream ss(SER_DISK, 0);
-    std::vector<char>::size_type i, j;
+    std::vector<char>::size_type i, j; // NOLINT(cppcoreguidelines-init-variables)
 
     for (i = 1; i <= MAX_SIZE; i *= 2) {
         WriteCompactSize(ss, i - 1);
@@ -352,7 +360,7 @@ BOOST_AUTO_TEST_CASE(noncanonical) {
     // Write some non-canonical CompactSize encodings, and make sure an
     // exception is thrown when read back.
     CDataStream ss(SER_DISK, 0);
-    std::vector<char>::size_type n;
+    std::vector<char>::size_type n; // NOLINT(cppcoreguidelines-init-variables)
 
     // zero encoded with three bytes:
     ss.write("\xfd\x00\x00", 3);
@@ -420,7 +428,7 @@ BOOST_AUTO_TEST_CASE(insert_delete) {
     BOOST_CHECK_EQUAL(ss.size(), 6U);
     BOOST_CHECK_EQUAL(ss[0], 0);
 
-    ss.erase(ss.begin() + ss.size() - 1);
+    ss.erase(ss.begin() + std::ssize(ss) - 1);
     BOOST_CHECK_EQUAL(ss.size(), 5U);
     BOOST_CHECK_EQUAL(ss[4], (char)0xff);
 

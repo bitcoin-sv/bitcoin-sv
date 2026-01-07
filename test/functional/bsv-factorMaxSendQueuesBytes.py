@@ -3,12 +3,16 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-from test_framework.mininode import *
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.cdefs import (ONE_MEGABYTE)
-from test_framework.util import *
 from test_framework.blocktools import ChainManager, prepare_init_chain
+from test_framework.cdefs import ONE_MEGABYTE
+from test_framework.comptool import logger
+from test_framework.mininode import CInv, msg_block, msg_getdata, \
+    NetworkThread, NodeConn, NodeConnCB
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import assert_equal, assert_greater_than, \
+    p2p_port
 
+import time
 
 # This test checks input parameter factormaxsendqueuesbytes, which is setting maxSendQueuesBytes.
 # Scenario:
@@ -23,6 +27,7 @@ from test_framework.blocktools import ChainManager, prepare_init_chain
 # In cases 1. and 4., all peers should receive the block, in case 2. and 3., some peers receive blocks and other receive reject messages.
 # In case 2, downloads are in series, while in cases 1. and 4., downloads are in parallel.
 # Forth case is special because we are requesting the newest block. Download limitations for whitelisted peers do not apply.
+
 
 class MaxSendQueuesBytesTest(BitcoinTestFramework):
 
@@ -105,11 +110,11 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
 
         # Scenario 1: Blocks from bitcoind should be sent in parallel as factormaxsendqueuesbytes=num_peers.
         args = ["-excessiveblocksize={}".format(self.excessiveblocksize + self.headerSize + self.msgOverhead),
-                "-blockmaxsize={}".format(self.excessiveblocksize + self.headerSize),'-rpcservertimeout=500',
+                "-blockmaxsize={}".format(self.excessiveblocksize + self.headerSize), '-rpcservertimeout=500',
                 '-maxsendbuffer=1000']
         with self.run_node_with_connections("should be sent in parallel as factormaxsendqueuesbytes=num_peers",
                                             0,
-                                            args+["-factormaxsendqueuesbytes={}".format(self.num_peers)],
+                                            args + ["-factormaxsendqueuesbytes={}".format(self.num_peers)],
                                             self.num_peers) as connections:
 
             start = time.time()
@@ -122,7 +127,7 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
         # only allows one 5MB to be downloaded at once.
         with self.run_node_with_connections("should not be sent in parallel because factormaxsendqueuesbytes=1",
                                             0,
-                                            args+["-factormaxsendqueuesbytes=1"],
+                                            args + ["-factormaxsendqueuesbytes=1"],
                                             self.num_peers) as connections:
 
             start = time.time()
@@ -133,7 +138,7 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
             logger.info("%d blocks received when running with factormaxsendqueuesbytes=%d.", numberOfReceivedBlocksSeries, 1)
             assert_greater_than(numberOfReceivedBlocksParallel, numberOfReceivedBlocksSeries)
             assert_greater_than(numberOfRejectedMsgs, 0)
-            assert_equal(numberOfReceivedBlocksSeries+numberOfRejectedMsgs, 15)
+            assert_equal(numberOfReceivedBlocksSeries + numberOfRejectedMsgs, 15)
 
         # Scenario 3: Blocks from bitcoind should not be sent in parallel if we reached rate limit,
         # because we are requesting the most recent block from non whitelisted peer.
@@ -151,7 +156,7 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
         # requesting most recent block even if queue is full.
         with self.run_node_with_connections("should be sent in parallel, because we are requesting the most recent block",
                                             0,
-                                            args+["-factormaxsendqueuesbytes=1", "-whitelist=127.0.0.1"],
+                                            args + ["-factormaxsendqueuesbytes=1", "-whitelist=127.0.0.1"],
                                             self.num_peers) as connections:
 
             start = time.time()

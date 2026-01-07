@@ -18,6 +18,7 @@ class CBlockStreamReader;
 // Dumb helper to handle CTransaction compression at serialize-time
 struct TransactionCompressor {
 private:
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     CTransactionRef &tx;
 
 public:
@@ -150,8 +151,8 @@ typedef enum ReadStatus_t {
 
 class CBlockHeaderAndShortTxIDs {
 private:
-    mutable uint64_t shorttxidk0, shorttxidk1;
-    uint64_t nonce;
+    mutable uint64_t shorttxidk0{}, shorttxidk1{};
+    uint64_t nonce{};
 
     void FillShortTxIDSelector() const;
 
@@ -167,7 +168,7 @@ public:
     CBlockHeader header;
 
     // Dummy for deserialization
-    CBlockHeaderAndShortTxIDs() {}
+    CBlockHeaderAndShortTxIDs() = default;
 
     CBlockHeaderAndShortTxIDs(const CBlock &block);
     CBlockHeaderAndShortTxIDs(CBlockStreamReader<CFileReader>& stream);

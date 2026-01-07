@@ -1,0 +1,45 @@
+# Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
+# software license, see the accompanying file LICENSE
+
+name: 'Build Bitcoin with CMake'
+description:  'Build Bitcoin with CMake'
+inputs:
+  toolset:
+    description: Toolset (clang/gcc)
+    required: false
+    default: 'clang'
+  build_type:
+    description: Build type (Release/Debug/etc)
+    required: false
+    default: 'Release'
+  targets:
+    description: Targets (bitcoind/bitcoin-cli/etc)
+    required: false
+    default: ''
+  options:
+    description: Options (asan/tsan/usan/etc)
+    required: false
+runs:
+  using: "composite"
+  steps:
+    - run: |
+        readarray -t args < <(.github/actions/build_bitcoin_cmake/build.sh \
+            ${{ inputs.toolset }} \
+            ${{ inputs.build_type }} \
+            ${{ inputs.options }})
+        echo "${args[@]}"
+        cmake -G Ninja . "${args[@]}"
+        cmake --build . --target ${{ inputs.targets }}
+      if: inputs.targets
+      shell: bash
+    - run: |
+        readarray -t args < <(.github/actions/build_bitcoin_cmake/build.sh \
+            ${{ inputs.toolset }} \
+            ${{ inputs.build_type }} \
+            ${{ inputs.options }})
+        echo "${args[@]}"
+        cmake -G Ninja . "${args[@]}"
+        cmake --build . -v --target test_bitcoin
+        cmake --build .
+      if: ${{ ! inputs.targets }}
+      shell: bash

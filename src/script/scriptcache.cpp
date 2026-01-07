@@ -54,7 +54,7 @@ uint256 GetScriptCacheKey(const CTransaction &tx, uint32_t flags) {
         .Write(scriptExecutionCacheNonce.begin(), 55 - sizeof(flags) - 32)
         .Write(tx.GetHash().begin(), 32)
         .Write((uint8_t *)&flags, sizeof(flags))
-        .Finalize(key.begin());
+        .Finalize(CSHA256::span{key.begin(), CSHA256::OUTPUT_SIZE});
 
     return key;
 }

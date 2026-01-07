@@ -6,7 +6,9 @@ Check the P2P connection handling after moving to use shared_ptrs.
 """
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import connect_nodes, connect_nodes_bi, \
+    disconnect_nodes_bi, sync_blocks, wait_until
+
 import random
 
 
@@ -28,7 +30,7 @@ class P2PConnections(BitcoinTestFramework):
         # connect every node to every other node
         for i in range(self.num_nodes):
             for j in range(self.num_nodes):
-                if(j != i):
+                if j != i:
                     connect_nodes_bi(self.nodes, i, j)
 
     def setup_network(self):

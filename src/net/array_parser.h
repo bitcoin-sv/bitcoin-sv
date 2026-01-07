@@ -7,7 +7,6 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <ios>
 #include <numeric>
 #include <optional>
 #include <span>
@@ -15,32 +14,26 @@
 #include <vector>
 
 #include "cmpct_size.h"
-#include "unique_array.h"
 
-// Parses a counted collection of msg parts into a vector of unique_array objects
+// Parses a counted collection of msg parts into a vector of value_type objects
 // e.g. multiple txs as part of a block or blocktxn message or 
 //      multiple prefilledtxs as part of a cmpctblock message.
 template<typename T>
 class array_parser
 {
 public:
-    using value_type = unique_array;
+    using value_type = std::vector<uint8_t>;
     using segments_type = std::vector<value_type>;
     using size_type = std::vector<value_type>::size_type;
 
     std::pair<size_t, size_t> operator()(std::span<const uint8_t> s);
     
     size_t size() const;
+    [[nodiscard]] size_t readable_size() const;
     bool empty() const { return size() == 0; }
 
-    const unique_array& operator[](size_t i) const
-    {
-        if(i >= segments_.size())
-        {
-            throw std::ios_base::failure("parsing error: index out of bounds");
-        }
-        return segments_[i];
-    }
+    const value_type& at(size_t i) const { return segments_.at(i); }
+    const value_type& operator[](size_t i) const { return segments_[i]; }
 
     auto begin() const { return segments_.begin(); }
     auto end() const { return segments_.end(); }
@@ -84,7 +77,9 @@ inline std::pair<size_t, size_t> array_parser<T>::parse_seg_count(std::span<cons
     if(!bytes_read)
         return make_pair(bytes_read, val);
 
-    segments_.push_back(unique_array{s.first(bytes_read)});
+    value_type v;
+    v.insert(v.cend(), s.begin(), s.begin() + bytes_read);
+    segments_.push_back(std::move(v));
     size_ += bytes_read;
     n_ = val;
     return make_pair(bytes_read, 0);
@@ -135,9 +130,16 @@ inline size_t array_parser<T>::size() const
 }
 
 template<typename T>
+inline size_t array_parser<T>::readable_size() const
+{
+    return size_ + parser_.readable_size(); 
+}
+
+template<typename T>
 inline void array_parser<T>::reset(const size_t segment)
 {
-    segments_[segment].reset();
+    value_type v;
+    segments_[segment].swap(v);
 }
 
 // converts the read position into an index into the segs and an offset

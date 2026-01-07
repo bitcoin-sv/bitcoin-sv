@@ -25,6 +25,7 @@
  * The methods exposed by this class are safe to use from multiple threads
  * without synchronization.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CMempoolTxDBReader {
 public:
     virtual ~CMempoolTxDBReader() = default;
@@ -81,32 +82,22 @@ public:
     void ClearDatabase();
 
     /*
-     * Used to add a batch of new transactions into the database
-     */
-    bool AddTransactions(const std::vector<CTransactionRef>& txs);
-
-    /*
      * Used to retrieve transaction from the database.
      */
+    // NOLINTNEXTLINE(cppcoreguidelines-explicit-virtual-functions)
     virtual bool GetTransaction(const uint256 &txid, CTransactionRef &tx) override;
 
     /*
      * Checks if the transaction key is in the database.
      */
+    // NOLINTNEXTLINE(cppcoreguidelines-explicit-virtual-functions)
     virtual bool TransactionExists(const uint256 &txid) override;
 
     struct TxData
     {
         TxId txid;
         uint64_t size;
-
-        TxData(TxId&& txid_, uint64_t size_) : txid{std::move(txid_)}, size{size_} {}
-        TxData(const TxId& txid_, uint64_t size_) : txid{txid_}, size{size_} {}
     };
-    /*
-     * Used to remove a batch of transactions from the database.
-     */
-    bool RemoveTransactions(const std::vector<TxData>& txs);
 
     /**
      * Return the total size of transactions moved to disk.
@@ -127,8 +118,7 @@ public:
     using XrefKey = boost::uuids::uuid;
     /*
      * Set the mempool.dat cross-reference key. Any later change to the
-     * database (i.e., calls to ClearDatabase(), AddTransactions() or
-     * RemoveTransactions() will remove this key.
+     * database (i.e., calls to ClearDatabase() will remove this key.
      */
     bool SetXrefKey(const XrefKey& xrefKey);
 
@@ -173,6 +163,7 @@ public:
 
 
 /** Wrapper for CMempoolTxDB for asynchronous writes and deletes. */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CAsyncMempoolTxDB
 {
 public:
@@ -191,24 +182,24 @@ public:
     void Add(CTransactionWrapperRef&& transactionToAdd);
 
     // Asynchronously remove a transaction from the database.
-    void Remove(CMempoolTxDB::TxData&& transactionToRemove);
+    void Remove(const CMempoolTxDB::TxData& transactionToRemove);
 
     // Get the size of the data in the database.
     uint64_t GetDiskUsage()
     {
-        return txdb->GetDiskUsage();
+        return txdb_->GetDiskUsage();
     }
 
     // Get the number of transactions in the database.
     uint64_t GetTxCount()
     {
-        return txdb->GetTxCount();
+        return txdb_->GetTxCount();
     }
 
     // Get the number of batch writes performed on the database.
     uint64_t GetWriteCount()
     {
-        return txdb->GetWriteCount();
+        return txdb_->GetWriteCount();
     }
 
     // Return a read-only database reference
@@ -232,11 +223,11 @@ public:
 private:
     // Task queue for the worker thread.
     class TaskQueue;
-    std::unique_ptr<TaskQueue> queue;
+    std::unique_ptr<TaskQueue> queue_;
 
     // Initialize the database and worker thread after the queue.
-    std::shared_ptr<CMempoolTxDB> txdb;
-    std::thread worker;
+    std::shared_ptr<CMempoolTxDB> txdb_;
+    std::thread worker_;
     void Work();
 };
 

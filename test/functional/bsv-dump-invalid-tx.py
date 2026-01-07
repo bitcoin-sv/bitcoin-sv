@@ -103,11 +103,11 @@ class InvalidTx(BitcoinTestFramework):
         wait_until(lambda: os.path.isdir(invalidtxsfolder),
                    check_interval=0.5,
                    timeout=30,
-                   label=f"waiting for folder to be created")
+                   label="waiting for folder to be created")
         wait_until(lambda: len([name for name in os.listdir(invalidtxsfolder)]) == number,
                    check_interval=0.5,
                    timeout=30,
-                   label=f"waiting for invalid transaction be written")
+                   label="waiting for invalid transaction be written")
         return [name for name in os.listdir(invalidtxsfolder)]
 
     def assert_number_of_files_with_substring_in_name(self, number, name_substring):
@@ -115,7 +115,7 @@ class InvalidTx(BitcoinTestFramework):
         wait_until(lambda: os.path.isdir(invalidtxsfolder),
                    check_interval=0.5,
                    timeout=30,
-                   label=f"waiting for folder to be created")
+                   label="waiting for folder to be created")
         wait_until(lambda: len([name for name in os.listdir(invalidtxsfolder) if name_substring in name]) == number,
                    check_interval=0.5,
                    timeout=30,
@@ -235,7 +235,7 @@ class InvalidTx(BitcoinTestFramework):
                                             0,
                                             ["-genesisactivationheight=1",
                                              "-banscore=100000",
-                                             "-invalidtxsink=FILE",],
+                                             "-invalidtxsink=FILE", ],
                                             1) as (conn,):
             invalid_tx2 = make_invalid_p2sh_tx(invalid_coinbases[0], 0)
             _, block = new_block(conn, [invalid_tx2], wait_for_confirmation=False)
@@ -244,7 +244,7 @@ class InvalidTx(BitcoinTestFramework):
                                     conn.rpc.sendrawtransaction, ToHex(invalid_tx2))
 
             self.assert_number_of_files(6) #three from previous run, three from this
-            filenames =self.assert_number_of_files_with_substring_in_name(3, invalid_tx2.hash)  # three from this run should have txid
+            filenames = self.assert_number_of_files_with_substring_in_name(3, invalid_tx2.hash)  # three from this run should have txid
 
             for fn in filenames:
                 self.check_stored_tx_file(filename=fn, tx=invalid_tx2, block=block, rejectionFlags=["isInvalid"],
@@ -257,7 +257,7 @@ class InvalidTx(BitcoinTestFramework):
                                             0,
                                             ["-genesisactivationheight=1",
                                              "-banscore=100000",
-                                             "-invalidtxsink=FILE",],
+                                             "-invalidtxsink=FILE", ],
                                             1) as (conn,):
 
             valid_tx_1 = create_transaction(valid_coinbases[0], 0, CScript(), valid_coinbases[0].vout[0].nValue - 200)
@@ -347,17 +347,17 @@ class InvalidTx(BitcoinTestFramework):
 
             invalid_tx1 = make_large_invalid_tx(invalid_coinbases[0], 0)
             conn.send_message(msg_tx(invalid_tx1))
-            names = self.assert_number_of_files_with_substring_in_name(1, invalid_tx1.hash)
+            self.assert_number_of_files_with_substring_in_name(1, invalid_tx1.hash)
             sleep(1)
 
             invalid_tx2 = make_large_invalid_tx(invalid_coinbases[1], 0)
             conn.send_message(msg_tx(invalid_tx2))
-            names = self.assert_number_of_files_with_substring_in_name(1, invalid_tx2.hash)
+            self.assert_number_of_files_with_substring_in_name(1, invalid_tx2.hash)
             sleep(1)
 
             invalid_tx3 = make_large_invalid_tx(invalid_coinbases[2], 0)
             conn.send_message(msg_tx(invalid_tx3))
-            names = self.assert_number_of_files_with_substring_in_name(1, invalid_tx3.hash)
+            self.assert_number_of_files_with_substring_in_name(1, invalid_tx3.hash)
             sleep(1)
 
             # each transaction is a bit over 1MB, that means its hex written to the file is bit over 2MB
@@ -376,7 +376,7 @@ class InvalidTx(BitcoinTestFramework):
                                             0,
                                             ["-genesisactivationheight=1",
                                              "-banscore=100000",
-                                             "-invalidtxsink=FILE",],
+                                             "-invalidtxsink=FILE", ],
                                             2) as (conn1, conn2):
 
             conn.rpc.clearinvalidtransactions()

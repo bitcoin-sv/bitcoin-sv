@@ -19,7 +19,7 @@ static inline uint64_t perf_cpucycles(void) {
 #elif defined(__x86_64__)
 
 static inline uint64_t perf_cpucycles(void) {
-    uint32_t hi, lo;
+    uint32_t hi, lo; // NOLINT(cppcoreguidelines-init-variables)
     __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
     return ((uint64_t)lo) | (((uint64_t)hi) << 32);
 }

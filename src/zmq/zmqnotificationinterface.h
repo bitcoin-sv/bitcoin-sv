@@ -10,6 +10,7 @@
 
 #include <list>
 #include <map>
+#include <memory>
 
 class CBlockIndex;
 class CZMQAbstractNotifier;
@@ -21,11 +22,13 @@ struct ActiveZMQNotifier
 };
 
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
-class CZMQNotificationInterface final : public CValidationInterface {
+class CZMQNotificationInterface final : public CValidationInterface
+{
 public:
+    CZMQNotificationInterface();
     virtual ~CZMQNotificationInterface();
 
-    static CZMQNotificationInterface *Create();
+    static std::unique_ptr<CZMQNotificationInterface> Create();
     std::vector<ActiveZMQNotifier> ActiveZMQNotifiers();
 
     // Register/unregister validation interface
@@ -59,8 +62,6 @@ protected:
     void InvalidTxMessageZMQ(std::string_view message) override;
 
 private:
-    CZMQNotificationInterface();
-
     void *pcontext;
     std::list<CZMQAbstractNotifier *> notifiers;
     std::shared_ptr<CZMQPublisher> zmqPublisher;

@@ -34,13 +34,16 @@ static uint256 BlockBuildMerkleTree(const CBlock &block, bool *fMutated,
     for (std::vector<CTransactionRef>::const_iterator it(block.vtx.begin());
          it != block.vtx.end(); ++it)
         vMerkleTree.push_back((*it)->GetId());
-    int j = 0;
+    size_t j = 0;
     bool mutated = false;
-    for (int nSize = block.vtx.size(); nSize > 1; nSize = (nSize + 1) / 2) {
-        for (int i = 0; i < nSize; i += 2) {
-            int i2 = std::min(i + 1, nSize - 1);
-            if (i2 == i + 1 && i2 + 1 == nSize &&
-                vMerkleTree[j + i] == vMerkleTree[j + i2]) {
+    for(auto nSize = block.vtx.size(); nSize > 1; nSize = (nSize + 1) / 2)
+    { 
+        for(size_t i = 0; i < nSize; i += 2)
+        {
+            auto i2 = std::min(i + 1, nSize - 1);
+            if(i2 == i + 1 && i2 + 1 == nSize &&
+                vMerkleTree[j + i] == vMerkleTree[j + i2])
+            {
                 // Two identical hashes at the end of the list at a particular
                 // level.
                 mutated = true;
@@ -58,13 +61,15 @@ static uint256 BlockBuildMerkleTree(const CBlock &block, bool *fMutated,
 }
 
 // Older version of the merkle branch computation code, for comparison.
-static std::vector<uint256>
-BlockGetMerkleBranch(const CBlock &block,
-                     const std::vector<uint256> &vMerkleTree, int nIndex) {
+static std::vector<uint256> BlockGetMerkleBranch(const CBlock& block,
+                                                 const std::vector<uint256>& vMerkleTree,
+                                                 size_t nIndex)
+{
     std::vector<uint256> vMerkleBranch;
-    int j = 0;
-    for (int nSize = block.vtx.size(); nSize > 1; nSize = (nSize + 1) / 2) {
-        int i = std::min(nIndex ^ 1, nSize - 1);
+    size_t j = 0;
+    for(auto nSize = block.vtx.size(); nSize > 1; nSize = (nSize + 1) / 2)
+    {
+        auto i = std::min(nIndex ^ 1, nSize - 1);
         vMerkleBranch.push_back(vMerkleTree[j + i]);
         nIndex >>= 1;
         j += nSize;
@@ -493,6 +498,7 @@ BOOST_AUTO_TEST_CASE(merkle_proof)
 
         // Return nodes list
         vector<MerkleProof::Node> nodes{};
+        nodes.reserve(treeProof.merkleTreeHashes.size());
         for(const auto& node : treeProof.merkleTreeHashes)
         {
             nodes.push_back(MerkleProof::Node{node});

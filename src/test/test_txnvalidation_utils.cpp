@@ -109,6 +109,7 @@ BOOST_AUTO_TEST_CASE(test_number_of_priority_threads_static) {
 BOOST_AUTO_TEST_CASE(test_number_of_priority_threads_dynamic) {
     for (size_t n=25; n < 100000; ++n) {
         // A number of Low priority threads
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         size_t nEstimateNumLowPriorityThrs = static_cast<size_t>(n * 0.25);
         size_t nLowPriorityThrs = GetNumLowPriorityValidationThrs(n);
         BOOST_CHECK(nLowPriorityThrs > 0);

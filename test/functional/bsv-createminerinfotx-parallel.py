@@ -3,15 +3,13 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.miner_id import create_miner_info_scriptPubKey, MinerIdKeys, make_miner_id_block
-from test_framework.test_framework import BitcoinTestFramework, sync_blocks
-from test_framework.util import wait_until, assert_equal, bytes_to_hex_str, disconnect_nodes_bi, connect_nodes_bi, connect_nodes
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import wait_until, assert_equal, bytes_to_hex_str, disconnect_nodes_bi, connect_nodes_bi
 from test_framework.script import CScript, OP_DUP, OP_HASH160, hash160, OP_EQUALVERIFY, OP_CHECKSIG
 from test_framework.mininode import CTransaction, ToHex, CTxIn, CTxOut, COutPoint, FromHex
 from test_framework.blocktools import create_block, create_coinbase
 from test_framework.address import key_to_p2pkh
-from test_framework.cdefs import ONE_GIGABYTE, ONE_MEGABYTE
 from pathlib import Path
-from time import sleep
 import json
 
 '''
@@ -39,14 +37,14 @@ class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
-        self.miner_names = ["miner name 0","miner name 1"]
+        self.miner_names = ["miner name 0", "miner name 1"]
 
         args = [
             '-mindebugrejectionfee=0',
             '-paytxfee=0.00003'
         ]
 
-        self.extra_args = [args,args]
+        self.extra_args = [args, args]
 
         self.TEST_call_create = 1
         self.TEST_call_replace = 3
@@ -83,8 +81,8 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         fundingKey = {}
         fundingSeed = {}
         fundingKey['fundingKey'] = {'privateBIP32': key.privateKey()}
-        fundingSeed['fundingDestination'] = {'addressBase58': destination,}
-        fundingSeed['firstFundingOutpoint'] = {'txid':txId, 'n': index}
+        fundingSeed['fundingDestination'] = {'addressBase58': destination, }
+        fundingSeed['firstFundingOutpoint'] = {'txid': txId, 'n': index}
 
         fundingKeyJson = json.dumps(fundingKey, indent=3)
         fundingSeedJson = json.dumps(fundingSeed, indent=3)
@@ -109,7 +107,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
             'pubCompromisedMinerKeyHex': None
         }
 
-        scriptPubKey = create_miner_info_scriptPubKey (minerinfotx_parameters)
+        scriptPubKey = create_miner_info_scriptPubKey(minerinfotx_parameters)
         txid = self.nodes[winner].createminerinfotx(bytes_to_hex_str(scriptPubKey))
 
         # create a minerinfo block with coinbase referencing the minerinfo transaction
@@ -118,22 +116,22 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         block_count = self.nodes[winner].getblockcount()
 
         self.nodes[winner].submitblock(ToHex(block))
-        wait_until (lambda: block_count + 1 == self.nodes[winner].getblockcount())
+        wait_until(lambda: block_count + 1 == self.nodes[winner].getblockcount())
 
         # check if the minerinfo-txn
         # was moved from the mempool into the new block
-        assert(txid not in self.nodes[winner].getrawmempool())
+        assert (txid not in self.nodes[winner].getrawmempool())
         bhash = self.nodes[winner].getbestblockhash()
         block = self.nodes[winner].getblock(bhash)
-        assert(txid in block['tx'])
+        assert (txid in block['tx'])
         if not oneNodeOnly:
             if winner == 0:
                 looser = 1
             else:
                 looser = 0
             self.sync_all()
-            assert(len(self.nodes[looser].getrawmempool()) == 0)
-            assert(bhash == self.nodes[looser].getbestblockhash())
+            assert (len(self.nodes[looser].getrawmempool()) == 0)
+            assert (bhash == self.nodes[looser].getbestblockhash())
 
     def run_test(self):
         # create bip32 keys

@@ -1,0 +1,12 @@
+#!/usr/bin/awk -f
+# Copyright (c) 2025 Bitcoin Association Distributed under the Open BSV
+# software license, see the accompanying file LICENSE
+
+/NOLINT[^(E]*\(/ || /NOLINTBEGIN[^(]*\(/ || /NOLINTNEXTLINE[^(]*\(/{
+
+    sub(/.*NOLINTBEGIN\(/, "")
+    sub(/.*NOLINTNEXTLINE\(/, "")
+    sub(/.*NOLINT\(/, "")
+    sub(/\).*/, "")
+    print($0)
+}

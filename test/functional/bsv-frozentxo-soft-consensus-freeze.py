@@ -49,7 +49,7 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
         # block is rejected as consensus freeze is in effect for parent transaction
         first_spend_frozen_tx = self._create_tx(PreviousSpendableOutput(first_frozen_tx, 0), b'', CScript([OP_TRUE]))
-        first_frozen_block = self._mine_and_check_rejected(node, first_spend_frozen_tx)
+        self._mine_and_check_rejected(node, first_spend_frozen_tx)
 
         # block is accepted but ignored since freeze is in place for previous block
         second_spend_frozen_tx = self._create_tx(PreviousSpendableOutput(second_frozen_tx, 0), b'', CScript([OP_TRUE]))
@@ -77,19 +77,19 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
         # block is rejected as consensus freeze is in effect for parent transaction
         first_spend_frozen_tx = self._create_tx(PreviousSpendableOutput(first_frozen_tx, 0), b'', CScript([OP_TRUE]))
-        first_frozen_block = self._mine_and_check_rejected(node, first_spend_frozen_tx)
+        self._mine_and_check_rejected(node, first_spend_frozen_tx)
         first_frozen_block_height = tip_height + 1
 
         freeze_for_two_blocks = first_frozen_block_height + 2
 
         # limit the duration of freeze
         self.log.info(f"Freezing TXO {first_frozen_tx.hash} on consensus blacklist until height {freeze_for_two_blocks}")
-        result=node.rpc.addToConsensusBlacklist({
+        result = node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : first_frozen_tx.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": first_frozen_tx.hash,
+                        "vout": 0
                     },
                     "enforceAtHeight": [{"start": 0, "stop": freeze_for_two_blocks}],
                     "policyExpiresWithConsensus": False
@@ -121,7 +121,7 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
         # block is rejected as consensus freeze is in effect for parent transaction
         first_spend_frozen_tx = self._create_tx(PreviousSpendableOutput(first_frozen_tx, 0), b'', CScript([OP_TRUE]))
-        first_frozen_block = self._mine_and_check_rejected(node, first_spend_frozen_tx)
+        self._mine_and_check_rejected(node, first_spend_frozen_tx)
 
         # clear all frozen entries
         result = node.rpc.clearBlacklists({"removeAllEntries": True})
@@ -147,7 +147,7 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
         # block is rejected as consensus freeze is in effect for parent transaction
         first_spend_frozen_tx = self._create_tx(PreviousSpendableOutput(first_frozen_tx, 0), b'', CScript([OP_TRUE]))
-        first_frozen_block = self._mine_and_check_rejected(node, first_spend_frozen_tx)
+        self._mine_and_check_rejected(node, first_spend_frozen_tx)
 
         # block is accepted but ignored since freeze is in place for previous block
         second_spend_frozen_tx = self._create_tx(PreviousSpendableOutput(second_frozen_tx, 0), b'', CScript([OP_TRUE]))
@@ -173,11 +173,11 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
         block = self._mine_and_send_block(None, node)
         node.rpc.invalidateblock(block.hash)
 
-        assert(block_before_frozen_blocks_hash == node.rpc.getbestblockhash())
+        assert (block_before_frozen_blocks_hash == node.rpc.getbestblockhash())
 
         # check that reconsidering the block works as expected
         node.rpc.reconsiderblock(block.hash)
-        assert(block.hash == node.rpc.getbestblockhash())
+        assert (block.hash == node.rpc.getbestblockhash())
 
         # check that verifychain works after node restart
         assert node.rpc.verifychain(4, 0)
@@ -186,22 +186,22 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
         # check that invalidateblock works after node restart
         node.restart_node()
-        assert(block.hash == node.rpc.getbestblockhash())
+        assert (block.hash == node.rpc.getbestblockhash())
         node.rpc.invalidateblock(block.hash)
         assert (block_before_frozen_blocks_hash == node.rpc.getbestblockhash())
 
         # create coinbase output that pays to much
-        invalid_coinbase_tx = create_coinbase(height=node.rpc.getblockcount()+1, outputValue=300)
-        invalid_block = create_block(int(last_soft_frozen_hash, 16), invalid_coinbase_tx, last_soft_frozen_time+1)
+        invalid_coinbase_tx = create_coinbase(height=node.rpc.getblockcount() + 1, outputValue=300)
+        invalid_block = create_block(int(last_soft_frozen_hash, 16), invalid_coinbase_tx, last_soft_frozen_time + 1)
         invalid_block.solve()
         node.p2p.send_and_ping(msg_block(invalid_block))
-        assert(node.check_log(f"ConnectBlock {invalid_block.hash} failed \\(bad-cb-amount \\(code 16\\)\\)"))
+        assert (node.check_log(f"ConnectBlock {invalid_block.hash} failed \\(bad-cb-amount \\(code 16\\)\\)"))
 
         # make sure tip is still the same
         assert (block_before_frozen_blocks_hash == node.rpc.getbestblockhash())
 
         node.rpc.reconsiderblock(block.hash)
-        assert(block.hash == node.rpc.getbestblockhash())
+        assert (block.hash == node.rpc.getbestblockhash())
 
     def _test_soft_consensus_freeze_submitblock(self, spendable_out, node):
         self.log.info("*** Performing soft consensus freeze with submitblock RPC")
@@ -269,7 +269,7 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
         new_valid_tip = self._mine_block(None)
         node.p2p.send_and_ping(msg_block(new_valid_tip))
         assert_equal(new_valid_tip.hash, node.rpc.getbestblockhash())
-        assert(node.check_frozen_tx_log(next_frozen_tip.hash)) # NOTE: Reject is expected because transaction spending frozen TXO is added back to mempool and its validation must fail when checked against new tip.
+        assert (node.check_frozen_tx_log(next_frozen_tip.hash)) # NOTE: Reject is expected because transaction spending frozen TXO is added back to mempool and its validation must fail when checked against new tip.
 
         self.log.info("Mining blocks on frozen chain")
         # 2 new blocks on frozen chain should trigger reorg back to frozen chain
@@ -302,7 +302,7 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
         frozen_block = self._mine_block(spend_frozen_tx)
         frozen_block.vtx[0].vout[0].nValue = 300 * COIN # coinbase that pays too much
         frozen_block.vtx[0].rehash()
-        self.chain.update_block(self.block_count-1, [])
+        self.chain.update_block(self.block_count - 1, [])
         self.submit_block_and_check_tip(node, frozen_block, last_valid_block.hash)
 
         # next 4 blocks would also be considered soft consensus frozen and must not become new tip
@@ -313,14 +313,14 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
 
         # invalid block has not yet been validated
         frozen_block_block_checked_log_string = f"ConnectBlock {frozen_block.hash} failed \\(bad-cb-amount \\(code 16\\)\\)"
-        assert(not node.check_log(frozen_block_block_checked_log_string))
+        assert (not node.check_log(frozen_block_block_checked_log_string))
 
         # this block is high enough for the frozen chain to become active but
         # it should not, because the block is invalid
-        new_frozen_tip = self._mine_and_send_block(None, node, False, last_valid_block.hash)
+        self._mine_and_send_block(None, node, False, last_valid_block.hash)
 
         # invalid block has now been validated
-        assert(node.check_log(frozen_block_block_checked_log_string))
+        assert (node.check_log(frozen_block_block_checked_log_string))
 
         # same thing again but with frozen block that is also invalid because it contains invalid transaction
         self.set_chain_tip(root_chain_tip)
@@ -329,16 +329,16 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
         frozen_block.vtx.extend([valid_tx])
         invalid_tx = self._create_tx(PreviousSpendableOutput(valid_tx, 0), CScript([OP_FALSE]), CScript([OP_TRUE]))
         frozen_block.vtx.extend([invalid_tx])
-        self.chain.update_block(self.block_count-1, [])
+        self.chain.update_block(self.block_count - 1, [])
         self.submit_block_and_check_tip(node, frozen_block, last_valid_block.hash)
         self.submit_block_and_check_tip(node, self._mine_block(None), last_valid_block.hash)
         self.submit_block_and_check_tip(node, self._mine_block(None), last_valid_block.hash)
         self.submit_block_and_check_tip(node, self._mine_block(None), last_valid_block.hash)
         self.submit_block_and_check_tip(node, self._mine_block(None), last_valid_block.hash)
         frozen_block_block_checked_log_string = f"ConnectBlock {frozen_block.hash} failed \\(blk-bad-inputs"
-        assert(not node.check_log(frozen_block_block_checked_log_string))
+        assert (not node.check_log(frozen_block_block_checked_log_string))
         self._mine_and_send_block(None, node, False, last_valid_block.hash)
-        assert(node.check_log(frozen_block_block_checked_log_string))
+        assert (node.check_log(frozen_block_block_checked_log_string))
 
     def run_test(self):
         node = self._init()

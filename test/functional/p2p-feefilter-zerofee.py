@@ -63,7 +63,7 @@ class FeeFilterTest(BitcoinTestFramework):
         self.num_nodes = 2
 
     def setup_nodes(self):
-        self.extra_args = [[],[]]
+        self.extra_args = [[], []]
         self.add_nodes(self.num_nodes, self.extra_args)
         self.start_nodes()
 
@@ -86,7 +86,7 @@ class FeeFilterTest(BitcoinTestFramework):
         test_node.send_and_ping(msg_feefilter(0))
 
         test_node.clear_invs()
-        zero_txids = [send_zero_fee_tx_funded_from (node1) for _ in range(3)]
+        zero_txids = [send_zero_fee_tx_funded_from(node1) for _ in range(3)]
         wait_until(lambda: {t for t in zero_txids}.issubset(set(node0.getrawmempool())), timeout=10)
         assert (allInvsMatch(zero_txids, test_node))
         test_node.clear_invs()
@@ -96,7 +96,7 @@ class FeeFilterTest(BitcoinTestFramework):
         test_node.send_and_ping(msg_feefilter(100))
 
         test_node.clear_invs()
-        zero_txids = [send_zero_fee_tx_funded_from (node1) for _ in range(3)]
+        zero_txids = [send_zero_fee_tx_funded_from(node1) for _ in range(3)]
         wait_until(lambda: {t for t in zero_txids}.issubset(set(node0.getrawmempool())), timeout=10)
         assert (not allInvsMatch(zero_txids, test_node))
         test_node.clear_invs()

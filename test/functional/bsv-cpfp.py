@@ -2,8 +2,7 @@
 # Copyright (c) 2020  Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.blocktools import create_block, create_coinbase, create_transaction
-from test_framework.key import CECKey
+from test_framework.blocktools import create_block, create_coinbase
 from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block, COIN
 from test_framework.script import CScript, OP_DROP, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
@@ -31,7 +30,7 @@ class Cpfp(BitcoinTestFramework):
             total_input += parent_tx.vout[n].nValue
 
         for _ in range(noutput):
-            tx.vout.append(CTxOut(total_input//noutput, CScript([b"X"*200, OP_DROP, OP_TRUE])))
+            tx.vout.append(CTxOut(total_input // noutput, CScript([b"X" * 200, OP_DROP, OP_TRUE])))
 
         tx.rehash()
 
@@ -78,7 +77,7 @@ class Cpfp(BitcoinTestFramework):
             conn.send_message(msg_block(block))
             wait_until(lambda: conn.rpc.getbestblockhash() == block.hash, check_interval=0.3)
 
-            tx_pays_relay1 = self.create_tx([(low_fee_tx,     0)], 2, relayfee)
+            tx_pays_relay1 = self.create_tx([(low_fee_tx, 0)], 2, relayfee)
             tx_pays_relay2 = self.create_tx([(tx_pays_relay1, 0)], 1, relayfee)
             tx_pays_enough_for_itself = self.create_tx([(tx_pays_relay1, 1)], 1, mining_fee)
             tx_pays_for_ancestors = self.create_tx([(tx_pays_relay2, 0)], 1, 3.5 * mining_fee)

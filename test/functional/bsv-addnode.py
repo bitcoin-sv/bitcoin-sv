@@ -36,7 +36,7 @@ class AddNodeTest(BitcoinTestFramework):
         subver = "testnode%d" % to_node_num
         try:
             wait_until(lambda: conn_up(subver), timeout=10)
-        except Exception as e:
+        except Exception:
             return False
 
         return True
@@ -57,13 +57,13 @@ class AddNodeTest(BitcoinTestFramework):
         # Take us up to the initial addnode limit of 2 for node0
         self.log.info("Taking node0 up to the addnode limit")
         for i in range(2, 4):
-            assert(self.add_node_conn(0, i))
+            assert (self.add_node_conn(0, i))
         assert_equal(self.count_addnode_peers(0), 2)
         assert_equal(len(self.nodes[0].getaddednodeinfo()), 2)
 
         # Can't add another without going over the addnode limit
         self.log.info("Taking node0 over the addnode limit")
-        assert(not self.add_node_conn(0, 4))
+        assert (not self.add_node_conn(0, 4))
         assert_equal(self.count_addnode_peers(0), 2)
         assert_equal(len(self.nodes[0].getaddednodeinfo()), 3)
 
@@ -75,7 +75,7 @@ class AddNodeTest(BitcoinTestFramework):
         # Can now addnode up to the new higher limit
         self.log.info("Taking node0 up to the new higher addnode limit")
         for i in range(2, 5):
-            assert(self.add_node_conn(0, i))
+            assert (self.add_node_conn(0, i))
         assert_equal(self.count_addnode_peers(0), 3)
         assert_equal(len(self.nodes[0].getaddednodeinfo()), 3)
 

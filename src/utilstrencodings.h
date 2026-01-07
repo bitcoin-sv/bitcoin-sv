@@ -120,10 +120,10 @@ inline constexpr std::array<char, 16> hexmap = {'0', '1', '2', '3', '4', '5', '6
 template <typename T>
 void HexStr(const T itbegin, const T itend, CTextWriter& writer, bool fSpaces = false)
 {
-    std::string rv;
     writer.ReserveAdditional((itend - itbegin) * (fSpaces ? 3 : 2));
     for (T it = itbegin; it < itend; ++it)
     {
+        // NOLINTNEXTLINE(clang-analyzer-core.uninitialized.Assign)
         uint8_t val = uint8_t(*it);
         if (fSpaces && it != itbegin)
         {
@@ -201,7 +201,7 @@ template <typename I, typename O>
 I transform_hex(I f, I l, O o)
 {
     return transform_pairs(f, l, o, [](const auto a, const auto b) {
-        constexpr auto l = [](const char c) {
+        constexpr auto t = [](const char c) {
             if(isdigit(c))
                 return c - '0';
             else if(c >= 'a' && c <= 'f')
@@ -209,7 +209,7 @@ I transform_hex(I f, I l, O o)
             else
                 assert(false);
         };
-        return (0xf0 & (l(a) << 4)) | (0xf & l(b));
+        return (0xf0 & (t(a) << 4)) | (0xf & t(b));
     });
 }
 

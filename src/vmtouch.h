@@ -12,7 +12,6 @@
 
 #include <string>
 #include <set>
-#include <tuple>
 #include <vector>
 
 #include <search.h>
@@ -27,11 +26,7 @@ struct dev_and_inode
     dev_t dev;
     ino_t ino;
 
-    // required for std::Set
-    bool operator<(const dev_and_inode& other) const
-    {
-        return std::tie (dev, ino) < std::tie (other.dev, other.ino);        
-    } 
+    auto operator<=>(const dev_and_inode&) const = default;
 };
 
 
@@ -94,7 +89,7 @@ private:
     
     std::set<dev_and_inode> seen_inodes; 
     std::vector<std::string> ignoreList;
-    int curr_crawl_depth;
+    int curr_crawl_depth{};
     ino_t crawl_inodes[MAX_CRAWL_DEPTH];
     std::vector<std::string> filenameFilterList;
 
@@ -110,7 +105,7 @@ private:
     void warning(const char *fmt, ...);
     std::vector<std::string> warnings;
 
-    dev_t orig_device;
+    dev_t orig_device{};
     bool orig_device_inited = false;
 
     // just to prevent any compiler optimizations when touching memory

@@ -12,9 +12,10 @@ namespace{
     // Create a vector with input data for a given txn and source
     std::vector<TxInputDataSPtr> TxInputDataVec(TxSource source,
                                                 const std::vector<CMutableTransaction>& spends,
-                                                std::shared_ptr<CNode> pNode = nullptr,
+                                                const std::shared_ptr<CNode>& pNode = nullptr,
                                                 TxValidationPriority priority = TxValidationPriority::normal) {
         std::vector<TxInputDataSPtr> vTxInputData {};
+        vTxInputData.reserve(spends.size());
         for (auto& elem : spends) {
             vTxInputData.
                     emplace_back(
@@ -108,7 +109,7 @@ namespace{
 
         // Check that transactions were validated in correct order.
         for (const auto& tx : txsToValidate) {
-            const auto& txPos = std::find(executedTxs.cbegin(), executedTxs.cend(), tx.GetId());
+            const auto txPos = std::find(executedTxs.cbegin(), executedTxs.cend(), tx.GetId());
             for (const auto& input : tx.vin) {
                 const auto& inputPos = std::find(executedTxs.cbegin(), executedTxs.cend(), input.prevout.GetTxId());
                 if (inputPos != executedTxs.cend()) {
@@ -129,8 +130,9 @@ namespace{
         }
 
     }
+}
 
-    struct TestSetup : TestChain100Setup {
+struct ValidationScheduler100Fixture : TestChain100Setup {
         // Remember executed tasks and ids of txns in the task.
         std::vector<std::vector<TxId>> executedTasks{};
         std::mutex executedTasksMtx;
@@ -189,14 +191,13 @@ namespace{
                 CheckExecutionOrder(txsToValidate, executedTasks, expectedVariants);
             } while(std::next_permutation(permutedTxsToValidate.begin(), permutedTxsToValidate.end(), CompareTxById));
         }
-    };
-}
+};
 
 namespace std {
     // Needed by Boost to print vector
     template<typename T>
     inline std::ostream &
-    operator<<(std::ostream &wrapped, std::vector<T> const &item) {
+    operator<<(std::ostream &wrapped, std::vector<T> const &item) { // NOLINT(cert-dcl58-cpp)
         wrapped << '[';
         bool first = true;
         for (auto const &element : item) {
@@ -208,13 +209,13 @@ namespace std {
     }
     // Needed by Boost to print TxId
     inline std::ostream &
-    operator<<(std::ostream &wrapped, const TxId& item) {
+    operator<<(std::ostream &wrapped, const TxId& item) { // NOLINT(cert-dcl58-cpp)
         wrapped << item.ToString();
         return wrapped;
     }
 };
 
-BOOST_FIXTURE_TEST_SUITE(validation_scheduler_tests, TestSetup)
+BOOST_FIXTURE_TEST_SUITE(validation_scheduler_tests, ValidationScheduler100Fixture)
 
 // Isolated transactions are scheduled in parallel. Task completion is random.
 BOOST_AUTO_TEST_CASE(txs_isolated) {

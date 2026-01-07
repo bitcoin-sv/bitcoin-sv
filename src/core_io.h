@@ -5,10 +5,12 @@
 #ifndef BITCOIN_CORE_IO_H
 #define BITCOIN_CORE_IO_H
 
+#include "protocol_era.h"
+#include "rpc/jsonwriter.h"
+
 #include <string>
 #include <vector>
 #include <optional>
-#include "rpc/jsonwriter.h"
 
 class CBlock;
 class CMutableTransaction;
@@ -30,9 +32,11 @@ public:
 // core_read.cpp
 CScript ParseScript(const std::string &s);
 std::string ScriptToAsmStr(const CScript &script,
+                           const int32_t txnVersion = 1,    // default assumes non-malleable (ver 1) transaction
                            const bool fAttemptSighashDecode = false);
 void ScriptToAsmStr(const CScript& script,
                     CTextWriter& textWriter, 
+                    const int32_t txnVersion = 1,
                     const bool fAttemptSighashDecode = false);
 bool DecodeHexTx(CMutableTransaction &tx, const std::string &strHexTx);
 bool DecodeHexBlk(CBlock &, const std::string &strHexBlk);
@@ -44,16 +48,16 @@ std::vector<uint8_t> ParseHexUV(const UniValue &v, const std::string &strName);
 std::string FormatScript(const CScript &script);
 std::string EncodeHexTx(const CTransaction &tx, const int serializeFlags = 0);
 void EncodeHexTx(const CTransaction& tx, CTextWriter& writer, const int serializeFlags = 0);
-void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, bool isGenesisEnabled, UniValue &out);
+void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, ProtocolEra era, UniValue &out);
 void TxToJSON(const CTransaction& tx,
               const uint256& hashBlock,
-              bool utxoAfterGenesis,
+              ProtocolEra era,
               const int serializeFlags,
               CJSONWriter& entry,
               const std::optional<CBlockDetailsData>& blockData = std::nullopt);
 void ScriptPublicKeyToJSON(const CScript& scriptPubKey,
                            bool fIncludeHex,
-                           bool isGenesisEnabled,
+                           ProtocolEra era,
                            CJSONWriter& out);
 
 #endif // BITCOIN_CORE_IO_H

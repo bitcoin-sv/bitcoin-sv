@@ -2,7 +2,7 @@
 # Copyright (c) 2020  Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.blocktools import create_block, create_coinbase, create_transaction
+from test_framework.blocktools import create_coinbase, create_transaction
 from test_framework.test_framework import BitcoinTestFramework, ChainManager
 from test_framework.util import assert_equal, wait_until, assert_raises_rpc_error
 from test_framework.mininode import ToHex, msg_block, msg_tx, CBlock, CTransaction, CTxIn, COutPoint, CTxOut
@@ -28,7 +28,7 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
         tx = CTransaction()
         for depend in depends:
             tx.vin.append(CTxIn(COutPoint(depend.sha256, 0), b''))
-        tx.vout.append(CTxOut(int(100), CScript([OP_RETURN,  b"a" * size])))
+        tx.vout.append(CTxOut(int(100), CScript([OP_RETURN, b"a" * size])))
         tx.rehash()
         return tx
 
@@ -62,16 +62,16 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
 
         # check if hex data was parsed correctly
         txs_data = [tx['data'] for tx in template['transactions']]
-        assert(ToHex(dependingTx) in txs_data)
+        assert (ToHex(dependingTx) in txs_data)
         for tx in txs:
-            assert(ToHex(tx) in txs_data)
+            assert (ToHex(tx) in txs_data)
 
         # check dependencies
         depending_indices = []
         depending_txs_hash = [tx.hash for tx in txs]
         for i in range(len(template['transactions'])):
             if template['transactions'][i]['hash'] in depending_txs_hash:
-                depending_indices.append(i+1)
+                depending_indices.append(i + 1)
 
         for tmpl_tx in template['transactions']:
             if tmpl_tx['hash'] == dependingTx.hash:
@@ -123,7 +123,7 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
 
             # Create large transaction that depends on previous two transactions.
             # If transaction pubkey contains 1/2 of BUFFER_SIZE_HttpTextWriter of data, it means that final result will for sure be chunked.
-            largeTx = self.createLargeTransaction(int(BUFFER_SIZE_HttpTextWriter/2), transactions)
+            largeTx = self.createLargeTransaction(int(BUFFER_SIZE_HttpTextWriter / 2), transactions)
             connection.cb.send_message(msg_tx(largeTx))
             self.check_mempool(self.nodes[0], [largeTx])
 

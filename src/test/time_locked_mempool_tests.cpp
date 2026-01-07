@@ -20,8 +20,8 @@ namespace MempoolTesting
     class CTimeLockedMempoolTester
     {
       public:
-        CTimeLockedMempoolTester(CTimeLockedMempool& mempool)
-        : mMempool{mempool}
+        CTimeLockedMempoolTester(CTimeLockedMempool& mem_pool)
+        : mMempool{mem_pool}
         {}
 
         // Check if the specified transaction is in the time-locked pool
@@ -65,7 +65,7 @@ namespace MempoolTesting
         }
 
       private:
-        CTimeLockedMempool& mMempool;
+        CTimeLockedMempool& mMempool; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     };
 }
 
@@ -95,8 +95,8 @@ namespace
     // Create some transactions to use in tests
     std::vector<CMutableTransaction> CreateTransactions()
     {
-        std::vector<CMutableTransaction> txns {};
-
+        std::vector<CMutableTransaction> txns{};
+        txns.reserve(NumTxns);
         for(unsigned i = 0; i < NumTxns; ++i)
         {
             txns.emplace_back(CreateRandomTransaction(i));
@@ -233,8 +233,8 @@ BOOST_AUTO_TEST_CASE(UpdateTest)
             GetTime()
         )
     };
-    CValidationState state { NonFinalState() };
-    tlMempool.addOrUpdateTransaction({txnRef}, pTxInputData, state);
+    CValidationState vs{ NonFinalState() };
+    tlMempool.addOrUpdateTransaction({txnRef}, pTxInputData, vs);
 
     CTransactionRef lastUpdate {nullptr};
 

@@ -8,7 +8,7 @@
 #include "script/standard.h"
 #include <string>
 
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CChainParams;
 
 std::string EncodeDestination(const CTxDestination &dest, const Config &config);

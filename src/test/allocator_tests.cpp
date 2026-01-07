@@ -14,7 +14,7 @@ BOOST_FIXTURE_TEST_SUITE(allocator_tests, BasicTestingSetup)
 BOOST_AUTO_TEST_CASE(arena_tests) {
     // Fake memory base address for testing
     // without actually using memory.
-    void *synth_base = reinterpret_cast<void *>(0x08000000);
+    void *synth_base = reinterpret_cast<void *>(0x08000000); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
     const size_t synth_size = 1024 * 1024;
     Arena b(synth_base, synth_size, 16);
     void *chunk = b.alloc(1000);
@@ -32,12 +32,14 @@ BOOST_AUTO_TEST_CASE(arena_tests) {
 #endif
     BOOST_CHECK(b.stats().used == 0);
     BOOST_CHECK(b.stats().free == synth_size);
-    try {
+    try
+    {
         // Test exception on double-free
-        b.free(chunk);
+        b.free(chunk); // NOLINT(clang-analyzer-unix.Malloc)
         BOOST_CHECK(0);
-    } catch (std::runtime_error &) {
     }
+    catch (std::runtime_error&)
+    {}
 
     void *a0 = b.alloc(128);
     void *a1 = b.alloc(256);
@@ -75,6 +77,7 @@ BOOST_AUTO_TEST_CASE(arena_tests) {
     b.walk();
 #endif
     // Sweeping allocate all memory
+    addr.reserve(1024);
     for (int x = 0; x < 1024; ++x)
         addr.push_back(b.alloc(1024));
     BOOST_CHECK(b.stats().free == 0);
@@ -109,6 +112,7 @@ BOOST_AUTO_TEST_CASE(arena_tests) {
         addr.push_back(0);
     uint32_t s = 0x12345678;
     for (int x = 0; x < 5000; ++x) {
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int idx = s & (addr.size() - 1);
         if (s & 0x80000000) {
             b.free(addr[idx]);
@@ -134,7 +138,7 @@ class TestLockedPageAllocator : public LockedPageAllocator {
 public:
     TestLockedPageAllocator(int count_in, int lockedcount_in)
         : count(count_in), lockedcount(lockedcount_in) {}
-    void *AllocateLocked(size_t len, bool *lockingSuccess) override {
+    void *AllocateLocked(size_t /*len*/, bool *lockingSuccess) override {
         *lockingSuccess = false;
         if (count > 0) {
             --count;
@@ -147,12 +151,12 @@ public:
             // Fake address, do not actually use this memory
             MSVC_WARNINGS_PUSH;
             MSVC_WARNINGS_IGNORE(4312);
-            return reinterpret_cast<void *>(0x08000000 + (count << 24));
+            return reinterpret_cast<void *>(0x08000000 + (count << 24)); // NOLINT(performance-no-int-to-ptr, cppcoreguidelines-pro-type-reinterpret-cast)
             MSVC_WARNINGS_POP;
         }
         return 0;
     }
-    void FreeLocked(void *addr, size_t len) override {}
+    void FreeLocked(void* /*addr*/, size_t /*len*/) override {}
     size_t GetLimit() override { return std::numeric_limits<size_t>::max(); }
 
 private:
@@ -215,16 +219,19 @@ BOOST_AUTO_TEST_CASE(lockedpool_tests_live) {
     void *a0 = pool.alloc(16);
     BOOST_CHECK(a0);
     // Test reading and writing the allocated memory
-    *((uint32_t *)a0) = 0x1234;
-    BOOST_CHECK(*((uint32_t *)a0) == 0x1234);
+    *((uint32_t *)a0) = 0x1234; // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+    BOOST_CHECK(*((uint32_t *)a0) == 0x1234); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
 
     pool.free(a0);
-    try {
+    try
+    {
         // Test exception on double-free
-        pool.free(a0);
+        pool.free(a0); // NOLINT(clang-analyzer-unix.Malloc)
         BOOST_CHECK(0);
-    } catch (std::runtime_error &) {
     }
+    catch(std::runtime_error&)
+    {}
+
     // If more than one new arena was allocated for the above tests, something
     // is wrong
     BOOST_CHECK(pool.stats().total <= (initial.total + LockedPool::ARENA_SIZE));

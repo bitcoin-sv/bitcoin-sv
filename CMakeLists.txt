@@ -2,12 +2,23 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.16)
 project(BitcoinSV)
-#Reduce warnings on MSVC, to closer match GCC compiler settings
+
+# CMP0092 (CMake 3.15): Reduce MSVC warnings to match GCC compiler settings
 if(POLICY CMP0092 AND MSVC)
    cmake_policy(SET CMP0092 NEW)
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W2")
+endif()
+
+# CMP0167 (CMake 3.30): Continue using legacy FindBoost module
+if(POLICY CMP0167)
+   cmake_policy(SET CMP0167 OLD)
+endif()
+
+# CMP0148 (CMake 3.27): Continue using FindPythonInterp module
+if(POLICY CMP0148)
+   cmake_policy(SET CMP0148 OLD)
 endif()
 
 # remove ndebug from flags for bitcoind release/relwithdebinfo to work
@@ -75,7 +86,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
                     " with enable_tsan enabled!")
         endif()
         set(CMAKE_CXX_FLAGS
-            "${CMAKE_CXX_FLAGS} ${sanitizer_common_flags} -fsanitize=undefined")
+            "${CMAKE_CXX_FLAGS} ${sanitizer_common_flags} -fsanitize=undefined -fno-sanitize-recover=all")
         set(CMAKE_LINKER_FLAGS
             "${CMAKE_LINKER_FLAGS} ${sanitizer_common_flags} -fsanitize=undefined")
     endif()
@@ -92,16 +103,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
         set(CMAKE_LINKER_FLAGS
             "${CMAKE_LINKER_FLAGS} ${sanitizer_common_flags} -fsanitize=thread")
     endif()
-
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        ###
-        # static analyzer
-        ###
-        option(enable_static_analyzer "Use clang static analyzer" OFF)
-        if(enable_static_analyzer)
-            set(CMAKE_CXX_CLANG_TIDY "clang-tidy;-checks=-*,clang-analyzer-*")
-        endif()
-    endif()
 endif()
 
 # Add path for custom modules.
@@ -111,6 +112,36 @@ set(CMAKE_MODULE_PATH
 )
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Setup GDB pretty printers for development
+# Create symlinks to contrib/gdb/.gdbinit in common working directories
+# so pretty-printers work from root, src/, and src/test/
+set(GDBINIT_SOURCE "contrib/gdb/.gdbinit")
+set(GDBINIT_SYMLINKS
+    "${CMAKE_SOURCE_DIR}/.gdbinit:${GDBINIT_SOURCE}"
+    "${CMAKE_SOURCE_DIR}/src/.gdbinit:../${GDBINIT_SOURCE}"
+    "${CMAKE_SOURCE_DIR}/src/test/.gdbinit:../../${GDBINIT_SOURCE}"
+)
+
+foreach(SYMLINK_SPEC ${GDBINIT_SYMLINKS})
+    string(REPLACE ":" ";" SYMLINK_PARTS "${SYMLINK_SPEC}")
+    list(GET SYMLINK_PARTS 0 SYMLINK_PATH)
+    list(GET SYMLINK_PARTS 1 SYMLINK_TARGET)
+
+    if(NOT EXISTS "${SYMLINK_PATH}")
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -E create_symlink "${SYMLINK_TARGET}" "${SYMLINK_PATH}"
+            RESULT_VARIABLE SYMLINK_RESULT
+        )
+        if(SYMLINK_RESULT EQUAL 0)
+            message(STATUS "GDB pretty printers: Created symlink ${SYMLINK_PATH} -> ${SYMLINK_TARGET}")
+        else()
+            message(WARNING "GDB pretty printers: Failed to create symlink ${SYMLINK_PATH}")
+        endif()
+    else()
+        message(STATUS "GDB pretty printers: ${SYMLINK_PATH} already exists")
+    endif()
+endforeach()
 
 # If ccache is available, then use it.
 find_program(CCACHE ccache)

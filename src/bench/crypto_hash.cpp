@@ -14,38 +14,48 @@
 /* Number of bytes to hash per iteration */
 static const uint64_t BUFFER_SIZE = 1000 * 1000;
 
-static void RIPEMD160(benchmark::State &state) {
-    uint8_t hash[CRIPEMD160::OUTPUT_SIZE];
+static void RIPEMD160(benchmark::State& state)
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, CRIPEMD160::OUTPUT_SIZE> hash;
     std::vector<uint8_t> in(BUFFER_SIZE, 0);
     while (state.KeepRunning())
         CRIPEMD160().Write(in.data(), in.size()).Finalize(hash);
 }
 
-static void SHA1(benchmark::State &state) {
-    uint8_t hash[CSHA1::OUTPUT_SIZE];
+static void SHA1(benchmark::State& state)
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, CSHA1::OUTPUT_SIZE> hash;
     std::vector<uint8_t> in(BUFFER_SIZE, 0);
     while (state.KeepRunning())
         CSHA1().Write(in.data(), in.size()).Finalize(hash);
 }
 
-static void SHA256(benchmark::State &state) {
-    uint8_t hash[CSHA256::OUTPUT_SIZE];
+static void SHA256(benchmark::State& state)
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, CSHA256::OUTPUT_SIZE> hash;
     std::vector<uint8_t> in(BUFFER_SIZE, 0);
     while (state.KeepRunning())
         CSHA256().Write(in.data(), in.size()).Finalize(hash);
 }
 
-static void SHA256_32b(benchmark::State &state) {
-    std::vector<uint8_t> in(32, 0);
+static void SHA256_32b(benchmark::State& state)
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, CSHA256::OUTPUT_SIZE> in;
     while (state.KeepRunning()) {
-        for (int i = 0; i < 1000000; i++) {
-            CSHA256().Write(in.data(), in.size()).Finalize(&in[0]);
+        for (int i = 0; i < 1'000'000; i++) {
+            CSHA256().Write(in.data(), in.size()).Finalize(in);
         }
     }
 }
 
-static void SHA512(benchmark::State &state) {
-    uint8_t hash[CSHA512::OUTPUT_SIZE];
+static void SHA512(benchmark::State& state)
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, CSHA512::OUTPUT_SIZE> hash;
     std::vector<uint8_t> in(BUFFER_SIZE, 0);
     while (state.KeepRunning())
         CSHA512().Write(in.data(), in.size()).Finalize(hash);
@@ -55,6 +65,7 @@ static void SipHash_32b(benchmark::State &state) {
     uint256 x;
     while (state.KeepRunning()) {
         for (int i = 0; i < 1000000; i++) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
             *reinterpret_cast<uint64_t *>(x.begin()) = SipHashUint256(0, i, x);
         }
     }

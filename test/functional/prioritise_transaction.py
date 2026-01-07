@@ -7,12 +7,13 @@
 # Test PrioritiseTransaction code
 #
 
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
-# FIXME: review how this test needs to be adapted w.r.t _LEGACY_MAX_BLOCK_SIZE
+from test_framework.cdefs import ONE_KILOBYTE
 from test_framework.mininode import COIN
-from test_framework.cdefs import LEGACY_MAX_BLOCK_SIZE, ONE_KILOBYTE
-import decimal
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import create_confirmed_utxos, gen_return_txouts, satoshi_round
+# FIXME: review how this test needs to be adapted w.r.t _LEGACY_MAX_BLOCK_SIZE
+
+from decimal import Decimal
 
 
 class PrioritiseTransactionTest(BitcoinTestFramework):
@@ -30,11 +31,11 @@ class PrioritiseTransactionTest(BitcoinTestFramework):
         node = self.nodes[0]
         self.txouts = gen_return_txouts()
 
-        utxo = create_confirmed_utxos(Decimal(1000)/Decimal(COIN), node, 1, age=101)[0]
+        utxo = create_confirmed_utxos(Decimal(1000) / Decimal(COIN), node, 1, age=101)[0]
 
         relayfeerate = self.nodes[0].getnetworkinfo()['relayfee']
 
-        ESTIMATED_TX_SIZE_IN_KB = Decimal(385)/Decimal(ONE_KILOBYTE)
+        ESTIMATED_TX_SIZE_IN_KB = Decimal(385) / Decimal(ONE_KILOBYTE)
 
         relayfee = ESTIMATED_TX_SIZE_IN_KB * relayfeerate
 
@@ -46,12 +47,11 @@ class PrioritiseTransactionTest(BitcoinTestFramework):
             outputs = {node.getnewaddress(): satoshi_round(utxo['amount'] - relayfee)}
             rawtx = node.createrawtransaction(inputs, outputs)
             signed_tx = node.signrawtransaction(rawtx)["hex"]
-            x = len(signed_tx)
             txid = node.sendrawtransaction(signed_tx)
             low_paying_txs.append(txid)
             assert txid in node.getrawmempool()
             tx_info = node.getrawtransaction(txid, True)
-            utxo = {"txid":txid, "vout":0, "amount":tx_info["vout"][0]["value"]}
+            utxo = {"txid": txid, "vout": 0, "amount": tx_info["vout"][0]["value"]}
 
         node.generate(1)
 

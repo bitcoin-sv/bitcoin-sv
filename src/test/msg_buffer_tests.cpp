@@ -22,11 +22,14 @@
 
 using namespace std;
 using namespace bsv;
-    
-constexpr auto type{1};
-constexpr auto version{2};
 
-static auto make_msg_header{[](const string& cmd)
+namespace {
+    // Internal linkage
+    constexpr auto msgbuf_type{1};
+    constexpr auto msgbuf_version{2};
+}
+
+static auto make_msg_header{[](const string& cmd) // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 {
     assert(cmd.size() <= cmd_len);
 
@@ -41,7 +44,7 @@ static auto make_msg_header{[](const string& cmd)
     return v;
 }};
 
-static std::vector<uint8_t> block_msg_payload{[]
+static std::vector<uint8_t> block_msg_payload{[] // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 {
     std::vector<uint8_t> v;
 
@@ -89,9 +92,9 @@ BOOST_AUTO_TEST_SUITE(msg_buffer_tests)
 
 BOOST_AUTO_TEST_CASE(write_read_happy_case)
 {
-    msg_buffer buff{type, version};
+    msg_buffer buff{msgbuf_type, msgbuf_version};
    
-    constexpr auto n{10};
+    constexpr auto n{10U};
     vector<uint8_t> ip1(n);
     std::iota(ip1.begin(), ip1.end(), 0);
     buff.write(span{ip1.data(), ip1.size()});
@@ -103,7 +106,7 @@ BOOST_AUTO_TEST_CASE(write_read_happy_case)
                                   ip1.cend(),
                                   op1.cbegin(),
                                   op1.cend());
-    BOOST_CHECK_EQUAL(0, buff.size());
+    BOOST_CHECK_EQUAL(0U, buff.size());
    
     buff.command("default");
     constexpr auto payload_len{42};
@@ -124,9 +127,9 @@ BOOST_AUTO_TEST_CASE(write_read_happy_case)
 
 BOOST_AUTO_TEST_CASE(write_read_past_the_end_of_header)
 {
-    msg_buffer buff{type, version};
+    msg_buffer buff{msgbuf_type, msgbuf_version};
    
-    constexpr auto n{10};
+    constexpr auto n{10U};
     vector<uint8_t> ip(n);
     std::iota(ip.begin(), ip.end(), 0);
     buff.write(span{ip.data(), ip.size()});
@@ -146,9 +149,9 @@ BOOST_AUTO_TEST_CASE(write_read_past_the_end_of_header)
 
 BOOST_AUTO_TEST_CASE(write_read_past_the_end_of_payload)
 {
-    msg_buffer buff{type, version};
+    msg_buffer buff{msgbuf_type, msgbuf_version};
    
-    constexpr auto n{10};
+    constexpr auto n{10U};
     vector<uint8_t> ip1(n);
     std::iota(ip1.begin(), ip1.end(), 0);
     buff.write(span{ip1.data(), ip1.size()});
@@ -160,7 +163,7 @@ BOOST_AUTO_TEST_CASE(write_read_past_the_end_of_payload)
                                   ip1.cend(),
                                   op1.cbegin(),
                                   op1.cend());
-    BOOST_CHECK_EQUAL(0, buff.size());
+    BOOST_CHECK_EQUAL(0U, buff.size());
     
     buff.command("default");
     constexpr auto payload_len{42};
@@ -185,7 +188,7 @@ BOOST_AUTO_TEST_CASE(write_read_past_the_end_of_payload)
 
 BOOST_AUTO_TEST_CASE(write_read_std_header)
 {
-    msg_buffer buff{type, version};
+    msg_buffer buff{msgbuf_type, msgbuf_version};
     
     vector<uint8_t> ip{0xda, 0xb5, 0xbf, 0xfa};
     const string cmd{"verack"};
@@ -210,13 +213,13 @@ BOOST_AUTO_TEST_CASE(write_read_std_header)
 
 BOOST_AUTO_TEST_CASE(write_read_block_msg)
 {
-    msg_buffer buff{type, version};
+    msg_buffer buff{msgbuf_type, msgbuf_version};
     const auto msg_header{make_msg_header("block")};
     buff.write(std::span{msg_header.data(), msg_header.size()});
 
     vector<uint8_t> header(msg_header_len);
     buff.read(span{header.data(), header.size()});
-    BOOST_CHECK_EQUAL(0, buff.size());
+    BOOST_CHECK_EQUAL(0U, buff.size());
 
     buff.command("default");
     buff.payload_len(block_msg_payload.size());
@@ -228,7 +231,7 @@ BOOST_AUTO_TEST_CASE(write_read_block_msg)
 
 BOOST_AUTO_TEST_CASE(read_null_payload)
 {
-    msg_buffer buff{type, version};
+    msg_buffer buff{msgbuf_type, msgbuf_version};
     const auto msg_header{make_msg_header("version")};
 
     buff.write(std::span{msg_header.data(), msg_header.size()});
@@ -241,7 +244,7 @@ BOOST_AUTO_TEST_CASE(read_null_payload)
 
 BOOST_AUTO_TEST_CASE(read_too_much)
 {
-    msg_buffer buff{type, version};
+    msg_buffer buff{msgbuf_type, msgbuf_version};
     
     vector<uint8_t> header{0xda, 0xb5, 0xbf, 0xfa};
     array<uint8_t, 12> a{};

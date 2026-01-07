@@ -2,11 +2,11 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+from test_framework.blocktools import create_transaction, CScript, prepare_init_chain
+from test_framework.mininode import msg_tx
+from test_framework.script import OP_CHECKMULTISIG
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import assert_equal
-from test_framework.comptool import TestManager, TestInstance, RejectResult
-from test_framework.blocktools import create_transaction, CScript, msg_tx, prepare_init_chain
-from test_framework.script import OP_CHECKMULTISIG, OP_TRUE
 
 
 # We create 100 high and 10 low sigops density transactions and make sure that low density transactions are mined too.
@@ -47,7 +47,7 @@ class MempoolHighSigopsDensity(ComparisonTestFramework):
         # send 10 transactions with normal sigops density
         txsBasics = []
         for j in range(10):
-            txBasic = create_transaction(out[i+j+1].tx, out[i+j+1].n, b'', 100000, CScript([2, OP_CHECKMULTISIG]))
+            txBasic = create_transaction(out[i + j + 1].tx, out[i + j + 1].n, b'', 100000, CScript([2, OP_CHECKMULTISIG]))
             self.test.connections[0].send_message(msg_tx(txBasic))
             txsBasics.append(txBasic)
         # check that transactions are in mempool

@@ -3,11 +3,16 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import *
+from test_framework.mininode import CInv, COutPoint, CTransaction, CTxIn, \
+    CTxOut, FromHex, NetworkThread, msg_ping, msg_tx, ToHex
 from test_framework.script import CScript, OP_TRUE
-import datetime
+from test_framework.test_framework import BitcoinTestFramework
+
+from threading import Thread
+
 import contextlib
+import datetime
+import time
 
 # Test if the functionality -broadcastdelay works as expected.
 # Create 2 connections (connection1 and connection2) to bitcoind node and measure how long it takes for connection2 to receive a transaction that connection1 sends to bitcoind.
@@ -49,7 +54,7 @@ class BroadcastDelayTest(BitcoinTestFramework):
             ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
 
         # fund the transcation:
-        ftxHex = node.fundrawtransaction(ToHex(ftx),{'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = node.fundrawtransaction(ToHex(ftx), {'changePosition': len(ftx.vout)})['hex']
         ftxHex = node.signrawtransaction(ftxHex)['hex']
         ftx = FromHex(CTransaction(), ftxHex)
         ftx.rehash()
@@ -63,7 +68,7 @@ class BroadcastDelayTest(BitcoinTestFramework):
         for i in range(num_transactions):
             tx = CTransaction()
             tx.vin.append(CTxIn(COutPoint(ftx.sha256, i), b''))
-            tx.vout.append(CTxOut(out_value-1000, CScript([OP_TRUE])))
+            tx.vout.append(CTxOut(out_value - 1000, CScript([OP_TRUE])))
             tx.rehash()
             txs.append(tx)
 
@@ -123,7 +128,7 @@ class BroadcastDelayTest(BitcoinTestFramework):
             with run_pinging_connection(connections[2]):
                 min_propagation_delay = self.syncNodesWithTransaction(num_txns_to_sync, txs, connections[0], connections[1])
                 self.log.info("Minimal propagation delay: %s", min_propagation_delay)
-                assert(min_propagation_delay < datetime.timedelta(milliseconds=200)) # minimal propagation delay must not be too large
+                assert (min_propagation_delay < datetime.timedelta(milliseconds=200)) # minimal propagation delay must not be too large
 
         # 2. Send 15 transactions with default broadcast delay (150ms) and calculate average broadcast delay
         with self.run_node_with_connections("calculating propagation delay (default)", 0,
@@ -131,16 +136,16 @@ class BroadcastDelayTest(BitcoinTestFramework):
             with run_pinging_connection(connections[2]):
                 propagation_delay = self.syncNodesWithTransaction(num_txns_to_sync, txs, connections[0], connections[1])
                 self.log.info("Propagation delay, expected 150ms: %s", propagation_delay)
-                assert(propagation_delay < datetime.timedelta(milliseconds=250)) # allow variation of +-100ms
-                assert(propagation_delay > datetime.timedelta(milliseconds=50))
+                assert (propagation_delay < datetime.timedelta(milliseconds=250)) # allow variation of +-100ms
+                assert (propagation_delay > datetime.timedelta(milliseconds=50))
 
         # 3. Send 15 transactions with broadcast delay 1s
         with self.run_node_with_connections("calculating propagation delay (1000ms)", 0, ['-broadcastdelay=1000'], self.num_peers) as connections:
             with run_pinging_connection(connections[2]):
                 propagation_delay = self.syncNodesWithTransaction(num_txns_to_sync, txs, connections[0], connections[1])
                 self.log.info("Propagation delay, expected 1000ms: %s", propagation_delay)
-                assert(propagation_delay < datetime.timedelta(milliseconds=1500)) # allow variation of +-500ms
-                assert(propagation_delay > datetime.timedelta(milliseconds=500))
+                assert (propagation_delay < datetime.timedelta(milliseconds=1500)) # allow variation of +-500ms
+                assert (propagation_delay > datetime.timedelta(milliseconds=500))
 
 
 if __name__ == '__main__':

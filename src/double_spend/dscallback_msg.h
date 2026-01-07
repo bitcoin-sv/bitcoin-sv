@@ -139,7 +139,8 @@ class DSCallbackMsg
                 READWRITE(dummy);
                 ok = false;
             }
-            catch(...) {} // NOLINT(bugprone-empty-catch)
+            catch(...)
+            {}
 
             if(!ok)
             {

@@ -7,6 +7,7 @@
 #define BITCOIN_CONSENSUS_CONSENSUS_H
 
 #include <cstdint>
+#include <limits>
 
 /** 1KB */
 static const uint64_t ONE_KILOBYTE = 1000;
@@ -59,9 +60,10 @@ static const uint64_t MAX_SCRIPT_SIZE_BEFORE_GENESIS = 10000;
 static const uint64_t MAX_SCRIPT_SIZE_AFTER_GENESIS = UINT32_MAX; // 4GB - limited by maximum P2P message size  
 // Maximum script number length before Genesis (equal to CScriptNum::MAXIMUM_ELEMENT_SIZE)
 static const uint64_t MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS = 4; 
-
 // Maximum script number length after Genesis
 static const uint64_t MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS = 750 * ONE_KILOBYTE; 
+// Maximum script number length after Chronicle
+static const uint64_t MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE = 32 * ONE_MEGABYTE;
 
 // Maximum coinbase scriptSig size
 static const uint64_t MAX_COINBASE_SCRIPTSIG_SIZE = 100;
@@ -75,8 +77,6 @@ static const int COINBASE_MATURITY = 100;
  * Confiscation transaction outputs can only be spent after this number of new blocks.
  */
 static const int CONFISCATION_MATURITY = 1000;
-/** Activation time for P2SH (April 1st 2012) */
-static const int64_t P2SH_ACTIVATION_TIME = 1333234914;
 
 /** Maximum stack memory usage (used instead of MAX_SCRIPT_ELEMENT_SIZE and MAX_STACK_ELEMENTS) after Genesis. **/
 static const uint64_t DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS = INT64_MAX;

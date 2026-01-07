@@ -90,22 +90,22 @@ SOLO_TESTS = {
 }
 
 ENVIRONMENT_TYPE = {
-    1 : "Release build",
-    2 : "Release build with sanitizers enabled",
-    3 : "Debug build",
-    4 : "Debug build with sanitizers enabled"
+    1: "Release build",
+    2: "Release build with sanitizers enabled",
+    3: "Debug build",
+    4: "Debug build with sanitizers enabled"
 }
 
 # collection of timeout factors for time-sensitive tests:
 # test_name : factor_release_build, factor_debug_build, factor_release_with_sanitizers, factor_debug_with_sanitizers
 # factor for release build is always 1; it is still present in this map for consistency
 TIMEOUT_FACTOR_FOR_TESTS = {
-    "bsv-block-propagation-priority.py" : [1,2,2,3],
-    "bsv-consolidation-feefilter.py" : [1,4,4,5],
-    "bsv-genesis-general.py" : [1,2,2,3],
-    "bsv-mempool-eviction.py" : [1,1,3,5],
-    "bsv-4gb-plus-block.py" : [1,2,2,3],
-    "bsv-block-stalling-test.py" : [1,2,2,3]
+    "bsv-block-propagation-priority.py": [1, 2, 2, 3],
+    "bsv-consolidation-feefilter.py": [1, 4, 4, 5],
+    "bsv-genesis-general.py": [1, 2, 2, 3],
+    "bsv-mempool-eviction.py": [1, 1, 3, 5],
+    "bsv-4gb-plus-block.py": [1, 2, 2, 3],
+    "bsv-block-stalling-test.py": [1, 2, 2, 3]
 }
 
 # This tests can be only run by explicitly specifying them on command line.
@@ -117,7 +117,7 @@ TEST_PARAMS = {
     # When a test is listed here, then it will be run without parameters
     # as well as with additional parameters listed here.
     # This:
-    #    example "testName" : [["--param1", "--param2"] , ["--param3"]]
+    #    example "testName" : [["--param1", "--param2"], ["--param3"]]
     # will run the test 3 times:
     #    testName
     #    testName --param1 --param2
@@ -143,7 +143,7 @@ running_jobs = []
 
 
 def on_ci():
-    return os.getenv('TRAVIS') == 'true' or os.getenv('TEAMCITY_VERSION') != None
+    return os.getenv('TRAVIS') == 'true' or os.getenv('TEAMCITY_VERSION') is not None
 
 
 def main():
@@ -201,7 +201,7 @@ def main():
                                                                          " There are two possible inputs for this argument: You can choose environment type and default timeout factors will be set:"
                                                                          " 1: Release build. (default) 2: Debug build. 3: Release build with sanitizers. 4: Debug build with sanitizers.\n"
                                                                          "If these factors do not work for you, you can pass them directly (in JSON): "
-                                                                         " Example: --timeout-factors={{\"bsv-genesis-general.py\" : 2, \"bsv-mempool-eviction.py\" : 3 , ...}}."
+                                                                         " Example: --timeout-factors={{\"bsv-genesis-general.py\" : 2, \"bsv-mempool-eviction.py\" : 3, ...}}."
                                                                          " You must pass timeout factors for all the following tests (if you are running them): {}."
                                                                          .format([test for test in TIMEOUT_FACTOR_FOR_TESTS.keys()]))
     args, unknown_args = parser.parse_known_args()
@@ -213,7 +213,7 @@ def main():
         else:
             console = sys.stdout.isatty()
     else:
-        console = args.output_type==1
+        console = args.output_type == 1
 
     # Create a set to store arguments and create the passon string
     tests = set(arg for arg in unknown_args if arg[:2] != "--")
@@ -305,7 +305,7 @@ def main():
         for timeout_test in TIMEOUT_FACTOR_FOR_TESTS.keys():
             if timeout_test in test_list:
                 test_list[test_list.index(timeout_test)] = (timeout_test + " --timeoutfactor={}"
-                    .format(TIMEOUT_FACTOR_FOR_TESTS[timeout_test][int(args.timeout_factors)-1])) # noqa
+                    .format(TIMEOUT_FACTOR_FOR_TESTS[timeout_test][int(args.timeout_factors) - 1])) # noqa
 
     else:
         try:
@@ -318,7 +318,7 @@ def main():
                 if timeout_test in test_list:
                     test_list[test_list.index(timeout_test)] = (timeout_test + " --timeoutfactor={}".format(timeout_factors_json[timeout_test]))
         except ValueError as e:
-            print ("Error parsing input json: ", e)
+            print("Error parsing input json: ", e)
 
     if not test_list:
         print("No valid test scripts specified. Check that your test is in one "
@@ -345,7 +345,7 @@ def main():
               config["environment"]["EXEEXT"], tmpdir, args.jobs, args.coverage, passon_args, build_timings, args.buildconfig, args.watch, console, solo_position_start)
 
 
-def run_tests(test_list, build_dir, tests_dir, junitouput, fail_fast, exeext, tmpdir, jobs=1, enable_coverage=False, args=[],  build_timings=None, buildconfig="", file_for_monitoring=None, console=False, solo_position_start=-1):
+def run_tests(test_list, build_dir, tests_dir, junitouput, fail_fast, exeext, tmpdir, jobs=1, enable_coverage=False, args=[], build_timings=None, buildconfig="", file_for_monitoring=None, console=False, solo_position_start=-1):
     # Warn if bitcoind is already running (unix only)
     try:
         pidofOutput = subprocess.check_output(["pidof", "bitcoind"])
@@ -419,8 +419,17 @@ def run_tests(test_list, build_dir, tests_dir, junitouput, fail_fast, exeext, tm
             print(BOLD[1] + 'stdout:\n' + BOLD[0] + test_result.stdout + '\n')
             print(BOLD[1] + 'stderr:\n' + BOLD[0] + test_result.stderr + '\n')
 
-            if(fail_fast):
+            if fail_fast:
                 break
+
+    # Wait for all remaining tests to finish - very likely with fail_fast option
+    while len(running_jobs) > 0:
+        (name, _, proc, log_out, log_err) = running_jobs[0]
+        if proc.poll() is None:
+            print(f"wait {name}...")
+            proc.wait()
+        log_out.close(), log_err.close()
+        running_jobs.pop(0)
 
     runtime = int(time.time() - time0)
     print_results(test_results, max_len_name, runtime)
@@ -482,7 +491,7 @@ class TestHandler:
         self.ts = time.time()
         self.console = console
         self.test_count = 0
-        self.solo_position_start=solo_position_start
+        self.solo_position_start = solo_position_start
         # In case there is a graveyard of zombie bitcoinds, we can apply a
         # pseudorandom offset to hopefully jump over them.
         # (625 is PORT_RANGE/MAX_NODES)
@@ -564,8 +573,8 @@ class TestHandler:
                             log_job.terminate()
                             log_job = None
                         log_out.seek(0), log_err.seek(0)
-                        [stdout, stderr] = [l.read().decode('utf-8')
-                                            for l in (log_out, log_err)]
+                        [stdout, stderr] = [x.read().decode('utf-8')
+                                            for x in (log_out, log_err)]
                         log_out.close(), log_err.close()
                         if proc.returncode == TEST_EXIT_PASSED and (stderr == "" or name in TESTS_WITH_DISABLED_STDERROR_CHECK):
                             status = "Passed"

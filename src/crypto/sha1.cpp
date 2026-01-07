@@ -7,6 +7,7 @@
 #include "crypto/common.h"
 
 #include <cassert>
+#include <cstdint>
 #include <cstring>
 
 // Internal implementation code.
@@ -14,7 +15,7 @@ namespace {
 /// Internal SHA-1 implementation.
 namespace sha1 {
     /** One round of SHA-1. */
-    inline void Round(uint32_t a, uint32_t &b, uint32_t c, uint32_t d,
+    inline void Round(uint32_t a, uint32_t &b, uint32_t /*c*/, uint32_t /*d*/,
                       uint32_t &e, uint32_t f, uint32_t k, uint32_t w) {
         e += ((a << 5) | (a >> 27)) + f + k + w;
         b = (b << 30) | (b >> 2);
@@ -32,11 +33,13 @@ namespace sha1 {
 
     /** Initialize SHA-1 state. */
     inline void Initialize(uint32_t *s) {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         s[0] = 0x67452301ul;
         s[1] = 0xEFCDAB89ul;
         s[2] = 0x98BADCFEul;
         s[3] = 0x10325476ul;
         s[4] = 0xC3D2E1F0ul;
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     const uint32_t k1 = 0x5A827999ul;
@@ -45,10 +48,14 @@ namespace sha1 {
     const uint32_t k4 = 0xCA62C1D6ul;
 
     /** Perform a SHA-1 transformation, processing a 64-byte chunk. */
-    void Transform(uint32_t *s, const uint8_t *chunk) {
+    void Transform(uint32_t *s, const uint8_t *chunk)
+    {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         uint32_t a = s[0], b = s[1], c = s[2], d = s[3], e = s[4];
+        // NOLINTBEGIN(cppcoreguidelines-init-variables)
         uint32_t w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13,
             w14, w15;
+        // NOLINTEND(cppcoreguidelines-init-variables)
 
         Round(a, b, c, d, e, f1(b, c, d), k1, w0 = ReadBE32(chunk + 0));
         Round(e, a, b, c, d, f1(a, b, c), k1, w1 = ReadBE32(chunk + 4));
@@ -140,6 +147,7 @@ namespace sha1 {
         s[2] += c;
         s[3] += d;
         s[4] += e;
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
 } // namespace sha1
@@ -148,54 +156,67 @@ namespace sha1 {
 
 ////// SHA1
 
-CSHA1::CSHA1() : bytes(0) {
-    sha1::Initialize(s);
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+CSHA1::CSHA1()
+{
+    sha1::Initialize(s.data());
 }
 
-CSHA1 &CSHA1::Write(const uint8_t *data, size_t len) {
-    if (len == 0) {
-        return *this;    
-    }
+CSHA1& CSHA1::Write(const uint8_t* data, size_t len)
+{
+    if(len == 0)
+        return *this;
+
     assert(data);
-    const uint8_t *end = data + len;
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    const uint8_t* end = data + len;
     size_t bufsize = bytes % 64;
-    if (bufsize && bufsize + len >= 64) {
+    if(bufsize && bufsize + len >= 64)
+    {
         // Fill the buffer, and process it.
-        memcpy(buf + bufsize, data, 64 - bufsize);
+        memcpy(buf.data() + bufsize, data, 64 - bufsize);
         bytes += 64 - bufsize;
         data += 64 - bufsize;
-        sha1::Transform(s, buf);
+        sha1::Transform(s.data(), buf.data());
         bufsize = 0;
     }
-    while (end >= data + 64) {
+
+    while(end >= data + 64)
+    {
         // Process full chunks directly from the source.
-        sha1::Transform(s, data);
+        sha1::Transform(s.data(), data);
         bytes += 64;
         data += 64;
     }
-    if (end > data) {
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
+    if(end > data)
+    {
         // Fill the buffer with what remains.
-        memcpy(buf + bufsize, data, end - data);
+        memcpy(buf.data() + bufsize, data, end - data);
         bytes += end - data;
     }
     return *this;
 }
 
-void CSHA1::Finalize(uint8_t hash[OUTPUT_SIZE]) {
-    static const uint8_t pad[64] = {0x80};
-    uint8_t sizedesc[8];
-    WriteBE64(sizedesc, bytes << 3);
-    Write(pad, 1 + ((119 - (bytes % 64)) % 64));
-    Write(sizedesc, 8);
-    WriteBE32(hash, s[0]);
-    WriteBE32(hash + 4, s[1]);
-    WriteBE32(hash + 8, s[2]);
-    WriteBE32(hash + 12, s[3]);
-    WriteBE32(hash + 16, s[4]);
+void CSHA1::Finalize(const span hash)
+{
+    static const std::array<uint8_t, 64> pad = {0x80};
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, 8> sizedesc;
+    WriteBE64(sizedesc.data(), bytes << 3);
+    Write(pad.data(), 1 + ((119 - (bytes % 64)) % 64));
+    Write(sizedesc.data(), 8);
+    WriteBE32(hash.data(), s[0]);
+    WriteBE32(hash.data() + 4, s[1]);
+    WriteBE32(hash.data() + 8, s[2]);
+    WriteBE32(hash.data() + 12, s[3]);
+    WriteBE32(hash.data() + 16, s[4]);
 }
 
-CSHA1 &CSHA1::Reset() {
+CSHA1& CSHA1::Reset()
+{
     bytes = 0;
-    sha1::Initialize(s);
+    sha1::Initialize(s.data());
     return *this;
 }

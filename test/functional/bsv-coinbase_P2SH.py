@@ -76,7 +76,7 @@ class MiningCoinbaseWithP2SHTest(BitcoinTestFramework):
         # Add P2SH to coinbase output - should be rejected
         candidate = self.nodes[0].getminingcandidate(False)
         block, ctx = create_block_from_candidate(candidate, False)
-        coinbase_tx = create_coinbase_P2SH(self.nodes[0].getblockcount()+1, example_script_hash)
+        coinbase_tx = create_coinbase_P2SH(self.nodes[0].getblockcount() + 1, example_script_hash)
 
         # submitminingsolution with P2SH in coinbase tx - should be denied.
         assert_raises_rpc_error(-26, "bad-txns-vout-p2sh",

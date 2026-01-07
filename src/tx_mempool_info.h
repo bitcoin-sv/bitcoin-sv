@@ -9,10 +9,10 @@
 #include "primitives/transaction.h"
 #include "txn_validation_data.h"
 
-#include <atomic>
 #include <functional>
 #include <mutex>
 #include <optional>
+#include <shared_mutex>
 #include <variant>
 
 #include <boost/noncopyable.hpp>
@@ -106,49 +106,61 @@ private:
     {
     public:
         AtomicTxRef() = default;
-        AtomicTxRef( CTransactionRef ref ) noexcept
-        // NOLINTNEXTLINE(performance-unnecessary-value-param)
-            : mValue{ ref }
+        AtomicTxRef(CTransactionRef ref) noexcept
+            : mValue{std::move(ref)}
         {}
-        
-        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
+
         AtomicTxRef(AtomicTxRef&& other)
-            : mValue{ std::atomic_load( &other.mValue ) }
-        {}
-        
-        // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
+        {
+            std::lock_guard lockOther {other.mMtx};
+            mValue = std::move(other.mValue);
+        }
+
         AtomicTxRef& operator=(AtomicTxRef&& other)
         {
-            mValue = std::atomic_load( &other.mValue );
+            if(this == &other)
+                return *this;
+
+            std::scoped_lock locks {mMtx, other.mMtx};
+            mValue = std::move(other.mValue);
             return *this;
         }
+
         AtomicTxRef(const AtomicTxRef& other)
-            : mValue{ std::atomic_load( &other.mValue ) }
-        {}
-    
-        // NOLINTNEXTLINE(bugprone-unhandled-self-assignment)
+        {
+            std::shared_lock lockOther {other.mMtx};
+            mValue = other.mValue;
+        }
+
         AtomicTxRef& operator=(const AtomicTxRef& other)
         {
-            mValue = std::atomic_load( &other.mValue );
+            if(this == &other)
+                return *this;
+
+            // Lock other for read and us for write
+            std::shared_lock lockOther {other.mMtx, std::defer_lock};
+            std::scoped_lock locks {mMtx, lockOther};
+            mValue = other.mValue;
             return *this;
         }
 
         // Try to set the value if mValue is still nullptr otherwise
         // just return existing value so we don't invalidate any existing
         // references to the underlying pointer.
-        const CTransactionRef& store( const CTransactionRef& ref )
+        const CTransactionRef& store(const CTransactionRef& ref)
         {
-            CTransactionRef expectedNullptr;
-            std::atomic_compare_exchange_strong(
-                &mValue,
-                &expectedNullptr,
-                ref );
-
+            std::lock_guard lock {mMtx};
+            if(!mValue)
+            {
+                mValue = ref;
+            }
             return mValue;
         }
+
         std::optional<std::reference_wrapper<const CTransactionRef>> load() const
         {
-            if (auto ref = std::atomic_load( &mValue ); ref)
+            std::shared_lock lock {mMtx};
+            if(mValue)
             {
                 return mValue;
             }
@@ -157,7 +169,8 @@ private:
         }
 
     private:
-        CTransactionRef mValue;
+        mutable std::shared_mutex mMtx {};
+        CTransactionRef mValue {nullptr};
     };
 
     // A local cache for the transaction which may be stored on disk in the

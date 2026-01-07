@@ -11,14 +11,16 @@ this one can be extended, to cover the checks done for bigger blocks
 (e.g. sigops limits).
 """
 
-from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import assert_equal, assert_raises_rpc_error
-from test_framework.comptool import TestManager, TestInstance, RejectResult
-from test_framework.blocktools import *
-import time
+from test_framework.blocktools import prepare_init_chain
+from test_framework.cdefs import MAX_BLOCK_SIGOPS_PER_MB, ONE_MEGABYTE
+from test_framework.comptool import RejectResult
 from test_framework.key import CECKey
-from test_framework.script import *
-from test_framework.cdefs import (ONE_MEGABYTE)
+from test_framework.mininode import COutPoint, CTransaction, CTxIn, CTxOut, \
+    msg_block, ToHex
+from test_framework.script import CScript, hash160, OP_2DUP, OP_CHECKSIG, \
+    OP_CHECKSIGVERIFY, OP_EQUAL, OP_HASH160, OP_TRUE, SIGHASH_ALL, \
+    SIGHASH_FORKID, SignatureHash
+from test_framework.test_framework import ComparisonTestFramework
 
 
 class FullBlockTest(ComparisonTestFramework):
@@ -69,11 +71,11 @@ class FullBlockTest(ComparisonTestFramework):
         yield self.accepted()
 
         # Oversized blocks will cause us to be disconnected
-        assert(not self.test.test_nodes[0].closed)
+        assert (not self.test.test_nodes[0].closed)
         block(18, spend=out[17], block_size=self.excessive_block_size + 1)
         self.test.connections[0].send_message(msg_block((self.chain.tip)))
         self.test.wait_for_disconnections()
-        assert(self.test.test_nodes[0].closed)
+        assert (self.test.test_nodes[0].closed)
 
         # Rewind bad block and remake connection to node
         self.chain.set_tip(17)
@@ -184,8 +186,7 @@ class FullBlockTest(ComparisonTestFramework):
             spent_p2sh_tx.vin.append(CTxIn(COutPoint(p2sh_tx.sha256, 0), b''))
             spent_p2sh_tx.vout.append(CTxOut(1, output_script))
             # Sign the transaction using the redeem script
-            sighash = SignatureHashForkId(
-                redeem_script, spent_p2sh_tx, 0, SIGHASH_ALL | SIGHASH_FORKID, p2sh_tx.vout[0].nValue)
+            sighash = SignatureHash(redeem_script, spent_p2sh_tx, 0, SIGHASH_ALL | SIGHASH_FORKID, p2sh_tx.vout[0].nValue)
             sig = private_key.sign(sighash) + \
                 bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
             spent_p2sh_tx.vin[0].scriptSig = CScript([sig, redeem_script])

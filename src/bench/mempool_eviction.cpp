@@ -9,7 +9,7 @@
 
 namespace
 {
-    mining::CJournalChangeSetPtr nullChangeSet {nullptr};
+    const mining::CJournalChangeSetPtr nullChangeSet {nullptr};
 }
 
 static void AddTx(const CTransaction &tx, const Amount &nFee,

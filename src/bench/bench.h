@@ -53,21 +53,20 @@ namespace benchmark {
         std::string name;
         duration maxElapsed;
         time_point beginTime, lastTime;
-        duration minTime, maxTime;
-        uint64_t count;
-        uint64_t countMask;
-        uint64_t beginCycles;
-        uint64_t lastCycles;
-        uint64_t minCycles;
-        uint64_t maxCycles;
+        duration minTime{duration::max()};
+        duration maxTime{duration::zero()};
+        uint64_t count{};
+        uint64_t countMask{1};
+        uint64_t beginCycles{};
+        uint64_t lastCycles{};
+        uint64_t minCycles{std::numeric_limits<uint64_t>::max()};
+        uint64_t maxCycles{std::numeric_limits<uint64_t>::min()};
     public:
-        State(std::string _name, duration _maxElapsed) : name(_name), maxElapsed(_maxElapsed), count(0) {
-            minTime = duration::max();
-            maxTime = duration::zero();
-            minCycles = std::numeric_limits<uint64_t>::max();
-            maxCycles = std::numeric_limits<uint64_t>::min();
-            countMask = 1;
-        }
+        State(std::string _name, duration _maxElapsed):
+            name{std::move(_name)},
+            maxElapsed{_maxElapsed}
+        {}
+
         bool KeepRunning();
     };
 
@@ -78,7 +77,8 @@ class BenchRunner {
     static BenchmarkMap &benchmarks();
 
 public:
-    BenchRunner(std::string name, BenchFunction func);
+    BenchRunner(const std::string& name,
+                const BenchFunction& func);
 
     static void RunAll(duration elapsedTimeForOne = std::chrono::seconds(1));
 };

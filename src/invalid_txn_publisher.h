@@ -138,10 +138,10 @@ public:
 
         for(const auto& item : mCollidedWithTransaction)
         {
-            auto tx = std::get_if<CTransactionRef>(&item.mTransaction);
-            if (tx)
+            const auto cw_tx = std::get_if<CTransactionRef>(&item.mTransaction);
+            if(cw_tx)
             {
-                totalSize += (*tx)->GetTotalSize();
+                totalSize += (*cw_tx)->GetTotalSize();
             }
         }
 
@@ -366,7 +366,7 @@ public:
     CInvalidTxnPublisher& operator=(const CInvalidTxnPublisher&) = delete;
 
     // Puts invalid transaction on the queue
-    void Publish(InvalidTxnPublisher::InvalidTxnInfoWithTxn&& InvalidTxnInfo);
+    void Publish(const InvalidTxnPublisher::InvalidTxnInfoWithTxn&);
 
     // Removes locally stored invalid transactions
     int64_t ClearStored();

@@ -48,6 +48,8 @@ std::string CBlockFileInfo::ToString() const
     return strprintf(
         "CBlockFileInfo(blocks=%u, size=%u, heights=%u...%u, time=%s...%s)",
         nBlocks, nSize, nHeightFirst, nHeightLast,
+        // NOLINTBEGIN(*-narrowing-conversions)
         DateTimeStrFormat("%Y-%m-%d", nTimeFirst),
         DateTimeStrFormat("%Y-%m-%d", nTimeLast));
+        // NOLINTEND(*-narrowing-conversions)
 }

@@ -1,10 +1,9 @@
-from genesis_upgrade_tests.test_base import GenesisHeightTestsCaseBase, GenesisHeightBasedSimpleTestsCase
+from genesis_upgrade_tests.test_base import GenesisHeightBasedSimpleTestsCase
 from test_framework.height_based_test_framework import SimpleTestDefinition
 from test_framework.key import CECKey
-from test_framework.mininode import CTransaction, COutPoint, CTxIn, CTxOut
 from test_framework.cdefs import MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS
-from test_framework.script import CScript, OP_FALSE, OP_RETURN, SignatureHashForkId, SignatureHash, SIGHASH_ALL, \
-    SIGHASH_FORKID, OP_CHECKSIG, OP_0, OP_1, OP_CHECKMULTISIG, OP_TRUE, OP_DROP
+from test_framework.script import CScript, SignatureHash, SIGHASH_ALL, \
+    SIGHASH_FORKID, OP_0, OP_1, OP_CHECKMULTISIG
 
 
 def make_key():
@@ -20,14 +19,13 @@ def makePubKeys(numOfKeys):
 
 
 def make_unlock_script(tx, tx_to_spend):
-    sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
-                                  tx_to_spend.vout[0].nValue)
+    sighash = SignatureHash(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
     sig = MaxMultiSigTest.THE_KEY.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
     return CScript([OP_0, sig])
 
 
 class MaxMultiSigTest(GenesisHeightBasedSimpleTestsCase):
-    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1','-maxpubkeyspermultisigpolicy=100']
+    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-maxpubkeyspermultisigpolicy=100']
     NAME = "Max multi signature test"
     THE_KEY = make_key()
     PUBKEYS10 = makePubKeys(10)
@@ -90,8 +88,7 @@ class MaxMultiSigTest(GenesisHeightBasedSimpleTestsCase):
 
 
 def make_unlock_script_for_default(tx, tx_to_spend):
-    sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID,
-                                  tx_to_spend.vout[0].nValue)
+    sighash = SignatureHash(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
     sig = MaxMultiSigTestPolicyNotSet.THE_KEY.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
     return CScript([OP_0, sig])
 

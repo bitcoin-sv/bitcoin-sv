@@ -6,6 +6,7 @@
 #include "arith_uint256.h"
 #include "crypto/common.h"
 #include "uint256.h"
+#include <cstddef>
 #include <string>
 
 template <unsigned int BITS>
@@ -13,12 +14,15 @@ base_uint<BITS>::base_uint(const std::string &str) {
     SetHex(str);
 }
 
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
+
 template <unsigned int BITS>
 base_uint<BITS> &base_uint<BITS>::operator<<=(unsigned int shift) {
     base_uint<BITS> a(*this);
     for (int i = 0; i < WIDTH; i++)
         pn[i] = 0;
-    int k = shift / 32;
+    
+    int k = shift / 32; // NOLINT(*-narrowing-conversions)
     shift = shift % 32;
     for (int i = 0; i < WIDTH; i++) {
         if (i + k + 1 < WIDTH && shift != 0)
@@ -33,7 +37,8 @@ base_uint<BITS> &base_uint<BITS>::operator>>=(unsigned int shift) {
     base_uint<BITS> a(*this);
     for (int i = 0; i < WIDTH; i++)
         pn[i] = 0;
-    int k = shift / 32;
+
+    int k = shift / 32; // NOLINT(*-narrowing-conversions);
     shift = shift % 32;
     for (int i = 0; i < WIDTH; i++) {
         if (i - k - 1 >= 0 && shift != 0)
@@ -177,6 +182,7 @@ template unsigned int base_uint<256>::bits() const;
 arith_uint256 &arith_uint256::SetCompact(uint32_t nCompact, bool *pfNegative,
                                          bool *pfOverflow)
 {
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     int nSize = nCompact >> 24;
     uint32_t nWord = nCompact & 0x007fffff;
     if (nSize <= 3) {
@@ -194,8 +200,9 @@ arith_uint256 &arith_uint256::SetCompact(uint32_t nCompact, bool *pfNegative,
     return *this;
 }
 
-uint32_t arith_uint256::GetCompact(bool fNegative) const {
-    int nSize = (bits() + 7) / 8;
+uint32_t arith_uint256::GetCompact(bool fNegative) const
+{
+    int nSize = (bits() + 7) / 8; // NOLINT(*-narrowing-conversions)
     uint32_t nCompact = 0;
     if (nSize <= 3) {
         nCompact = GetLow64() << 8 * (3 - nSize);
@@ -217,18 +224,25 @@ uint32_t arith_uint256::GetCompact(bool fNegative) const {
     return nCompact;
 }
 
-uint256 ArithToUint256(const arith_uint256 &a) {
+uint256 ArithToUint256(const arith_uint256& a)
+{
     uint256 b;
-    for (int x = 0; x < a.WIDTH; ++x)
-        WriteLE32(b.begin() + x * 4, a.pn[x]);
+    for(int x = 0; x < a.WIDTH; ++x)
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        WriteLE32(b.begin() + static_cast<ptrdiff_t>(x * 4), a.pn[x]);
     return b;
 }
-arith_uint256 UintToArith256(const uint256 &a) {
+
+arith_uint256 UintToArith256(const uint256& a)
+{
     arith_uint256 b;
-    for (int x = 0; x < b.WIDTH; ++x)
-        b.pn[x] = ReadLE32(a.begin() + x * 4);
+    for(int x = 0; x < b.WIDTH; ++x)
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        b.pn[x] = ReadLE32(a.begin() + static_cast<ptrdiff_t>(x * 4));
     return b;
 }
+
+// NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
 
 std::ostream& operator<<(std::ostream& os, const arith_uint256& a)
 {

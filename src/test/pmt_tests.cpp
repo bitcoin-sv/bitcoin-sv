@@ -20,20 +20,22 @@ class CPartialMerkleTreeTester : public CPartialMerkleTree {
 public:
     // flip one bit in one of the hashes - this should break the authentication
     void Damage() {
-        unsigned int n = InsecureRandRange(vHash.size());
+        const auto n = InsecureRandRange(vHash.size());
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int bit = InsecureRandBits(8);
-        *(vHash[n].begin() + (bit >> 3)) ^= 1 << (bit & 7);
+        *(vHash[n].begin() + (bit >> 3)) ^= 1 << (bit & 7); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 };
 
 BOOST_FIXTURE_TEST_SUITE(pmt_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(pmt_test1) {
-    static const unsigned int nTxCounts[] = {1,   4,   7,   17,  56,   100,
-                                             127, 256, 312, 513, 1000, 4095};
+    static const std::array<unsigned int, 12> nTxCounts =
+        {1, 4, 7, 17, 56, 100, 127, 256, 312, 513, 1000, 4095};
 
-    for (int i = 0; i < 12; i++) {
-        unsigned int nTx = nTxCounts[i];
+    for(size_t i = 0; i < nTxCounts.size(); i++)
+    {
+        auto nTx = nTxCounts[i];
 
         // build a block with some dummy transactions
         CBlock block;
@@ -55,7 +57,7 @@ BOOST_AUTO_TEST_CASE(pmt_test1) {
         std::vector<uint256> vTxid(nTx, uint256());
         for (unsigned int j = 0; j < nTx; j++)
             vTxid[j] = block.vtx[j]->GetId();
-        int nHeight = 1, nTx_ = nTx;
+        unsigned int nHeight = 1, nTx_ = nTx;
         while (nTx_ > 1) {
             nTx_ = (nTx_ + 1) / 2;
             nHeight++;

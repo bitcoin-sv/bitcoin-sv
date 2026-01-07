@@ -36,12 +36,10 @@ from test_framework.mininode import (
     msg_block,
     msg_getdata,
     msg_getblocks,
-    CInv,
-    CBlockLocator
+    CInv
 )
 from test_framework.test_framework import BitcoinTestFramework, ChainManager
 from test_framework.util import (
-    assert_equal,
     p2p_port,
     wait_until,
     check_for_log_msg)

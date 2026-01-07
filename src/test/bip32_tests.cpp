@@ -14,30 +14,31 @@
 #include <string>
 #include <vector>
 
-struct TestDerivation {
+struct TestDerivation
+{
     std::string pub;
     std::string prv;
-    unsigned int nChild;
+    unsigned int nChild{};
 };
 
 struct TestVector {
     std::string strHexMaster;
     std::vector<TestDerivation> vDerive;
 
-    TestVector(std::string strHexMasterIn) : strHexMaster(strHexMasterIn) {}
+    TestVector(std::string strHexMasterIn) : strHexMaster{std::move(strHexMasterIn)}
+    {}
 
-    TestVector &operator()(std::string pub, std::string prv,
-                           unsigned int nChild) {
+    TestVector& operator()(std::string pub, std::string prv, unsigned int nChild)
+    {
         vDerive.push_back(TestDerivation());
-        TestDerivation &der = vDerive.back();
-        der.pub = pub;
-        der.prv = prv;
+        TestDerivation& der = vDerive.back();
+        der.pub = std::move(pub);
+        der.prv = std::move(prv);
         der.nChild = nChild;
         return *this;
     }
 };
-
-TestVector test1 = TestVector("000102030405060708090a0b0c0d0e0f")(
+TestVector test1 = TestVector("000102030405060708090a0b0c0d0e0f")( // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
     "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1R"
     "upje8YtGqsefD265TMg7usUDFdp6W1EGMcet8",
     "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWU"
@@ -65,7 +66,7 @@ TestVector test1 = TestVector("000102030405060708090a0b0c0d0e0f")(
                    "kmHScGpWmj4WggLyQjgPie1rFSruoUihUZREPSL39UNdE3BBDu76",
                    0);
 
-TestVector test2 = TestVector("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdba"
+TestVector test2 = TestVector("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdba" // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
                               "b7b4b1aeaba8a5a29f9c999693908d8a8784817e7b787572"
                               "6f6c696663605d5a5754514e4b484542")(
     "xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6"
@@ -101,8 +102,9 @@ void RunTest(const TestVector &test) {
     CExtPubKey pubkey;
     key.SetMaster(&seed[0], seed.size());
     pubkey = key.Neuter();
-    for (const TestDerivation &derive : test.vDerive) {
-        uint8_t data[74];
+    for(const TestDerivation& derive : test.vDerive)
+    {
+        std::array<uint8_t, BIP32_EXTKEY_SIZE> data{};
         key.Encode(data);
         pubkey.Encode(data);
 

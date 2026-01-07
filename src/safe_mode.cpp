@@ -2,13 +2,14 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "safe_mode.h"
+
 #include "validation.h"
 #include "config.h"
 #include "rpc/http_request.h"
 #include "rpc/http_response.h"
 #include "rpc/webhook_client.h"
 
-SafeMode safeMode;
+static SafeMode safeMode; // NOLINT(cert-err58-cpp)
 
 bool SafeMode::IsBlockPartOfExistingSafeModeFork(const CBlockIndex* pindexNew) const
 {
@@ -23,19 +24,34 @@ bool SafeMode::IsBlockPartOfExistingSafeModeFork(const CBlockIndex* pindexNew) c
             return true;
         }
         // if it is higher than tip or lower than base it is not member
-        if(pindexNew->GetHeight() >= fork.first->GetHeight() || pindexNew->GetHeight() <= fork.second->back()->GetHeight())
+        if(pindexNew->GetHeight() >= fork.first->GetHeight()
+           || pindexNew->GetHeight() <= fork.second->back()->GetHeight())
         {
             return false;
         }
 
-        for(const CBlockIndex* pindex: *fork.second)
+        if(fork.second)
         {
-            if(pindex == pindexNew)
+            // shortcut lookup index by height
+            const auto& blocks = *fork.second;
+            if(!blocks.empty())
             {
-                return true;
+                const auto h0 = blocks.front()->GetHeight();
+                const auto index = h0 - pindexNew->GetHeight();
+                if(index >= 0 && index < ssize(blocks))
+                    if(blocks[index] == pindexNew)
+                        return true;
+            }
+
+            // fallback to linear search
+            for(const CBlockIndex* pindex: blocks)
+            {
+                if(pindex == pindexNew)
+                    return true;
             }
         }
     }
+            
     return false;
 }
 
@@ -98,15 +114,16 @@ SafeModeLevel SafeMode::ShouldForkTriggerSafeMode(const Config& config, const CB
     return SafeModeLevel::UNKNOWN;
 }
 
-int64_t SafeMode::GetMinimumRelevantBlockHeight(const Config& config) const
+int64_t GetMinimumRelevantBlockHeight(const Config& config)
 {
     AssertLockHeld(cs_main);
-    auto tipHeight = chainActive.Tip() ? chainActive.Tip()->GetHeight() : 0;
-    if(tipHeight < config.GetSafeModeMaxForkDistance())
-    {
+
+    const auto tipHeight = chainActive.Tip() ? chainActive.Tip()->GetHeight() : 0;
+    const auto safemode_max_fork_dist = config.GetSafeModeMaxForkDistance();
+    if(tipHeight < safemode_max_fork_dist)
         return 0;
-    }
-    return tipHeight - config.GetSafeModeMaxForkDistance();
+
+    return tipHeight - safemode_max_fork_dist;
 }
 
 void SafeMode::CreateForkData(const Config& config, const CBlockIndex* pindexNew)
@@ -207,7 +224,8 @@ void SafeMode::PruneStaleForkData(const Config& config)
     }
 }
 
-std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>> SafeMode::ExcludeIgnoredBlocks(const Config& config, const CBlockIndex* pindexForkTip) const
+std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>> 
+ExcludeIgnoredBlocks(const Config& config, const CBlockIndex* pindexForkTip)
 {
     AssertLockHeld(cs_main);
 
@@ -218,7 +236,7 @@ std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>> SafeMode::Exclud
 
     auto minimumRelevantBlockHeight = GetMinimumRelevantBlockHeight(config);
 
-    while (!chainActive.Contains(pindexWalk))
+    while(pindexWalk && !chainActive.Contains(pindexWalk))
     {
         if(pindexWalk->GetHeight() < minimumRelevantBlockHeight)
         {
@@ -362,22 +380,22 @@ void SafeMode::CheckSafeModeParameters(const Config& config, const CBlockIndex* 
 
     currentResult = std::move(newResults);
     oldTip = chainActive.Tip();
-
+    
     // If we have any forks trigger safe mode
-    if (GetSafeModeLevel() != newResults.maxLevel)
+    if(GetSafeModeLevel() != currentResult.maxLevel)
     {
-        SetSafeModeLevel(newResults.maxLevel);
+        SetSafeModeLevel(currentResult.maxLevel);
         static std::map<SafeModeLevel, std::string> levelLookup = {
             {SafeModeLevel::NONE, "NONE"}, 
             {SafeModeLevel::VALID, "VALID"}, 
             {SafeModeLevel::INVALID, "INVALID"}, 
             {SafeModeLevel::UNKNOWN, "UNKNOWN"} 
         };
-        LogPrintf("WARNING: Safe mode level changed to " + levelLookup[newResults.maxLevel] + "\n");
-        if( newResults.maxLevel == SafeModeLevel::VALID)
+        LogPrintf("WARNING: Safe mode level changed to " + levelLookup[currentResult.maxLevel] + "\n");
+        if(currentResult.maxLevel == SafeModeLevel::VALID)
         {
             std::string warning = "'Warning: Large-work fork detected, forking after block:";
-            for (const auto& f: newResults.forks)
+            for (const auto& f: currentResult.forks)
             {
                 warning += " " + f.second.base->GetPrev()->GetBlockHash().ToString();
             }
@@ -460,22 +478,22 @@ void SafeMode::SafeModeResult::ToJson(CJSONWriter& writer) const
         return status;
     };
 
-    auto WriteBlock = [&](CJSONWriter& writer, std::string jsonObjectName, const CBlockIndex* block )
+    auto WriteBlock = [&](CJSONWriter& w,
+                          const std::string& jsonObjectName,
+                          const CBlockIndex* block)
     {
-        writer.writeBeginObject(jsonObjectName);
+        w.writeBeginObject(jsonObjectName);
         if(block)
         {
-            writer.pushKV("hash", block->GetBlockHash().ToString());
-            writer.pushKV("height", block->GetHeight());
-            writer.pushKV("blocktime", DateTimeStrFormat("%Y-%m-%dT%H:%M:%SZ", block->GetBlockTime()));
-            writer.pushKV("firstseentime", DateTimeStrFormat("%Y-%m-%dT%H:%M:%SZ", block->GetHeaderReceivedTime()));
-            writer.pushKV("status", GetStatusString(block));
+            w.pushKV("hash", block->GetBlockHash().ToString());
+            w.pushKV("height", block->GetHeight());
+            w.pushKV("blocktime", DateTimeStrFormat("%Y-%m-%dT%H:%M:%SZ", block->GetBlockTime()));
+            w.pushKV("firstseentime", DateTimeStrFormat("%Y-%m-%dT%H:%M:%SZ", block->GetHeaderReceivedTime()));
+            w.pushKV("status", GetStatusString(block));
         }
-        writer.writeEndObject();
+        w.writeEndObject();
     };
 
-
-    
     writer.writeBeginObject();
         writer.pushKV("safemodeenabled", maxLevel != SafeModeLevel::NONE);
         WriteBlock(writer, "activetip", chainActive.Tip());
@@ -497,6 +515,7 @@ void SafeMode::SafeModeResult::ToJson(CJSONWriter& writer) const
         writer.writeEndObject();
 
         std::vector<std::reference_wrapper<const SafeModeFork>> sortedForks;
+        sortedForks.reserve(forks.size());
         for(const auto& f: forks)
         {
             sortedForks.emplace_back(f.second);

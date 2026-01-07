@@ -33,8 +33,6 @@ private:
     std::string prev_key_sig_; 
 };
 
-inline bool operator!=(const key_set& a, const key_set& b) { return !(a == b); }
-
 class revocation_msg
 {
     std::string compromised_miner_id_;
@@ -53,11 +51,6 @@ public:
     friend bool operator==(const revocation_msg&, const revocation_msg&);
     friend std::ostream& operator<<(std::ostream&, const revocation_msg&);
 };
-
-inline bool operator!=(const revocation_msg& a, const revocation_msg& b)
-{
-    return !(a == b);
-}
 
 class data_ref
 {
@@ -80,8 +73,6 @@ public:
     int32_t vout() const { return vout_; }
     const std::string& compress() const { return compress_; }
 };
-
-inline bool operator!=(const data_ref& a, const data_ref& b){ return !(a == b); }
 
 class miner_info_doc
 {
@@ -121,11 +112,6 @@ private:
     std::vector<data_ref> data_refs_;
 };
 
-inline bool operator!=(const miner_info_doc& a, const miner_info_doc& b)
-{
-    return !(a == b);
-}
-
 std::string to_json(const miner_info_doc&);
 
 using mi_doc_sig = std::tuple<std::string_view, miner_info_doc, std::span<const uint8_t>>;
@@ -135,5 +121,5 @@ std::variant<mi_doc_sig, miner_info_error> ParseMinerInfoScript(
 std::variant<miner_info_doc, miner_info_error> ParseMinerInfoDoc(
     std::string_view miner_info_doc);
 
-using data_refs = std::vector<data_ref>;
-std::variant<data_refs, miner_info_error> ParseDataRefs(std::string_view sv);
+using data_refs_type = std::vector<data_ref>;
+std::variant<data_refs_type, miner_info_error> ParseDataRefs(std::string_view sv);

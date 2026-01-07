@@ -3,120 +3,177 @@
 
 #include "transaction_specific_config.h"
 
-TransactionSpecificConfig::TransactionSpecificConfig(const GlobalConfig& config)
-  : GlobalConfig( config.getGlobalConfigData() )
-{
-}
+SpecificConfigScriptPolicy::SpecificConfigScriptPolicy(const ConfigScriptPolicy& cfg) : ConfigScriptPolicy(cfg){}
 
-bool TransactionSpecificConfig::SetTransactionSpecificMaxTxSize(int64_t maxTxSizePolicyIn, std::string* err)
-{
-    // To avoid duplicating code from GlobalConfig we create temporary GlobalConfig object and call getter and setter
-    // for specific policy setting.
-    GlobalConfig tmp;
-    if(!tmp.SetMaxTxSizePolicy(maxTxSizePolicyIn, err))
+uint64_t SpecificConfigScriptPolicy::GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const {
+    if(isConsensus || !mMaxScriptNumLength.has_value())
     {
-        return false;
+        return ConfigScriptPolicy::GetMaxScriptNumLength(era, isConsensus);
     }
 
-    mMaxTxSize = tmp.GetMaxTxSize(true, false);
-    return true;
-}
-
-uint64_t TransactionSpecificConfig::GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const
-{
-    if (isConsensus || !isGenesisEnabled)
+    // Return value as though it were set in GlobalConfig. This ensures we get the
+    // right value for the era if policy is unlimited.
+    ConfigScriptPolicy tmp{};
+    if(std::string err; !tmp.SetMaxScriptNumLengthPolicy(*mMaxScriptNumLength, &err))
     {
-        return GlobalConfig::GetMaxTxSize(isGenesisEnabled, isConsensus);
+        // Someone has set the policy limit to a value incompatible with the era they
+        // are then requesting it for. Assume they know what they're doing and just give
+        // them back the value they set.
+        return *mMaxScriptNumLength;
     }
 
-    return mMaxTxSize.has_value() ? *mMaxTxSize : GlobalConfig::GetMaxTxSize(isGenesisEnabled, isConsensus);
+    return ConfigScriptPolicy::GetMaxScriptNumLength(era, isConsensus);
 }
 
-void TransactionSpecificConfig::SetTransactionSpecificDataCarrierSize(uint64_t dataCarrierSize)
-{
-    mDataCarrierSize = dataCarrierSize;
-};
-
-uint64_t TransactionSpecificConfig::GetDataCarrierSize() const
-{
-    return mDataCarrierSize.has_value() ? *mDataCarrierSize : GlobalConfig::GetDataCarrierSize();
-};
-
-bool TransactionSpecificConfig::SetTransactionSpecificMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err)
-{
-    // see comment in SetTransactionSpecificMaxTxSize 
-    GlobalConfig tmp;
-    if(!tmp.SetMaxScriptSizePolicy(maxScriptSizePolicyIn, err))
-    {
-        return false;
-    }
-
-    mMaxScriptSize = tmp.GetMaxScriptSize(true, false);
-    return true;
-};
-
-uint64_t TransactionSpecificConfig::GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const
-{
+uint64_t SpecificConfigScriptPolicy::GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const{
     if(isConsensus || !isGenesisEnabled)
     {
-        GlobalConfig::GetMaxScriptSize(isGenesisEnabled, isConsensus);
+        return ConfigScriptPolicy::GetMaxScriptSize(isGenesisEnabled, isConsensus);
     }
-    return mMaxScriptSize.has_value() ? *mMaxScriptSize : GlobalConfig::GetMaxScriptSize(isGenesisEnabled, isConsensus);
-};
+    return mMaxScriptSize.has_value() ? *mMaxScriptSize : ConfigScriptPolicy::GetMaxScriptSize(isGenesisEnabled, isConsensus);
+}
 
-bool TransactionSpecificConfig::SetTransactionSpecificMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err)
-{
-    // see comment in SetTransactionSpecificMaxTxSize
-    GlobalConfig tmp;
-    if(!tmp.SetMaxScriptNumLengthPolicy(maxScriptNumLengthIn, err))
-    {
-        return false;
-    }
-
-    mMaxScriptNumLength = tmp.GetMaxScriptNumLength(true, false);
-    return true;
-};
-
-uint64_t TransactionSpecificConfig::GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const
-{ 
-    if(isConsensus || !isGenesisEnabled)
-    {
-        GlobalConfig::GetMaxScriptNumLength(isGenesisEnabled, isConsensus);
-    }
-    return mMaxScriptNumLength.has_value() ? *mMaxScriptNumLength : GlobalConfig::GetMaxScriptNumLength(isGenesisEnabled, isConsensus);
-};
-
-bool TransactionSpecificConfig::SetTransactionSpecificMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err)
-{
-    // To avoid duplicating code from GlobalConfig we create temporary GlobalConfig object and call getter and setter
-    // for specific policy setting.
-    GlobalConfig tmp;
-    if(!tmp.SetMaxStackMemoryUsage(maxStackMemoryUsageConsensusIn, maxStackMemoryUsagePolicyIn, err))
-    {
-        return false;
-    }
-
-    mMaxStackMemoryUsageConsensus = tmp.GetMaxScriptNumLength(true, true);
-    mMaxStackMemoryUsagePolicy = tmp.GetMaxStackMemoryUsage(true, false);
-
-    return true;
-};
-
-uint64_t TransactionSpecificConfig::GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const
-{ 
+uint64_t SpecificConfigScriptPolicy::GetMaxStackMemoryUsage(bool isGenesisEnabled, bool isConsensus) const{
     // concept of max stack memory usage is not defined before genesis
     // before Genesis stricter limitations exist, so maxStackMemoryUsage can be infinite
     if (!isGenesisEnabled)
     {
-        return GlobalConfig::GetMaxStackMemoryUsage(isGenesisEnabled, consensus);
+        return ConfigScriptPolicy::GetMaxStackMemoryUsage(isGenesisEnabled, isConsensus);
     }
 
-    if (consensus)
+    if (isConsensus)
     {
-        return mMaxStackMemoryUsageConsensus.has_value() ? *mMaxStackMemoryUsageConsensus : GlobalConfig::GetMaxStackMemoryUsage(isGenesisEnabled, consensus);
+        return mMaxStackMemoryUsageConsensus.has_value() ? *mMaxStackMemoryUsageConsensus : ConfigScriptPolicy::GetMaxStackMemoryUsage(isGenesisEnabled, isConsensus);
     }
 
-    return mMaxStackMemoryUsagePolicy.has_value() ? *mMaxStackMemoryUsagePolicy : GlobalConfig::GetMaxStackMemoryUsage(isGenesisEnabled, consensus);
+    return mMaxStackMemoryUsagePolicy.has_value() ? *mMaxStackMemoryUsagePolicy : ConfigScriptPolicy::GetMaxStackMemoryUsage(isGenesisEnabled, isConsensus);
+}
+
+bool SpecificConfigScriptPolicy::SetSpecificMaxScriptNumLengthPolicy(ProtocolEra era, int64_t maxScriptNumLengthIn, std::string* err){
+    if(!ConfigScriptPolicy::SetMaxScriptNumLengthPolicy(maxScriptNumLengthIn, err))
+    {
+        return false;
+    }
+
+    mMaxScriptNumLength = ConfigScriptPolicy::GetMaxScriptNumLength(era, false);
+    return true;
+}
+
+bool SpecificConfigScriptPolicy::SetSpecificMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err){
+    if(!ConfigScriptPolicy::SetMaxScriptSizePolicy(maxScriptSizePolicyIn, err))
+    {
+        return false;
+    }
+
+    mMaxScriptSize = ConfigScriptPolicy::GetMaxScriptSize(true, false);
+    return true;
+}
+
+bool SpecificConfigScriptPolicy::SetSpecificMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err){
+    if(!ConfigScriptPolicy::SetMaxStackMemoryUsage(maxStackMemoryUsageConsensusIn, maxStackMemoryUsagePolicyIn, err))
+    {
+        return false;
+    }
+
+    mMaxStackMemoryUsageConsensus = ConfigScriptPolicy::GetMaxStackMemoryUsage(true, true);
+    mMaxStackMemoryUsagePolicy = ConfigScriptPolicy::GetMaxStackMemoryUsage(true, false);
+    return true;
+}
+
+uint64_t SpecificConfigScriptPolicy::GetMaxTxSize(ProtocolEra era, bool isConsensus) const{
+    if(isConsensus || !IsProtocolActive(era, ProtocolName::Genesis))
+    {
+        return ConfigScriptPolicy::GetMaxTxSize(era, isConsensus);
+    }
+    return mMaxTxSize.has_value() ? *mMaxTxSize : ConfigScriptPolicy::GetMaxTxSize(era, isConsensus);
+}
+
+bool SpecificConfigScriptPolicy::SetSpecificMaxTxSizePolicy(int64_t value, std::string* err){
+    if(!ConfigScriptPolicy::SetMaxTxSizePolicy(value, err))
+    {
+        return false;
+    }
+
+    mMaxTxSize = ConfigScriptPolicy::GetMaxTxSize(ProtocolEra::PostGenesis, false);
+    return true;
+}
+
+uint64_t SpecificConfigScriptPolicy::GetDataCarrierSize() const{
+    return mDataCarrierSize.has_value() ? *mDataCarrierSize : ConfigScriptPolicy::GetDataCarrierSize();
+}
+
+void SpecificConfigScriptPolicy::SetSpecificDataCarrierSize(uint64_t data_carrier_size){
+    mDataCarrierSize = data_carrier_size;
+}
+
+bool SpecificConfigScriptPolicy::GetDataCarrier() const{
+    return mDataCarrier.has_value() ? *mDataCarrier : ConfigScriptPolicy::GetDataCarrier();
+}
+
+void SpecificConfigScriptPolicy::SetSpecificDataCarrier(bool data_carrier){
+    mDataCarrier = data_carrier;
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+TransactionSpecificConfig::TransactionSpecificConfig(const GlobalConfig& config)
+  : GlobalConfig( config.getGlobalConfigData() ), mScriptPolicysettings(config.GetConfigScriptPolicy())
+{
+}
+
+const ConfigScriptPolicy& TransactionSpecificConfig::GetConfigScriptPolicy() const{
+    return mScriptPolicysettings;
+}
+
+bool TransactionSpecificConfig::SetTransactionSpecificMaxTxSize(int64_t maxTxSizePolicyIn, std::string* err)
+{
+    return mScriptPolicysettings.SetSpecificMaxTxSizePolicy(maxTxSizePolicyIn, err);
+}
+
+uint64_t TransactionSpecificConfig::GetMaxTxSize(ProtocolEra era, bool isConsensus) const
+{
+    return mScriptPolicysettings.GetMaxTxSize(era, isConsensus);
+}
+
+void TransactionSpecificConfig::SetTransactionSpecificDataCarrierSize(uint64_t dataCarrierSize)
+{
+    mScriptPolicysettings.SetSpecificDataCarrierSize(dataCarrierSize);
+};
+
+uint64_t TransactionSpecificConfig::GetDataCarrierSize() const
+{
+    return mScriptPolicysettings.GetDataCarrierSize();
+};
+
+bool TransactionSpecificConfig::SetTransactionSpecificMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err)
+{
+    return mScriptPolicysettings.SetSpecificMaxScriptSizePolicy(maxScriptSizePolicyIn, err);
+};
+
+uint64_t TransactionSpecificConfig::GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const
+{
+    return mScriptPolicysettings.GetMaxScriptSize(isGenesisEnabled, isConsensus);
+};
+
+bool TransactionSpecificConfig::SetTransactionSpecificMaxScriptNumLengthPolicy(ProtocolEra era, int64_t maxScriptNumLengthIn, std::string* err)
+{
+    return mScriptPolicysettings.SetSpecificMaxScriptNumLengthPolicy(era, maxScriptNumLengthIn, err);
+};
+
+uint64_t TransactionSpecificConfig::GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const
+{ 
+    return mScriptPolicysettings.GetMaxScriptNumLength(era, isConsensus);
+};
+
+bool TransactionSpecificConfig::SetTransactionSpecificMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err)
+{
+    return mScriptPolicysettings.SetSpecificMaxStackMemoryUsage(maxStackMemoryUsageConsensusIn, maxStackMemoryUsagePolicyIn, err);
+};
+
+uint64_t TransactionSpecificConfig::GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const
+{ 
+    return mScriptPolicysettings.GetMaxStackMemoryUsage(isGenesisEnabled, consensus);
 };
 
 
@@ -161,9 +218,10 @@ void TransactionSpecificConfig::SetTransactionSpecificAcceptNonStandardOutput(bo
     mAcceptNonStdOutputs = accept;
 };
 
-bool TransactionSpecificConfig::GetAcceptNonStandardOutput(bool isGenesisEnabled) const
+bool TransactionSpecificConfig::GetAcceptNonStandardOutput(ProtocolEra era) const
 {
-    return (mAcceptNonStdOutputs.has_value() && isGenesisEnabled) ? *mAcceptNonStdOutputs : GlobalConfig::GetAcceptNonStandardOutput(isGenesisEnabled);
+    bool isGenesisEnabled { IsProtocolActive(era, ProtocolName::Genesis) };
+    return (mAcceptNonStdOutputs.has_value() && isGenesisEnabled) ? *mAcceptNonStdOutputs : GlobalConfig::GetAcceptNonStandardOutput(era);
 };
 
 bool TransactionSpecificConfig::SetTransactionSpecificMaxStdTxnValidationDuration(int ms, std::string* err)
@@ -211,13 +269,13 @@ bool TransactionSpecificConfig::SetTransactionSpecificMinConsolidationFactor(int
         return false;
     }
 
-    mMinColsolidationFactor = tmp.GetMinConsolidationFactor();
+    mMinConsolidationFactor = tmp.GetMinConsolidationFactor();
     return true;
 };
 
 uint64_t TransactionSpecificConfig::GetMinConsolidationFactor() const
 {
-    return mMinColsolidationFactor.has_value() ? *mMinColsolidationFactor :  GlobalConfig::GetMinConsolidationFactor();
+    return mMinConsolidationFactor.has_value() ? *mMinConsolidationFactor :  GlobalConfig::GetMinConsolidationFactor();
 };
 
 bool TransactionSpecificConfig::SetTransactionSpecificMaxConsolidationInputScriptSize(int64_t maxConsolidationInputScriptSizeIn, std::string* err)
@@ -255,14 +313,14 @@ uint64_t TransactionSpecificConfig::GetMinConfConsolidationInput() const
     return mMinConsolidationInput.has_value() ? *mMinConsolidationInput : GlobalConfig::GetMinConfConsolidationInput();
 };
 
-bool TransactionSpecificConfig::SetTransactionSpecificAcceptNonStdConsolidationInput(bool flagValue, std::string* err)
+bool TransactionSpecificConfig::SetTransactionSpecificAcceptNonStdConsolidationInput(bool flagValue, std::string* /*err*/)
 {
-    mAcceptNonStdConsoldationInput = flagValue;
+    mAcceptNonStdConsolidationInput = flagValue;
     return true;
 };
 bool TransactionSpecificConfig::GetAcceptNonStdConsolidationInput() const
 {
-    return mAcceptNonStdConsoldationInput.has_value() ? *mAcceptNonStdConsoldationInput : GlobalConfig::GetAcceptNonStdConsolidationInput();
+    return mAcceptNonStdConsolidationInput.has_value() ? *mAcceptNonStdConsolidationInput : GlobalConfig::GetAcceptNonStdConsolidationInput();
 };
 
 bool TransactionSpecificConfig::SetTransactionSpecificDustLimitFactor(int64_t factor, std::string* err)
@@ -294,11 +352,11 @@ CFeeRate TransactionSpecificConfig::GetDustRelayFee() const
 
 void TransactionSpecificConfig::SetTransactionSpecificDataCarrier(bool dataCarrier)
 {
-    mDataCarrier = dataCarrier;
+    mScriptPolicysettings.SetSpecificDataCarrier(dataCarrier);
 };
 bool TransactionSpecificConfig::GetDataCarrier() const
 {
-    return mDataCarrier.has_value() ? *mDataCarrier : GlobalConfig::GetDataCarrier();
+    return mScriptPolicysettings.GetDataCarrier();
 };
 
 bool TransactionSpecificConfig::SetTransactionSpecificMaxTxnValidatorAsyncTasksRunDuration(int ms, std::string* err)

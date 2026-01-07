@@ -14,8 +14,10 @@ the candidate size
 
 from test_framework.blocktools import create_coinbase, merkle_root_from_merkle_proof, solve_bad, create_block_from_candidate
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import CBlock, ToHex
-from test_framework.util import connect_nodes_bi, create_confirmed_utxos, satoshi_round, assert_raises_rpc_error, assert_equal, wait_until, sync_blocks, sync_mempools
+from test_framework.mininode import CBlock, CTransaction, ToHex, FromHex
+from test_framework.script import OP_CHECKSIG
+from test_framework.util import connect_nodes_bi, create_confirmed_utxos, \
+    satoshi_round, assert_raises_rpc_error, assert_equal, wait_until, sync_blocks
 from decimal import Decimal
 import math
 import time
@@ -128,9 +130,10 @@ class MiningTest(BitcoinTestFramework):
 
         # Submit with wrong ID
         self.log.info("Submitting to wrong node with unknown ID")
-        assert_raises_rpc_error(-22, "Block candidate ID not found",
-                                otherNode.submitminingsolution,
-                                {'id': candidate['id'], 'nonce': block.nNonce})
+
+        submitResult = otherNode.submitminingsolution({'id': candidate['id'],
+                                                       'nonce': block.nNonce})
+        assert submitResult == 'unknown-id'
 
         # Omit nonce
         self.log.info("Submitting without nonce")
@@ -191,7 +194,7 @@ class MiningTest(BitcoinTestFramework):
         candidate = blockNode.getminingcandidate(get_coinbase)
         assert 'id' in candidate
         assert 'prevhash' in candidate
-        if(get_coinbase):
+        if get_coinbase:
             assert 'coinbase' in candidate
         else:
             assert 'coinbase' not in candidate
@@ -236,7 +239,7 @@ class MiningTest(BitcoinTestFramework):
         # Start 2 nodes, 1 with validation enabled the other disabled
         self.log.info("Restarting nodes for optional validation")
         self.stop_nodes()
-        self.start_nodes([['-blockcandidatevaliditytest=1','-checkmempool=0', "-disablesafemode=1"], ['-blockcandidatevaliditytest=0','-checkmempool=0', "-disablesafemode=1"]])
+        self.start_nodes([['-blockcandidatevaliditytest=1', '-checkmempool=0', "-disablesafemode=1"], ['-blockcandidatevaliditytest=0', '-checkmempool=0', "-disablesafemode=1"]])
         self.sync_all()
         connect_nodes_bi(self.nodes, 0, 1)
 
@@ -247,14 +250,14 @@ class MiningTest(BitcoinTestFramework):
 
         # Time call to getminingcandidate with validation
         start_time = time.time()
-        candidate = self.nodes[0].getminingcandidate(True)
+        self.nodes[0].getminingcandidate(True)
         end_time = time.time()
         validation_time = end_time - start_time
         self.log.info("Time to get candidate with validation: {}".format(validation_time))
 
         # Time call to getminingcandidate without validation
         start_time = time.time()
-        candidate = self.nodes[1].getminingcandidate(True)
+        self.nodes[1].getminingcandidate(True)
         end_time = time.time()
         novalidation_time = end_time - start_time
         self.log.info("Time to get candidate without validation: {}".format(novalidation_time))
@@ -274,7 +277,7 @@ class MiningTest(BitcoinTestFramework):
         for i in range(0, num_transactions):
             utx = get_any_unspent(node.listunspent(), threshold_amount=1.0)
             inputs = [{'txid': utx['txid'], 'vout': utx['vout']}]
-            outputs = {node.getnewaddress(): utx['amount']-relay_fee}
+            outputs = {node.getnewaddress(): utx['amount'] - relay_fee}
             rawtx = node.createrawtransaction(inputs, outputs)
             signed = node.signrawtransaction(rawtx)
             node.sendrawtransaction(signed["hex"])
@@ -296,9 +299,32 @@ class MiningTest(BitcoinTestFramework):
         # size of transactions + 80 bytes for header
         assert_equal(size_txs + 80, candidate['sizeWithoutCoinbase'])
 
+    def test_coinbase_flag(self):
+        self.nodes[1].generate(1)
+
+        # Test coinbase=False
+        candidate = self.nodes[1].getminingcandidate(False)
+        assert 'coinbase' not in candidate, "Unexpected 'coinbase' field in candidate"
+
+        # Test coinbase=True
+        candidate = self.nodes[1].getminingcandidate(True)
+        assert 'coinbase' in candidate, "Missing 'coinbase' field in candidate"
+        coinbase_tx = FromHex(CTransaction(), candidate["coinbase"])
+        # Check that coinbase txn has a proper scriptPubKey
+        assert_equal(len(coinbase_tx.vout), 1)
+        assert len(coinbase_tx.vout[0].scriptPubKey) > 0, "Coinbase scriptPubKey is empty"
+        got_checksig = False
+        for opcode in coinbase_tx.vout[0].scriptPubKey:
+            if opcode == OP_CHECKSIG:
+                got_checksig = True
+                break
+        assert got_checksig, "Coinbase scriptPubKey does not contain OP_CHECKSIG"
+
     def run_test(self):
         txnNode = self.nodes[0]
         blockNode = self.nodes[1]
+
+        self.test_coinbase_flag()
 
         self.test_mine_block(txnNode, blockNode, True)
         self.test_mine_block(txnNode, blockNode, False)

@@ -12,7 +12,7 @@ bool HasCustomOption(std::string option)
 {
     const auto& argc = boost::unit_test::framework::master_test_suite().argc;
     const auto& argv = boost::unit_test::framework::master_test_suite().argv;
-    return std::any_of(argv, argv+argc, [&option](auto& arg) {return option == arg;});
+    return std::any_of(argv, argv+argc, [&option](auto& arg) {return option == arg;}); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 }
 
 struct EnableLoggingFixture {
@@ -20,9 +20,9 @@ struct EnableLoggingFixture {
         std::string option {"--enable-logging"};
         if (HasCustomOption(option)) {
             GetLogger().EnableCategory(BCLog::ALL);
-            GetLogger().fPrintToConsole = true;
-            GetLogger().fLogTimeMicros = true;
-            GetLogger().fLogTimestamps = true;
+            GetLogger().SetPrintToConsole(true);
+            GetLogger().SetLogTimeMicros(true);
+            GetLogger().SetLogTimestamps(true);
         } else {
             BOOST_TEST_MESSAGE("To enable logging, run the unit tests with   -- " << option);
         }

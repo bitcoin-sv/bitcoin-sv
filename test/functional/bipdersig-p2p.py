@@ -7,11 +7,13 @@
 Test that the DERSIG soft-fork activates at (regtest) height 1251.
 """
 
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
-from test_framework.mininode import *
 from test_framework.blocktools import create_coinbase, create_block
+from test_framework.mininode import CTransaction, mininode_lock, msg_block, \
+    NetworkThread, NodeConn, NodeConnCB, hex_str_to_bytes
 from test_framework.script import CScript
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import assert_equal, p2p_port, wait_until
+
 from io import BytesIO
 
 DERSIG_HEIGHT = 1251
@@ -124,7 +126,7 @@ class BIP66Test(BitcoinTestFramework):
             assert_equal(node0.last_message["reject"].data, block.sha256)
             if node0.last_message["reject"].code == REJECT_INVALID:
                 # Generic rejection when a block is invalid
-                assert(node0.last_message["reject"].reason.startswith(b'blk-bad-inputs'))
+                assert (node0.last_message["reject"].reason.startswith(b'blk-bad-inputs'))
             else:
                 assert b'Non-canonical DER signature' in node0.last_message["reject"].reason
 

@@ -4,7 +4,7 @@
 from genesis_upgrade_tests.test_base import GenesisHeightBasedSimpleTestsCase
 from test_framework.height_based_test_framework import SimpleTestDefinition
 from test_framework.script import CScript, OP_ADD
-from test_framework.cdefs import MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS, MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS, DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
+from test_framework.cdefs import MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS, MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS
 
 
 class MaxScriptNumLengthTestWithPolicy(GenesisHeightBasedSimpleTestsCase):
@@ -77,13 +77,6 @@ class MaxScriptNumLengthTest(GenesisHeightBasedSimpleTestsCase):
                              "GENESIS", b"",
                              p2p_reject_reason=b'genesis-script-verify-flag-failed (Script number overflow)',
                              block_reject_reason=b'blk-bad-inputs'
-                             ),
-        SimpleTestDefinition("GENESIS", CScript([bytearray([42] * DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS), bytearray([42] * DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS), OP_ADD]),
-                             "GENESIS", b""
-                             ),
-        SimpleTestDefinition("GENESIS", CScript([bytearray([42] * (DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS + 1)), bytearray([42] * (DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS + 1)), OP_ADD]),
-                             "GENESIS", b"",
-                             p2p_reject_reason=b'non-mandatory-script-verify-flag (Script number overflow)'
                              ),
         SimpleTestDefinition("GENESIS", CScript([bytearray([42] * (MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)), bytearray([42] * (MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1)), OP_ADD]),
                              "GENESIS", b"",

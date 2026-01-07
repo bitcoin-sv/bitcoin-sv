@@ -3,7 +3,7 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import msg_block, NodeConnCB, sha256
+from test_framework.mininode import msg_block, sha256
 from test_framework.miner_id import MinerIdKeys, make_miner_id_block
 from test_framework.util import create_confirmed_utxos, wait_until, bytes_to_hex_str, assert_raises_rpc_error
 from decimal import Decimal
@@ -129,18 +129,18 @@ class RovokeMinerIdRpc(BitcoinTestFramework):
             -8, "Invalid minerid key!", conn.rpc.getmineridinfo, "1")
         # Test a non-existing key.
         randombip32key = BIP32Key.fromEntropy(os.urandom(16))
-        assert(len(conn.rpc.getmineridinfo(bytes_to_hex_str(randombip32key.PublicKey()))) == 0)
+        assert (len(conn.rpc.getmineridinfo(bytes_to_hex_str(randombip32key.PublicKey()))) == 0)
 
     def check_getmineridinfo_result(self, actual, expected):
-        assert(actual["minerId"] == expected["minerId"])
-        assert(actual["minerIdState"] == expected["minerIdState"])
-        assert(actual["prevMinerId"] == expected["prevMinerId"])
-        assert(actual["revocationKey"] == expected["revocationKey"])
-        assert(actual["prevRevocationKey"] == expected["prevRevocationKey"])
+        assert (actual["minerId"] == expected["minerId"])
+        assert (actual["minerIdState"] == expected["minerIdState"])
+        assert (actual["prevMinerId"] == expected["prevMinerId"])
+        assert (actual["revocationKey"] == expected["revocationKey"])
+        assert (actual["prevRevocationKey"] == expected["prevRevocationKey"])
 
     def run_test(self):
 
-        with self.run_all_nodes_connected(title="revokeminerid_rpc", args=self.extra_args, p2pConnections=[0,1,2]) as (p2p_0,p2p_1,p2p_2):
+        with self.run_all_nodes_connected(title="revokeminerid_rpc", args=self.extra_args, p2pConnections=[0, 1, 2]) as (p2p_0, p2p_1, p2p_2):
 
             # Get out of IBD and make some spendable outputs
             utxos = create_confirmed_utxos(Decimal("250") / 100000000, self.nodes[0], 5, nodes=self.nodes)

@@ -72,9 +72,9 @@ namespace
                     return UniqueCFile{ fsbridge::fopen(path, "rb+") };
                 }
 
-                if (UniqueCFile file{ fsbridge::fopen(path, "rb+") }; file)
+                if (UniqueCFile f{ fsbridge::fopen(path, "rb+") }; f)
                 {
-                    return file;
+                    return f;
                 }
 
                 // Only create directories for new files
@@ -198,6 +198,7 @@ bool BlockFileAccess::WriteBlockToDisk(
     CVectorWriter{SER_DISK, CLIENT_VERSION, data, 0, block};
     metaData = { Hash(data.begin(), data.end()), data.size() };
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     fileout.write(reinterpret_cast<const char*>(data.data()), data.size());
 
     return true;
@@ -435,7 +436,9 @@ bool BlockFileAccess::LoadBlockHashAndTx(
 #if defined(WIN32)
         _fseeki64(file.Get(), postx.TxOffset(), SEEK_CUR);
 #else
-        fseek(file.Get(), postx.TxOffset(), SEEK_CUR);
+        // NOLINTNEXTLINE(*-narrowing-conversions)
+        if(fseek(file.Get(), postx.TxOffset(), SEEK_CUR) != 0)
+            return error("%s: fseek failed", __func__);
 #endif
         file >> txOut;
     } catch (const std::exception &e) {

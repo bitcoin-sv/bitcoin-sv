@@ -14,7 +14,7 @@
 #include "util.h"
 #include "warnings.h"
 
-static CCriticalSection cs_nTimeOffset;
+static CCriticalSection cs_nTimeOffset; // NOLINT(cert-err58-cpp)
 static int64_t nTimeOffset = 0;
 
 /**

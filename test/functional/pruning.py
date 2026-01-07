@@ -14,12 +14,14 @@
 # ********
 
 from test_framework.blocktools import mine_block_of_size
+from test_framework.cdefs import DEFAULT_MIN_BLOCKS_TO_KEEP, ONE_MEGABYTE
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_equal, assert_greater_than, \
+    assert_raises_rpc_error, connect_nodes, mine_large_block, sync_blocks, wait_until
+
 from decimal import Decimal
 import time
 import os
-from test_framework.cdefs import DEFAULT_MIN_BLOCKS_TO_KEEP, ONE_MEGABYTE
 
 # Rescans start at the earliest block up to 2 hours before a key timestamp, so
 # the manual prune RPC avoids pruning blocks in the same window to be
@@ -167,7 +169,7 @@ class PruneTest(BitcoinTestFramework):
             self.nodes[1].invalidateblock(curhash)
             curhash = self.nodes[1].getblockhash(invalidheight - 1)
 
-        assert(self.nodes[1].getblockcount() == invalidheight - 1)
+        assert (self.nodes[1].getblockcount() == invalidheight - 1)
         self.log.info("New best height: %d" % self.nodes[1].getblockcount())
 
         # Reboot node1 to clear those giant tx's from mempool
@@ -248,8 +250,8 @@ class PruneTest(BitcoinTestFramework):
             self.log.info(
                 "Rewind node 0 to prev main chain to mine longer chain to trigger redownload. Blocks needed: %d" % blocks_to_mine)
             self.nodes[0].invalidateblock(curchainhash)
-            assert(self.nodes[0].getblockcount() == self.mainchainheight)
-            assert(self.nodes[0].getbestblockhash() == self.mainchainhash2)
+            assert (self.nodes[0].getblockcount() == self.mainchainheight)
+            assert (self.nodes[0].getbestblockhash() == self.mainchainhash2)
             goalbesthash = self.nodes[0].generate(blocks_to_mine)[-1]
             goalbestheight = first_reorg_height + 1
 
@@ -260,9 +262,9 @@ class PruneTest(BitcoinTestFramework):
             time.sleep(0.1)
             if time.time() - waitstart > 900:
                 raise AssertionError("Node 2 didn't reorg to proper height")
-        assert(self.nodes[2].getbestblockhash() == goalbesthash)
+        assert (self.nodes[2].getbestblockhash() == goalbesthash)
         # Verify we can now have the data for a block previously pruned
-        assert(self.nodes[2].getblock(
+        assert (self.nodes[2].getblock(
             self.forkhash)["height"] == self.forkheight)
 
     def manual_test(self, node_number, use_timestamp):
@@ -375,30 +377,30 @@ class PruneTest(BitcoinTestFramework):
         def has_block(index):
             return os.path.isfile(self.options.tmpdir + "/node{}/regtest/blocks/blk{:05}.dat".format(node_number, index))
 
-        assert(has_block(4))
-        assert(not has_block(5))
+        assert (has_block(4))
+        assert (not has_block(5))
 
         self.prunedir = self.options.tmpdir + "/node{}/regtest/blocks/".format(node_number)
 
         node = self.nodes[node_number]
         node.generate(288)
-        assert(not has_block(5))
+        assert (not has_block(5))
         # Then mine enough full blocks to create more than 550MiB of data
         for i in range(10):
             mine_block_of_size(node, ONE_MEGABYTE * 64, fee=Decimal("0.1"))
         self.log.info("Usage after mining 10 large blocks: %d" % calc_usage(self.prunedir))
 
         # Usage will be over target
-        assert(calc_usage(self.prunedir) > 550)
-        assert(has_block(5))
+        assert (calc_usage(self.prunedir) > 550)
+        assert (has_block(5))
 
         # Restart with lower min blocks to keep
         self.stop_node(node_number)
         self.start_node(node_number, extra_args=["-disablesafemode=1", "-prune=550", "-pruneminblockstokeep=6", "-genesisactivationheight=1"])
 
         self.log.info("Usage after restart and prune: %d" % calc_usage(self.prunedir))
-        assert(calc_usage(self.prunedir) < 550)
-        assert(not has_block(5))
+        assert (calc_usage(self.prunedir) < 550)
+        assert (not has_block(5))
 
         self.log.info("Success")
 

@@ -16,17 +16,7 @@
 #include <unistd.h>
 #endif // WIN32
 
-namespace
-{
-    struct RegtestingSetup : public TestingSetup
-    {
-        RegtestingSetup() : TestingSetup(CBaseChainParams::REGTEST)
-        {
-        }
-    };
-}
-
-BOOST_FIXTURE_TEST_SUITE(dstxn_serialiser, RegtestingSetup)
+BOOST_FIXTURE_TEST_SUITE(dstxn_serialiser, RegtestingFixture)
 
 // Test creation of a txn serialiser and some simple serialisation
 BOOST_AUTO_TEST_CASE(Serialise)

@@ -10,15 +10,8 @@
 
 namespace
 {
-    struct RegtestingSetup : public BasicTestingSetup
-    {
-        RegtestingSetup() : BasicTestingSetup(CBaseChainParams::REGTEST)
-        {
-        }
-    };
-
     // WrittenData holds information of Merkle Tree we want to use in later checks.
-    struct WrittenData
+    struct WrittenData // NOLINT(cppcoreguidelines-pro-type-member-init)
     {
         // blockHash is needed to read Merkle Tree from the disk
         uint256 blockHash; 
@@ -58,7 +51,7 @@ namespace
             block.vtx[i] = MakeTransactionRef(tx);
         }
 
-        bool mutated;
+        bool mutated; // NOLINT(cppcoreguidelines-init-variables)
         block.hashMerkleRoot = BlockMerkleRoot(block, &mutated);
         return block;
     }
@@ -111,7 +104,7 @@ namespace
     }
 }
 
-BOOST_FIXTURE_TEST_SUITE(merkletreefile_readwrite_tests, RegtestingSetup)
+BOOST_FIXTURE_TEST_SUITE(merkletreefile_readwrite_tests, BasicRegtestFixture)
 
 BOOST_AUTO_TEST_CASE(write_read_test)
 {

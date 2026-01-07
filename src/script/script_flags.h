@@ -7,6 +7,8 @@
 #ifndef BITCOIN_SCRIPT_SCRIPTFLAGS_H
 #define BITCOIN_SCRIPT_SCRIPTFLAGS_H
 
+#include <cstdint>
+
 /** Script verification flags */
 enum {
     SCRIPT_VERIFY_NONE = 0,
@@ -91,8 +93,7 @@ enum {
     //
     SCRIPT_ENABLE_SIGHASH_FORKID = (1U << 16),
 
-
-    // Is Genesis enabled - transcations that is being executed is part of block that uses Geneisis rules.
+    // Is Genesis enabled - transaction that is being executed is part of block that uses Genesis rules.
     //
     SCRIPT_GENESIS = (1U << 18),
 
@@ -101,8 +102,71 @@ enum {
     // This is per (input!) UTXO flag
     SCRIPT_UTXO_AFTER_GENESIS = (1U << 19),
 
+    // Is Chronicle enabled - transaction that is being executed is part of block that uses Chronicle rules.
+    //
+    SCRIPT_CHRONICLE = (1U << 20),
+
+    // UTXO being used in this script was created *after* Chronicle upgrade has been activated.
+    // This is per (input!) UTXO flag
+    SCRIPT_UTXO_AFTER_CHRONICLE = (1U << 21),
+
     // Not actual flag. Used for marking largest flag value.
-    SCRIPT_FLAG_LAST = (1U << 20)
+    SCRIPT_FLAG_LAST = (1U << 22)
 };
+
+constexpr bool IsChronicle(uint32_t flags)
+{
+    return (flags & SCRIPT_CHRONICLE) != 0;
+}
+
+constexpr bool IsGenesis(uint32_t flags)
+{
+    return (flags & SCRIPT_GENESIS) != 0;
+}
+
+constexpr bool IsUtxoAfterChronicle(uint32_t flags)
+{
+    return (flags & SCRIPT_UTXO_AFTER_CHRONICLE) != 0;
+}
+
+constexpr bool IsUtxoAfterGenesis(uint32_t flags)
+{
+    return (flags & SCRIPT_UTXO_AFTER_GENESIS) != 0;
+}
+
+constexpr bool IsDiscourageUpgradableNops(uint32_t flags)
+{
+    return (flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) != 0;
+}
+
+constexpr bool VerifyMinimalIf(uint32_t flags)
+{
+    return (flags & SCRIPT_VERIFY_MINIMALIF) != 0;
+}
+
+constexpr bool VerifyNullDummy(uint32_t flags)
+{
+    return (flags & SCRIPT_VERIFY_NULLDUMMY) != 0;
+}
+
+constexpr bool VerifyNullFail(uint32_t flags)
+{
+    return (flags & SCRIPT_VERIFY_NULLFAIL) != 0;
+}
+
+constexpr bool VerifyMinimalData(uint32_t flags)
+{
+    return (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
+}
+
+constexpr bool VerifyCleanStack(uint32_t flags)
+{
+    return (flags & SCRIPT_VERIFY_CLEANSTACK) != 0;
+}
+
+constexpr bool VerifySigPushOnly(uint32_t flags)
+{
+    return (flags & SCRIPT_VERIFY_SIGPUSHONLY) != 0;
+}
 
 #endif // BITCOIN_SCRIPT_SCRIPTFLAGS_H

@@ -7,6 +7,8 @@
 #define BITCOIN_WALLET_WALLET_H
 
 #include "amount.h"
+#include "config.h"
+#include "protocol_era.h"
 #include "script/ismine.h"
 #include "script/sign.h"
 #include "streams.h"
@@ -23,33 +25,37 @@
 #include <atomic>
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <set>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 #include <random>
 
-typedef CWallet *CWalletRef;
-extern std::vector<CWalletRef> vpwallets;
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+extern std::vector<std::unique_ptr<CWallet>> vpwallets;
 
 /**
  * Settings
  */
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 extern CFeeRate payTxFee;
 extern bool bSpendZeroConfChange;
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 static const unsigned int DEFAULT_KEYPOOL_SIZE = 1000;
+
 //! -paytxfee default
-static const Amount DEFAULT_TRANSACTION_FEE(0);
+static const Amount DEFAULT_TRANSACTION_FEE{0};
 //! -fallbackfee default
-static const Amount DEFAULT_FALLBACK_FEE(20000);
+static const Amount DEFAULT_FALLBACK_FEE{20'000};
 //! -mintxfee default
-static const Amount DEFAULT_TRANSACTION_MINFEE(1000);
+static const Amount DEFAULT_TRANSACTION_MINFEE{1'000};
 //! target minimum change amount
-static const Amount MIN_CHANGE = CENT;
+static const Amount MIN_CHANGE{CENT};
 //! final minimum change amount after paying for fees
-static const Amount MIN_FINAL_CHANGE = MIN_CHANGE / 2;
+static const Amount MIN_FINAL_CHANGE{MIN_CHANGE / 2};
+
 //! Default for -spendzeroconfchange
 static const bool DEFAULT_SPEND_ZEROCONF_CHANGE = true;
 //! Default for -walletrejectlongchains
@@ -61,6 +67,7 @@ static const bool DEFAULT_DISABLE_WALLET = false;
 //! if set, all keys will be derived by using BIP32
 static const bool DEFAULT_USE_HD_WALLET = true;
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern const char *DEFAULT_WALLET_DAT;
 
 class CBlockIndex;
@@ -137,9 +144,7 @@ public:
 class CAddressBookData {
 public:
     std::string name;
-    std::string purpose;
-
-    CAddressBookData() { purpose = "unknown"; }
+    std::string purpose{"unknown"};
 
     typedef std::map<std::string, std::string> StringMap;
     StringMap destdata;
@@ -182,7 +187,7 @@ private:
     static const uint256 ABANDON_HASH;
 
 public:
-    CTransactionRef tx;
+    std::shared_ptr<const CTransaction> tx;
     uint256 hashBlock;
 
     /**
@@ -191,17 +196,13 @@ public:
      * with. Older clients interpret nIndex == -1 as unconfirmed for backward
      * compatibility.
      */
-    int nIndex;
+    int nIndex{-1};
 
-    CMerkleTx() {
-        SetTx(MakeTransactionRef());
-        Init();
-    }
+    CMerkleTx():tx{std::make_shared<const CTransaction>()}
+    {}
 
-    CMerkleTx(CTransactionRef arg) {
-        SetTx(std::move(arg));
-        Init();
-    }
+    CMerkleTx(std::shared_ptr<const CTransaction> arg): tx(std::move(arg))
+    {}
 
     /**
      * Helper conversion operator to allow passing CMerkleTx where CTransaction
@@ -209,11 +210,6 @@ public:
      * TODO: adapt callers and remove this operator.
      */
     operator const CTransaction &() const { return *tx; }
-
-    void Init() {
-        hashBlock = uint256();
-        nIndex = -1;
-    }
 
     void SetTx(CTransactionRef arg) { tx = std::move(arg); }
 
@@ -247,11 +243,15 @@ public:
      */
     int32_t GetHeightInMainChain() const;
     /**
-    * Return is the transaction height larger or equal to the genesis activation height. 
+    * Return is the transaction height larger or equal to the given protocol activation height. 
     * If in mempool, we assume that it will be mined in next block.
     */
-    bool IsGenesisEnabled() const;
-
+    bool IsProtocolActive(ProtocolName name) const;
+    /**
+    * Get protocol activation state for the transaction.
+    * If in mempool, we assume that it will be mined in next block.
+    */
+    ProtocolEra GetProtocolEra() const;
 
     /**
      * Pass this transaction to the mempool. Fails if absolute fee exceeds
@@ -323,8 +323,10 @@ public:
     mutable Amount nAvailableWatchCreditCached;
     mutable Amount nChangeCached;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CWalletTx() { Init(nullptr); }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init
     CWalletTx(const CWallet *pwalletIn, CTransactionRef arg)
         : CMerkleTx(std::move(arg)) {
         Init(pwalletIn);
@@ -443,6 +445,7 @@ public:
     bool IsEquivalentTo(const CWalletTx &tx) const;
 
     bool InMempool() const;
+    bool InNonFinalMempool() const;
     bool IsTrusted() const;
 
     int64_t GetTxTime() const;
@@ -473,14 +476,19 @@ public:
      */
     bool fSafe;
 
-    COutput(const CWalletTx *txIn, int iIn, int nDepthIn, bool fSpendableIn,
-            bool fSolvableIn, bool fSafeIn) {
-        tx = txIn;
-        i = iIn;
-        nDepth = nDepthIn;
-        fSpendable = fSpendableIn;
-        fSolvable = fSolvableIn;
-        fSafe = fSafeIn;
+    COutput(const CWalletTx* txIn,
+            int iIn,
+            int nDepthIn,
+            bool fSpendableIn,
+            bool fSolvableIn,
+            bool fSafeIn)
+        : tx{txIn},
+          i{iIn},
+          nDepth{nDepthIn},
+          fSpendable{fSpendableIn},
+          fSolvable{fSolvableIn},
+          fSafe{fSafeIn}
+    {
     }
 
     std::string ToString() const;
@@ -519,25 +527,13 @@ class CAccountingEntry {
 public:
     std::string strAccount;
     Amount nCreditDebit;
-    int64_t nTime;
+    int64_t nTime{};
     std::string strOtherAccount;
     std::string strComment;
     mapValue_t mapValue;
     //!< position in ordered transaction list
-    int64_t nOrderPos;
-    uint64_t nEntryNo;
-
-    CAccountingEntry() { SetNull(); }
-
-    void SetNull() {
-        nCreditDebit = Amount(0);
-        nTime = 0;
-        strAccount.clear();
-        strOtherAccount.clear();
-        strComment.clear();
-        nOrderPos = -1;
-        nEntryNo = 0;
-    }
+    int64_t nOrderPos{-1};
+    uint64_t nEntryNo{};
 
     ADD_SERIALIZE_METHODS
 
@@ -569,6 +565,7 @@ public:
             mapValue.clear();
             if (std::string::npos != nSepPos) {
                 CDataStream ss(
+                    // NOLINTNEXTLINE(*-narrowing-conversions)
                     std::vector<char>(strComment.begin() + nSepPos + 1,
                                       strComment.end()),
                     s.GetType(), s.GetVersion());
@@ -591,8 +588,10 @@ private:
  * transactions and balances, and provides the ability to create new
  * transactions.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CWallet final : public CCryptoKeyStore, public CValidationInterface {
 private:
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     static std::atomic<bool> fFlushScheduled;
 
     mutable std::mt19937 randomNumbers;
@@ -714,18 +713,21 @@ public:
     unsigned int nMasterKeyMaxID;
 
     // Create wallet with dummy database handle
-    CWallet(const CChainParams &chainParams)
-        : randomNumbers(std::random_device{}()), dbw(new CWalletDBWrapper()), chainParams(chainParams) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    CWallet(const CChainParams& chain_params)
+        : randomNumbers(std::random_device{}()), dbw(new CWalletDBWrapper()), chainParams(chain_params) {
         SetNull();
     }
 
     // Create wallet with passed-in database handle
-    CWallet(const CChainParams &chainParams,
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    CWallet(const CChainParams& chain_params,
             std::unique_ptr<CWalletDBWrapper> dbw_in)
-        : randomNumbers(std::random_device{}()), dbw(std::move(dbw_in)), chainParams(chainParams) {
+        : randomNumbers(std::random_device{}()), dbw(std::move(dbw_in)), chainParams(chain_params) {
         SetNull();
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-explicit-virtual-functions)
     ~CWallet() {
         delete pwalletdbEncryption;
         pwalletdbEncryption = nullptr;
@@ -953,8 +955,10 @@ public:
     template <typename ContainerType>
     bool DummySignTx(const Config& config, CMutableTransaction& txNew, const ContainerType& coins);
 
+    // NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variable)
     static CFeeRate minTxFee;
     static CFeeRate fallbackFee;
+    // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variable)
     Amount GetMinimumFee(unsigned int nTxBytes,
                          const CCoinControl &coin_control,
                          const CTxMemPool &pool);
@@ -1099,8 +1103,8 @@ public:
      * Initializes the wallet, returns a new CWallet instance or a null pointer
      * in case of an error.
      */
-    static CWallet *CreateWalletFromFile(const CChainParams &chainParams,
-                                         const std::string walletFile);
+    static std::unique_ptr<CWallet> CreateWalletFromFile(const CChainParams& chainParams,
+                                                         const std::string walletFile);
     static bool InitLoadWallet(const CChainParams &chainParams);
 
     /**
@@ -1140,20 +1144,19 @@ public:
 };
 
 /** A key allocated from the key pool. */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CReserveKey final : public CReserveScript {
 protected:
     CWallet *pwallet;
-    int64_t nIndex;
+    int64_t nIndex{-1};
     CPubKey vchPubKey;
-    bool fInternal;
+    bool fInternal{};
 
 public:
-    CReserveKey(CWallet *pwalletIn) {
-        nIndex = -1;
-        pwallet = pwalletIn;
-        fInternal = false;
-    }
+    CReserveKey(CWallet* pwalletIn):pwallet{pwalletIn}
+    {}
 
+    // NOLINTNEXTLINE(cppcoreguidelines-explicit-virtual-functions)
     ~CReserveKey() { ReturnKey(); }
 
     void ReturnKey();
@@ -1200,8 +1203,9 @@ bool CWallet::DummySignTx(const Config& config, CMutableTransaction& txNew,
             coin.first->tx->vout[coin.second].scriptPubKey;
         SignatureData sigdata;
 
-        if (!ProduceSignature(config, false, DummySignatureCreator(this), true, false, scriptPubKey,
-                              sigdata)) {
+        if (!SignAndVerify(config.GetConfigScriptPolicy(), false, DummySignatureCreator(this),
+                          ProtocolEra::PostGenesis, ProtocolEra::PreGenesis, scriptPubKey,
+                          sigdata)) {
             return false;
         } else {
             UpdateTransaction(txNew, nIn, sigdata);

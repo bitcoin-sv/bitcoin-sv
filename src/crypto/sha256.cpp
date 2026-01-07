@@ -5,8 +5,9 @@
 #include "crypto/sha256.h"
 #include "crypto/common.h"
 
-#include <atomic>
+#include <array>
 #include <cassert>
+#include <cstdint>
 #include <cstring>
 
 #if defined(__x86_64__) || defined(__amd64__)
@@ -53,6 +54,7 @@ namespace sha256 {
 
     /** Initialize SHA-256 state. */
     inline void Initialize(uint32_t *s) {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         s[0] = 0x6a09e667ul;
         s[1] = 0xbb67ae85ul;
         s[2] = 0x3c6ef372ul;
@@ -61,16 +63,20 @@ namespace sha256 {
         s[5] = 0x9b05688cul;
         s[6] = 0x1f83d9abul;
         s[7] = 0x5be0cd19ul;
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     /** Perform a number of SHA-256 transformations, processing 64-byte chunks.
      */
     void Transform(uint32_t *s, const unsigned char *chunk, size_t blocks) {
         while (blocks--) {
+            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             uint32_t a = s[0], b = s[1], c = s[2], d = s[3], e = s[4], f = s[5],
                      g = s[6], h = s[7];
+            // NOLINTBEGIN(cppcoreguidelines-init-variables)
             uint32_t w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13,
                 w14, w15;
+            // NOLINTEND(cppcoreguidelines-init-variables)
 
             Round(a, b, c, d, e, f, g, h, 0x428a2f98, w0 = ReadBE32(chunk + 0));
             Round(h, a, b, c, d, e, f, g, 0x71374491, w1 = ReadBE32(chunk + 4));
@@ -210,6 +216,7 @@ namespace sha256 {
             s[6] += g;
             s[7] += h;
             chunk += 64;
+            // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         }
     }
 
@@ -217,9 +224,10 @@ namespace sha256 {
 
 typedef void (*TransformType)(uint32_t *, const unsigned char *, size_t);
 
-bool SelfTest(TransformType tr) {
-    static const unsigned char in1[65] = {0, 0x80};
-    static const unsigned char in2[129] = {
+bool SelfTest(TransformType tr)
+{
+    static const std::array<unsigned char, 65> in1 = {0, 0x80};
+    static const std::array<unsigned char, 129> in2 = {
         0,  32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,   32, 32,
         32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,   32, 32,
         32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,   32, 32,
@@ -228,27 +236,34 @@ bool SelfTest(TransformType tr) {
         0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,    0,  0,
         0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,    0,  0,
         0,  0,  0,  0,  0,  0,  0,  0,  2,  0};
-    static const uint32_t init[8] = {0x6a09e667ul, 0xbb67ae85ul, 0x3c6ef372ul,
-                                     0xa54ff53aul, 0x510e527ful, 0x9b05688cul,
-                                     0x1f83d9abul, 0x5be0cd19ul};
-    static const uint32_t out1[8] = {0xe3b0c442ul, 0x98fc1c14ul, 0x9afbf4c8ul,
-                                     0x996fb924ul, 0x27ae41e4ul, 0x649b934cul,
-                                     0xa495991bul, 0x7852b855ul};
-    static const uint32_t out2[8] = {0xce4153b0ul, 0x147c2a86ul, 0x3ed4298eul,
-                                     0xe0676bc8ul, 0x79fc77a1ul, 0x2abe1f49ul,
-                                     0xb2b055dful, 0x1069523eul};
-    uint32_t buf[8];
-    memcpy(buf, init, sizeof(buf));
+    static const std::array<uint32_t, 8> init = {
+        0x6a09e667ul, 0xbb67ae85ul, 0x3c6ef372ul, 0xa54ff53aul,
+        0x510e527ful, 0x9b05688cul, 0x1f83d9abul, 0x5be0cd19ul};
+    static const std::array<uint32_t, 8> out1 = {
+        0xe3b0c442ul, 0x98fc1c14ul, 0x9afbf4c8ul, 0x996fb924ul,
+        0x27ae41e4ul, 0x649b934cul, 0xa495991bul, 0x7852b855ul};
+    static const std::array<uint32_t, 8> out2 = {
+        0xce4153b0ul, 0x147c2a86ul, 0x3ed4298eul, 0xe0676bc8ul,
+        0x79fc77a1ul, 0x2abe1f49ul, 0xb2b055dful, 0x1069523eul};
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint32_t, 8> buf;
+    memcpy(buf.data(), init.data(), sizeof(buf));
     // Process nothing, and check we remain in the initial state.
-    tr(buf, nullptr, 0);
-    if (memcmp(buf, init, sizeof(buf))) return false;
+    tr(buf.data(), nullptr, 0);
+    if(memcmp(buf.data(), init.data(), sizeof(buf)) != 0)
+        return false;
+
     // Process the padded empty string (unaligned)
-    tr(buf, in1 + 1, 1);
-    if (memcmp(buf, out1, sizeof(buf))) return false;
+    tr(buf.data(), in1.data() + 1, 1);
+    if(memcmp(buf.data(), out1.data(), sizeof(buf)) != 0)
+        return false;
+
     // Process 64 spaces (unaligned)
-    memcpy(buf, init, sizeof(buf));
-    tr(buf, in2 + 1, 2);
-    if (memcmp(buf, out2, sizeof(buf))) return false;
+    memcpy(buf.data(), init.data(), sizeof(buf));
+    tr(buf.data(), in2.data() + 1, 2);
+    if(memcmp(buf.data(), out2.data(), sizeof(buf)) != 0)
+        return false;
+
     return true;
 }
 
@@ -258,6 +273,7 @@ TransformType Transform = sha256::Transform;
 
 std::string SHA256AutoDetect() {
 #if defined(USE_ASM) && (defined(__x86_64__) || defined(__amd64__))
+    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
     uint32_t eax, ebx, ecx, edx;
     if (__get_cpuid(1, &eax, &ebx, &ecx, &edx) && (ecx >> 19) & 1) {
         Transform = sha256_sse4::Transform;
@@ -272,57 +288,69 @@ std::string SHA256AutoDetect() {
 
 ////// SHA-256
 
-CSHA256::CSHA256() : bytes(0) {
-    sha256::Initialize(s);
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+CSHA256::CSHA256()
+{
+    sha256::Initialize(s.data());
 }
 
-CSHA256 &CSHA256::Write(const uint8_t *data, size_t len) {
-    if (len == 0) {
-        return *this;    
-    }
+CSHA256& CSHA256::Write(const uint8_t* data, size_t len)
+{
+    if(len == 0)
+        return *this;
+
     assert(data);
-    const uint8_t *end = data + len;
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    const uint8_t* end = data + len;
     size_t bufsize = bytes % 64;
-    if (bufsize && bufsize + len >= 64) {
+    if(bufsize && bufsize + len >= 64)
+    {
         // Fill the buffer, and process it.
-        memcpy(buf + bufsize, data, 64 - bufsize);
+        memcpy(buf.data() + bufsize, data, 64 - bufsize);
         bytes += 64 - bufsize;
         data += 64 - bufsize;
-        Transform(s, buf, 1);
+        Transform(s.data(), buf.data(), 1);
         bufsize = 0;
     }
-    if (end - data >= 64) {
+    if(end - data >= 64)
+    {
         size_t blocks = (end - data) / 64;
-        Transform(s, data, blocks);
+        Transform(s.data(), data, blocks);
         data += 64 * blocks;
         bytes += 64 * blocks;
     }
-    if (end > data) {
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
+    if(end > data)
+    {
         // Fill the buffer with what remains.
-        memcpy(buf + bufsize, data, end - data);
+        memcpy(buf.data() + bufsize, data, end - data);
         bytes += end - data;
     }
     return *this;
 }
 
-void CSHA256::Finalize(uint8_t hash[OUTPUT_SIZE]) {
-    static const uint8_t pad[64] = {0x80};
-    uint8_t sizedesc[8];
-    WriteBE64(sizedesc, bytes << 3);
-    Write(pad, 1 + ((119 - (bytes % 64)) % 64));
-    Write(sizedesc, 8);
-    WriteBE32(hash, s[0]);
-    WriteBE32(hash + 4, s[1]);
-    WriteBE32(hash + 8, s[2]);
-    WriteBE32(hash + 12, s[3]);
-    WriteBE32(hash + 16, s[4]);
-    WriteBE32(hash + 20, s[5]);
-    WriteBE32(hash + 24, s[6]);
-    WriteBE32(hash + 28, s[7]);
+void CSHA256::Finalize(const span hash)
+{
+    static const std::array<uint8_t, 64> pad = {0x80};
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, 8> sizedesc;
+    WriteBE64(sizedesc.data(), bytes << 3);
+    Write(pad.data(), 1 + ((119 - (bytes % 64)) % 64));
+    Write(sizedesc.data(), 8);
+    WriteBE32(hash.data(), s[0]);
+    WriteBE32(hash.data() + 4, s[1]);
+    WriteBE32(hash.data() + 8, s[2]);
+    WriteBE32(hash.data() + 12, s[3]);
+    WriteBE32(hash.data() + 16, s[4]);
+    WriteBE32(hash.data() + 20, s[5]);
+    WriteBE32(hash.data() + 24, s[6]);
+    WriteBE32(hash.data() + 28, s[7]);
 }
 
-CSHA256 &CSHA256::Reset() {
+CSHA256& CSHA256::Reset()
+{
     bytes = 0;
-    sha256::Initialize(s);
+    sha256::Initialize(s.data());
     return *this;
 }

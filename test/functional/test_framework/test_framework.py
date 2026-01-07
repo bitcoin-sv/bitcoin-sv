@@ -4,20 +4,9 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """Base class for RPC testing."""
 
-from collections import deque
-from enum import Enum
-import logging
-import optparse
-import os
-import pdb
-import shutil
-import sys
-import tempfile
-import time
-import traceback
-import contextlib
-from test_framework.comptool import TestManager, TestInstance, RejectResult
-from test_framework.mininode import NetworkThread, StopNetworkThread
+from test_framework.comptool import TestManager, TestInstance
+from test_framework.mininode import NodeConn, NodeConnCB, NetworkThread, StopNetworkThread
+
 from .associations import Association, AssociationCB
 
 from .authproxy import JSONRPCException
@@ -41,7 +30,22 @@ from .util import (
     wait_until
 )
 
-from test_framework.blocktools import *
+from test_framework.comptool import logger
+from test_framework.blocktools import ChainManager
+
+from collections import deque
+from enum import Enum
+
+import contextlib
+import logging
+import optparse
+import os
+import pdb
+import shutil
+import sys
+import tempfile
+import time
+import traceback
 
 
 class TestStatus(Enum):
@@ -98,7 +102,13 @@ class BitcoinTestFramework():
         parser.add_option("--tmpdir", dest="tmpdir",
                           help="Root directory for datadirs")
         parser.add_option("-l", "--loglevel", dest="loglevel", default="INFO",
-                          help="log events at this level and higher to the console. Can be set to DEBUG, INFO, WARNING, ERROR or CRITICAL. Passing --loglevel DEBUG will output all logs to console. Note that logs at all levels are always written to the test_framework.log file in the temporary test directory.")
+                          help=("log events at this level and higher to the"
+                                "console. Can be set to DEBUG, INFO, WARNING, "
+                                "ERROR or CRITICAL. Passing --loglevel DEBUG "
+                                "will output all logs to console. Note that "
+                                "logs at all levels are always written to the "
+                                "test_framework.log file in the temporary test"
+                                " directory."))
         parser.add_option("--tracerpc", dest="trace_rpc", default=False, action="store_true",
                           help="Print out all RPC calls as they are made")
         parser.add_option("--portseed", dest="port_seed", default=os.getpid(), type='int',
@@ -139,18 +149,18 @@ class BitcoinTestFramework():
             self.setup_network()
             self.run_test()
             success = TestStatus.PASSED
-        except JSONRPCException as e:
+        except JSONRPCException:
             self.log.exception("JSONRPC error")
         except SkipTest as e:
             self.log.warning("Test Skipped: %s" % e.message)
             success = TestStatus.SKIPPED
-        except AssertionError as e:
+        except AssertionError:
             self.log.exception("Assertion failed")
-        except KeyError as e:
+        except KeyError:
             self.log.exception("Key error")
-        except Exception as e:
+        except Exception:
             self.log.exception("Unexpected exception caught during testing")
-        except KeyboardInterrupt as e:
+        except KeyboardInterrupt:
             self.log.warning("Exiting after keyboard interrupt")
 
         if success == TestStatus.FAILED and self.options.pdbonfailure:
@@ -171,7 +181,7 @@ class BitcoinTestFramework():
             # so that they will not be killed when Python exists.
             TestNode_process_list.clear()
 
-        if len(TestNode_process_list)>0:
+        if len(TestNode_process_list) > 0:
             self.log.warning("%i process(es) started by test are still running and will be killed." % len(TestNode_process_list))
             if success != TestStatus.FAILED:
                 self.log.error("Because not all started processes were properly stopped, test is considered to have failed!")
@@ -299,11 +309,11 @@ class BitcoinTestFramework():
             for i, node in enumerate(self.nodes):
                 node.wait_for_rpc_connection()
                 wait_until(lambda: node.rpc.getinfo()["initcomplete"])
-                if(self.options.waitforpid):
+                if self.options.waitforpid:
                     print('Node {} started, pid is {}'.format(i, node.process.pid))
                     print('Do what you need (eg; gdb ./bitcoind {}) and then press <return> to continue...'.format(node.process.pid))
                     input()
-        except:
+        except Exception:
             # If one node failed to start, stop the others
             self.stop_nodes()
             raise
@@ -369,7 +379,7 @@ class BitcoinTestFramework():
         if not args:
             args = [[]] * self.num_nodes
         else:
-            assert(len(args) == self.num_nodes)
+            assert (len(args) == self.num_nodes)
 
         self.start_nodes(args)
 
@@ -429,7 +439,8 @@ class BitcoinTestFramework():
         # Allow associations to exchange their setup messages and fully initialise
         for association in associations:
             association.setup()
-        wait_until(lambda: len(self.nodes[node_index].getpeerinfo()) == len(associations))
+        number_of_associations = len(associations)
+        wait_until(lambda: len(self.nodes[node_index].getpeerinfo()) == number_of_associations)
 
         # Test can now proceed
         logger.debug("before %s", title)
@@ -472,7 +483,7 @@ class BitcoinTestFramework():
                 self.start_node(i, extra_args, stderr=log_stderr)
                 self.stop_node(i)
             except Exception as e:
-                self.wait_for_node_exit(i,1) # wait until process properly terminates and resources are cleaned up
+                self.wait_for_node_exit(i, 1) # wait until process properly terminates and resources are cleaned up
                 assert 'bitcoind exited' in str(e)  # node must have shutdown
                 if expected_msg is not None:
                     log_stderr.seek(0)
@@ -649,8 +660,8 @@ class ComparisonTestFramework(BitcoinTestFramework):
     - 2 binaries: 1 test binary, 1 ref binary
     - n>2 binaries: 1 test binary, n-1 ref binaries"""
 
-    def __init__(self, destAddress = '127.0.0.1'):
-        super(ComparisonTestFramework,self).__init__()
+    def __init__(self, destAddress='127.0.0.1'):
+        super(ComparisonTestFramework, self).__init__()
         self.chain = ChainManager()
         self.destAddr = destAddress
         self._network_thread = None

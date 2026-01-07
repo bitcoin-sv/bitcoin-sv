@@ -1,0 +1,20 @@
+Checks: '-clang-analyzer-*,
+
+         -bugprone-empty-catch,
+         -bugprone-implicit-widening-of-multiplication-result,
+
+         -cert-err58-cpp,
+
+         -cppcoreguidelines-avoid-non-const-global-variables,
+         -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+         -cppcoreguidelines-pro-bounds-constant-array-index,
+         -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+         -cppcoreguidelines-pro-type-reinterpret-cast,
+      '
+
+InheritParentConfig: true
+CheckOptions:
+  - key:             cppcoreguidelines-avoid-c-arrays.AllowStringArrays
+    value:           'true'
+...
+

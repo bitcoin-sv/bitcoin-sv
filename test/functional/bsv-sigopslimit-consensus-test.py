@@ -23,13 +23,14 @@ Add a block with MAX_BLOCK_SIGOPS_PER_MB +1 sigops (OP_CHECKSIGVERIFY) at height
 Add a block with MAX_BLOCK_SIGOPS_PER_MB_POST_GENESIS sigops to check that max size is still allowed        -> OK
 """
 
+from test_framework.blocktools import get_legacy_sigopcount_block, \
+    prepare_init_chain
+from test_framework.cdefs import MAX_BLOCK_SIGOPS_PER_MB, ONE_MEGABYTE
+from test_framework.comptool import logger, RejectResult
+from test_framework.script import CScript, OP_CHECKMULTISIG, OP_CHECKSIG, \
+    OP_CHECKSIGVERIFY
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import *
-from test_framework.comptool import TestManager, TestInstance, RejectResult
-from test_framework.blocktools import *
-from test_framework.script import *
-from test_framework.cdefs import LEGACY_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB
-from time import sleep
+from test_framework.util import assert_equal
 
 
 class CheckSigTest(ComparisonTestFramework):
@@ -50,14 +51,11 @@ class CheckSigTest(ComparisonTestFramework):
         def tip(number):
             self.chain.set_tip(number)
 
-        # shorthand for functions
-        block = self.chain.next_block
-
         node = self.nodes[0]
         gen_hash = int(node.getbestblockhash(), 16)
         self.chain.set_genesis_hash(gen_hash)
 
-        block(0)
+        self.chain.next_block(0)
         yield self.accepted()
 
         test, out, _ = prepare_init_chain(self.chain, 119, 119)
@@ -71,12 +69,12 @@ class CheckSigTest(ComparisonTestFramework):
         #tip(0) - height = 120
 
         lots_of_checksigs = CScript([OP_CHECKSIG] * MAX_BLOCK_SIGOPS_PER_MB)
-        b1 = block(1, spend=out[0], script=lots_of_checksigs, block_size=ONE_MEGABYTE)
+        self.chain.next_block(1, spend=out[0], script=lots_of_checksigs, block_size=ONE_MEGABYTE)
         self.chain.save_spendable_output()
         yield self.accepted()
         # Test 4
         # Test that a block with too many checksigs is rejected
-        b2 = block(2, spend=out[1], script=lots_of_checksigs, block_size=ONE_MEGABYTE, extra_sigops=1)
+        self.chain.next_block(2, spend=out[1], script=lots_of_checksigs, block_size=ONE_MEGABYTE, extra_sigops=1)
         yield self.rejected(RejectResult(16, b'bad-blk-sigops'))
 
         # Test 5
@@ -84,13 +82,13 @@ class CheckSigTest(ComparisonTestFramework):
 
         tip(1)
         lots_of_multisigs = CScript([OP_CHECKMULTISIG] * (MAX_BLOCK_SIGOPS_PER_MB // 20))
-        b3 = block(3, spend=out[3], script=lots_of_multisigs, block_size=ONE_MEGABYTE)
+        b3 = self.chain.next_block(3, spend=out[3], script=lots_of_multisigs, block_size=ONE_MEGABYTE)
         assert_equal(get_legacy_sigopcount_block(b3), MAX_BLOCK_SIGOPS_PER_MB)
         yield self.accepted()
 
         # Test 6
         # this goes over the limit because the coinbase has one sigop
-        b4 = block(4, spend=out[4], script=lots_of_multisigs, block_size=ONE_MEGABYTE, extra_sigops=1)
+        b4 = self.chain.next_block(4, spend=out[4], script=lots_of_multisigs, block_size=ONE_MEGABYTE, extra_sigops=1)
         assert_equal(get_legacy_sigopcount_block(b4), MAX_BLOCK_SIGOPS_PER_MB + 1)
         yield self.rejected(RejectResult(16, b'bad-blk-sigops'))
 
@@ -98,16 +96,16 @@ class CheckSigTest(ComparisonTestFramework):
         tip(3)
         # Test 7
         lots_of_checksigs = CScript([OP_CHECKSIGVERIFY] * (MAX_BLOCK_SIGOPS_PER_MB))
-        b5 = block(5, spend=out[5], script=lots_of_checksigs, block_size=ONE_MEGABYTE)
+        b5 = self.chain.next_block(5, spend=out[5], script=lots_of_checksigs, block_size=ONE_MEGABYTE)
         assert_equal(get_legacy_sigopcount_block(b5), MAX_BLOCK_SIGOPS_PER_MB)
         self.chain.save_spendable_output()
         yield self.accepted()
 
         # Test 8
-        b6 = block(6, spend=out[6], script=lots_of_checksigs, block_size=ONE_MEGABYTE, extra_sigops=1)
+        self.chain.next_block(6, spend=out[6], script=lots_of_checksigs, block_size=ONE_MEGABYTE, extra_sigops=1)
         yield self.rejected(RejectResult(16, b'bad-blk-sigops'))
         tip(5)
-        b7 = block(7)
+        self.chain.next_block(7)
         yield self.accepted()
 
         logger.info("Genesis is enabled, all the following blocks should be accepted")
@@ -116,37 +114,37 @@ class CheckSigTest(ComparisonTestFramework):
         # Add a block with MAX_BLOCK_SIGOPS_PER_MB and one with one more sigop
         # Test that a block with a lot of checksigs is okay
         lots_of_checksigs = CScript([OP_CHECKSIG] * MAX_BLOCK_SIGOPS_PER_MB)
-        b9 = block(9, spend=out[9], script=lots_of_checksigs, block_size=ONE_MEGABYTE)
+        self.chain.next_block(9, spend=out[9], script=lots_of_checksigs, block_size=ONE_MEGABYTE)
         self.chain.save_spendable_output()
         yield self.accepted()
 
         # Test 11
         # Test that a block with 'too many' checksigs is now accepted
-        b10 = block(10, spend=out[10], script=lots_of_checksigs, block_size=ONE_MEGABYTE, extra_sigops=1)
+        self.chain.next_block(10, spend=out[10], script=lots_of_checksigs, block_size=ONE_MEGABYTE, extra_sigops=1)
         yield self.accepted()
         self.chain.save_spendable_output()
 
         # Test 12
         # this goes over the limit because the coinbase has one sigop, but should pass bcs genesis threshold was reached
-        b11 = block(11, spend=out[11], script=lots_of_multisigs, block_size=ONE_MEGABYTE, extra_sigops=1)
+        self.chain.next_block(11, spend=out[11], script=lots_of_multisigs, block_size=ONE_MEGABYTE, extra_sigops=1)
         yield self.accepted()
 
         # CHECKSIGVERIFY
         # Test 13
         lots_of_checksigs = CScript([OP_CHECKSIGVERIFY] * MAX_BLOCK_SIGOPS_PER_MB)
-        b12 = block(12, spend=out[12], script=lots_of_checksigs, block_size=ONE_MEGABYTE)
+        self.chain.next_block(12, spend=out[12], script=lots_of_checksigs, block_size=ONE_MEGABYTE)
         self.chain.save_spendable_output()
         yield self.accepted()
         # Test 14
-        b13 = block(13, spend=out[13], script=lots_of_checksigs, block_size=ONE_MEGABYTE, extra_sigops=1)
+        self.chain.next_block(13, spend=out[13], script=lots_of_checksigs, block_size=ONE_MEGABYTE, extra_sigops=1)
         self.chain.save_spendable_output()
         yield self.accepted()
 
         # Test 15
         # Test that a block with MAX_BLOCK_SIGOPS_PER_MB_POST_GENESIS checksigs is OK
-        MAX_BLOCK_SIGOPS_PER_MB_POST_GENESIS=1000000
+        MAX_BLOCK_SIGOPS_PER_MB_POST_GENESIS = 1000000
         lots_of_checksigs = CScript([OP_CHECKSIG] * MAX_BLOCK_SIGOPS_PER_MB)
-        b14 = block(14, spend=out[14], script=lots_of_checksigs, block_size=ONE_MEGABYTE+500, extra_sigops=MAX_BLOCK_SIGOPS_PER_MB_POST_GENESIS-MAX_BLOCK_SIGOPS_PER_MB)
+        self.chain.next_block(14, spend=out[14], script=lots_of_checksigs, block_size=ONE_MEGABYTE + 500, extra_sigops=MAX_BLOCK_SIGOPS_PER_MB_POST_GENESIS - MAX_BLOCK_SIGOPS_PER_MB)
         yield self.accepted()
 
 

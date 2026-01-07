@@ -8,7 +8,6 @@
 #
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until
-import time
 
 
 class ReindexTest(BitcoinTestFramework):

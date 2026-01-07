@@ -37,14 +37,14 @@ class Send_node():
         self.tmpdir = tmpdir
         self.log = log
 
-    def send_block(self, block, expect_reject = False):
+    def send_block(self, block, expect_reject=False):
         self.rpc.submitblock(ToHex(block))
 
         if expect_reject:
-            assert(self.check_frozen_tx_log(block.hash))
+            assert (self.check_frozen_tx_log(block.hash))
         else:
             assert_equal(block.hash, self.rpc.getbestblockhash())
-            assert(self.check_frozen_tx_log(block.hash) == False)
+            assert (self.check_frozen_tx_log(block.hash) is False)
 
     def check_frozen_tx_log(self, hash):
         for line in open(glob.glob(self.tmpdir + f"/node{self.node_no}" + "/regtest/blacklist.log")[0]):
@@ -103,7 +103,7 @@ class FrozenTXOReindex(BitcoinTestFramework):
 
         return create_transaction(tx_out.tx, tx_out.n, unlock_script, 1, lock)
 
-    def _mine_and_send_block(self, tx, node, expect_reject = False):
+    def _mine_and_send_block(self, tx, node, expect_reject=False):
         block = self.chain.next_block(self.block_count)
 
         self.chain.update_block(self.block_count, [tx] if tx else [])
@@ -117,18 +117,18 @@ class FrozenTXOReindex(BitcoinTestFramework):
 
     def _remove_last_block(self):
         # remove last block from chain manager
-        del self.chain.block_heights[self.chain.blocks[self.block_count-1].sha256]
-        del self.chain.blocks[self.block_count-1]
+        del self.chain.block_heights[self.chain.blocks[self.block_count - 1].sha256]
+        del self.chain.blocks[self.block_count - 1]
         self.block_count -= 1
-        self.chain.set_tip(self.block_count-1)
+        self.chain.set_tip(self.block_count - 1)
 
     def _mine_and_check_rejected(self, tx, node):
         self.log.info(f"Mining block with transaction {tx.hash} spending TXO {tx.vin[0].prevout.hash:064x},{tx.vin[0].prevout.n} and checking that it is rejected")
         old_tip = self.chain.tip
         rejected_block_hash = self._mine_and_send_block(tx, node, True)
         assert_equal(node.rpc.getbestblockhash(), old_tip.hash)
-        assert(node.check_frozen_tx_log(self.chain.tip.hash))
-        assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*"+self.chain.tip.hash))
+        assert (node.check_frozen_tx_log(self.chain.tip.hash))
+        assert (node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*" + self.chain.tip.hash))
 
         # remove rejected block from test node - the only remaining copy after this point is on remote node disk
         self._remove_last_block()
@@ -144,9 +144,9 @@ class FrozenTXOReindex(BitcoinTestFramework):
         result = node.rpc.addToPolicyBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : freeze_tx.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": freeze_tx.hash,
+                        "vout": 0
                     }
                 }]
         })
@@ -164,12 +164,12 @@ class FrozenTXOReindex(BitcoinTestFramework):
         self._mine_and_send_block(freeze_tx, node)
 
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on consensus blacklist")
-        result=node.rpc.addToConsensusBlacklist({
+        result = node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : freeze_tx.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": freeze_tx.hash,
+                        "vout": 0
                     },
                     "enforceAtHeight": [{"start": 0}],
                     "policyExpiresWithConsensus": False
@@ -198,7 +198,7 @@ class FrozenTXOReindex(BitcoinTestFramework):
         old_tip_hash = node_chain_info['bestblockhash']
         old_tip_height = node_chain_info['blocks']
 
-        assert(rejected_block_hash != old_tip_hash)
+        assert (rejected_block_hash != old_tip_hash)
 
         # Make sure that we get to the same height:
         # best block with transactions policy frozen - should get to this point
@@ -209,7 +209,7 @@ class FrozenTXOReindex(BitcoinTestFramework):
         # Waiting for last valid block. Waiting just for old_tip_height is not enough becuase next block (to be rejected) may not be processed yet.
         send_node.rpc.waitforblockheight(old_tip_height)
         # Wait for next block to be rejected. We need to wait for the second occurrence of the same log because one rejection happens before
-        wait_until(lambda: count_log_msg(self, "InvalidChainFound: invalid block="+rejected_block_hash+"  height=105", "/node0") == 2, timeout=5)
+        wait_until(lambda: count_log_msg(self, "InvalidChainFound: invalid block=" + rejected_block_hash + "  height=105", "/node0") == 2, timeout=5)
 
         assert_equal(send_node.rpc.getbestblockhash(), old_tip_hash)
 

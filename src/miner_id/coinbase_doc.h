@@ -236,9 +236,4 @@ private:
     friend std::ostream& operator<<(std::ostream&, const CoinbaseDocument&);
 };
 
-inline bool operator!=(const CoinbaseDocument& a, const CoinbaseDocument& b)
-{
-    return !(a == b);
-}
-
 std::string to_json(const CoinbaseDocument&);

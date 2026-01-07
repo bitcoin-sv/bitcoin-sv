@@ -3,15 +3,12 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 import json
 import urllib
-from time import sleep
 
 from rest import http_get_call
 from test_framework.blocktools import create_block, create_coinbase
 from test_framework.key import CECKey
-from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block, NetworkThread, CInv, \
-    ToHex
-from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG, \
-    OP_CODESEPARATOR, OP_TRUE, OP_VERIFY, OP_CHECKSIGVERIFY, OP_RETURN
+from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block
+from test_framework.script import CScript, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID, OP_TRUE, OP_RETURN
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, bytes_to_hex_str
 
@@ -44,7 +41,7 @@ def spend_tx_to_data(tx_to_spend, key_for_tx_to_spend):
     amount = tx_to_spend.vout[0].nValue - 2000
     tx.vout.append(CTxOut(amount, OP_TRUE_OP_RETURN_SCRIPT))
 
-    sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
+    sighash = SignatureHash(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
     tx.vin[0].scriptSig = CScript([key_for_tx_to_spend.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
     tx.rehash()
@@ -72,7 +69,9 @@ class SpendingOpReturnTx(BitcoinTestFramework):
             conn.cb.sync_with_ping()
 
             url = urllib.parse.urlparse(self.nodes[0].url)
-            json_mempool = json.loads(http_get_call(url.hostname, url.port, f'/rest/mempool/contents.json'))
+            json_mempool = json.loads(http_get_call(url.hostname,
+                                                    url.port,
+                                                    '/rest/mempool/contents.json'))
             json_tx = json.loads(http_get_call(url.hostname, url.port, f'/rest/getutxos/checkmempool/{tx_data.hash}-0.json'))
 
             assert len(json_mempool) == 1, f"Only one tx should be in mempool. Found {len(json_mempool)}"

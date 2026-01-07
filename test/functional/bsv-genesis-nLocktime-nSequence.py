@@ -91,7 +91,7 @@ from test_framework.script import CScript, OP_TRUE
 from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal, p2p_port, wait_until, check_for_log_msg
 from test_framework.comptool import TestManager, TestInstance, TestNode, RejectResult, DiscardResult
-from test_framework.mininode import NodeConn, NodeConnCB, NetworkThread, msg_getdata, msg_tx, CInv, mininode_lock
+from test_framework.mininode import NodeConn, msg_getdata, CInv, mininode_lock
 import time
 import copy
 
@@ -216,11 +216,11 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         tx1 = self.create_locked_transaction(spend_tx1, 0, CScript(), 1, CScript([OP_TRUE]), nLockTime, self.make_sequence(583))
         # The transaction should be accepted because genesis has not yet activated but the transaction is minable in the next block
         yield TestInstance([[tx1, True]])
-        assert(tx1.hash in self.nodes[0].getrawmempool())
+        assert (tx1.hash in self.nodes[0].getrawmempool())
 
         # Move height on to 583, tx1 is mined and removed from mempool
         self.nodes[0].generate(1)
-        assert(tx1.hash not in self.nodes[0].getrawmempool())
+        assert (tx1.hash not in self.nodes[0].getrawmempool())
 
         # Create block with bip68 non-final txn in it. It will be rejected.
         self.build_on_tip(9)
@@ -261,7 +261,7 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         # The transaction should be accepted because this is now considered final.
         yield TestInstance([[tx2, True]])
         mempool = self.nodes[0].getrawmempool()
-        assert(tx2.hash in mempool)
+        assert (tx2.hash in mempool)
 
         # At height 601, create a transaction with nLockTime in the future & nSequence not 0xFFFFFFFF.
         nLockTime = int(time.time()) + 1000
@@ -272,19 +272,19 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         yield TestInstance([[tx3, DiscardResult()], [tx4, DiscardResult()], [tx5, DiscardResult()]])
         mempool = self.nodes[0].getrawmempool()
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
-        assert(tx3.hash not in mempool)
-        assert(tx3.hash in nonfinalmempool)
-        assert(tx4.hash not in mempool)
-        assert(tx4.hash in nonfinalmempool)
-        assert(tx5.hash not in mempool)
-        assert(tx5.hash in nonfinalmempool)
+        assert (tx3.hash not in mempool)
+        assert (tx3.hash in nonfinalmempool)
+        assert (tx4.hash not in mempool)
+        assert (tx4.hash in nonfinalmempool)
+        assert (tx5.hash not in mempool)
+        assert (tx5.hash in nonfinalmempool)
 
         # At height 601, create a transaction with nLockTime in the future & nSequence equal to 0xFFFFFFFF.
         tx6 = self.create_locked_transaction(spend_tx6, 0, CScript(), 1000, CScript([OP_TRUE]), nLockTime, 0xFFFFFFFF)
         # The transaction will be considered final and accepted into the main mempool.
         yield TestInstance([[tx6, True]])
         mempool = self.nodes[0].getrawmempool()
-        assert(tx6.hash in mempool)
+        assert (tx6.hash in mempool)
 
         # Create transaction that tries to double spend UTXOs locked by txn3. It will be discarded.
         tx3_double_spend = self.create_transaction(spend_tx3, 0, CScript(), 1000, CScript([OP_TRUE]))
@@ -295,14 +295,14 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         self.nodes[0].generate(1)
         mempool = self.nodes[0].getrawmempool()
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
-        assert(tx2.hash not in mempool)
-        assert(tx3.hash not in mempool)
-        assert(tx4.hash not in mempool)
-        assert(tx5.hash not in mempool)
-        assert(tx6.hash not in mempool)
-        assert(tx3.hash in nonfinalmempool)
-        assert(tx4.hash in nonfinalmempool)
-        assert(tx5.hash in nonfinalmempool)
+        assert (tx2.hash not in mempool)
+        assert (tx3.hash not in mempool)
+        assert (tx4.hash not in mempool)
+        assert (tx5.hash not in mempool)
+        assert (tx6.hash not in mempool)
+        assert (tx3.hash in nonfinalmempool)
+        assert (tx4.hash in nonfinalmempool)
+        assert (tx5.hash in nonfinalmempool)
 
         # Create standard transaction which tries to spend non-final txn3. It will be an orphan.
         txn_spend = self.create_transaction(tx3, 0, CScript(), 100, CScript([OP_TRUE]))
@@ -323,9 +323,9 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         yield TestInstance([[tx3, DiscardResult()]])
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
         assert_equal(len(nonfinalmempool), 3)
-        assert(tx3.hash in nonfinalmempool)
-        assert(tx4.hash in nonfinalmempool)
-        assert(tx5.hash in nonfinalmempool)
+        assert (tx3.hash in nonfinalmempool)
+        assert (tx4.hash in nonfinalmempool)
+        assert (tx5.hash in nonfinalmempool)
 
         # Send multiple updates together for txn3 with higher and different nSequence numbers.
         # Just one of the updates will be accepted, but due to PTV we can't be sure which.
@@ -342,9 +342,9 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         yield TestInstance([[tx3_update1, None], [tx3_update2, None], [tx3_update3, None]])
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
         assert_equal(len(nonfinalmempool), 3)
-        assert(bool(tx3_update1.hash in nonfinalmempool) ^ bool(tx3_update2.hash in nonfinalmempool) ^ bool(tx3_update3.hash in nonfinalmempool))
-        assert(tx4.hash in nonfinalmempool)
-        assert(tx5.hash in nonfinalmempool)
+        assert (bool(tx3_update1.hash in nonfinalmempool) ^ bool(tx3_update2.hash in nonfinalmempool) ^ bool(tx3_update3.hash in nonfinalmempool))
+        assert (tx4.hash in nonfinalmempool)
+        assert (tx5.hash in nonfinalmempool)
 
         # Remember which update got accepted
         tx3_update_accepted = None
@@ -362,8 +362,8 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         yield TestInstance([[tx4_tx5_invalid, RejectResult(16, b'bad-txn-update')]])
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
         assert_equal(len(nonfinalmempool), 3)
-        assert(tx4.hash in nonfinalmempool)
-        assert(tx5.hash in nonfinalmempool)
+        assert (tx4.hash in nonfinalmempool)
+        assert (tx5.hash in nonfinalmempool)
 
         # Send an invalid update for txn4 which changes the number of inputs. It will be rejected.
         tx4_invalid = copy.deepcopy(tx4)
@@ -373,32 +373,32 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         yield TestInstance([[tx4_invalid, RejectResult(16, b'bad-txn-update')]])
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
         assert_equal(len(nonfinalmempool), 3)
-        assert(tx4.hash in nonfinalmempool)
+        assert (tx4.hash in nonfinalmempool)
 
         # Send an update for txn3 with nSequence = 0xFFFFFFFF. It will be finalised and moved
         # into the main mempool.
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
-        assert(tx3_update_accepted in nonfinalmempool)
+        assert (tx3_update_accepted in nonfinalmempool)
         tx3.vin[0].nSequence = 0xFFFFFFFF
         tx3.rehash()
         yield TestInstance([[tx3, True]])
         mempool = self.nodes[0].getrawmempool()
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
-        assert(tx3.hash in mempool)
-        assert(tx3.hash not in nonfinalmempool)
-        assert(tx3_update_accepted not in nonfinalmempool)
+        assert (tx3.hash in mempool)
+        assert (tx3.hash not in nonfinalmempool)
+        assert (tx3_update_accepted not in nonfinalmempool)
 
         # Move time on beyond the nLockTime for txn4. It will be finalised and moved into the
         # main mempool.
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
-        assert(tx4.hash in nonfinalmempool)
-        assert(tx5.hash in nonfinalmempool)
+        assert (tx4.hash in nonfinalmempool)
+        assert (tx5.hash in nonfinalmempool)
         self.nodes[0].setmocktime(nLockTime + 1)
         self.nodes[0].generate(6)
         wait_until(lambda: tx4.hash in self.nodes[0].getrawmempool(), timeout=5)
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
-        assert(tx4.hash not in nonfinalmempool)
-        assert(tx5.hash in nonfinalmempool)
+        assert (tx4.hash not in nonfinalmempool)
+        assert (tx5.hash in nonfinalmempool)
 
         # Get tip from bitcoind because it's further along than we are, and we want to build on it
         self.build_on_tip(4)
@@ -422,20 +422,20 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         yield TestInstance([[tx7_spend, True]])
         mempool = self.nodes[0].getrawmempool()
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
-        assert(tx7.hash not in nonfinalmempool)
-        assert(tx7.hash not in mempool)
-        assert(tx7_spend.hash not in nonfinalmempool)
-        assert(tx7_spend.hash in mempool)
+        assert (tx7.hash not in nonfinalmempool)
+        assert (tx7.hash not in mempool)
+        assert (tx7_spend.hash not in nonfinalmempool)
+        assert (tx7_spend.hash in mempool)
         # Reorg back so tx7 is no longer final
         self.nodes[0].invalidateblock(self.nodes[0].getbestblockhash())
         self.nodes[0].invalidateblock(self.nodes[0].getbestblockhash())
         # Both txns will have been removed from the mempool
         mempool = self.nodes[0].getrawmempool()
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
-        assert(tx7.hash not in nonfinalmempool)
-        assert(tx7.hash not in mempool)
-        assert(tx7_spend.hash not in nonfinalmempool)
-        assert(tx7_spend.hash not in mempool)
+        assert (tx7.hash not in nonfinalmempool)
+        assert (tx7.hash not in mempool)
+        assert (tx7_spend.hash not in nonfinalmempool)
+        assert (tx7_spend.hash not in mempool)
 
         # Send non-final txn
         currentHeight = self.nodes[0].getblockcount()
@@ -443,7 +443,7 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         yield TestInstance([[tx7, DiscardResult()]])
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
         mempool = self.nodes[0].getrawmempool()
-        assert(tx7.hash in nonfinalmempool)
+        assert (tx7.hash in nonfinalmempool)
         # Create a block that contains a txn that conflicts with the previous non-final txn
         tx7_double_spend = self.create_transaction(spend_tx11, 0, CScript(), 1000, CScript([OP_TRUE]))
         block(6, spend=out[30])
@@ -451,17 +451,17 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         yield self.accepted()
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
         mempool = self.nodes[0].getrawmempool()
-        assert(tx7.hash not in nonfinalmempool)
-        assert(tx7.hash not in mempool)
+        assert (tx7.hash not in nonfinalmempool)
+        assert (tx7.hash not in mempool)
 
         # Reorg back and check that the transaction from the block is the txn picked to be kept in the mempool
         mempool = self.nodes[0].getrawmempool()
-        assert(tx7_double_spend.hash not in mempool)
-        assert(tx7.hash not in mempool)
+        assert (tx7_double_spend.hash not in mempool)
+        assert (tx7.hash not in mempool)
         self.nodes[0].invalidateblock(self.nodes[0].getbestblockhash())
         mempool = self.nodes[0].getrawmempool()
-        assert(tx7_double_spend.hash in mempool)
-        assert(tx7.hash not in mempool)
+        assert (tx7_double_spend.hash in mempool)
+        assert (tx7.hash not in mempool)
 
         # Check that post-genesis if we receive a block containing a txn that pre-genesis would have been BIP68
         # non-final but now is final, we accept that block ok.
@@ -485,28 +485,28 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         tx8 = self.create_locked_transaction(spend_tx13, 0, CScript(), 1000, CScript([OP_TRUE]), currentHeight + 1, 0x01)
         yield TestInstance([[tx8, DiscardResult()]])
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
-        assert(tx8.hash in nonfinalmempool)
+        assert (tx8.hash in nonfinalmempool)
         # Send updates within the permitted rate
         for i in range(5):
             tx8.vin[0].nSequence += 1
             tx8.rehash()
             yield TestInstance([[tx8, DiscardResult()]])
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
-        assert(tx8.hash in nonfinalmempool)
+        assert (tx8.hash in nonfinalmempool)
         # Send another update to take us above the permitted rate
         tx8.vin[0].nSequence += 1
         tx8.rehash()
         yield TestInstance([[tx8, RejectResult(69, b'non-final-txn-replacement-rate')]])
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
-        assert(tx8.hash not in nonfinalmempool)
-        assert(not check_for_log_msg(self, "Non-final txn that exceeds replacement rate made it to validation", "/node0"))
+        assert (tx8.hash not in nonfinalmempool)
+        assert (not check_for_log_msg(self, "Non-final txn that exceeds replacement rate made it to validation", "/node0"))
         # Wait and retry, should now be accepted
         time.sleep(12)
         tx8.vin[0].nSequence += 1
         tx8.rehash()
         yield TestInstance([[tx8, DiscardResult()]])
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
-        assert(tx8.hash in nonfinalmempool)
+        assert (tx8.hash in nonfinalmempool)
 
 
 if __name__ == '__main__':

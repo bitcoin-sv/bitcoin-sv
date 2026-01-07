@@ -5,7 +5,8 @@
 """Test the wallet accounts properly when there are cloned transactions with malleated scriptsigs."""
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_equal, connect_nodes, sync_blocks, \
+    sync_mempools, wait_for_txn_propagator
 
 
 class TxnMallTest(BitcoinTestFramework):
@@ -64,7 +65,7 @@ class TxnMallTest(BitcoinTestFramework):
         # Construct a clone of tx1, to be malleated
         rawtx1 = self.nodes[0].getrawtransaction(txid1, 1)
         clone_inputs = [{"txid": rawtx1["vin"][0]
-                         ["txid"], "vout":rawtx1["vin"][0]["vout"]}]
+                         ["txid"], "vout": rawtx1["vin"][0]["vout"]}]
         clone_outputs = {rawtx1["vout"][0]["scriptPubKey"]["addresses"][0]: rawtx1["vout"][0]["value"],
                          rawtx1["vout"][1]["scriptPubKey"]["addresses"][0]: rawtx1["vout"][1]["value"]}
         clone_locktime = rawtx1["locktime"]

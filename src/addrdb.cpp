@@ -14,19 +14,25 @@
 #include "tinyformat.h"
 #include "util.h"
 
-CBanDB::CBanDB(const CChainParams &chainParams) : chainParams(chainParams) {
-    pathBanlist = GetDataDir() / "banlist.dat";
+#include <array>
+#include <cstdint>
+
+CBanDB::CBanDB(const CChainParams& chainParams) : chainParams_{chainParams}
+{
+    pathBanlist_ = GetDataDir() / "banlist.dat";
 }
 
-bool CBanDB::Write(const banmap_t &banSet) {
+bool CBanDB::Write(const banmap_t& banSet)
+{
     // Generate random temporary filename
     unsigned short randv = 0;
-    GetRandBytes((uint8_t *)&randv, sizeof(randv));
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    GetRandBytes(reinterpret_cast<uint8_t*>(&randv), sizeof(randv));
     std::string tmpfn = strprintf("banlist.dat.%04x", randv);
 
     // serialize banlist, checksum data up to that point, then append csum
     CDataStream ssBanlist(SER_DISK, CLIENT_VERSION);
-    ssBanlist << FLATDATA(chainParams.DiskMagic());
+    ssBanlist << FLATDATA(chainParams_.DiskMagic());
     ssBanlist << banSet;
     uint256 hash = Hash(ssBanlist.begin(), ssBanlist.end());
     ssBanlist << hash;
@@ -48,22 +54,23 @@ bool CBanDB::Write(const banmap_t &banSet) {
     fileout.reset();
 
     // replace existing banlist.dat, if any, with new banlist.dat.XXXX
-    if (!RenameOver(pathTmp, pathBanlist))
+    if (!RenameOver(pathTmp, pathBanlist_))
         return error("%s: Rename-into-place failed", __func__);
 
     return true;
 }
 
-bool CBanDB::Read(banmap_t &banSet) {
+bool CBanDB::Read(banmap_t& banSet)
+{
     // open input file, and associate with CAutoFile
-    FILE *file = fsbridge::fopen(pathBanlist, "rb");
+    FILE *file = fsbridge::fopen(pathBanlist_, "rb");
     CAutoFile filein(file, SER_DISK, CLIENT_VERSION);
     if (filein.IsNull())
         return error("%s: Failed to open file %s", __func__,
-                     pathBanlist.string());
+                     pathBanlist_.string());
 
     // use file size to size memory buffer
-    uint64_t fileSize = fs::file_size(pathBanlist);
+    uint64_t fileSize = fs::file_size(pathBanlist_);
     uint64_t dataSize = 0;
     // Don't try to resize to a negative number if file is small
     if (fileSize >= sizeof(uint256)) dataSize = fileSize - sizeof(uint256);
@@ -73,7 +80,8 @@ bool CBanDB::Read(banmap_t &banSet) {
 
     // read data and checksum from file
     try {
-        filein.read((char *)&vchData[0], dataSize);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+        filein.read(reinterpret_cast<char*>(vchData.data()), vchData.size());
         filein >> hashIn;
     } catch (const std::exception &e) {
         return error("%s: Deserialize or I/O error - %s", __func__, e.what());
@@ -87,14 +95,14 @@ bool CBanDB::Read(banmap_t &banSet) {
     if (hashIn != hashTmp)
         return error("%s: Checksum mismatch, data corrupted", __func__);
 
-    uint8_t pchMsgTmp[4];
+    std::array<uint8_t, 4> pchMsgTmp{};
     try {
         // de-serialize file header (network specific magic number) and ..
         ssBanlist >> FLATDATA(pchMsgTmp);
 
         // ... verify the network matches ours
-        if (memcmp(pchMsgTmp, chainParams.DiskMagic().data(),
-                   sizeof(pchMsgTmp))) {
+        if (memcmp(pchMsgTmp.data(), chainParams_.DiskMagic().data(),
+                   pchMsgTmp.size()) != 0) {
             return error("%s: Invalid network magic number", __func__);
         }
 
@@ -107,19 +115,22 @@ bool CBanDB::Read(banmap_t &banSet) {
     return true;
 }
 
-CAddrDB::CAddrDB(const CChainParams &chainParams) : chainParams(chainParams) {
-    pathAddr = GetDataDir() / "peers.dat";
+CAddrDB::CAddrDB(const CChainParams& chainParams) : chainParams_{chainParams}
+{
+    pathAddr_ = GetDataDir() / "peers.dat";
 }
 
-bool CAddrDB::Write(const CAddrMan &addr) {
+bool CAddrDB::Write(const CAddrMan& addr)
+{
     // Generate random temporary filename
     unsigned short randv = 0;
-    GetRandBytes((uint8_t *)&randv, sizeof(randv));
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    GetRandBytes(reinterpret_cast<uint8_t*>(&randv), sizeof(randv));
     std::string tmpfn = strprintf("peers.dat.%04x", randv);
 
     // serialize addresses, checksum data up to that point, then append csum
     CDataStream ssPeers(SER_DISK, CLIENT_VERSION);
-    ssPeers << FLATDATA(chainParams.DiskMagic());
+    ssPeers << FLATDATA(chainParams_.DiskMagic());
     ssPeers << addr;
     uint256 hash = Hash(ssPeers.begin(), ssPeers.end());
     ssPeers << hash;
@@ -141,21 +152,22 @@ bool CAddrDB::Write(const CAddrMan &addr) {
     fileout.reset();
 
     // replace existing peers.dat, if any, with new peers.dat.XXXX
-    if (!RenameOver(pathTmp, pathAddr))
+    if (!RenameOver(pathTmp, pathAddr_))
         return error("%s: Rename-into-place failed", __func__);
 
     return true;
 }
 
-bool CAddrDB::Read(CAddrMan &addr) {
+bool CAddrDB::Read(CAddrMan& addr)
+{
     // open input file, and associate with CAutoFile
-    FILE *file = fsbridge::fopen(pathAddr, "rb");
+    FILE *file = fsbridge::fopen(pathAddr_, "rb");
     CAutoFile filein(file, SER_DISK, CLIENT_VERSION);
     if (filein.IsNull())
-        return error("%s: Failed to open file %s", __func__, pathAddr.string());
+        return error("%s: Failed to open file %s", __func__, pathAddr_.string());
 
     // use file size to size memory buffer
-    uint64_t fileSize = fs::file_size(pathAddr);
+    uint64_t fileSize = fs::file_size(pathAddr_);
     uint64_t dataSize = 0;
     // Don't try to resize to a negative number if file is small
     if (fileSize >= sizeof(uint256)) dataSize = fileSize - sizeof(uint256);
@@ -165,7 +177,8 @@ bool CAddrDB::Read(CAddrMan &addr) {
 
     // read data and checksum from file
     try {
-        filein.read((char *)&vchData[0], dataSize);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+        filein.read(reinterpret_cast<char*>(vchData.data()), vchData.size());
         filein >> hashIn;
     } catch (const std::exception &e) {
         return error("%s: Deserialize or I/O error - %s", __func__, e.what());
@@ -183,14 +196,14 @@ bool CAddrDB::Read(CAddrMan &addr) {
 }
 
 bool CAddrDB::Read(CAddrMan &addr, CDataStream &ssPeers) {
-    uint8_t pchMsgTmp[4];
+    std::array<uint8_t, 4> pchMsgTmp{};
     try {
         // de-serialize file header (network specific magic number) and ..
         ssPeers >> FLATDATA(pchMsgTmp);
 
         // ... verify the network matches ours
-        if (memcmp(pchMsgTmp, chainParams.DiskMagic().data(),
-                   sizeof(pchMsgTmp))) {
+        if (memcmp(pchMsgTmp.data(), chainParams_.DiskMagic().data(),
+                   pchMsgTmp.size()) != 0) {
             return error("%s: Invalid network magic number", __func__);
         }
 

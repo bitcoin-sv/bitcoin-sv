@@ -33,7 +33,7 @@
 extern "C" {
 #endif
 
-class CScriptConfig;
+class Config;
 
 #define BITCOINCONSENSUS_API_VER 1
 
@@ -75,17 +75,24 @@ enum {
 /// correctly spends the scriptPubKey pointed to by scriptPubKey under the
 /// additional constraints specified by flags.
 /// If not nullptr, err will contain an error/success code for the operation
-EXPORT_SYMBOL int bitcoinconsensus_verify_script(
-    const CScriptConfig& config,
-    const uint8_t *scriptPubKey, unsigned int scriptPubKeyLen,
-    const uint8_t *txTo, unsigned int txToLen, unsigned int nIn,
-    unsigned int flags, bitcoinconsensus_error *err);
+EXPORT_SYMBOL int bitcoinconsensus_verify_script(const Config&,
+                                                 const uint8_t* scriptPubKey,
+                                                 unsigned int scriptPubKeyLen,
+                                                 const uint8_t* txTo,
+                                                 unsigned int txToLen,
+                                                 unsigned int nIn,
+                                                 unsigned int flags,
+                                                 bitcoinconsensus_error*);
 
-EXPORT_SYMBOL int bitcoinconsensus_verify_script_with_amount(
-    const CScriptConfig& config,
-    const uint8_t *scriptPubKey, unsigned int scriptPubKeyLen, int64_t amount,
-    const uint8_t *txTo, unsigned int txToLen, unsigned int nIn,
-    unsigned int flags, bitcoinconsensus_error *err);
+EXPORT_SYMBOL int bitcoinconsensus_verify_script_with_amount(const Config&,
+                                                             const uint8_t* scriptPubKey,
+                                                             unsigned int scriptPubKeyLen,
+                                                             int64_t amount,
+                                                             const uint8_t* txTo,
+                                                             unsigned int txToLen,
+                                                             unsigned int nIn,
+                                                             unsigned int flags,
+                                                             bitcoinconsensus_error*);
 
 EXPORT_SYMBOL unsigned int bitcoinconsensus_version();
 

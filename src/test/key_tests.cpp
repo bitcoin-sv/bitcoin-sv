@@ -15,7 +15,6 @@
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
-
 static const std::string strSecret1 =
     "5HxWvvfubhXpYYpS3tJkw6fq9jE9j18THftkZjHHfmFiWtmAbrj";
 static const std::string strSecret2 =

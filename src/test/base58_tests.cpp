@@ -24,11 +24,11 @@ BOOST_FIXTURE_TEST_SUITE(base58_tests, BasicTestingSetup)
 // Goal: test low-level base58 encoding functionality
 BOOST_AUTO_TEST_CASE(base58_EncodeBase58) {
     UniValue tests =
-        read_json(std::string(json_tests::base58_encode_decode,
-                              json_tests::base58_encode_decode +
+        read_json(std::string(json_tests::base58_encode_decode, // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+                              json_tests::base58_encode_decode + // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
                                   sizeof(json_tests::base58_encode_decode)));
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
-        UniValue test = tests[idx];
+        const UniValue& test = tests[idx];
         std::string strTest = test.write();
         // Allow for extra stuff (useful for comments)
         if (test.size() < 2) {
@@ -39,7 +39,7 @@ BOOST_AUTO_TEST_CASE(base58_EncodeBase58) {
         std::string base58string = test[1].get_str();
         BOOST_CHECK_MESSAGE(
             EncodeBase58(sourcedata.data(),
-                         sourcedata.data() + sourcedata.size()) == base58string,
+                         sourcedata.data() + sourcedata.size()) == base58string, // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             strTest);
     }
 }
@@ -47,13 +47,13 @@ BOOST_AUTO_TEST_CASE(base58_EncodeBase58) {
 // Goal: test low-level base58 decoding functionality
 BOOST_AUTO_TEST_CASE(base58_DecodeBase58) {
     UniValue tests =
-        read_json(std::string(json_tests::base58_encode_decode,
-                              json_tests::base58_encode_decode +
+        read_json(std::string(json_tests::base58_encode_decode, // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+                              json_tests::base58_encode_decode + // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
                                   sizeof(json_tests::base58_encode_decode)));
     std::vector<uint8_t> result;
 
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
-        UniValue test = tests[idx];
+        const UniValue& test = tests[idx];
         std::string strTest = test.write();
         // Allow for extra stuff (useful for comments)
         if (test.size() < 2) {
@@ -88,15 +88,9 @@ private:
 public:
     TestAddrTypeVisitor(const std::string &_exp_addrType)
         : exp_addrType(_exp_addrType) {}
-    bool operator()(const CKeyID &id) const {
-        return (exp_addrType == "pubkey");
-    }
-    bool operator()(const CScriptID &id) const {
-        return (exp_addrType == "script");
-    }
-    bool operator()(const CNoDestination &no) const {
-        return (exp_addrType == "none");
-    }
+    bool operator()(const CKeyID&) const { return (exp_addrType == "pubkey"); }
+    bool operator()(const CScriptID&) const { return (exp_addrType == "script"); }
+    bool operator()(const CNoDestination&) const { return (exp_addrType == "none"); }
 };
 
 // Visitor to check address payload
@@ -115,7 +109,7 @@ public:
         uint160 exp_key(exp_payload);
         return exp_key == id;
     }
-    bool operator()(const CNoDestination &no) const {
+    bool operator()(const CNoDestination&) const {
         return exp_payload.size() == 0;
     }
 };
@@ -123,14 +117,14 @@ public:
 // Goal: check that parsed keys match test payload
 BOOST_AUTO_TEST_CASE(base58_keys_valid_parse) {
     UniValue tests = read_json(std::string(
-        json_tests::base58_keys_valid,
-        json_tests::base58_keys_valid + sizeof(json_tests::base58_keys_valid)));
+        json_tests::base58_keys_valid, // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+        json_tests::base58_keys_valid + sizeof(json_tests::base58_keys_valid))); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     CBitcoinSecret secret;
     CTxDestination destination;
     SelectParams(CBaseChainParams::MAIN);
 
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
-        UniValue test = tests[idx];
+        const UniValue& test = tests[idx];
         std::string strTest = test.write();
         // Allow for extra stuff (useful for comments)
         if (test.size() < 3) {
@@ -191,11 +185,11 @@ BOOST_AUTO_TEST_CASE(base58_keys_valid_parse) {
 // Goal: check that generated keys match test vectors
 BOOST_AUTO_TEST_CASE(base58_keys_valid_gen) {
     UniValue tests = read_json(std::string(
-        json_tests::base58_keys_valid,
-        json_tests::base58_keys_valid + sizeof(json_tests::base58_keys_valid)));
+        json_tests::base58_keys_valid, // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+        json_tests::base58_keys_valid + sizeof(json_tests::base58_keys_valid))); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
-        UniValue test = tests[idx];
+        const UniValue& test = tests[idx];
         std::string strTest = test.write();
         // Allow for extra stuff (useful for comments)
         if (test.size() < 3) {
@@ -248,14 +242,14 @@ BOOST_AUTO_TEST_CASE(base58_keys_valid_gen) {
 BOOST_AUTO_TEST_CASE(base58_keys_invalid) {
     // Negative testcases
     UniValue tests =
-        read_json(std::string(json_tests::base58_keys_invalid,
-                              json_tests::base58_keys_invalid +
+        read_json(std::string(json_tests::base58_keys_invalid, // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+                              json_tests::base58_keys_invalid + // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
                                   sizeof(json_tests::base58_keys_invalid)));
     CBitcoinSecret secret;
     CTxDestination destination;
 
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
-        UniValue test = tests[idx];
+        const UniValue& test = tests[idx];
         std::string strTest = test.write();
         // Allow for extra stuff (useful for comments)
         if (test.size() < 1) {

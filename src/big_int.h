@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <compare>
 #include <memory>
 #include <span>
 #include <stdexcept>
@@ -34,7 +35,7 @@ namespace bsv
         void swap(bint&) noexcept;
 
         // Relational operators
-        friend bool operator<(const bint&, const bint&);
+        friend std::strong_ordering operator<=>(const bint&, const bint&);
         friend bool operator==(const bint&, const bint&);
 
         // Arithmetic operators
@@ -43,36 +44,40 @@ namespace bsv
         bint& operator*=(const bint&);
         bint& operator/=(const bint&);
         bint& operator%=(const bint&);
+        bint& operator>>=(const bint&);
+        bint& operator>>=(int n);
+        bint& operator<<=(const bint&);
+        bint& operator<<=(int n);
         bint operator-() const;
-        
+
         bint& operator+=(int64_t other){ return *this += bint(other); }
         bint& operator-=(int64_t other){ return *this -= bint(other); }
         bint& operator&=(int64_t other){ return *this &= bint(other); }
 
         // Bit-manipulation operators
-        bint& operator>>=(int n);
-        bint& operator<<=(int n);
-        
         bint& operator&=(const bint&);
         bint& operator|=(const bint&);
 
         uint8_t lsb() const;
-        
+
         int size_bytes() const;
 
         friend std::ostream& operator<<(std::ostream&, const bint&);
 
         friend bool is_negative(const bint&);
 
+        friend int64_t to_int64_t(const bint&);
         friend long to_long(const bint&);
         friend std::size_t to_size_t_limited(const bint&);
+        friend std::string to_dec(const bint&);
+        friend std::string to_hex(const bint&);
+        friend bint pow(const bint&, const bint&);
 
         std::vector<uint8_t> serialize() const;
+        size_t serialized_size() const;
         static bint deserialize(std::span<const uint8_t>);
 
     private:
-        int spaceship_operator(
-            const bint&) const; // auto operator<=>(const bint&) in C++20
         void negate();
 
         int size_bits() const;
@@ -81,7 +86,7 @@ namespace bsv
         using buffer_type = std::vector<unsigned char>;
         buffer_type to_bin() const;
         void mask_bits(int n);
-        
+
         struct empty_bn_deleter // See Note 1.
         {
             void operator()(bignum_st* ) const;
@@ -90,18 +95,12 @@ namespace bsv
         static_assert(sizeof(unique_bn_ptr) == sizeof(bignum_st*));
         unique_bn_ptr value_;
     };
-    
-    inline void swap(bint& a, bint& b) { a.swap(b);}
 
-    bool operator<(const bint&, const bint&);
+    inline void swap(bint& a, bint& b) noexcept { a.swap(b);}
+
+    std::strong_ordering operator<=>(const bint&, const bint&);
     bool operator==(const bint&, const bint&);
 
-    inline bool operator!=(const bint& a, const bint& b) { return !(a == b); }
-
-    inline bool operator<=(const bint& a, const bint& b) { return !(b < a); }
-    inline bool operator>(const bint& a, const bint& b) { return b < a; }
-    inline bool operator>=(const bint& a, const bint& b) { return !(a < b); }
-        
     inline bint operator+(bint a, const bint& b)
     {
         a += b;
@@ -140,42 +139,33 @@ namespace bsv
 
     std::ostream& operator<<(std::ostream& os, const bint&);
 
-    // int64_t overloads
-    inline bool operator==(const bint& a, const int64_t b) { return a == bint{b}; } 
+    inline std::strong_ordering operator<=>(const bint& a, int64_t b) { return a <=> bint{b}; }
+
     inline bool operator==(const int64_t a, const bint& b)  { return bint{a} == b; }
-    inline bool operator!=(const bint& a, const int64_t b) { return a != bint(b); }
+    inline bool operator==(const size_t a, const bint& b)  { return bint{a} == b; }
+    inline bool operator==(const int a, const bint& b)  { return bint{a} == b; }
 
-    inline bool operator<(const bint& a, int64_t b) { return a < bint(b); }
-    inline bool operator<(int64_t a, const bint& b) { return bint(a) < b; }
-    inline bool operator<=(const bint& a, int64_t b) { return a <= bint(b); }
-    inline bool operator>(const bint& a, int64_t b) { return a > bint(b); }
-    inline bool operator>=(const bint& a, int64_t b) { return a >= bint(b); }
-
+    // NOLINTBEGIN(performance-unnecessary-value-param)
     inline bint operator+(bint a, const int64_t b) { return a + bint(b); }
     inline bint operator-(bint a, const int64_t b) { return a - bint(b); }
     inline bint operator*(bint a, const int64_t b) { return a * bint(b); }
     inline bint operator/(bint a, const int64_t b) { return a / bint(b); }
     inline bint operator%(bint a, const int64_t b) { return a % bint(b); }
-    
-    // size_t overloads
-    inline bool operator==(const bint& a, const size_t b) { return a == bint{b}; } 
-    inline bool operator==(const size_t a, const bint& b)  { return bint{a} == b; }
-    inline bool operator!=(const bint& a, const size_t b) { return a != bint(b); }
-    
-    // int overloads
-    inline bool operator==(const bint& a, const int b) { return a == bint{b}; } 
-    inline bool operator==(const int a, const bint& b)  { return bint{a} == b; }
-    inline bool operator!=(const bint& a, const int b) { return a != bint(b); }
+    // NOLINTEND(performance-unnecessary-value-param)
 
     inline uint8_t operator&(const bint& a, const uint8_t b) { 
         return a.lsb() & b;
     }
-    
+
     bool is_negative(const bint&);
     bint abs(const bint&);
-    std::string to_string(const bint&);
+    std::string to_dec(const bint&);
+    std::string to_hex(const bint&);
     std::size_t to_size_t_limited(const bint&);
+    int64_t to_int64_t(const bint&);
     long to_long(const bint&);
+
+    bint pow(const bint&, const bint&);
 
     template <typename O>
     inline void serialize(const bint& n, O o)

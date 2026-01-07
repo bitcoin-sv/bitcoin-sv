@@ -46,7 +46,7 @@ class TestIncompleteTxnList(BitcoinTestFramework):
         with self.run_node_with_connections("Bad blocktxn test", 0, [], 1) as (conn,):
             conn.send_message(msg_badblocktxn())
 
-            wait_until(lambda: check_for_log_msg(self, "parsing error: index out of bounds", "/node0"), timeout=10)
+            wait_until(lambda: check_for_log_msg(self, "msg_buffer::read(): end of data", "/node0"), timeout=10)
 
 
 if __name__ == '__main__':

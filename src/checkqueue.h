@@ -91,7 +91,7 @@ private:
             , mCounter{counter}
         {/**/}
 
-        ~CTotalScopeGuard()
+        ~CTotalScopeGuard() // NOLINT(bugprone-exception-escape)
         {
             if(mRunning)
             {
@@ -207,7 +207,7 @@ private:
 
                     nTodo -= nNow;
 
-                    if (mSessionToken->IsCanceled())
+                    if(mSessionToken && mSessionToken->IsCanceled())
                     {
                         // drain remaining work from the queue (there can still
                         // be some work in other workers)
@@ -241,7 +241,7 @@ private:
                         // the result without the fear of some workers still
                         // being active from current session once the next
                         // session starts
-                        if (mSessionToken->IsCanceled())
+                        if(mSessionToken && mSessionToken->IsCanceled())
                         {
                             fAllOk = {};
                         }
@@ -281,16 +281,21 @@ private:
                 subguard.DoNotReleaseNL();
             }
             // execute work
-            for (T &check : vChecks) {
-                if (!fOk.has_value() || !fOk.value() || mSessionToken->IsCanceled())
+            for (T &check : vChecks)
+            {
+                if(!fOk.has_value() || !fOk.value()
+                   || (mSessionToken && mSessionToken->IsCanceled()))
                 {
                     break;
                 }
 
-                fOk = check(*mSessionToken);
-                if (fOk.has_value() && (fOk.value() == false))
+                if(mSessionToken)
                 {
-                    vTempFailedChecks.emplace_back(std::move(check));
+                    fOk = check(*mSessionToken);
+                    if (fOk.has_value() && (fOk.value() == false))
+                    {
+                        vTempFailedChecks.emplace_back(std::move(check));
+                    }
                 }
             }
             vChecks.clear();
@@ -337,7 +342,7 @@ public:
         }
     }
 
-    ~CCheckQueue()
+    ~CCheckQueue() // NOLINT(bugprone-exception-escape)
     {
         {
             boost::unique_lock lock{mutex};
@@ -442,6 +447,7 @@ public:
      *       be called from the same thread or the caller should make sure to
      *       handle thread synchronization.
      */
+    // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
     void StartCheckingSession(task::CCancellationToken&& token)
     {
         if(!mWaitCalled || !IsIdle())

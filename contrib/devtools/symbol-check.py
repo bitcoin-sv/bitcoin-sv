@@ -30,9 +30,12 @@ MAX_VERSIONS = {
 # Ignore symbols that are exported as part of every executable
 IGNORE_EXPORTS = {
     '_edata', '_end', '__end__', '_init', '__bss_start', '__bss_start__', '_bss_end__', '__bss_end__', '_fini', '_IO_stdin_used', 'stdin', 'stdout', 'stderr',
-    # Figure out why we get these symbols exported on xenial.
-    '_ZNKSt5ctypeIcE8do_widenEc', 'in6addr_any', 'optarg',
-    '_ZNSt16_Sp_counted_baseILN9__gnu_cxx12_Lock_policyE2EE10_M_destroyEv'
+    # Figure out why we get this symbol exported on Ubuntu
+    'in6addr_any',
+    # From TCMalloc
+    'environ', '_environ', '__environ', 'memcpy','memalign','posix_memalign','__libc_valloc','mallopt','mallinfo','free','__libc_free',
+    '__libc_calloc','pvalloc','realloc','valloc','__libc_memalign','calloc','__libc_malloc','__libc_pvalloc','aligned_alloc','__libc_realloc',
+    'malloc_usable_size','malloc_stats','malloc'
 }
 READELF_CMD = os.getenv('READELF', '/usr/bin/readelf')
 CPPFILT_CMD = os.getenv('CPPFILT', '/usr/bin/c++filt')

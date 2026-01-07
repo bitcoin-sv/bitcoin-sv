@@ -6,8 +6,6 @@
 #include "chainparamsbase.h"
 
 #include "tinyformat.h"
-#include "util.h"
-
 #include <cassert>
 
 const std::string CBaseChainParams::MAIN = "main";
@@ -15,25 +13,12 @@ const std::string CBaseChainParams::TESTNET = "test";
 const std::string CBaseChainParams::REGTEST = "regtest";
 const std::string CBaseChainParams::STN = "stn";
 
-void AppendParamsHelpMessages(std::string &strUsage, bool debugHelp) {
-    strUsage += HelpMessageGroup(_("Chain selection options:"));
-    strUsage += HelpMessageOpt("-testnet", _("Use the test chain"));
-    strUsage += HelpMessageOpt(
-        "-regtest", "Enter regression test mode, which uses a special "
-                    "chain in which blocks can be solved instantly. "
-                    "This is intended for regression testing tools and app "
-                    "development.");
-    strUsage += HelpMessageOpt(
-            "-stn", "Use the Scaling Test Network"
-            );
-}
+static std::unique_ptr<CBaseChainParams> globalChainBaseParams;
 
 CBaseChainParams::CBaseChainParams(int port, const std::string& data_dir)
     : nRPCPort{port}, strDataDir{data_dir}
 {
 }
-
-static std::unique_ptr<CBaseChainParams> globalChainBaseParams;
 
 const CBaseChainParams &BaseParams() {
     assert(globalChainBaseParams);
@@ -61,18 +46,4 @@ CreateBaseChainParams(const std::string &chain) {
 
 void SelectBaseParams(const std::string &chain) {
     globalChainBaseParams = CreateBaseChainParams(chain);
-}
-
-std::string ChainNameFromCommandLine() {
-    bool fRegTest = gArgs.GetBoolArg("-regtest", false);
-    bool fTestNet = gArgs.GetBoolArg("-testnet", false);
-    bool fStn = gArgs.GetBoolArg("-stn", false);
-
-    if ((fTestNet && fRegTest) || (fTestNet && fStn) || (fRegTest && fStn))
-        throw std::runtime_error(
-            "Invalid combination of -regtest, -stn, and -testnet.");
-    if (fRegTest) return CBaseChainParams::REGTEST;
-    if (fTestNet) return CBaseChainParams::TESTNET;
-    if (fStn) return CBaseChainParams::STN;
-    return CBaseChainParams::MAIN;
 }

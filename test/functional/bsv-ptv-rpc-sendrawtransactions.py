@@ -33,7 +33,7 @@ Test a new rpc interface sendrawtransactions which allows a bulk submit of trans
 """
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.key import CECKey
-from test_framework.script import CScript, OP_TRUE, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
+from test_framework.script import CScript, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
 from test_framework.blocktools import create_transaction, PreviousSpendableOutput
 from test_framework.blocktools import create_coinbase, create_block
 from test_framework.util import assert_equal, assert_greater_than_or_equal, assert_raises_rpc_error, wait_until
@@ -67,8 +67,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
     # Sign a transaction, using the key we know about.
     # This signs input 0 in tx, which is assumed to be spending output n in spend_tx
     def sign_tx(self, tx, spend_tx, n, *, key):
-        scriptPubKey = bytearray(spend_tx.vout[n].scriptPubKey)
-        sighash = SignatureHashForkId(
+        sighash = SignatureHash(
             spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
         tx.vin[0].scriptSig = CScript(
             [key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
@@ -86,7 +85,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
             money_to_spend = money_to_spend - 1000  # one satoshi to fee
             tx = create_transaction(spend.tx, spend.n, b"", money_to_spend, self.locking_script)
             self.sign_tx(tx, spend.tx, spend.n,
-                         key = self.coinbase_key if i != bad_transaction else self.wrong_key)
+                         key=self.coinbase_key if i != bad_transaction else self.wrong_key)
             tx.rehash()
             txns = ok if i < bad_transaction else bad if i == bad_transaction else orphan
             txns.append(tx)
@@ -95,7 +94,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
 
     # Create a required number of chains with equal length.
     def get_txchains_n(self, num_of_chains, chain_length, spend, *, num_of_bad_chains):
-        assert(0 <= num_of_bad_chains <= num_of_chains)
+        assert (0 <= num_of_bad_chains <= num_of_chains)
         if num_of_chains > len(spend):
             raise Exception('Insufficient number of spendable outputs.')
         txok = []
@@ -130,7 +129,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         result = conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
         if listunconfirmedancestors:
             assert_equal(len(result), 1)
-            assert_equal(len(result['unconfirmed']), num_of_chains*chain_length)
+            assert_equal(len(result['unconfirmed']), num_of_chains * chain_length)
             first_in_chain = 0
             expected_ancestors = []
             # A map of transactions and their known parents to be checked in 'vin'
@@ -150,7 +149,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                     # we expect to have increasing number of unconfirmed ancestors by each transaction in this chain
                     assert_equal(len(tx['ancestors']), len(expected_ancestors))
                     for ancestor in tx['ancestors']:
-                        assert(ancestor['txid'] in expected_ancestors)
+                        assert (ancestor['txid'] in expected_ancestors)
                         # each ancestor has 1 input
                         assert_equal(len(ancestor['vin']), 1)
                         # check input
@@ -255,7 +254,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         wait_until(lambda: conn.rpc.getblockchainactivity()["transactions"] == num_of_chains * chain_length, timeout=timeout)
         assert_equal(conn.rpc.getorphaninfo()["size"], 0)
         # Submit the batch through rpc interface.
-        rejected_txns = conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
+        conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
         # All transactions must be in the mempool.
         assert_equal(conn.rpc.getmempoolinfo()['size'], len(rpc_txs_bulk_input))
 
@@ -274,7 +273,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
             # Send a txn, one by one, through p2p interface.
             conn.send_message(msg_tx(tx))
         # Check if there is an expected number of transactions in the orphan p2p buffer.
-        wait_until(lambda: conn.rpc.getorphaninfo()["size"] == chain_length-1, timeout=timeout)
+        wait_until(lambda: conn.rpc.getorphaninfo()["size"] == chain_length - 1, timeout=timeout)
         assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
         # Submits the txchain without the parent transaction.
         rejected_txns = conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
@@ -286,7 +285,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         # The mempool must be empty.
         assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
         # The p2p orphan buffer must contain 'chain_length-1' transactions.
-        assert_equal(conn.rpc.getorphaninfo()["size"], chain_length-1)
+        assert_equal(conn.rpc.getorphaninfo()["size"], chain_length - 1)
 
     # Submit transactions (via rpc interface) which are already known:
     # (a) received earlier through the p2p interface and detected as p2p orphans
@@ -303,12 +302,12 @@ class RPCSendRawTransactions(ComparisonTestFramework):
             # Send a txn, one by one, through p2p interface.
             conn.send_message(msg_tx(tx))
         # Check if there is an expected number of transactions in the p2p orphan pool.
-        wait_until(lambda: conn.rpc.getorphaninfo()["size"] == chain_length-1, timeout=timeout)
+        wait_until(lambda: conn.rpc.getorphaninfo()["size"] == chain_length - 1, timeout=timeout)
         assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
         # Insert the parent tx at the front of the input array.
         rpc_txs_bulk_input.insert(0, {'hex': ToHex(txchain[0]), 'allowhighfees': allowhighfees, 'dontcheckfee': dontcheckfee})
         # Submit the batch through rpc interface.
-        rejected_txns = conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
+        conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
         # All transactions must be in the mempool.
         assert_equal(conn.rpc.getmempoolinfo()['size'], len(rpc_txs_bulk_input))
         # The p2p orphan pool must be empty.
@@ -349,7 +348,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
             rpc_txs_bulk_input.append({'hex': ToHex(tx), 'allowhighfees': allowhighfees, 'dontcheckfee': dontcheckfee})
         # Submit a batch of txns through rpc interface.
         rejected_txns = conn.rpc.sendrawtransactions(rpc_txs_bulk_input)
-        for k,v in rejected_txns.items():
+        for k, v in rejected_txns.items():
             self.log.info("====== rejected_txns[%s] = %s", k, v)
         assert_equal(len(rejected_txns), 1)
         assert_equal(len(rejected_txns['invalid']), len(bad) + len(orphan))
@@ -357,9 +356,9 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         def reject_reason(x):
             return x['reject_reason']
         invalid = {k: list(v)
-                   for k,v in itertools.groupby(sorted(rejected_txns['invalid'],
-                                                       key=reject_reason),
-                                                key=reject_reason)
+                   for k, v in itertools.groupby(sorted(rejected_txns['invalid'],
+                                                        key=reject_reason),
+                                                 key=reject_reason)
                    }
         self.log.info("invalid: %s", invalid)
         missing_inputs = invalid.pop('missing-inputs')
@@ -588,9 +587,9 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         # Test case config
         num_of_chains = 10
         chain_length = 100
-        allowhighfees=False
-        dontcheckfee=False
-        listunconfirmedancestors=False
+        allowhighfees = False
+        dontcheckfee = False
+        listunconfirmedancestors = False
         # Node's config
         args = ['-txnvalidationasynchrunfreq=100',
                 '-maxorphantxsize=0',
@@ -619,9 +618,9 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         # Test case config
         num_of_chains = 10
         chain_length = 100
-        allowhighfees=True
-        dontcheckfee=True
-        listunconfirmedancestors=True
+        allowhighfees = True
+        dontcheckfee = True
+        listunconfirmedancestors = True
         # Node's config
         args = ['-txnvalidationasynchrunfreq=100',
                 '-maxorphantxsize=0',

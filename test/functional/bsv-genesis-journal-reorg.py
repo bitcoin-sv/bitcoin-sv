@@ -7,11 +7,17 @@ Verify that a large reorg across the Genesis boundary does not result in any
 journal errors.
 '''
 
+from test_framework.mininode import NetworkThread, NodeConn, NodeConnCB, \
+    COutPoint, CTransaction, CTxIn, CTxOut
+from test_framework.script import CScript, OP_TRUE, OP_ADD, OP_DROP, OP_4, \
+    OP_CHECKSIG
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import *
-from test_framework.util import *
-from test_framework.script import CScript, OP_TRUE, OP_FALSE, OP_RETURN, OP_ADD, OP_DROP, OP_4, OP_CHECKSIG
-from test_framework.blocktools import create_transaction
+from test_framework.util import bytes_to_hex_str, check_for_log_msg, \
+    connect_nodes, connect_nodes_bi, disconnect_nodes_bi, p2p_port, \
+    satoshi_round, wait_until
+
+from decimal import Decimal
+
 import codecs
 
 
@@ -60,11 +66,11 @@ class JournalReorg(BitcoinTestFramework):
         spendTxn = utxos.pop()
         fee = Decimal(0.0000025) #node.getnetworkinfo()['relayfee']
         send_value1 = int((spendTxn['amount'] - fee) * 100000000)
-        send_value2 = int((spendTxn['amount'] - fee*2) * 100000000)
+        send_value2 = int((spendTxn['amount'] - fee * 2) * 100000000)
 
         txOpAdd1 = CTransaction()
         txOpAdd1.vin.append(CTxIn(COutPoint(int(spendTxn["txid"], 16), spendTxn["vout"]), b'', 0xffffffff))
-        txOpAdd1.vout.append(CTxOut(send_value1, CScript([b'\xFF'*4, b'\xFF'*4, OP_ADD, OP_4, OP_ADD, OP_DROP, OP_TRUE])))
+        txOpAdd1.vout.append(CTxOut(send_value1, CScript([b'\xFF' * 4, b'\xFF' * 4, OP_ADD, OP_4, OP_ADD, OP_DROP, OP_TRUE])))
         txOpAdd1.calc_sha256()
         tx1raw = bytes_to_hex_str(txOpAdd1.serialize())
         tx1raw = node.signrawtransaction(tx1raw)
@@ -138,7 +144,7 @@ class JournalReorg(BitcoinTestFramework):
         wait_until(lambda: self.got_chain_tip(self.nodes[1], 425, "active"))
 
         # check we didn't hit a reorg error
-        assert(not check_for_log_msg(self, "ERROR: Failed to find and remove txn", "/node1"))
+        assert (not check_for_log_msg(self, "ERROR: Failed to find and remove txn", "/node1"))
 
 
 if __name__ == '__main__':

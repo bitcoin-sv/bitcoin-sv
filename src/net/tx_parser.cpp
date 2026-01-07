@@ -314,7 +314,7 @@ std::pair<size_t, size_t> tx_parser::operator()(span<const uint8_t> s)
     return make_pair(total_bytes_read, 0);
 }
 
-unique_array tx_parser::buffer() &&
+tx_parser::value_type tx_parser::buffer() &&
 {
     assert(state_ == state::complete); 
     size_ = 0;
@@ -331,16 +331,16 @@ size_t tx_parser::buffer_size() const
 
     size += accumulate(ip_buffers_.cbegin(), ip_buffers_.cend(),
                        0,
-                       [](auto size, const auto& buffer)
+                       [](auto acc, const auto& buffer)
                        {
-                           return size + buffer.size();
+                           return acc + buffer.size();
                        });
 
     size += accumulate(op_buffers_.cbegin(), op_buffers_.cend(),
                        0,
-                       [](auto size, const auto& buffer)
+                       [](auto acc, const auto& buffer)
                        {
-                           return size + buffer.size();
+                           return acc + buffer.size();
                        });
     return size;
 }
@@ -348,6 +348,11 @@ size_t tx_parser::buffer_size() const
 size_t tx_parser::size() const
 {
     return size_ + buffer_size(); 
+}
+
+size_t tx_parser::readable_size() const
+{
+    return size_; 
 }
 
 std::ostream& operator<<(std::ostream& os, const tx_parser::state& state)

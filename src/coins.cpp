@@ -8,6 +8,7 @@
 #include "consensus/consensus.h"
 #include "memusage.h"
 #include "random.h"
+#include "protocol_era.h"
 
 #include <algorithm>
 #include <cassert>
@@ -48,7 +49,17 @@ void CCoinsViewCache::Shard::AddCoin(
     int32_t genesisActivationHeight)
 {
     assert(!coin.IsSpent());
-    if(coin.GetTxOut().scriptPubKey.IsUnspendable(coin.GetHeight() >= genesisActivationHeight))
+
+    // FIXME: Here we should really be checking the coin height against the chainActive height
+    // as we do in other places. This is made harder however by the fact that this code is
+    // also called from other applications that don't have chainActive (bitcoin-tx, bitcoin-bench).
+    // Even in bitcoind this code is called without cs_main, so chainActive could be moving
+    // underneath us.
+    //
+    // For now it doesn't matter because IsUnspendable only cares about whether Genesis is
+    // activated.
+    ProtocolEra era { (coin.GetHeight() >= genesisActivationHeight)? ProtocolEra::PostGenesis : ProtocolEra::PreGenesis };
+    if(coin.GetTxOut().scriptPubKey.IsUnspendable(era))
     {
         return;
     }
@@ -64,7 +75,7 @@ void CCoinsViewCache::Shard::AddCoin(
     }
 #endif
 
-    mCache.AddCoin(outpoint, std::move(coin), possible_overwrite, genesisActivationHeight);
+    mCache.AddCoin(outpoint, std::move(coin), possible_overwrite);
 }
 
 bool CCoinsViewCache::Shard::SpendCoin(const COutPoint& outpoint, CoinWithScript* moveout)
@@ -370,11 +381,9 @@ const CoinImpl& CoinsStore::AddCoin(const COutPoint& outpoint, CoinImpl&& coin)
     return it->second.GetCoinImpl();
 }
 
-void CoinsStore::AddCoin(
-    const COutPoint& outpoint,
-    CoinWithScript&& coin,
-    bool possible_overwrite,
-    uint64_t genesisActivationHeight)
+void CoinsStore::AddCoin(const COutPoint& outpoint,
+                         CoinWithScript&& coin,
+                         bool possible_overwrite)
 {
     auto [it, inserted] =
         cacheCoins.emplace(std::piecewise_construct,

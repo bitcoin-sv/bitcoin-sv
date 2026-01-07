@@ -9,7 +9,6 @@ Test non-sensitive parameters are also dumped to log file at node startup.
 Verify sensitive parameters (rpcuser, rpcpassword, rpcauth) are not dumped to log file and are excluded
 from the response.
 """
-import glob
 import os
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import check_for_log_msg, wait_until

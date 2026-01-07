@@ -89,23 +89,17 @@ namespace
         return true;
     }
 
-    template <typename O>
-    void hash_sha256(const string_view msg, O o)
-    {
-        CSHA256()
-            .Write(reinterpret_cast<const uint8_t*>(msg.data()), msg.size())
-            .Finalize(o);
-    }
-
     bool verify(const string_view msg,
                 const vector<uint8_t>& pub_key,
                 const std::span<const uint8_t> sig)
     {
-        std::vector<uint8_t> hash(CSHA256::OUTPUT_SIZE);
-        hash_sha256(msg, hash.data());
+        std::array<uint8_t, CSHA256::OUTPUT_SIZE> hash;
+        CSHA256()
+            .Write(reinterpret_cast<const uint8_t*>(msg.data()), msg.size())
+            .Finalize(hash);
 
         const CPubKey pubKey{pub_key.begin(), pub_key.end()};
-        return pubKey.Verify(uint256{hash}, sig);
+        return pubKey.Verify(uint256{hash.begin(), hash.end()}, sig);
     }
 }
 

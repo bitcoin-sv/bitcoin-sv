@@ -17,9 +17,11 @@
 #include "fs.h"
 #include "hash.h"
 #include "invalid_txn_publisher.h"
+#include "leaky_bucket.h"
 #include "limitedmap.h"
 #include "net/association.h"
 #include "net/authconn.h"
+#include "net/mempool_msg.h"
 #include "net/net_message.h"
 #include "net/net_types.h"
 #include "net/node_stats.h"
@@ -113,7 +115,6 @@ static const unsigned int DEFAULT_MAXPENDINGRESPONSES_GETHEADERS = 0;
 /** The default for -maxpendingresponses_gethdrsen. 0 = Unlimited */
 static const unsigned int DEFAULT_MAXPENDINGRESPONSES_GETHDRSEN = 0;
 /** The default timeframe for -maxuploadtarget. 1 day. */
-// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const uint64_t MAX_UPLOAD_TIMEFRAME = 60 * 60 * 24;
 /** Default for blocks only*/
 static const bool DEFAULT_BLOCKSONLY = false;
@@ -140,11 +141,8 @@ static const unsigned int DEFAULT_BLOCK_TXN_MAX_PERCENT = 99;
 static const bool DEFAULT_FORCEDNSSEED = true;
 
 // Maximum sizes of queued messages for receiving and sending
-// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const size_t DEFAULT_MAXRECEIVEBUFFER = 500 * 1000;
-// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const size_t DEFAULT_MAXSENDBUFFER = 500 * 1000;
-static const size_t DEFAULT_MAXSENDBUFFER_MULTIPLIER = 10;
 
 static const ServiceFlags REQUIRED_SERVICES = ServiceFlags(NODE_NETWORK);
 
@@ -155,7 +153,6 @@ static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24;
 // Multiple streams enabled by default
 static const bool DEFAULT_STREAMS_ENABLED = true;
 // Default prioritised list of stream policies to use
-// NOLINTNEXTLINE(cert-err58-cpp)
 static const std::string DEFAULT_STREAM_POLICY_LIST =
     std::string{BlockPriorityStreamPolicy::POLICY_NAME} + "," +
     std::string{DefaultStreamPolicy::POLICY_NAME};
@@ -163,7 +160,6 @@ static const std::string DEFAULT_STREAM_POLICY_LIST =
 // Parallel block fetch timeout for slow peers (in seconds)
 static const unsigned int DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT = 30;
 // Parallel block fetch maximum number of requests for a single block to different peers
-// NOLINTNEXTLINE(cert-err58-cpp)
 static const size_t DEFAULT_MAX_BLOCK_PARALLEL_FETCH = 3;
 /**
  * Default maximum amount of concurrent async tasks per node before node message
@@ -189,9 +185,15 @@ struct NodeConnectInfo
     : addrConnect{addr}, pszDest{dest}, fCountFailure{count}
     {}
 
-    NodeConnectInfo(const CAddress& addr, StreamType st, const std::string& streamPolicy,
-        const AssociationIDPtr& id)
-    : addrConnect{addr}, streamType{st}, streamPolicy{streamPolicy}, assocID{id}, fNewStream{true}
+    NodeConnectInfo(const CAddress& addr,
+                    StreamType st,
+                    const std::string& stream_policy,
+                    const AssociationIDPtr& id)
+        : addrConnect{addr},
+          streamType{st},
+          streamPolicy{stream_policy},
+          assocID{id},
+          fNewStream{true}
     {}
 
     CAddress addrConnect {};
@@ -369,12 +371,11 @@ public:
     DSAttemptHandler& GetDSAttemptHandler() { return mDSHandler; }
 
     /** Call the specified function for each node */
-    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     template <typename Callable> void ForEachNode(Callable&& func) const { 
         LOCK(cs_vNodes);
         for(const CNodePtr& node : vNodes) {
             if(NodeFullyConnected(node))
-                func(node);
+                std::forward<Callable>(func)(node);
         }
     }
 
@@ -549,6 +550,7 @@ public:
     unsigned int GetSendBufferSize() const;
 
     void AddWhitelistedRange(const CSubNet &subnet);
+    void AddMempoolSyncPeer(const CSubNet &subnet);
 
     ServiceFlags GetLocalServices() const;
 
@@ -671,6 +673,7 @@ private:
     bool AttemptToEvictConnection();
     CNodePtr ConnectNode(NodeConnectInfo& connect);
     bool IsWhitelistedRange(const CNetAddr &addr);
+    bool IsMempoolSyncPeer(const CNetAddr &addr) const;
 
     void DeleteNode(const CNodePtr& pnode);
 
@@ -696,7 +699,10 @@ private:
     // Peer average bandwidth calculation
     void PeerAvgBandwithCalc();
 
-    const Config *config;
+    // Mempool syncing
+    void SyncMempool();
+
+    const Config* config_;
 
     // Network usage totals
     CCriticalSection cs_totalBytesRecv;
@@ -714,6 +720,10 @@ private:
     // whitelisted (as well as those connecting to whitelisted binds).
     std::vector<CSubNet> vWhitelistedRange;
     CCriticalSection cs_vWhitelistedRange;
+
+    // Peers with whom we should periodically synchronise mempools
+    std::vector<CSubNet> vMempoolSyncPeers {};
+    mutable CCriticalSection cs_vMempoolSyncPeers {};
 
     unsigned int nSendBufferMaxSize;
     unsigned int nReceiveFloodSize;
@@ -803,7 +813,7 @@ private:
 };
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern std::unique_ptr<CConnman> g_connman;
-void Discover(boost::thread_group &threadGroup);
+void Discover();
 void MapPort(bool fUseUPnP);
 unsigned short GetListenPort();
 
@@ -917,6 +927,8 @@ public:
     CCriticalSection cs_SubVer {};
     // This peer can bypass DoS banning.
     std::atomic_bool fWhitelisted {false};
+    // This peer is one to sync mempools with
+    std::atomic_bool fMempoolSync {false};
     // If true this node is being used as a short lived feeler.
     bool fFeeler {false};
     bool fOneShot {false};
@@ -998,7 +1010,7 @@ public:
     // protected by cs_inventory.
     std::vector<uint256> vBlockHashesToAnnounce {};
     // Used for BIP35 mempool sending, also protected by cs_inventory.
-    bool fSendMempool {false};
+    std::optional<MempoolMsg> mempoolRequest {};
 
     // Last time a "MEMPOOL" request was serviced.
     std::atomic<int64_t> timeLastMempoolReq {0};
@@ -1022,7 +1034,7 @@ public:
     Amount minFeeFilter {0};
     CCriticalSection cs_feeFilter {};
     Amount lastSentFeeFilter {0};
-    int64_t nextSendTimeFeeFilter {0};
+    std::atomic<int64_t> nextSendTimeFeeFilter {0};
 
     /** Maximum number of CInv elements this peers is willing to accept */
     uint32_t maxInvElements {CInv::estimateMaxInvElements(LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)};
@@ -1030,6 +1042,9 @@ public:
     bool protoconfReceived {false};
     /** Maximum size for data that is allowed to be sent to the client */
     uint32_t maxRecvPayloadLength {0};
+
+    /** AuthCh and AuthResp msg rate limiter (an average of 1 every 10 minutes over an hour) */
+    LeakyBucket<std::chrono::minutes> authRateLimit { 6, std::chrono::minutes{10} };
 
     /**
      * Number of outgoing response messages created by processing specific types of P2P requests
@@ -1056,7 +1071,7 @@ public:
              */
             void Increment()
             {
-                counter.fetch_add(1, std::memory_order_relaxed);
+                counter_.fetch_add(1, std::memory_order_relaxed);
             }
 
             /**
@@ -1066,7 +1081,7 @@ public:
              */
             void Decrement()
             {
-                counter.fetch_sub(1, std::memory_order_relaxed);
+                counter_.fetch_sub(1, std::memory_order_relaxed);
             }
 
             /**
@@ -1085,14 +1100,14 @@ public:
              */
             bool IsBelowLimit(unsigned int& numPendingResponses) const
             {
-                if(max_allowed==0)
+                if(max_allowed_==0)
                 {
                     return true;
                 }
 
-                unsigned int n = counter.load(std::memory_order_relaxed);
+                unsigned int n = counter_.load(std::memory_order_relaxed);
                 numPendingResponses = n;
-                return n < max_allowed;
+                return n < max_allowed_;
             }
 
             /**
@@ -1100,15 +1115,15 @@ public:
              */
             unsigned int GetMaxAllowed() const
             {
-                return max_allowed;
+                return max_allowed_;
             }
 
         private:
             friend MonitoredPendingResponses;
             PendingResponses(unsigned int max_allowed);
 
-            std::atomic<unsigned int> counter {0};
-            const unsigned int max_allowed;
+            std::atomic<unsigned int> counter_{0};
+            const unsigned int max_allowed_;
         };
 
         PendingResponses getheaders;
@@ -1204,6 +1219,7 @@ public:
 
     bool GetDisconnect() const { return fDisconnect; }
     bool GetPausedForSending(bool checkPauseRecv = false);
+    bool GetPausedForReceiving() const;
 
     void SetRecvVersion(int nVersionIn) { nRecvVersion = nVersionIn; }
     int GetRecvVersion() { return nRecvVersion; }

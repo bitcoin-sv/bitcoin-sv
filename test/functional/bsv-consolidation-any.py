@@ -9,7 +9,7 @@ This test creates "spendable by anyone" scripts to easely tweak the script sizes
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.script import CScript, OP_NOP, OP_DROP, OP_RETURN, OP_TRUE, OP_FALSE, SIGHASH_FORKID, SIGHASH_ANYONECANPAY, SIGHASH_NONE
-from test_framework.util import assert_raises_rpc_error, satoshi_round, assert_equal, bytes_to_hex_str, sync_blocks
+from test_framework.util import satoshi_round, assert_equal, bytes_to_hex_str, sync_blocks
 from test_framework.mininode import ToHex, FromHex, CTransaction, CTxOut, CTxIn, COutPoint, uint256_from_str, hex_str_to_bytes, COIN
 from decimal import Decimal
 
@@ -27,8 +27,8 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             [
                 "-whitelist=127.0.0.1",
                 "-txindex=1",
-                "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
+                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats) / COIN),
                 "-minconsolidationfactor=2",
                 "-maxconsolidationinputscriptsize=151",
                 "-minconfconsolidationinput=5",
@@ -38,29 +38,29 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             [
                 "-whitelist=127.0.0.1",
                 "-txindex=1",
-                "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
+                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats) / COIN),
                 "-minconsolidationfactor=10",
                 "-acceptnonstdtxn=1",
                 "-acceptnonstdconsolidationinput=1"
             ]
         ]
 
-    def test_extra_args_values (self):
+    def test_extra_args_values(self):
         # Check that all exra args are read correction
         network_info = self.nodes[0].getnetworkinfo()
-        assert(int(network_info['minconsolidationfactor']) == 2)
-        assert(int(network_info['maxconsolidationinputscriptsize']) == 151)
-        assert(int(network_info['minconfconsolidationinput']) == 5)
-        assert(network_info['acceptnonstdconsolidationinput'] is True)
+        assert (int(network_info['minconsolidationfactor']) == 2)
+        assert (int(network_info['maxconsolidationinputscriptsize']) == 151)
+        assert (int(network_info['minconfconsolidationinput']) == 5)
+        assert (network_info['acceptnonstdconsolidationinput'] is True)
 
-    def create_utxos_value100000(self, node, utxo_count, utxo_size, min_confirmations, is_donation = False):
+    def create_utxos_value100000(self, node, utxo_count, utxo_size, min_confirmations, is_donation=False):
 
         utxos = []
         addr = node.getnewaddress()
 
         # create some confirmed UTXOs
-        for i in range (utxo_count):
+        for i in range(utxo_count):
             txid = node.sendtoaddress(addr, self.utxo_test_bsvs)
             tx = FromHex(CTransaction(), node.getrawtransaction(txid))
             tx.rehash()
@@ -125,9 +125,9 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
         return tx
 
-    def create_and_sign_tx(self, node, in_count, out_count, in_size, out_size, min_confirmations, spam, is_donation = False):
+    def create_and_sign_tx(self, node, in_count, out_count, in_size, out_size, min_confirmations, spam, is_donation=False):
 
-        utx = self.create_utxos_value100000 (node, in_count, in_size, min_confirmations, is_donation)
+        utx = self.create_utxos_value100000(node, in_count, in_size, min_confirmations, is_donation)
         sum_values_sats = 0
         assert (len(utx.vout) == in_count)
         tx = CTransaction()
@@ -166,7 +166,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
             if is_donation:
                 protocol_id = 'dust'
-                scriptPubKey = CScript([OP_FALSE, OP_RETURN, bytearray(protocol_id,'utf-8')])
+                scriptPubKey = CScript([OP_FALSE, OP_RETURN, bytearray(protocol_id, 'utf-8')])
             else:
                 scriptPubKey = CScript([OP_NOP] * (x - 1) + [OP_TRUE])
 
@@ -188,7 +188,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
         self.test_extra_args_values()
         output_counts = [1, 5]
-        single_output_script_sizes = [25,50]
+        single_output_script_sizes = [25, 50]
         for node in self.nodes:
             node.generate(200)
             sync_blocks(self.nodes)
@@ -199,12 +199,12 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                     self.scriptSigSpam = int(network_info['maxconsolidationinputscriptsize'])
                     self.minConfirmations = int(network_info['minconfconsolidationinput'])
                     self.acceptNonStandardInputs = network_info['acceptnonstdconsolidationinput']
-                    self.log.info ("consolidation factor: {}".format(self.consolidation_factor))
-                    self.log.info ("scriptSig limit: {}".format(self.scriptSigSpam))
+                    self.log.info("consolidation factor: {}".format(self.consolidation_factor))
+                    self.log.info("scriptSig limit: {}".format(self.scriptSigSpam))
                     self.log.info("minimum input confirmations: {}".format(self.minConfirmations))
                     self.log.info("accept non-std consolidation inputs: {}".format(self.acceptNonStandardInputs))
-                    self.log.info ("output_count: {}".format(output_count))
-                    self.log.info ("single_output_script_size: {}".format(single_output_script_size))
+                    self.log.info("output_count: {}".format(output_count))
+                    self.log.info("single_output_script_size: {}".format(single_output_script_size))
 
                     enough_inputs = output_count * self.consolidation_factor
                     not_spam = self.scriptSigSpam
@@ -216,31 +216,31 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                                                      in_count=enough_inputs,
                                                      out_count=output_count,
                                                      in_size=enough_cumulated_inputsize,
-                                                     out_size = cumulated_outputsize,
+                                                     out_size=cumulated_outputsize,
                                                      min_confirmations=enough_confirmations,
-                                                     spam = not_spam
+                                                     spam=not_spam
                                                      )
                     txid = node.sendrawtransaction(tx_hex)
                     node.generate(1)
                     tx = node.getrawtransaction(txid, 1)
                     confirmations = tx.get('confirmations', 0)
-                    assert_equal (confirmations, 1)
+                    assert_equal(confirmations, 1)
                     self.log.info("test 1 - all consolidation conditions met:PASS")
 
                     tx_hex = self.create_and_sign_tx(node,
-                                                     in_count = 1,
-                                                     out_count = 1,
-                                                     in_size = single_output_script_size,
-                                                     out_size = single_output_script_size,
-                                                     min_confirmations = 0,
-                                                     spam = not_spam,
-                                                     is_donation = True
+                                                     in_count=1,
+                                                     out_count=1,
+                                                     in_size=single_output_script_size,
+                                                     out_size=single_output_script_size,
+                                                     min_confirmations=0,
+                                                     spam=not_spam,
+                                                     is_donation=True
                                                      )
                     txid = node.sendrawtransaction(tx_hex)
                     node.generate(1)
                     tx = node.getrawtransaction(txid, 1)
                     confirmations = tx.get('confirmations', 0)
-                    assert_equal (confirmations, 1)
+                    assert_equal(confirmations, 1)
                     self.log.info("test 2 - donation with one input and one output:PASS")
 
 

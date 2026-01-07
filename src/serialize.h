@@ -387,7 +387,7 @@ void WriteVarInt(Stream &os, I n) {
         n = (n >> 7) - 1;
         len++;
     }
-    do { // NOLINT(cppcoreguidelines-avoid-do-while) 
+    do {
         ser_writedata8(os, tmp[len]);
     } while (len--);
 }
@@ -440,19 +440,19 @@ public:
     CFlatData(void *pbeginIn, void *pendIn)
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         : pbegin((char *)pbeginIn), pend((char *)pendIn) {}
-    template <class T, class TAl> explicit CFlatData(std::vector<T, TAl> &v) {
-        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-        pbegin = (char *)v.data();
-        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-        pend = (char *)(v.data() + v.size());
-    }
+
+    template<class T, class TAl>
+    explicit CFlatData(std::vector<T, TAl>& v):
+        pbegin{(char *)v.data()},
+        pend{(char *)(v.data() + v.size())}
+    {}
+
     template <unsigned int N, typename T, typename S, typename D>
-    explicit CFlatData(prevector<N, T, S, D> &v) {
-        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-        pbegin = (char *)v.data();
-        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-        pend = (char *)(v.data() + v.size());
-    }
+    explicit CFlatData(prevector<N, T, S, D>& v):
+        pbegin{(char *)v.data()},
+        pend{(char *)(v.data() + v.size())}
+    {}
+
     char *begin() { return pbegin; }
     const char *begin() const { return pbegin; }
     char *end() { return pend; }
@@ -960,7 +960,7 @@ void Serialize(Stream &os, const std::unique_ptr<const T> &p) {
 
 template <typename Stream, typename T>
 void Unserialize(Stream &is, std::unique_ptr<const T> &p) {
-    p.reset(new T(deserialize, is));
+    p.reset(new T(::deserialize, is));
 }
 
 /**
@@ -973,7 +973,7 @@ void Serialize(Stream &os, const std::shared_ptr<const T> &p) {
 
 template <typename Stream, typename T>
 void Unserialize(Stream &is, std::shared_ptr<const T> &p) {
-    p = std::make_shared<const T>(deserialize, is);
+    p = std::make_shared<const T>(::deserialize, is);
 }
 
 /**
@@ -986,7 +986,7 @@ void Serialize(Stream &os, const boost::uuids::uuid &v) {
     static_assert(uuid_size == 16);
     static_assert(sizeof(boost::uuids::uuid::value_type) == sizeof(char));
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-    os.write(reinterpret_cast<const char*>(v.data), uuid_size);
+    os.write(reinterpret_cast<const char*>(v.begin()), uuid_size);
 }
 
 template <typename Stream>
@@ -996,7 +996,7 @@ void Unserialize(Stream &is, boost::uuids::uuid &v) {
     static_assert(uuid_size == 16);
     static_assert(sizeof(boost::uuids::uuid::value_type) == sizeof(char));
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-    is.read(reinterpret_cast<char*>(v.data), uuid_size);
+    is.read(reinterpret_cast<char*>(v.begin()), uuid_size);
 }
 
 /**
@@ -1036,14 +1036,15 @@ struct CSerActionUnserialize {
     constexpr bool ForRead() const { return true; }
 };
 
-template <typename Stream, typename T>
-inline void SerReadWrite(Stream &s, const T &obj,
-                         CSerActionSerialize ser_action) {
+template<typename Stream, typename T>
+inline void SerReadWrite(Stream& s, const T& obj, CSerActionSerialize)
+{
     ::Serialize(s, obj);
 }
 
-template <typename Stream, typename T>
-inline void SerReadWrite(Stream &s, T &obj, CSerActionUnserialize ser_action) {
+template<typename Stream, typename T>
+inline void SerReadWrite(Stream& s, T& obj, CSerActionUnserialize)
+{
     ::Unserialize(s, obj);
 }
 
@@ -1051,14 +1052,15 @@ inline void SerReadWrite(Stream &s, T &obj, CSerActionUnserialize ser_action) {
  * Support for READWRITECOMPACTSIZE macro
  */
 
-template <typename Stream>
-inline void SerReadWriteCompactSize(Stream &s, const uint64_t &obj,
-                         CSerActionSerialize ser_action) {
+template<typename Stream>
+inline void SerReadWriteCompactSize(Stream& s, const uint64_t& obj, CSerActionSerialize)
+{
     ::WriteCompactSize(s, obj);
 }
 
-template <typename Stream>
-inline void SerReadWriteCompactSize(Stream &s, uint64_t &obj, CSerActionUnserialize ser_action) {
+template<typename Stream>
+inline void SerReadWriteCompactSize(Stream& s, uint64_t& obj, CSerActionUnserialize)
+{
     obj = ::ReadCompactSize(s);
 }
 
@@ -1093,7 +1095,7 @@ inline void SerReadWriteEnum(Stream& s, E& e, CSerActionUnserialize) {
  */
 class CSizeComputer {
 protected:
-    size_t nSize; // NOLINT(cppcoreguidelines-use-default-member-init)
+    size_t nSize{};
 
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const int nType;
@@ -1101,10 +1103,12 @@ protected:
     const int nVersion;
 
 public:
-    CSizeComputer(int nTypeIn, int nVersionIn)
-        : nSize(0), nType(nTypeIn), nVersion(nVersionIn) {}
+    CSizeComputer(int nTypeIn, int nVersionIn):
+        nType(nTypeIn),
+        nVersion(nVersionIn)
+    {}
 
-    void write(const char *psz, size_t _nSize) { this->nSize += _nSize; }
+    void write(const char* /*psz*/, size_t _nSize) { nSize += _nSize; }
 
     /** Pretend _nSize bytes are written, without specifying them. */
     void seek(size_t _nSize) { this->nSize += _nSize; }
@@ -1120,7 +1124,9 @@ public:
     int GetType() const { return nType; }
 };
 
-template <typename Stream> void SerializeMany(Stream &s) {}
+template<typename Stream>
+void SerializeMany(Stream&)
+{}
 
 template <typename Stream, typename Arg>
 void SerializeMany(Stream &s, Arg &&arg) {
@@ -1133,7 +1139,9 @@ void SerializeMany(Stream &s, Arg &&arg, Args &&... args) {
     ::SerializeMany(s, std::forward<Args>(args)...);
 }
 
-template <typename Stream> inline void UnserializeMany(Stream &s) {}
+template<typename Stream>
+inline void UnserializeMany(Stream&)
+{}
 
 template <typename Stream, typename Arg>
 inline void UnserializeMany(Stream &s, Arg &arg) {
@@ -1146,15 +1154,15 @@ inline void UnserializeMany(Stream &s, Arg &arg, Args &... args) {
     ::UnserializeMany(s, args...);
 }
 
-template <typename Stream, typename... Args>
-inline void SerReadWriteMany(Stream &s, CSerActionSerialize ser_action,
-                             Args &&... args) {
+template<typename Stream, typename... Args>
+inline void SerReadWriteMany(Stream& s, CSerActionSerialize, Args&&... args)
+{
     ::SerializeMany(s, std::forward<Args>(args)...);
 }
 
-template <typename Stream, typename... Args>
-inline void SerReadWriteMany(Stream &s, CSerActionUnserialize ser_action,
-                             Args &... args) {
+template<typename Stream, typename... Args>
+inline void SerReadWriteMany(Stream& s, CSerActionUnserialize, Args&... args)
+{
     ::UnserializeMany(s, args...);
 }
 

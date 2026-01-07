@@ -39,8 +39,8 @@ class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
-        self.miner_names = ["miner name 0","miner name 1"]
-        self.extra_args = [['-mindebugrejectionfee=0','-paytxfee=0.00003'],['-mindebugrejectionfee=0', '-paytxfee=0.00003']]
+        self.miner_names = ["miner name 0", "miner name 1"]
+        self.extra_args = [['-mindebugrejectionfee=0', '-paytxfee=0.00003'], ['-mindebugrejectionfee=0', '-paytxfee=0.00003']]
 
         self.TEST_call_create = 1
         self.TEST_call_create_twice = 2
@@ -81,8 +81,8 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         fundingKey = {}
         fundingSeed = {}
         fundingKey['fundingKey'] = {'privateBIP32': keys.privateKey()}
-        fundingSeed['fundingDestination'] = {'addressBase58': destination,}
-        fundingSeed['firstFundingOutpoint'] = {'txid':txId, 'n': index}
+        fundingSeed['fundingDestination'] = {'addressBase58': destination, }
+        fundingSeed['firstFundingOutpoint'] = {'txid': txId, 'n': index}
 
         fundingKeyJson = json.dumps(fundingKey, indent=3)
         fundingSeedJson = json.dumps(fundingSeed, indent=3)
@@ -129,7 +129,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         else:
             jsonOverrideWithBadSyntax = None
 
-        scriptPubKey = create_miner_info_scriptPubKey (
+        scriptPubKey = create_miner_info_scriptPubKey(
             params=minerinfotx_parameters,
             json_override_string=jsonOverrideWithBadSyntax)
 
@@ -143,7 +143,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
                 disconnect_nodes_bi(self.nodes, 0, 1)
                 connect_nodes_bi(self.nodes, 0, 1)
                 sleep(4)
-                assert(txid not in self.nodes[0].getrawmempool())
+                assert (txid not in self.nodes[0].getrawmempool())
                 txid = self.nodes[0].createminerinfotx(bytes_to_hex_str(scriptPubKey))
 
         except Exception as e:
@@ -161,23 +161,23 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         if test_case == self.TEST_call_create_twice:
             txid_twice = self.nodes[0].createminerinfotx(bytes_to_hex_str(scriptPubKey))
-            assert(txid == txid_twice)
+            assert (txid == txid_twice)
 
         if test_case == self.TEST_call_replace:
             minerinfotx_parameters['publicPort'] = '8334' # vary the port to get a different txid
-            scriptPubKey = create_miner_info_scriptPubKey (minerinfotx_parameters)
+            scriptPubKey = create_miner_info_scriptPubKey(minerinfotx_parameters)
             txid_twice = self.nodes[0].replaceminerinfotx(bytes_to_hex_str(scriptPubKey))
-            assert(txid != txid_twice)
+            assert (txid != txid_twice)
             txid = txid_twice
 
         # ensure the minerinfotx was not relayed to the connected node
         wait_until(lambda: txid in self.nodes[0].getrawmempool(), timeout=10)
         sleep(0.3) # to give time for relaying
-        assert(txid not in self.nodes[1].getrawmempool())
+        assert (txid not in self.nodes[1].getrawmempool())
         tx0 = self.nodes[0].getminerinfotxid()
         tx1 = self.nodes[1].getminerinfotxid()
-        assert(tx0 == txid)
-        assert(tx1 == None)
+        assert (tx0 == txid)
+        assert (tx1 is None)
 
         # create a minerinfo block with coinbase referencing the minerinfo transaction
         minerInfoTx = FromHex(CTransaction(), self.nodes[0].getrawtransaction(txid))
@@ -190,18 +190,18 @@ class CreateMinerInfoTest(BitcoinTestFramework):
             block_count0 = self.nodes[0].getblockcount()
             self.nodes[1].generate(1)
             wait_until(lambda: block_count0 + 1 == self.nodes[0].getblockcount(), timeout=10)
-            wait_until (lambda: tx0 not in self.nodes[0].getrawmempool(), timeout=10, check_interval=1)
+            wait_until(lambda: tx0 not in self.nodes[0].getrawmempool(), timeout=10, check_interval=1)
             return True
 
         self.nodes[0].submitblock(ToHex(block))
-        wait_until (lambda: block_count + 1 == self.nodes[0].getblockcount())
+        wait_until(lambda: block_count + 1 == self.nodes[0].getblockcount())
 
         # check if the minerinfo-txn
         # was moved from the mempool into the new block
-        assert(txid not in self.nodes[0].getrawmempool())
+        assert (txid not in self.nodes[0].getrawmempool())
         bhash = self.nodes[0].getbestblockhash()
         block = self.nodes[0].getblock(bhash)
-        assert(txid in block['tx'])
+        assert (txid in block['tx'])
 
         # the connected node needs to validate the block containing
         # the minerinfotx successfully too.
@@ -212,8 +212,8 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
         tx0 = self.nodes[0].getminerinfotxid()
         tx1 = self.nodes[1].getminerinfotxid()
-        assert(tx0 == None)
-        assert(tx1 == None)
+        assert (tx0 is None)
+        assert (tx1 is None)
 
     def run_test(self):
         # create bip32 keys

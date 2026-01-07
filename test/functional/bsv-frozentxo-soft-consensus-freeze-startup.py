@@ -62,12 +62,12 @@ class FrozenTXOSoftConsensusFreezeStartup(SoftConsensusFreezeBase):
         self.start_node(1)
 
         self.log.info(f"Freezing TXO {frozen_tx.hash},0 on consensus blacklist on second node")
-        result=self.nodes[1].addToConsensusBlacklist({
+        result = self.nodes[1].addToConsensusBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : frozen_tx.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": frozen_tx.hash,
+                        "vout": 0
                     },
                     "enforceAtHeight": [{"start": 0}],
                     "policyExpiresWithConsensus": False
@@ -100,7 +100,7 @@ class FrozenTXOSoftConsensusFreezeStartup(SoftConsensusFreezeBase):
 
         # all blocks are unfrozen
         new_valid_tip = self._mine_and_send_block(None, node)
-        self.nodes[1].waitforblockheight(last_valid_tip_height+6)
+        self.nodes[1].waitforblockheight(last_valid_tip_height + 6)
         assert_equal(new_valid_tip.hash, self.nodes[0].getbestblockhash())
         assert_equal(new_valid_tip.hash, self.nodes[1].getbestblockhash())
 

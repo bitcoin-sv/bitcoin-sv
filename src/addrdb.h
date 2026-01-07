@@ -26,20 +26,15 @@ typedef enum BanReason {
 class CBanEntry {
 public:
     static const int CURRENT_VERSION = 1;
-    int nVersion;
-    int64_t nCreateTime;
-    int64_t nBanUntil;
-    uint8_t banReason;
+    int nVersion{CBanEntry::CURRENT_VERSION};
+    int64_t nCreateTime{};
+    int64_t nBanUntil{};
+    uint8_t banReason{BanReasonUnknown};
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    CBanEntry() { SetNull(); }
+    CBanEntry() = default;
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    CBanEntry(int64_t nCreateTimeIn) {
-        SetNull();
-        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-        nCreateTime = nCreateTimeIn;
-    }
+    CBanEntry(int64_t nCreateTimeIn):nCreateTime{nCreateTimeIn}
+    {}
 
     ADD_SERIALIZE_METHODS
 
@@ -49,13 +44,6 @@ public:
         READWRITE(nCreateTime);
         READWRITE(nBanUntil);
         READWRITE(banReason);
-    }
-
-    void SetNull() {
-        nVersion = CBanEntry::CURRENT_VERSION;
-        nCreateTime = 0;
-        nBanUntil = 0;
-        banReason = BanReasonUnknown;
     }
 
     std::string banReasonToString() {
@@ -73,30 +61,30 @@ public:
 typedef std::map<CSubNet, CBanEntry> banmap_t;
 
 /** Access to the (IP) address database (peers.dat) */
-class CAddrDB {
-private:
-    fs::path pathAddr;
+class CAddrDB
+{
+    fs::path pathAddr_;
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
-    const CChainParams &chainParams;
+    const CChainParams& chainParams_;
 
 public:
-    CAddrDB(const CChainParams &chainParams);
-    bool Write(const CAddrMan &addr);
-    bool Read(CAddrMan &addr);
-    bool Read(CAddrMan &addr, CDataStream &ssPeers);
+    CAddrDB(const CChainParams&);
+    bool Write(const CAddrMan&);
+    bool Read(CAddrMan&);
+    bool Read(CAddrMan&, CDataStream&);
 };
 
 /** Access to the banlist database (banlist.dat) */
-class CBanDB {
-private:
-    fs::path pathBanlist;
+class CBanDB
+{
+    fs::path pathBanlist_;
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
-    const CChainParams &chainParams;
+    const CChainParams& chainParams_;
 
 public:
-    CBanDB(const CChainParams &chainParams);
-    bool Write(const banmap_t &banSet);
-    bool Read(banmap_t &banSet);
+    CBanDB(const CChainParams&);
+    bool Write(const banmap_t&);
+    bool Read(banmap_t&);
 };
 
 #endif // BITCOIN_ADDRDB_H

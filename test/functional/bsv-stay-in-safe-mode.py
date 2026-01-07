@@ -12,7 +12,6 @@ Test with different ordering and with and without waiting between sending branch
 In cases 1 and 2, where there is no waiting between sending, there is no guarantee safe mode is disabled in between.
 This also does not apply for case 4, where longer branch (20 headers) is sent first.
 """
-from test_framework.authproxy import JSONRPCException
 from test_framework.blocktools import make_block, send_by_headers, wait_for_tip, wait_for_tip_status
 from test_framework.mininode import msg_block
 from test_framework.test_framework import BitcoinTestFramework

@@ -20,20 +20,20 @@ struct CThreadSafeQueue<T>::UnitTestAccess
     
     static auto Count(const CThreadSafeQueue& q)
     {
-        std::unique_lock<std::mutex> lock(const_cast<std::mutex&>(q.mtx));
+        std::unique_lock<std::mutex> lock(const_cast<std::mutex&>(q.mtx)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
         return q.theQueue.size();
     }
 
     static auto Size(const CThreadSafeQueue& q)
     { 
-        std::unique_lock<std::mutex> lock(const_cast<std::mutex&>(q.mtx));
+        std::unique_lock<std::mutex> lock(const_cast<std::mutex&>(q.mtx)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
         return q.currentSize;
     }
 };
 
 BOOST_AUTO_TEST_SUITE(thread_safe_queue_tests)
 
-bool WaitFor(std::function<bool()> f)
+bool WaitFor(const std::function<bool()>& f)
 {
     for(int i = 0; i < 100; i++)
     {
@@ -92,12 +92,13 @@ BOOST_AUTO_TEST_CASE(multiple_inputs_full_queue) {
     BOOST_CHECK(theQueue.MaximalSize() == 5);
 
     std::vector<std::future<void>> pushers;
+    pushers.reserve(7);
     std::set<int> outValues;
 
     // adding 7 integers in queue of capacity of 5
     for(int i = 0; i < 7; i++)
     {
-        pushers.push_back(std::async(std::launch::async, 
+        pushers.push_back(std::async(std::launch::async,
             [&theQueue, i](){ 
                 theQueue.PushWait(i);
             }));
@@ -113,7 +114,9 @@ BOOST_AUTO_TEST_CASE(multiple_inputs_full_queue) {
     BOOST_CHECK(CheckNumberOfRunningThreads(pushers, 2));
 
     // popping one value
-    outValues.insert(theQueue.PopWait().value());
+    const auto o{theQueue.PopWait()};
+    assert(o);
+    outValues.insert(*o);
 
     // the queue is still full
     BOOST_CHECK(WaitFor(
@@ -134,8 +137,8 @@ BOOST_AUTO_TEST_CASE(multiple_inputs_full_queue) {
 
     // take all values from queue, there should be 6 different integers
     const auto contents = theQueue.PopAllWait();
-    BOOST_REQUIRE(contents.has_value());
-    for (const auto& v : contents.value())
+    assert(contents);
+    for(const auto& v : *contents)
     {
         outValues.insert(v);
     }
@@ -188,8 +191,8 @@ BOOST_AUTO_TEST_CASE(fill_replace)
     theQueue.Close();
     BOOST_CHECK(theQueue.IsClosed());
     const auto contents = theQueue.PopAllNoWait();
-    BOOST_REQUIRE(contents.has_value());
-    BOOST_CHECK(contents.value().size() == 5);
+    assert(contents);
+    BOOST_CHECK(contents->size() == 5);
 }
 
 BOOST_AUTO_TEST_CASE(fill_replace_dynamic)
@@ -236,8 +239,8 @@ BOOST_AUTO_TEST_CASE(fill_replace_dynamic)
     theQueue.Close();
     BOOST_CHECK(theQueue.IsClosed());
     const auto contents = theQueue.PopAllNoWait();
-    BOOST_REQUIRE(contents.has_value());
-    BOOST_CHECK(contents.value().size() == 3);
+    assert(contents);
+    BOOST_CHECK(contents->size() == 3);
 }
 
 BOOST_AUTO_TEST_CASE(multiple_outputs)
@@ -260,18 +263,20 @@ BOOST_AUTO_TEST_CASE(multiple_outputs)
     // getting one value from eight threads and pushing them to the collectingQueue
     for(unsigned i = 0; i < nThreads; ++i)
     {
-        auto f = std::async(std::launch::async, 
-            [&theQueue, &collectingQueue, &sf](std::promise<void>* ready){ 
-
-                ready->set_value();
-                sf.wait();                
+        auto f = std::async(
+            std::launch::async,
+            [&theQueue, &collectingQueue, &sf](std::promise<void>* p)
+            {
+                p->set_value();
+                sf.wait();
 
                 std::optional<int> popped = theQueue.PopWait();
                 if(popped.has_value())
                 {
                     collectingQueue.PushWait(popped.value());
                 }
-            }, &ready[i]);
+            },
+            &ready[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         outs.push_back(std::move(f));
     }
 
@@ -462,6 +467,7 @@ BOOST_AUTO_TEST_CASE(nowait) {
     // can pop three values
     BOOST_CHECK(theQueue.PopNoWait().has_value());
     const auto contents = theQueue.PopAllNoWait();
+    assert(contents);
     BOOST_CHECK(contents.has_value());
     BOOST_CHECK(contents.value().size() == 2);
 

@@ -8,80 +8,49 @@
 
 #include "serialize.h"
 
+#include <concepts>
 #include <cstdlib>
 #include <iostream>
 #include <string>
-#include <type_traits>
 
-// NOLINTBEGIN(performance-unnecessary-value-param)
-// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct Amount {
 private:
-    int64_t amount;
+    int64_t amount_{};
 
 public:
-    constexpr Amount() : amount(0) {}
+    explicit constexpr Amount(std::integral auto amount) noexcept:
+        amount_(amount)
+    {}
 
-    template <typename T>
-    explicit constexpr Amount(T _camount) : amount(_camount) {
-        static_assert(std::is_integral<T>(),
-                      "Only integer types can be used as amounts");
-    }
-
-    constexpr Amount(const Amount &_camount) : amount(_camount.amount) {}
-    constexpr Amount& operator=(const Amount&) = default;
+    Amount() = default;
 
     // Allow access to underlying value for non-monetary operations
-    int64_t GetSatoshis() const { return amount; }
+    int64_t GetSatoshis() const { return amount_; }
 
     /**
      * Implement standard operators
      */
-    Amount &operator+=(const Amount a) {
-        amount += a.amount;
+    Amount &operator+=(const Amount& a) {
+        amount_ += a.amount_;
         return *this;
     }
-    Amount &operator-=(const Amount a) {
-        amount -= a.amount;
+    Amount &operator-=(const Amount& a) {
+        amount_ -= a.amount_;
         return *this;
     }
 
-    /**
-     * Equality
-     */
-    friend constexpr bool operator==(const Amount a, const Amount b) {
-        return a.amount == b.amount;
-    }
-    friend constexpr bool operator!=(const Amount a, const Amount b) {
-        return !(a == b);
-    }
-
-    /**
-     * Comparison
-     */
-    friend constexpr bool operator<(const Amount a, const Amount b) {
-        return a.amount < b.amount;
-    }
-    friend constexpr bool operator>(const Amount a, const Amount b) {
-        return b < a;
-    }
-    friend constexpr bool operator<=(const Amount a, const Amount b) {
-        return !(a > b);
-    }
-    friend constexpr bool operator>=(const Amount a, const Amount b) {
-        return !(a < b);
-    }
+    friend auto operator<=>(const Amount&, const Amount&) = default;
 
     /**
      * Unary minus
      */
-    constexpr Amount operator-() const { return Amount(-amount); }
+    constexpr Amount operator-() const { return Amount(-amount_); }
 
     /**
      * Addition and subtraction.
      */
     friend constexpr Amount operator+(const Amount a, const Amount b) {
-        return Amount(a.amount + b.amount);
+        return Amount(a.amount_ + b.amount_);
     }
     friend constexpr Amount operator-(const Amount a, const Amount b) {
         return a + -b;
@@ -91,33 +60,33 @@ public:
      * Multiplication
      */
     friend constexpr Amount operator*(const int64_t a, const Amount b) {
-        return Amount(a * b.amount);
+        return Amount(a * b.amount_);
     }
     friend constexpr Amount operator*(const int a, const Amount b) {
-        return Amount(a * b.amount);
+        return Amount(a * b.amount_);
     }
 
     /**
      * Division
      */
     constexpr int64_t operator/(const Amount b) const {
-        return amount / b.amount;
+        return amount_ / b.amount_;
     }
     constexpr Amount operator/(const int64_t b) const {
-        return Amount(amount / b);
+        return Amount(amount_ / b);
     }
-    constexpr Amount operator/(const int b) const { return Amount(amount / b); }
+    constexpr Amount operator/(const int b) const { return Amount(amount_ / b); }
 
     /**
      * Modulus
      */
     constexpr int64_t operator%(const Amount b) const {
-        return amount % b.amount;
+        return amount_ % b.amount_;
     }
     constexpr Amount operator%(const int64_t b) const {
-        return Amount(amount % b);
+        return Amount(amount_ % b);
     }
-    constexpr Amount operator%(const int b) const { return Amount(amount % b); }
+    constexpr Amount operator%(const int b) const { return Amount(amount_ % b); }
 
     /**
      * Do not implement double ops to get an error with double and ensure
@@ -129,7 +98,7 @@ public:
 
     // ostream support
     friend std::ostream &operator<<(std::ostream &stream, const Amount &ca) {
-        return stream << ca.amount;
+        return stream << ca.amount_;
     }
 
     std::string ToString() const;
@@ -139,12 +108,12 @@ public:
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
-        READWRITE(amount);
+        READWRITE(amount_);
     }
 };
 
-static const Amount COIN(100000000); // NOLINT(cert-err58-cpp)
-static const Amount CENT(1000000);   // NOLINT(cert-err58-cpp)
+static const Amount COIN{100'000'000}; 
+static const Amount CENT{1'000'000};
 
 extern const std::string CURRENCY_UNIT;
 
@@ -158,7 +127,8 @@ extern const std::string CURRENCY_UNIT;
  * critical; in unusual circumstances like a(nother) overflow bug that allowed
  * for the creation of coins out of thin air modification could lead to a fork.
  */
-static const Amount MAX_MONEY = 21000000 * COIN; // NOLINT(cert-err58-cpp)
+static const Amount MAX_MONEY{21'000'000 * COIN};
+
 inline bool MoneyRange(const Amount nValue) {
     return (nValue >= Amount(0) && nValue <= MAX_MONEY);
 }
@@ -173,7 +143,7 @@ private:
 
 public:
     CFeeRate () = default;
-    explicit CFeeRate(const Amount _nSatoshisPerK)
+    explicit CFeeRate(const Amount& _nSatoshisPerK)
         : nSatoshisPerK(_nSatoshisPerK) {}
     /**
      * Constructor for a fee rate in satoshis per kB. The size in bytes must not
@@ -188,21 +158,9 @@ public:
      * Return the fee in satoshis for a size of 1000 bytes
      */
     Amount GetFeePerK() const { return nSatoshisPerK; }
-    friend bool operator<(const CFeeRate &a, const CFeeRate &b) {
-        return a.nSatoshisPerK < b.nSatoshisPerK;
-    }
-    friend bool operator>(const CFeeRate &a, const CFeeRate &b) {
-        return a.nSatoshisPerK > b.nSatoshisPerK;
-    }
-    friend bool operator==(const CFeeRate &a, const CFeeRate &b) {
-        return a.nSatoshisPerK == b.nSatoshisPerK;
-    }
-    friend bool operator<=(const CFeeRate &a, const CFeeRate &b) {
-        return a.nSatoshisPerK <= b.nSatoshisPerK;
-    }
-    friend bool operator>=(const CFeeRate &a, const CFeeRate &b) {
-        return a.nSatoshisPerK >= b.nSatoshisPerK;
-    }
+
+    friend auto operator<=>(const CFeeRate&, const CFeeRate&) = default;
+    
     CFeeRate &operator+=(const CFeeRate &a) {
         nSatoshisPerK += a.nSatoshisPerK;
         return *this;
@@ -216,6 +174,5 @@ public:
         READWRITE(nSatoshisPerK);
     }
 };
-// NOLINTEND(performance-unnecessary-value-param)
 
 #endif //  BITCOIN_AMOUNT_H

@@ -2,11 +2,14 @@
 // Distributed under the Open BSV software license, see the accompanying file
 // LICENSE.
 
-#include <array>
 #include "script/script.h"
+
+#include "protocol_era.h"
 #include "script_macros.h"
 
 #include <boost/test/unit_test.hpp>
+
+#include <array>
 
 using namespace std;
 
@@ -19,9 +22,9 @@ BOOST_AUTO_TEST_CASE(GetOp2)
 
     vector<test_data_type> test_data {
         { {OP_0}, true, static_cast<opcodetype>(0), {} }, // Note: OP_0 = 0
-        { {1, 1}, true, static_cast<opcodetype>(1), {1} },
-        { {2, 1, 2}, true, static_cast<opcodetype>(2), {1, 2} },
-        { {3, 1, 2, 3}, true, static_cast<opcodetype>(3), {1, 2, 3} },
+        { {1, 1}, true, static_cast<opcodetype>(1), {1} }, // NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange)
+        { {2, 1, 2}, true, static_cast<opcodetype>(2), {1, 2} }, // NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange)
+        { {3, 1, 2, 3}, true, static_cast<opcodetype>(3), {1, 2, 3} }, // NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange)
 
         { {OP_PUSHDATA1, 3, 1, 2, 3}, true, OP_PUSHDATA1, {1, 2, 3} },
         { {OP_PUSHDATA2, 3, 0, 1, 2, 3}, true, OP_PUSHDATA2, {1, 2, 3} },
@@ -55,7 +58,7 @@ BOOST_AUTO_TEST_CASE(GetOp2)
     {
         const CScript script(begin(ip), end(ip));
         auto it{script.begin()};
-        opcodetype opcode;
+        opcodetype opcode; // NOLINT(cppcoreguidelines-init-variables)
         vector<uint8_t> v;
         const auto s = script.GetOp2(it, opcode, &v);
         BOOST_CHECK_EQUAL(exp_status, s);
@@ -67,12 +70,12 @@ BOOST_AUTO_TEST_CASE(GetOp2)
 
 BOOST_AUTO_TEST_CASE(OpCount_tests)
 {
-    uint8_t a[] = {OP_1, OP_2, OP_2};
+    uint8_t a[] = {OP_1, OP_2, OP_2}; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     BOOST_CHECK_EQUAL(0U, CountOp(a, OP_0));
     BOOST_CHECK_EQUAL(1U, CountOp(a, OP_1));
     BOOST_CHECK_EQUAL(2U, CountOp(a, OP_2));
 
-    array<uint8_t, 3> arr;
+    array<uint8_t, 3> arr{};
     copy(begin(a), end(a), begin(arr));
     BOOST_CHECK_EQUAL(0U, CountOp(arr, OP_0));
     BOOST_CHECK_EQUAL(1U, CountOp(arr, OP_1));
@@ -91,61 +94,61 @@ BOOST_AUTO_TEST_CASE(OpCount_tests)
 
 BOOST_AUTO_TEST_CASE(GetSigOpCount)
 {
-    // input script, accurate, genesis_enabled, expected_count, expected_error
-    using test_data_type = tuple< vector<uint8_t>, bool, bool, uint64_t, bool >;
+    // input script, accurate, protocol, expected_count, expected_error
+    using test_data_type = tuple< vector<uint8_t>, bool, ProtocolEra, uint64_t, bool >;
     vector<test_data_type> test_data {
-        { {}, false, false, 0, false },
-        { {}, false, true, 0, false },
-        { {}, true, false, 0, false },
-        { {}, true, true, 0, false },
+        { {}, false, ProtocolEra::PreGenesis, 0, false },
+        { {}, false, ProtocolEra::PostGenesis, 0, false },
+        { {}, true, ProtocolEra::PreGenesis, 0, false },
+        { {}, true, ProtocolEra::PostGenesis, 0, false },
         
-        { {OP_1}, false, false, 0, false },
-        { {OP_1}, false, true, 0, false },
-        { {OP_1}, true, false, 0, false },
-        { {OP_1}, true, true, 0, false },
+        { {OP_1}, false, ProtocolEra::PreGenesis, 0, false },
+        { {OP_1}, false, ProtocolEra::PostGenesis, 0, false },
+        { {OP_1}, true, ProtocolEra::PreGenesis, 0, false },
+        { {OP_1}, true, ProtocolEra::PostGenesis, 0, false },
         
-        { {OP_CHECKSIG}, false, false, 1, false },
-        { {OP_CHECKSIG}, false, true, 1, false },
-        { {OP_CHECKSIG}, true, false, 1, false },
-        { {OP_CHECKSIG}, true, true, 1, false },
+        { {OP_CHECKSIG}, false, ProtocolEra::PreGenesis, 1, false },
+        { {OP_CHECKSIG}, false, ProtocolEra::PostGenesis, 1, false },
+        { {OP_CHECKSIG}, true, ProtocolEra::PreGenesis, 1, false },
+        { {OP_CHECKSIG}, true, ProtocolEra::PostGenesis, 1, false },
         
-        { {OP_CHECKSIG, OP_CHECKSIG}, false, false, 2, false },
-        { {OP_CHECKSIG, OP_CHECKSIG}, false, true, 2, false },
-        { {OP_CHECKSIG, OP_CHECKSIG}, true, false, 2, false },
-        { {OP_CHECKSIG, OP_CHECKSIG}, true, true, 2, false },
+        { {OP_CHECKSIG, OP_CHECKSIG}, false, ProtocolEra::PreGenesis, 2, false },
+        { {OP_CHECKSIG, OP_CHECKSIG}, false, ProtocolEra::PostGenesis, 2, false },
+        { {OP_CHECKSIG, OP_CHECKSIG}, true, ProtocolEra::PreGenesis, 2, false },
+        { {OP_CHECKSIG, OP_CHECKSIG}, true, ProtocolEra::PostGenesis, 2, false },
         
-        { {OP_CHECKMULTISIG}, false, false, 20, false },
-        { {OP_CHECKMULTISIG}, false, true, 0, false },
-        { {OP_CHECKMULTISIG}, true, false, 20, false },
-        { {OP_CHECKMULTISIG}, true, true, 0, false },
+        { {OP_CHECKMULTISIG}, false, ProtocolEra::PreGenesis, 20, false },
+        { {OP_CHECKMULTISIG}, false, ProtocolEra::PostGenesis, 0, false },
+        { {OP_CHECKMULTISIG}, true, ProtocolEra::PreGenesis, 20, false },
+        { {OP_CHECKMULTISIG}, true, ProtocolEra::PostGenesis, 0, false },
         
-        { {OP_CHECKMULTISIG, OP_CHECKMULTISIG}, false, false, 40, false },
-        { {OP_CHECKMULTISIG, OP_CHECKMULTISIG}, false, true, 0, false },
-        { {OP_CHECKMULTISIG, OP_CHECKMULTISIG}, true, false, 40, false },
-        { {OP_CHECKMULTISIG, OP_CHECKMULTISIG}, true, true, 0, false },
+        { {OP_CHECKMULTISIG, OP_CHECKMULTISIG}, false, ProtocolEra::PreGenesis, 40, false },
+        { {OP_CHECKMULTISIG, OP_CHECKMULTISIG}, false, ProtocolEra::PostGenesis, 0, false },
+        { {OP_CHECKMULTISIG, OP_CHECKMULTISIG}, true, ProtocolEra::PreGenesis, 40, false },
+        { {OP_CHECKMULTISIG, OP_CHECKMULTISIG}, true, ProtocolEra::PostGenesis, 0, false },
 
-        { {MULTISIG_LOCKING_2}, false, false, 20, false }, 
-        { {MULTISIG_LOCKING_2}, false, true, 2, false }, 
-        { {MULTISIG_LOCKING_2}, true, false, 2, false }, 
-        { {MULTISIG_LOCKING_2}, true, true, 2, false }, 
+        { {MULTISIG_LOCKING_2}, false, ProtocolEra::PreGenesis, 20, false }, 
+        { {MULTISIG_LOCKING_2}, false, ProtocolEra::PostGenesis, 2, false }, 
+        { {MULTISIG_LOCKING_2}, true, ProtocolEra::PreGenesis, 2, false }, 
+        { {MULTISIG_LOCKING_2}, true, ProtocolEra::PostGenesis, 2, false }, 
         
-        { {MULTISIG_LOCKING_32}, false, false, 20, false },
-        { {MULTISIG_LOCKING_32}, false, true, 32, false },
-        { {MULTISIG_LOCKING_32}, true, false, 20, false },
-        { {MULTISIG_LOCKING_32}, true, true, 32, false },
+        { {MULTISIG_LOCKING_32}, false, ProtocolEra::PreGenesis, 20, false },
+        { {MULTISIG_LOCKING_32}, false, ProtocolEra::PostGenesis, 32, false },
+        { {MULTISIG_LOCKING_32}, true, ProtocolEra::PreGenesis, 20, false },
+        { {MULTISIG_LOCKING_32}, true, ProtocolEra::PostGenesis, 32, false },
        
-        { {MULTISIG_2_IF_LOCKING}, false, false, 21, false }, 
-        { {MULTISIG_2_IF_LOCKING}, false, true, 3, false }, 
-        { {MULTISIG_2_IF_LOCKING}, true, false, 3, false }, 
-        { {MULTISIG_2_IF_LOCKING}, true, true, 3, false }, 
+        { {MULTISIG_2_IF_LOCKING}, false, ProtocolEra::PreGenesis, 21, false }, 
+        { {MULTISIG_2_IF_LOCKING}, false, ProtocolEra::PostGenesis, 3, false }, 
+        { {MULTISIG_2_IF_LOCKING}, true, ProtocolEra::PreGenesis, 3, false }, 
+        { {MULTISIG_2_IF_LOCKING}, true, ProtocolEra::PostGenesis, 3, false }, 
         
-        { {P2SH_LOCKING}, true, true, 0, false }, 
+        { {P2SH_LOCKING}, true, ProtocolEra::PostGenesis, 0, false }, 
     };
-    for(const auto& [ip, accurate, genesis_enabled, exp_n, exp_error] : test_data)
+    for(const auto& [ip, accurate, protocol, exp_n, exp_error] : test_data)
     {
         const CScript script(begin(ip), end(ip));
         bool error{false};
-        const auto n = script.GetSigOpCount(accurate, genesis_enabled, error);
+        const auto n = script.GetSigOpCount(accurate, protocol, error);
         BOOST_CHECK_EQUAL(exp_n, n);
         BOOST_CHECK_EQUAL(exp_error, error);
     }
@@ -153,41 +156,41 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount)
 
 BOOST_AUTO_TEST_CASE(GetSigOpCount_p2sh)
 {
-    // input script, genesis_enabled, expected_count, expected_error
-    using test_data_type = tuple< vector<uint8_t>, bool, uint64_t, bool >;
+    // input script, protocol, expected_count, expected_error
+    using test_data_type = tuple< vector<uint8_t>, ProtocolEra, uint64_t, bool >;
     vector<test_data_type> test_data {
-        { {71, MULTISIG_LOCKING_2}, false, 2, false }, 
-        { {71, MULTISIG_LOCKING_2}, true, 0, false }, 
+        { {71, MULTISIG_LOCKING_2}, ProtocolEra::PreGenesis, 2, false }, 
+        { {71, MULTISIG_LOCKING_2}, ProtocolEra::PostGenesis, 0, false }, 
         
-        { {OP_PUSHDATA1, 139, MULTISIG_LOCKING_4}, false, 4, false }, 
-        { {OP_PUSHDATA1, 139, MULTISIG_LOCKING_4}, true, 0, false }, 
+        { {OP_PUSHDATA1, 139, MULTISIG_LOCKING_4}, ProtocolEra::PreGenesis, 4, false }, 
+        { {OP_PUSHDATA1, 139, MULTISIG_LOCKING_4}, ProtocolEra::PostGenesis, 0, false }, 
         
-        { {OP_PUSHDATA2, 0x13, 0x1, MULTISIG_LOCKING_8}, false, 8, false }, 
-        { {OP_PUSHDATA2, 0x13, 0x1, MULTISIG_LOCKING_8}, true, 0, false }, 
+        { {OP_PUSHDATA2, 0x13, 0x1, MULTISIG_LOCKING_8}, ProtocolEra::PreGenesis, 8, false }, 
+        { {OP_PUSHDATA2, 0x13, 0x1, MULTISIG_LOCKING_8}, ProtocolEra::PostGenesis, 0, false }, 
         
-        { {OP_PUSHDATA2, 0x23, 0x2, MULTISIG_LOCKING_16}, false, 16, false }, 
-        { {OP_PUSHDATA2, 0x23, 0x2, MULTISIG_LOCKING_16}, true, 0, false }, 
+        { {OP_PUSHDATA2, 0x23, 0x2, MULTISIG_LOCKING_16}, ProtocolEra::PreGenesis, 16, false }, 
+        { {OP_PUSHDATA2, 0x23, 0x2, MULTISIG_LOCKING_16}, ProtocolEra::PostGenesis, 0, false }, 
        
         // Note: MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS = 20
-        { {OP_PUSHDATA2, 0xac, 0x2, MULTISIG_LOCKING_20}, false, 20, false }, 
-        { {OP_PUSHDATA2, 0xac, 0x2, MULTISIG_LOCKING_20}, true, 0, false }, 
+        { {OP_PUSHDATA2, 0xac, 0x2, MULTISIG_LOCKING_20}, ProtocolEra::PreGenesis, 20, false }, 
+        { {OP_PUSHDATA2, 0xac, 0x2, MULTISIG_LOCKING_20}, ProtocolEra::PostGenesis, 0, false }, 
         
-        { {OP_PUSHDATA2, 0xce, 0x2, MULTISIG_LOCKING_21}, false, 20, false }, 
-        { {OP_PUSHDATA2, 0xce, 0x2, MULTISIG_LOCKING_21}, true, 0, false }, 
+        { {OP_PUSHDATA2, 0xce, 0x2, MULTISIG_LOCKING_21}, ProtocolEra::PreGenesis, 20, false }, 
+        { {OP_PUSHDATA2, 0xce, 0x2, MULTISIG_LOCKING_21}, ProtocolEra::PostGenesis, 0, false }, 
 
-        { {OP_PUSHDATA2, 0x44, 0x4, MULTISIG_LOCKING_32}, false, 20, false }, 
-        { {OP_PUSHDATA2, 0x44, 0x4, MULTISIG_LOCKING_32}, true, 0, false }, 
+        { {OP_PUSHDATA2, 0x44, 0x4, MULTISIG_LOCKING_32}, ProtocolEra::PreGenesis, 20, false }, 
+        { {OP_PUSHDATA2, 0x44, 0x4, MULTISIG_LOCKING_32}, ProtocolEra::PostGenesis, 0, false }, 
  
-        { {74, MULTISIG_2_IF_LOCKING}, false, 3, false }, 
-        { {74, MULTISIG_2_IF_LOCKING}, true, 0, false }, 
+        { {74, MULTISIG_2_IF_LOCKING}, ProtocolEra::PreGenesis, 3, false }, 
+        { {74, MULTISIG_2_IF_LOCKING}, ProtocolEra::PostGenesis, 0, false }, 
     };
     vector<uint8_t> v{P2SH_LOCKING};
     const CScript p2sh_script(begin(v), end(v));
-    for(const auto& [ip, genesis_enabled, exp_n, exp_error] : test_data)
+    for(const auto& [ip, protocol, exp_n, exp_error] : test_data)
     {
         const CScript redeem_script{begin(ip), end(ip)};
         bool error{false};
-        const auto n = p2sh_script.GetSigOpCount(redeem_script, genesis_enabled, error);
+        const auto n = p2sh_script.GetSigOpCount(redeem_script, protocol, error);
         BOOST_CHECK_EQUAL(exp_n, n);
         BOOST_CHECK_EQUAL(exp_error, error);
     }

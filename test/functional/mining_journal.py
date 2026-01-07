@@ -12,13 +12,20 @@ Note that most of the actual checking occurs inside the bitcoind process, we are
 setting up situations for that testing to happen here.
 '''
 
+from test_framework.cdefs import ONE_MEGABYTE
+from test_framework.blocktools import create_block_from_candidate
+from test_framework.mininode import COIN, NetworkThread, NodeConn, NodeConnCB, \
+    ToHex
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import *
-from test_framework.util import *
-from test_framework.cdefs import (ONE_MEGABYTE)
-from test_framework.blocktools import merkle_root_from_merkle_proof, create_block_from_candidate
+from test_framework.util import assert_equal, assert_greater_than, \
+    bytes_to_hex_str, connect_nodes, create_confirmed_utxos, disconnect_nodes, \
+    p2p_port, satoshi_round, sync_blocks, wait_until
+
+from decimal import Decimal
+
 import math
 import random
+import time
 
 
 class MyNode(NodeConnCB):
@@ -38,7 +45,7 @@ class MyNode(NodeConnCB):
     def on_block(self, conn, message):
         super().on_block(conn, message)
 
-        if(self.setup_finished):
+        if self.setup_finished:
             block = message.block
             block.rehash()
 
@@ -125,7 +132,7 @@ def fill_mempool(fee, node, num_reqd, ancestor_depth=1):
             outputs[addr] = satoshi_round(send_value)
 
             # Maybe pad txn with OP_RETURN to increase its size
-            if(pad_size > max_pad_size / 2):
+            if pad_size > max_pad_size / 2:
                 mbytes = bytearray(pad_size)
                 outputs["data"] = bytes_to_hex_str(mbytes)
 
@@ -141,7 +148,7 @@ def fill_mempool(fee, node, num_reqd, ancestor_depth=1):
             input_txid = decoded_raw["txid"]
             for i in range(len(decoded_raw["vout"])):
                 value = decoded_raw["vout"][i]["value"]
-                if(value > 0):
+                if value > 0:
                     input_vout = i
                     break
             input_amount = send_value
@@ -169,7 +176,7 @@ class MiningJournal(BitcoinTestFramework):
                             '-maxtipage={}'.format(max_tip_age),
                             '-debug=journal', '-blockassembler=journaling',
                             '-blockmaxsize={}'.format(self.maxblocksize), '-persistmempool',
-                            "-checkmempool=1",]] * self.num_nodes
+                            "-checkmempool=1", ]] * self.num_nodes
         self.conncbs = []
         self.num_utxos = 5000
         self.ancestor_depth = 25
@@ -257,7 +264,7 @@ class MiningJournal(BitcoinTestFramework):
         if mainTest:
             self.log.info("Testing block creation...")
 
-        for i in range(1,3):
+        for i in range(1, 3):
             if mainTest or i > 1:
                 # Topup and check the mempool again
                 self.test_initial_mempool(txnNode, numTxns=numTxns)
@@ -284,13 +291,13 @@ class MiningJournal(BitcoinTestFramework):
         disconnect_nodes(self.nodes[node0], node1)
 
         # Mine 20 blocks on node0 and lots more on node1
-        for i in range(1,11):
+        for i in range(1, 11):
             self.test_mine_block(node0, numTxns=250)
         blockheight = self.nodes[node0].getblockchaininfo()['blocks']
         blockhash1 = self.nodes[node0].getblockhash(blockheight - 10)
 
         self.setup_for_submission(node1)
-        for i in range(1,11):
+        for i in range(1, 11):
             self.test_mine_block(node1, numTxns=100)
 
         info0 = self.nodes[node0].getmempoolinfo()
@@ -349,12 +356,12 @@ class MiningJournal(BitcoinTestFramework):
 
         # Verify good state at start
         status = self.nodes[rebuildNode].checkjournal()
-        assert(status["ok"])
+        assert (status["ok"])
 
         # Rebuild and check again
         self.nodes[rebuildNode].rebuildjournal()
         status = self.nodes[rebuildNode].checkjournal()
-        assert(status["ok"])
+        assert (status["ok"])
 
     def run_test(self):
 

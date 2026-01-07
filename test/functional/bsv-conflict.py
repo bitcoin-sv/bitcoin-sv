@@ -33,14 +33,15 @@ class Conflict(BitcoinTestFramework):
             total_input += parent_tx.vout[n].nValue
 
         for _ in range(noutput):
-            tx.vout.append(CTxOut(total_input//noutput - 1000, CScript([b"X"*200, OP_DROP, OP_TRUE])))
+            tx.vout.append(CTxOut(total_input // noutput - 1000, CScript([b"X" * 200, OP_DROP, OP_TRUE])))
 
         tx.rehash()
         return tx
 
     def run_test(self):
-        with self.run_node_with_connections("Scenario 1: Create complex graph of txs, doublespend some fo them and check mempool after"
-                                            , 0, ["-minrelaytxfee=0"],
+        with self.run_node_with_connections("Scenario 1: Create complex graph of txs, doublespend some fo them and check mempool after",
+                                            0,
+                                            ["-minrelaytxfee=0"],
                                             number_of_connections=1) as (conn,):
 
             # create block with coinbase
@@ -88,18 +89,18 @@ class Conflict(BitcoinTestFramework):
             #                    |           |
             #                tx_descedant_of_conflict_4
 
-            tx_double_spend_mempool = self.create_tx([(low_fee_tx,                 0)], 2)
-            tx_double_spend_block = self.create_tx([(low_fee_tx,                 0)], 1)
-            tx_to_be_mined = self.create_tx([(low_fee_tx,                 1)], 2)
-            tx_descedant_of_conflict_1 = self.create_tx([(tx_double_spend_mempool,    0),
-                                                         (tx_to_be_mined,             0)], 1)
+            tx_double_spend_mempool = self.create_tx([(low_fee_tx, 0)], 2)
+            tx_double_spend_block = self.create_tx([(low_fee_tx, 0)], 1)
+            tx_to_be_mined = self.create_tx([(low_fee_tx, 1)], 2)
+            tx_descedant_of_conflict_1 = self.create_tx([(tx_double_spend_mempool, 0),
+                                                         (tx_to_be_mined, 0)], 1)
             tx_descedant_of_conflict_2 = self.create_tx([(tx_descedant_of_conflict_1, 0)], 1)
-            tx_stay_in_mempool_1 = self.create_tx([(tx_to_be_mined,             1)], 2)
+            tx_stay_in_mempool_1 = self.create_tx([(tx_to_be_mined, 1)], 2)
             tx_descedant_of_conflict_3 = self.create_tx([(tx_descedant_of_conflict_2, 0),
-                                                         (tx_stay_in_mempool_1,       0)], 2)
-            tx_stay_in_mempool_2 = self.create_tx([(tx_stay_in_mempool_1,       1)], 1)
-            tx_descedant_of_conflict_4 = self.create_tx([(tx_double_spend_mempool,    1),
-                                                         (tx_stay_in_mempool_2,       0)], 1)
+                                                         (tx_stay_in_mempool_1, 0)], 2)
+            tx_stay_in_mempool_2 = self.create_tx([(tx_stay_in_mempool_1, 1)], 1)
+            tx_descedant_of_conflict_4 = self.create_tx([(tx_double_spend_mempool, 1),
+                                                         (tx_stay_in_mempool_2, 0)], 1)
 
             conn.send_message(msg_tx(tx_double_spend_mempool))
             conn.send_message(msg_tx(tx_to_be_mined))

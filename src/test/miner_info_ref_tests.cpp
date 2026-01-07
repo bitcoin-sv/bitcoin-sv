@@ -90,7 +90,7 @@ BOOST_AUTO_TEST_CASE(parse_miner_id_ref_happy_case)
     
     constexpr uint8_t sig_len{70};
     script.push_back(sig_len);
-    generate_n(back_inserter(script), sig_len, [](){ static uint8_t i{}; return i++; });
+    generate_n(back_inserter(script), sig_len, [](){ static uint8_t n{}; return n++; });
 
     const auto status = ParseMinerInfoRef(script);
     BOOST_CHECK(std::holds_alternative<miner_info_ref>(status));
@@ -130,7 +130,6 @@ BOOST_AUTO_TEST_CASE(parse_miner_id_ref_failure_cases)
     constexpr uint8_t txid_len{32};
     constexpr uint8_t mmr_pbh_hash_len{32};
     constexpr uint8_t sig_len{70};
-    vector<uint8_t> script{0x0, 0x6a, 0x4, 0x60, 0x1d, 0xfa, 0xce, 0x1, 0x0};
 
     // version, txid_len_offset, mmr_pbh_hash_len_offset, sig_len_offset, expected
     // result
@@ -140,7 +139,7 @@ BOOST_AUTO_TEST_CASE(parse_miner_id_ref_failure_cases)
         make_tuple(0,  1,  0,   0, mie::invalid_txid_len),
         make_tuple(0,  0, -1,   0, mie::invalid_mmr_pbh_hash_len),
         make_tuple(0,  0,  1,   0, mie::invalid_mmr_pbh_hash_len),
-        make_tuple(0,  0,  0,  -2, mie::invalid_sig_len),
+        make_tuple(0,  0,  0,  -7, mie::invalid_sig_len),
         make_tuple(0,  0,  0,   3, mie::invalid_sig_len),
     };
     for(const auto& [version,

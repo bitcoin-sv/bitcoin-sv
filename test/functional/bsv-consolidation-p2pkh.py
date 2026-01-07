@@ -37,15 +37,15 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         self.extra_args = [
             [
                 "-whitelist=127.0.0.1",
-                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
+                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats) / COIN),
                 "-minconsolidationfactor=2",
                 "-acceptnonstdtxn=1",
             ],
             [
                 "-whitelist=127.0.0.1",
-                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
+                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats) / COIN),
                 #"-minconsolidationfactor=10", # test default consolidation factor
                 "-acceptnonstdtxn=1",
             ]
@@ -55,7 +55,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
         utxos = []
         addr = node.getnewaddress()
-        for i in range (utxo_count):
+        for i in range(utxo_count):
             txid = node.sendtoaddress(addr, self.utxo_test_bsvs)
             tx = FromHex(CTransaction(), node.getrawtransaction(txid))
             tx.rehash()
@@ -68,7 +68,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
     def create_and_sign_tx(self, node, in_count, min_confirmations):
 
-        utxos = self.create_utxos_value10000 (node, in_count, min_confirmations)
+        utxos = self.create_utxos_value10000(node, in_count, min_confirmations)
         inputs = []
         sum_values_bsvs = 0
         for u in utxos:
@@ -93,8 +93,8 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         for node in self.nodes:
             self.consolidation_factor = int(node.getnetworkinfo()['minconsolidationfactor'])
             self.minConfirmations = int(node.getnetworkinfo()['minconfconsolidationinput'])
-            self.log.info ("consolidation factor: {}".format(self.consolidation_factor))
-            self.log.info ("minimum input confirmations: {}".format(self.minConfirmations))
+            self.log.info("consolidation factor: {}".format(self.consolidation_factor))
+            self.log.info("minimum input confirmations: {}".format(self.minConfirmations))
 
             # Disconnect nodes before each generate RPC. On a busy environment generate
             # RPC might not create the provided number of blocks. While nodes are communicating
@@ -105,7 +105,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             connect_nodes_bi(self.nodes, 0, 1)
 
             # test ratio between size of input script and size of output script
-            tx_hex = self.create_and_sign_tx (node, 1, min_confirmations = 1)
+            tx_hex = self.create_and_sign_tx(node, 1, min_confirmations=1)
             tx = FromHex(CTransaction(), tx_hex)
             tx.rehash()
             sin = len(getInputScriptPubKey(node, tx.vin[0], 0))
@@ -117,23 +117,23 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
             # FAILING CONDITION: input_sizes <= consolidation_factor * output_size
             # We assume scriptSig ~ 4 * scriptPubKey
-            tx_hex = self.create_and_sign_tx (node, in_count = enough_inputs - 1 , min_confirmations = enough_confirmations)
+            tx_hex = self.create_and_sign_tx(node, in_count=enough_inputs - 1, min_confirmations=enough_confirmations)
             assert_raises_rpc_error(-26, "66: mempool min fee not met", node.sendrawtransaction, tx_hex)
-            self.log.info ("test 1: PASS")
+            self.log.info("test 1: PASS")
 
             # FAILING CONDITION: not enough input confirmations
-            tx_hex = self.create_and_sign_tx (node, in_count = enough_inputs , min_confirmations = enough_confirmations - 1)
+            tx_hex = self.create_and_sign_tx(node, in_count=enough_inputs, min_confirmations=enough_confirmations - 1)
             assert_raises_rpc_error(-26, "66: mempool min fee not met", node.sendrawtransaction, tx_hex)
-            self.log.info ("test 2: PASS")
+            self.log.info("test 2: PASS")
 
             # ALL CONDITIONS MET: must succeed
-            tx_hex = self.create_and_sign_tx (node, in_count = enough_inputs, min_confirmations = enough_confirmations)
+            tx_hex = self.create_and_sign_tx(node, in_count=enough_inputs, min_confirmations=enough_confirmations)
             txid = node.sendrawtransaction(tx_hex)
             node.generate(1)
             tx = node.getrawtransaction(txid, 1)
             confirmations = tx.get('confirmations', 0)
-            assert_equal (confirmations, 1)
-            self.log.info ("test 3: PASS")
+            assert_equal(confirmations, 1)
+            self.log.info("test 3: PASS")
             # Blocks must be synced because we do not want to start generating new blocks on node1 in the next loop iteration
             # before node1 has received all blocks generated on node0 and all pending P2P block requests have completed.
             sync_blocks(self.nodes)
@@ -151,11 +151,11 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         self.stop_nodes()
         deprecation_log = False
         for line in open(glob.glob(self.options.tmpdir + "/node0" + "/regtest/bitcoind.log")[0]):
-            if f"Option -minconsolidationinputmaturity is deprecated, use -minconfconsolidationinput instead" in line:
+            if "Option -minconsolidationinputmaturity is deprecated, use -minconfconsolidationinput instead" in line:
                 deprecation_log = True
                 #self.log.info("Found line: %s", line.strip())
                 break
-        assert(deprecation_log)
+        assert (deprecation_log)
 
         # Verify init error when deprecated and new option are used together
         self.extra_args[0].append("-minconfconsolidationinput=99")

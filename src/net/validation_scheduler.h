@@ -20,11 +20,10 @@ enum class ScheduleStatus {
 };
 
 // Used to notify scheduler when task completes.
-struct TaskCompletion {
+struct TaskCompletion
+{
     std::vector<size_t> positions;
     ScheduleStatus status;
-
-    explicit TaskCompletion(std::vector<size_t>&& positions, const ScheduleStatus status) : positions{std::move(positions)}, status{status} {}
 };
 
 /*

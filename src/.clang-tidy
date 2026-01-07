@@ -1,26 +1,33 @@
 Checks: '-*,
          performance*,
+         -performance-enum-size,
 
          bugprone*,
          -bugprone-easily-swappable-parameters,
-         
-         cppcoreguidelines*,
-         -cppcoreguidelines-avoid-magic-numbers,
-         -cppcoreguidelines-macro-usage,
-         -cppcoreguidelines-non-private-member-variables-in-classes,
+         -bugprone-suspicious-include, # Unity builds
 
          cert-*,
-         -cert-dcl16-c,
-         -cert-dcl37-c,
-         -cert-dcl21-cpp,
-         -cert-dcl51-cpp,
-         -cert-oop54-cpp
+
+         clang-analyzer-*,
+
+         cppcoreguidelines*,
+         -cppcoreguidelines-avoid-do-while,
+         -cppcoreguidelines-avoid-magic-numbers,
+         -cppcoreguidelines-macro-usage,
+         -cppcoreguidelines-macro-to-enum,
+         -cppcoreguidelines-non-private-member-variables-in-classes,
       '
 
 WarningsAsErrors: '*'
 HeaderFilterRegex: '.*'
 CheckOptions:    
-  - key:             cppcoreguidelines-avoid-do-while.IgnoreMacros
+  - key:             bugprone-implicit-widening-of-multiplication-result.IgnoreConstantIntExpr
+    value:           'true'
+  - key:             cppcoreguidelines-avoid-non-const-global-variables.AllowInternalLinkage
+    value:           'true'
+  - key:             cppcoreguidelines-pro-type-member-init.IgnoreArrays
+    value:           'true'
+  - key:             cppcoreguidelines-rvalue-reference-param-not-moved.AllowPartialMove
     value:           'true'
   - key:             cppcoreguidelines-virtual-class-destructor.IgnoreDestructors
     value:           'true'

@@ -4,7 +4,8 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_equal, assert_greater_than, \
+    assert_raises_rpc_error
 
 
 class ImportMultiTest (BitcoinTestFramework):
@@ -22,17 +23,7 @@ class ImportMultiTest (BitcoinTestFramework):
         timestamp = self.nodes[1].getblock(
             self.nodes[1].getbestblockhash())['mediantime']
 
-        # keyword definition
-        PRIV_KEY = 'privkey'
-        PUB_KEY = 'pubkey'
-        ADDRESS_KEY = 'address'
-        SCRIPT_KEY = 'script'
-
         node0_address1 = self.nodes[0].validateaddress(
-            self.nodes[0].getnewaddress())
-        node0_address2 = self.nodes[0].validateaddress(
-            self.nodes[0].getnewaddress())
-        node0_address3 = self.nodes[0].validateaddress(
             self.nodes[0].getnewaddress())
 
         # Check only one address
@@ -258,7 +249,7 @@ class ImportMultiTest (BitcoinTestFramework):
         self.nodes[1].generate(1)
         timestamp = self.nodes[1].getblock(
             self.nodes[1].getbestblockhash())['mediantime']
-        transaction = self.nodes[1].gettransaction(transactionid)
+        self.nodes[1].gettransaction(transactionid)
 
         self.log.info("Should import a p2sh")
         result = self.nodes[1].importmulti([{
@@ -293,7 +284,7 @@ class ImportMultiTest (BitcoinTestFramework):
         self.nodes[1].generate(1)
         timestamp = self.nodes[1].getblock(
             self.nodes[1].getbestblockhash())['mediantime']
-        transaction = self.nodes[1].gettransaction(transactionid)
+        self.nodes[1].gettransaction(transactionid)
 
         self.log.info("Should import a p2sh with respective redeem script")
         result = self.nodes[1].importmulti([{
@@ -328,7 +319,7 @@ class ImportMultiTest (BitcoinTestFramework):
         self.nodes[1].generate(1)
         timestamp = self.nodes[1].getblock(
             self.nodes[1].getbestblockhash())['mediantime']
-        transaction = self.nodes[1].gettransaction(transactionid)
+        self.nodes[1].gettransaction(transactionid)
 
         self.log.info(
             "Should import a p2sh with respective redeem script and private keys")
@@ -365,7 +356,7 @@ class ImportMultiTest (BitcoinTestFramework):
         self.nodes[1].generate(1)
         timestamp = self.nodes[1].getblock(
             self.nodes[1].getbestblockhash())['mediantime']
-        transaction = self.nodes[1].gettransaction(transactionid)
+        self.nodes[1].gettransaction(transactionid)
 
         self.log.info(
             "Should import a p2sh with respective redeem script and private keys")

@@ -2,8 +2,6 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-project(crypto)
-
 option(CRYPTO_USE_ASM "Use assembly version of crypto primitives" ON)
 
 # The library
@@ -18,6 +16,7 @@ add_library(crypto
 	$<$<BOOL:${CRYPTO_USE_ASM}>:sha256_sse4.cpp>
 	sha512.cpp
 )
+enable_coverage(crypto)
 
 target_include_directories(crypto
 	PRIVATE
@@ -36,6 +35,11 @@ if(CRYPTO_USE_ASM)
 			" CRYPTO_USE_ASM enabled!")
 	endif()
 	target_compile_definitions(crypto PRIVATE USE_ASM)
+endif()
+
+if(ENABLE_CLANG_TIDY)
+    include(ClangTidy)
+    AddClangTidy(crypto)
 endif()
 
 # Dependencies

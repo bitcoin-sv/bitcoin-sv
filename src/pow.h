@@ -10,7 +10,7 @@
 
 class CBlockHeader;
 class CBlockIndex;
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class uint256;
 
 uint32_t GetNextWorkRequired(const CBlockIndex *pindexPrev,

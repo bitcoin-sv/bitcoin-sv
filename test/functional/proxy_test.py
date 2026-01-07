@@ -33,8 +33,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     PORT_MIN,
     PORT_RANGE,
-    assert_equal,
-    wait_until, check_for_log_msg)
+    assert_equal)
 from test_framework.netutil import test_ipv6_local
 
 RANGE_BEGIN = PORT_MIN + 2 * PORT_RANGE  # Start after p2p and rpc ports
@@ -96,7 +95,7 @@ class ProxyTest(BitcoinTestFramework):
         # Test: outgoing IPv4 connection through node
         node.addnode("15.61.23.23:1234", "onetry")
         cmd = proxies[0].queue.get()
-        assert(isinstance(cmd, Socks5Command))
+        assert (isinstance(cmd, Socks5Command))
         # Note: bitcoind's SOCKS5 implementation only sends atyp DOMAINNAME,
         # even if connecting directly to IPv4/IPv6
         assert_equal(cmd.atyp, AddressType.DOMAINNAME)
@@ -112,7 +111,7 @@ class ProxyTest(BitcoinTestFramework):
             node.addnode(
                 "[1233:3432:2434:2343:3234:2345:6546:4534]:5443", "onetry")
             cmd = proxies[1].queue.get()
-            assert(isinstance(cmd, Socks5Command))
+            assert (isinstance(cmd, Socks5Command))
             # Note: bitcoind's SOCKS5 implementation only sends atyp
             # DOMAINNAME, even if connecting directly to IPv4/IPv6
             assert_equal(cmd.atyp, AddressType.DOMAINNAME)
@@ -126,7 +125,7 @@ class ProxyTest(BitcoinTestFramework):
         # Test: outgoing DNS name connection through node
         node.addnode("node.noumenon:8333", "onetry")
         cmd = proxies[3].queue.get()
-        assert(isinstance(cmd, Socks5Command))
+        assert (isinstance(cmd, Socks5Command))
         assert_equal(cmd.atyp, AddressType.DOMAINNAME)
         assert_equal(cmd.addr, b"node.noumenon")
         assert_equal(cmd.port, 8333)

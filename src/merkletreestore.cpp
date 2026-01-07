@@ -4,14 +4,17 @@
 #include "merkletreestore.h"
 
 #include "block_file_access.h"
-#include "util.h"
-#include "config.h"
+#include "cfile_util.h"
 #include "clientversion.h"
+#include "config.h"
+#include "util.h"
+
 #include <regex>
 
 /* Global state of Merkle Tree factory.
  * Merkle Trees are stored in memory cache and on disk when requested (RPC).
  */
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 std::unique_ptr<CMerkleTreeFactory> pMerkleTreeFactory = nullptr;
 
 CMerkleTreeStore::CMerkleTreeStore(const fs::path& storePath, size_t leveldbCacheSize)
@@ -25,26 +28,31 @@ fs::path CMerkleTreeStore::GetDataFilename(int merkleTreeFileSuffix) const
     return (merkleStorePath / strprintf("%s%08u.dat", "mrk", merkleTreeFileSuffix));
 }
 
-FILE* CMerkleTreeStore::OpenMerkleTreeFile(const MerkleTreeDiskPosition& merkleTreeDiskPosition, bool fReadOnly) const
+UniqueCFile CMerkleTreeStore::OpenMerkleTreeFile(
+    const MerkleTreeDiskPosition& merkleTreeDiskPosition,
+    bool fReadOnly) const
 {
     fs::path path = GetDataFilename(merkleTreeDiskPosition.fileSuffix);
     fs::create_directories(path.parent_path());
-    FILE* file = fsbridge::fopen(path, "rb+");
-    if (!file && !fReadOnly)
+    UniqueCFile file{fsbridge::fopen(path, "rb+")};
+    if(!file && !fReadOnly)
     {
-        file = fsbridge::fopen(path, "wb+");
+        file.reset(fsbridge::fopen(path, "wb+"));
     }
-    if (!file)
+
+    if(!file)
     {
         LogPrintf("Unable to open file %s\n", path.string());
         return nullptr;
     }
+
     if (merkleTreeDiskPosition.fileOffset)
     {
-        if (fseek(file, merkleTreeDiskPosition.fileOffset, SEEK_SET))
+        // NOLINTNEXTLINE(*-narrowing-conversions)
+        if(fseek(file.get(), merkleTreeDiskPosition.fileOffset, SEEK_SET))
         {
             LogPrintf("Unable to seek to position %u of %s\n", merkleTreeDiskPosition.fileOffset, path.string());
-            fclose(file);
+            file.reset();
             return nullptr;
         }
     }
@@ -565,7 +573,7 @@ CMerkleTreeRef CMerkleTreeFactory::GetMerkleTree(const Config& config, const CBl
     return merkleTreeRef;
 }
 
-void CMerkleTreeFactory::Insert(const uint256& blockHash, CMerkleTreeRef merkleTree, const Config& config)
+void CMerkleTreeFactory::Insert(const uint256& blockHash, const CMerkleTreeRef& merkleTree, const Config& config)
 {
     LOCK(cs_merkleTreeFactory);
     if (merkleTreeMap.count(blockHash))

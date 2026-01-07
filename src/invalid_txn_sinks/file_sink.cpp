@@ -34,8 +34,8 @@ void CInvalidTxnFileSink::SaveTransaction(const InvalidTxnInfo& invalidTxnInfo, 
     }
 
     auto size = boost::filesystem::file_size(path);
-    cumulativeFilesSize += size;
-    files[fname.str()] = size;
+    cumulativeFilesSize += size; // NOLINT(*-narrowing-conversions)
+    files[fname.str()] = size;   // NOLINT(*-narrowing-conversions)
     idCountMap[txid] += 1;
 }
 
@@ -66,7 +66,6 @@ void CInvalidTxnFileSink::FillFilesState()
             continue;
         }
 
-        std::string current_file = itr->path().string();
         auto filename = itr->path().filename().string();
 
         std::string txid;
@@ -78,14 +77,14 @@ void CInvalidTxnFileSink::FillFilesState()
         }
 
         auto fileSize = boost::filesystem::file_size(itr->path());
-        files[filename] = fileSize;
-        cumulativeFilesSize += fileSize;
+        files[filename] = fileSize;      // NOLINT(*-narrowing-conversions)
+        cumulativeFilesSize += fileSize; // NOLINT(*-narrowing-conversions)
 
         idCountMap[txid] = std::max(idCountMap[txid], count+1);
     }
 }
 
-bool CInvalidTxnFileSink::RemoveFile(const std::string fname, int64_t fsize)
+bool CInvalidTxnFileSink::RemoveFile(const std::string& fname, int64_t fsize)
 {
     std::string txid; int count = 0;
     if (!ParseFilename(fname, txid, count))

@@ -2,9 +2,6 @@
 # Copyright (c) 2019-2020 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-cmake_minimum_required(VERSION 3.9)
-project(BitcoinSV)
-
 set(CMAKE_CXX_STANDARD 20)
 
 # Default visibility is hidden on all targets.
@@ -21,6 +18,11 @@ option(BUILD_BITCOIN_TX "Build bitcoin-tx" ON)
 option(BUILD_BITCOIN_MINER "Build bitcoin-miner" ON)
 option(BUILD_BITCOIN_BENCH "Build benchmarks" ON)
 
+option(ENABLE_TCMALLOC "Use TCMAlloc" ON)
+option(ENABLE_CLANG_TIDY "Use ClangTidy" OFF)
+
+option(CMAKE_UNITY_BUILD "Enable Unity build")
+
 # Ensure that WINDRES_PREPROC is enabled when using windres.
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	list(APPEND CMAKE_RC_FLAGS "-DWINDRES_PREPROC")
@@ -28,29 +30,27 @@ endif()
 
 # Enable warning
 option(EXTRA_WARNINGS "Enable extra warnings" OFF)
+
 if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
 	add_compile_options(
 		-Wall
+		-Wcast-align
 		-Wextra
 		-Wformat
-		-Wvla
 		-Wformat-security
-		-Wcast-align
-		-Wunused-parameter
+		-Wshadow
+		-Wvla
 		$<$<COMPILE_LANGUAGE:C>:-Wnested-externs>
 		$<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
+		$<$<COMPILE_LANGUAGE:CXX>:-Wsuggest-override>
 	)
 
-	if(EXTRA_WARNINGS)
-		add_compile_options(
-			-Wshadow
-			$<$<COMPILE_LANGUAGE:CXX>:-Wsuggest-override>
-		)
-	else()
-		add_compile_options(
-			-Wno-unused-parameter
-		)
-	endif()
+    if(CMAKE_CXX_COMPILER_ID MATCHES Clang)
+        if(CMAKE_CXX_COMPILER_VERSION MATCHES 18.*)
+            add_compile_options(-Wno-deprecated-declarations)
+        endif()
+    endif()
+
 elseif(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
     if(NOT EXTRA_WARNINGS)
 		add_compile_options(
@@ -60,6 +60,40 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
 		)
 	endif()
 endif()
+
+function(enable_coverage target)
+    if(NOT ENABLE_COVERAGE)
+        return()
+    endif()
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES Clang)
+        target_compile_options(${target}
+            PRIVATE
+            -fprofile-instr-generate
+            -fcoverage-mapping
+        )
+
+        target_link_options(${target}
+            PRIVATE
+            -fprofile-instr-generate
+            -fcoverage-mapping
+        )
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES GNU)
+        target_compile_options(${target}
+            PRIVATE
+            --coverage
+        )
+
+        target_link_options(${target}
+            PRIVATE
+            --coverage
+        )
+    endif()
+
+endfunction()
+
+# Enable coverage
+option(ENABLE_COVERAGE "Enable code coverage" OFF)
 
 # Enable hardening
 option(USE_HARDENING "Enable extra hardening" ON)
@@ -78,6 +112,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
             "LINKER:-pie"
         )
     endif()
+endif()
+
+# TCMalloc
+if(ENABLE_TCMALLOC)
+    find_package(GooglePerf REQUIRED)
+    add_compile_options(-fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free)
 endif()
 
 if(MSVC)
@@ -118,6 +158,13 @@ add_subdirectory(config)
 # libraries
 add_subdirectory(crypto)
 add_subdirectory(leveldb)
+
+target_compile_options(leveldb
+                       PRIVATE
+                       -Wno-shadow
+                       -Wno-suggest-override
+                       -Wno-unused-parameter)
+
 add_subdirectory(secp256k1)
 add_subdirectory(univalue)
 
@@ -130,6 +177,8 @@ add_subdirectory(univalue)
 # Various completely unrelated features shared by all executables.
 add_library(util
 	amount.h
+	cfile_util.cpp
+	cfile_util.h
 	chainparamsbase.cpp
 	chainparamsbase.h
 	clientversion.cpp
@@ -144,8 +193,15 @@ add_library(util
 	enum_cast.h
 	fs.cpp
 	fs.h
+	logging_flags.h
+	logging_impl.cpp
+	logging_impl.h
 	logging.cpp
 	logging.h
+	net/netaddress.cpp
+	net/netaddress.h
+	net/netbase.cpp
+	net/netbase.h
 	prevector.h
 	random.cpp
 	random.h
@@ -176,18 +232,20 @@ add_library(util
 	utiltime.cpp
 	utiltime.h
 )
+enable_coverage(util)
 
 if(ENABLE_PROD_BUILD)
     target_compile_definitions(util PUBLIC IS_PRODUCTION_BUILD)
 endif()
 target_compile_definitions(util PUBLIC HAVE_CONFIG_H)
 target_include_directories(util
+	SYSTEM PUBLIC
+		univalue/include
 	PUBLIC
-		.
+		${CMAKE_CURRENT_SOURCE_DIR}
+	PRIVATE
 		# To access the config.
 		${CMAKE_CURRENT_BINARY_DIR}
-	PRIVATE
-		${OPENSSL_INCLUDE_DIR}
 )
 
 # Target specific configs
@@ -218,6 +276,7 @@ endfunction(prepend)
 
 prepend(BOOST_LIBRARIES "Boost::" ${BOOST_PACKAGES_REQUIRED})
 
+set(Boost_NO_WARN_NEW_VERSIONS TRUE)
 find_package(Boost 1.74 REQUIRED ${BOOST_PACKAGES_REQUIRED})
 target_link_libraries(util univalue crypto ${BOOST_LIBRARIES})
 
@@ -239,8 +298,6 @@ add_library(common
 	blockstreams.h
 	blockvalidation.h
 	bloom.h
-	cfile_util.cpp
-	cfile_util.h
 	chain.h
 	chainparams.cpp
 	chainparams.h
@@ -251,6 +308,8 @@ add_library(common
 	compressor.h
 	config.cpp
 	config.h
+	configscriptpolicy.cpp
+	configscriptpolicy.h
 	consensus/consensus.h
 	consensus/merkle.cpp
 	consensus/merkle.h
@@ -299,6 +358,7 @@ add_library(common
     net/fixed_len_multi_parser.cpp
     net/fixed_len_parser.h
     net/fixed_len_parser.cpp
+    net/mempool_msg.h
     net/msg_buffer.h
     net/msg_buffer.cpp
     net/msg_parser.h
@@ -310,10 +370,6 @@ add_library(common
 	net/net.h
 	net/net_message.h
 	net/net_types.h
-	net/netaddress.cpp
-	net/netaddress.h
-	net/netbase.cpp
-	net/netbase.h
 	net/node_stats.h
     net/prefilled_tx_parser.h
     net/prefilled_tx_parser.cpp
@@ -334,6 +390,8 @@ add_library(common
 	protocol.cpp
 	protocol.h
 	pubkey.h
+    protocol_era.cpp
+    protocol_era.h
 	reverselock.h
 	rpc/jsonwriter.cpp
 	rpc/jsonwriter.h
@@ -345,6 +403,7 @@ add_library(common
 	script/opcodes.h
 	script/script.h
 	script/script_error.h
+	script/script_flags.cpp
 	script/script_flags.h
 	script/script_num.h
 	script/sighashtype.h
@@ -352,14 +411,11 @@ add_library(common
 	script/sign.h
 	script/standard.cpp
 	script/standard.h
-	script_config.h
 	streams.h
 	support/allocators/secure.h
 	support/allocators/zeroafterfree.h
 	task.h
 	task_helpers.h
-	taskcancellation.cpp
-	taskcancellation.h
 	thread_safe_queue.h
 	threadpool.h
 	threadpoolT.h
@@ -367,6 +423,7 @@ add_library(common
 	timedata.h
 	transaction_specific_config.cpp
 	transaction_specific_config.h
+    txdb_defaults.h
 	tx_mempool_info.h
 	txhasher.cpp
 	txhasher.h
@@ -378,18 +435,16 @@ add_library(common
 	txn_validation_config.h
 	txn_validation_data.h
 	txn_validation_result.h
-    unique_array.h
-    unique_array.cpp
 	validation.h
 	version.h
 	versionbits.h
-	warnings.cpp
-	warnings.h
 	write_preferring_upgradable_mutex.cpp
 	write_preferring_upgradable_mutex.h
 )
 
-target_include_directories(common PRIVATE secp256k1/include)
+enable_coverage(common)
+
+target_include_directories(common SYSTEM PUBLIC secp256k1/include)
 target_link_libraries(common util secp256k1)
 
 # libbitcoinconsensus
@@ -411,14 +466,13 @@ add_library(bitcoinconsensus
 	script/script_num.cpp
     taskcancellation.cpp
     taskcancellation.h
+    verify_script_flags.h
+    verify_script_flags.cpp
 )
 
+enable_coverage(bitcoinconsensus)
+
 target_link_libraries(bitcoinconsensus common)
-target_include_directories(bitcoinconsensus
-	PRIVATE
-		${OPENSSL_INCLUDE_DIR}
-        secp256k1/include
-)
 
 # Bitcoin server facilities
 add_library(server
@@ -440,6 +494,8 @@ add_library(server
 	blockfileinfostore.cpp
 	blockfileinfostore.h
 	blockindex_with_descendants.h
+    block_read_cache.cpp
+    block_read_cache.h
 	bloom.cpp
 	chain.cpp
 	checkpoints.cpp
@@ -610,15 +666,21 @@ add_library(server
 	validationinterface.h
 	vmtouch.cpp
 	vmtouch.h
+	warnings.cpp
+	warnings.h
 )
+
+enable_coverage(server)
 
 # This require libevent
 find_package(Event REQUIRED)
 
 target_include_directories(server
-	PRIVATE
+	SYSTEM PRIVATE
 		leveldb/helpers/memenv
 		${EVENT_INCLUDE_DIR}
+	SYSTEM PUBLIC
+		leveldb/include
 )
 
 target_link_libraries(server
@@ -634,6 +696,7 @@ else()
   find_library(BCRYPT_LIBRARY NAMES bcrypt)
   target_link_libraries(server ${BCRYPT_LIBRARY})
 endif()
+
 
 # Test suite.
 add_subdirectory(test)
@@ -665,12 +728,6 @@ endif()
 
 # RPC client support
 add_library(rpcclient
-	cfile_util.cpp
-	cfile_util.h
-    net/netaddress.cpp
-    net/netaddress.h
-    net/netbase.cpp
-    net/netbase.h
 	rpc/client.cpp
 	rpc/client.h
 	rpc/client_config.cpp
@@ -683,42 +740,64 @@ add_library(rpcclient
 	rpc/http_response.h
 	support/events.h
 )
-target_link_libraries(rpcclient univalue util)
+enable_coverage(rpcclient)
+target_link_libraries(rpcclient util)
 
 # bitcoin-cli
 if(BUILD_BITCOIN_CLI)
-	add_executable(bitcoin-cli bitcoin-cli.cpp
-)
+	add_executable(bitcoin-cli bitcoin-cli.cpp)
+    enable_coverage(bitcoin-cli)
+
 	if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 		target_sources(bitcoin-cli PRIVATE bitcoin-cli-res.rc)
 	endif()
 
 	target_include_directories(bitcoin-cli PRIVATE ${EVENT_INCLUDE_DIR})
 	target_link_libraries(bitcoin-cli common rpcclient ${EVENT_LIBRARY})
+
+    if(ENABLE_TCMALLOC)
+        target_link_libraries(bitcoin-cli ${TCMALLOC_LIBRARY})
+    endif()
 endif()
 
 # bitcoin-tx
 if(BUILD_BITCOIN_TX)
-	add_executable(bitcoin-tx bitcoin-tx.cpp
-)
+	add_executable(bitcoin-tx bitcoin-tx.cpp)
+
+    enable_coverage(bitcoin-tx)
+
 	if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 		target_sources(bitcoin-tx PRIVATE bitcoin-tx-res.rc)
 	endif()
 
 	target_link_libraries(bitcoin-tx bitcoinconsensus)
+
+    if(ENABLE_TCMALLOC)
+        target_link_libraries(bitcoin-tx ${TCMALLOC_LIBRARY})
+    endif()
 endif()
 
 # bitcoin-miner
 if(BUILD_BITCOIN_MINER)
-	add_executable(bitcoin-miner bitcoin-miner.cpp
-)
+	add_executable(bitcoin-miner bitcoin-miner.cpp)
+    enable_coverage(bitcoin-miner)
+
 	target_include_directories(bitcoin-miner PRIVATE ${EVENT_INCLUDE_DIR})
+
 	target_link_libraries(bitcoin-miner common rpcclient bitcoinconsensus ${EVENT_LIBRARY})
+
+    if(ENABLE_TCMALLOC)
+        target_link_libraries(bitcoin-miner ${TCMALLOC_LIBRARY})
+    endif()
+
 endif()
 
 # bitcoind
 add_executable(bitcoind bitcoind.cpp
 )
+
+enable_coverage(bitcoind)
+
 target_link_libraries(
 	bitcoind
 	server
@@ -728,10 +807,24 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	target_sources(bitcoind PRIVATE bitcoind-res.rc)
 endif()
 
-include(ClangTidy)
-AddClangTidy(bitcoind)
-if(BUILD_BITCOIN_CLI)
-    AddClangTidy(bitcoin-cli)
+if(ENABLE_TCMALLOC)
+    target_link_libraries(bitcoind ${TCMALLOC_LIBRARY})
+endif()
+
+if(ENABLE_CLANG_TIDY)
+    include(ClangTidy)
+    AddClangTidy(server)
+    AddClangTidy(bitcoinconsensus)
+    AddClangTidy(bitcoind)
+    if(BUILD_BITCOIN_CLI)
+        AddClangTidy(bitcoin-cli)
+    endif()
+	if(BUILD_BITCOIN_TX)
+		AddClangTidy(bitcoin-tx)
+	endif()
+	if(BUILD_BITCOIN_MINER)
+		AddClangTidy(bitcoin-miner)
+	endif()
 endif()
 
 if (MSVC)

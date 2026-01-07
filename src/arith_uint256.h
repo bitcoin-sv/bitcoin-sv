@@ -11,7 +11,6 @@
 #include <cstring>
 #include <stdexcept>
 #include <string>
-#include <vector>
 
 class uint256;
 
@@ -29,30 +28,30 @@ protected:
     uint32_t pn[WIDTH];
 
 public:
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    base_uint() {
+    base_uint() noexcept {
         for (int i = 0; i < WIDTH; i++)
             // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             pn[i] = 0;
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     base_uint(const base_uint &b) {
         for (int i = 0; i < WIDTH; i++)
             // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             pn[i] = b.pn[i];
     }
 
-    // NOLINTNEXTLINE(bugprone-unhandled-self-assignment)
-    base_uint &operator=(const base_uint &b) {
-        for (int i = 0; i < WIDTH; i++)
+    base_uint &operator=(const base_uint& b)
+    {
+        if(this == &b)
+            return *this;
+
+        for(int i = 0; i < WIDTH; i++)
             // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             pn[i] = b.pn[i];
         return *this;
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    base_uint(uint64_t b) {
+    base_uint(uint64_t b) noexcept {
         pn[0] = (unsigned int)b;
         pn[1] = (unsigned int)(b >> 32);
         for (int i = 2; i < WIDTH; i++)
@@ -234,9 +233,6 @@ public:
     friend inline bool operator==(const base_uint &a, const base_uint &b) {
         return memcmp(a.pn, b.pn, sizeof(a.pn)) == 0;
     }
-    friend inline bool operator!=(const base_uint &a, const base_uint &b) {
-        return memcmp(a.pn, b.pn, sizeof(a.pn)) != 0;
-    }
     friend inline bool operator>(const base_uint &a, const base_uint &b) {
         return a.CompareTo(b) > 0;
     }
@@ -251,9 +247,6 @@ public:
     }
     friend inline bool operator==(const base_uint &a, uint64_t b) {
         return a.EqualTo(b);
-    }
-    friend inline bool operator!=(const base_uint &a, uint64_t b) {
-        return !a.EqualTo(b);
     }
 
     std::string GetHex() const;
@@ -278,9 +271,9 @@ public:
 /** 256-bit unsigned big integer. */
 class arith_uint256 : public base_uint<256> {
 public:
-    arith_uint256() {}
+    arith_uint256() = default;
     arith_uint256(const base_uint<256> &b) : base_uint<256>(b) {}
-    arith_uint256(uint64_t b) : base_uint<256>(b) {}
+    arith_uint256(uint64_t b) noexcept : base_uint<256>(b) {}
     explicit arith_uint256(const std::string &str) : base_uint<256>(str) {}
 
     /**

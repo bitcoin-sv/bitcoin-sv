@@ -52,8 +52,7 @@ class BlockDatarefTracker
 
 public:
     std::optional<std::pair<COutPoint, std::optional<CoinWithScript>>>
-    find_fund(int32_t height,
-              std::function<std::optional<CoinWithScript>(const COutPoint&)>
+    find_fund(std::function<std::optional<CoinWithScript>(const COutPoint&)>
                   get_spendable_coin) const;
 
     void set_current_minerid(const CPubKey& minerId);

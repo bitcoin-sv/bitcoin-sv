@@ -7,93 +7,34 @@
 #ifndef BITCOIN_LOGGING_H
 #define BITCOIN_LOGGING_H
 
-#include <atomic>
-#include <cstdint>
-#include <list>
-#include <mutex>
+#include <memory>
 #include <string>
+#include <type_traits>
 
+#include "logging_flags.h"
+
+#if !defined(DISABLE_LOGGING) && !defined(__EMSCRIPTEN__)
 #include "tinyformat.h"
-
-static const bool DEFAULT_LOGTIMEMICROS = false;
-static const bool DEFAULT_LOGIPS = false;
-static const bool DEFAULT_LOGTIMESTAMPS = true;
+#endif
 
 extern bool fLogIPs; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+class LoggerImpl;
 
 namespace BCLog {
 
-enum LogFlags : uint32_t {
-    NONE = 0,
-    MEMPOOL = (1 << 1),
-    HTTP = (1 << 2),
-    BENCH = (1 << 3),
-    ZMQ = (1 << 4),
-    DB = (1 << 5),
-    RPC = (1 << 6),
-    ADDRMAN = (1 << 7),
-    SELECTCOINS = (1 << 8),
-    REINDEX = (1 << 9),
-    CMPCTBLOCK = (1 << 10),
-    RAND = (1 << 11),
-    PRUNE = (1 << 12),
-    PROXY = (1 << 13),
-    MEMPOOLREJ = (1 << 14),
-    LIBEVENT = (1 << 15),
-    COINDB = (1 << 16),
-    LEVELDB = (1 << 17),
-    TXNPROP = (1 << 18),
-    TXNSRC = (1 << 19),
-    JOURNAL = (1 << 20),
-    TXNVAL = (1 << 21),
-    NETCONN = (1 << 22),
-    NETMSG = (1 << 23),
-    NETMSGVERB = (1 << 24),
-    NETMSGALL = NETMSG | NETMSGVERB,
-    NET = NETCONN | NETMSGALL,
-    DOUBLESPEND = (1 << 25),
-    MINERID = (1 << 26),
-    ALL = ~uint32_t(0),
-};
-
-// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class Logger {
-private:
-    /**
-     * Name of the log file
-     */
-    const char* const fileName; // NOLINT (cppcoreguidelines-avoid-const-or-ref-data-members)
-
-    FILE *fileout = nullptr;
-    std::mutex mutexDebugLog;
-    std::list<std::string> vMsgsBeforeOpenLog;
-
-    /**
-     * fStartedNewLine is a state variable that will suppress printing of the
-     * timestamp when multiple calls are made that don't end in a newline.
-     */
-    std::atomic_bool fStartedNewLine{true};
-
-    /**
-     * Log categories bitfield. Leveldb/libevent need special handling if their
-     * flags are changed at runtime.
-     */
-    std::atomic<typename std::underlying_type<LogFlags>::type> logCategories{0};
-
-    std::string LogTimestampStr(const std::string &str);
-    int log(const char*);
 
 public:
-    bool fPrintToConsole = false;
-    bool fPrintToDebugLog = true;
 
-    bool fLogTimestamps = DEFAULT_LOGTIMESTAMPS;
-    bool fLogTimeMicros = DEFAULT_LOGTIMEMICROS;
+    Logger(const char* file_name);
 
-    std::atomic<bool> fReopenDebugLog{false};
+    Logger(const Logger&) = delete;
+    Logger& operator=(const Logger&) = delete;
 
-    explicit Logger(const char* fileName);
-    ~Logger();
+    Logger(Logger&&) = default;
+    Logger& operator=(Logger&&) = default;
+
+    ~Logger() = default;
 
     /** Send a string to the log output */
     int LogPrintStr(const std::string &str);
@@ -109,6 +50,20 @@ public:
 
     /** Default for whether ShrinkDebugFile should be run */
     bool DefaultShrinkDebugFile() const;
+
+    void SetPrintToConsole(bool v);
+    void SetPrintToDebugLog(bool v);
+    void SetLogTimestamps(bool v);
+    void SetLogTimeMicros(bool v);
+    void SetReopenDebugLog(bool v);
+
+    bool PrintToConsole() const;
+    bool PrintToDebugLog() const;
+    bool LogTimestamps() const;
+    bool LogTimeMicros() const;
+
+private:
+    std::unique_ptr<LoggerImpl> loggerImpl;
 };
 
 } // namespace BCLog
@@ -126,16 +81,22 @@ std::string ListLogCategories();
 /** Return true if str parses as a log category and set the flag */
 bool GetLogCategory(BCLog::LogFlags &flag, const std::string &str);
 
-#define LogPrint(category, ...)                                                \
-    do {                                                                       \
-        if (LogAcceptCategory((category))) {                                   \
-            GetLogger().LogPrintStr(tfm::format(__VA_ARGS__));                 \
-        }                                                                      \
-    } while (0)
+// Building with __EMSCRIPTEN__ will need to disable logging
+#if defined(DISABLE_LOGGING) || defined(__EMSCRIPTEN__)
+    #define LogPrint(category, ...) do {} while (0)
+    #define LogPrintf(...)          do {} while (0)
+#else
+    #define LogPrint(category, ...)                                                \
+        do {                                                                       \
+            if (LogAcceptCategory((category))) {                                   \
+                GetLogger().LogPrintStr(tfm::format(__VA_ARGS__));                 \
+            }                                                                      \
+        } while (0)
 
-#define LogPrintf(...)                                                         \
-    do {                                                                       \
-        GetLogger().LogPrintStr(tfm::format(__VA_ARGS__));                     \
-    } while (0)
+    #define LogPrintf(...)                                                         \
+        do {                                                                       \
+            GetLogger().LogPrintStr(tfm::format(__VA_ARGS__));                     \
+        } while (0)
+#endif
 
 #endif // BITCOIN_LOGGING_H

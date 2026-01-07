@@ -3,7 +3,7 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.blocktools import create_block, create_coinbase
-from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block, COIN
+from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block
 from test_framework.script import CScript, OP_DROP, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until, check_mempool_equals, assert_equal
@@ -29,7 +29,7 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
             total_input += parent_tx.vout[n].nValue
 
         for _ in range(noutput):
-            tx.vout.append(CTxOut(total_input//noutput, CScript([b"X"*200, OP_DROP, OP_TRUE])))
+            tx.vout.append(CTxOut(total_input // noutput, CScript([b"X" * 200, OP_DROP, OP_TRUE])))
 
         tx.rehash()
 
@@ -91,7 +91,7 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
                                              "-relayfee=0.000005",
                                              f"-limitancestorcount={limitancestorcount}",
                                              f"-limitcpfpgroupmemberscount={limitcpfpgroupmemberscount}",
-                                             "-checkmempool=1",],
+                                             "-checkmempool=1", ],
                                             number_of_connections=1) as (conn,):
 
             mining_fee = 1.001 # in satoshi per byte
@@ -171,7 +171,7 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
                                              "-relayfee=0.000005",
                                              f"-limitancestorcount={limitancestorcount}",
                                              f"-limitcpfpgroupmemberscount={limitcpfpgroupmemberscount}",
-                                             "-checkmempool=1",],
+                                             "-checkmempool=1", ],
                                             number_of_connections=1) as (conn,):
             # ensure that the mempool is empty
             check_mempool_equals(conn.rpc, [])

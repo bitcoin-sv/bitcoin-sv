@@ -12,7 +12,7 @@ bool CCancellationToken::IsCanceled() const
         std::any_of(
             mSource.begin(),
             mSource.end(),
-            [](auto source){ return source->IsCanceled(); });
+            [](const auto& source){ return source->IsCanceled(); });
 }
 
 }

@@ -16,25 +16,22 @@ Second part: reorg scenario
 Check that the transaction specific config is not applied when reorg happens, so the transactions that were accepted
 when originally sent will now be rejected.
 """
-import json
 import random
 import glob
-from decimal import Decimal
 from math import floor, ceil
 from time import sleep
 import re
 
-from test_framework.cdefs import ONE_MEGABYTE, ELEMENT_OVERHEAD, DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS
-from test_framework.mininode import NodeConn, NetworkThread, NodeConnCB, mininode_lock, FromHex
+from test_framework.cdefs import ONE_MEGABYTE, ELEMENT_OVERHEAD
+from test_framework.mininode import NodeConn, FromHex
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.test_node import TestNode
-from test_framework.util import hex_str_to_bytes, assert_raises_rpc_error, assert_equal, wait_for_reject_message, \
-    wait_until, p2p_port, bytes_to_hex_str, connect_nodes_bi, hashToHex, satoshi_round, connect_nodes, sync_blocks
+from test_framework.util import hex_str_to_bytes, assert_raises_rpc_error, assert_equal, \
+    wait_until, p2p_port, bytes_to_hex_str, connect_nodes_bi, hashToHex, satoshi_round, sync_blocks
 from test_framework.script import OP_1, OP_FALSE, OP_RETURN, OP_TRUE, OP_CHECKSIG, OP_DROP, OP_DUP, OP_HASH160, \
-    OP_EQUALVERIFY, OP_ADD, OP_CAT, OP_MUL
+    OP_EQUALVERIFY, OP_ADD, OP_CAT
 from test_framework.blocktools import COIN, CScript, CTransaction, CTxOut, CTxIn, COutPoint, uint256_from_str, ToHex, \
-    calc_needed_data_size, create_tx
-from test_framework.blocktools import create_transaction
+    calc_needed_data_size
 
 
 def getInputScriptPubKey(node, input, index):
@@ -46,7 +43,6 @@ def getInputScriptPubKey(node, input, index):
 
 
 def count_in_log(rpc, msg, node_dir, from_line=0):
-    count = 0
     txes = set()
     for line in open(glob.glob(rpc.options.tmpdir + node_dir + "/regtest/bitcoind.log")[0]).readlines()[from_line:]:
         if msg in line:
@@ -55,7 +51,7 @@ def count_in_log(rpc, msg, node_dir, from_line=0):
                 try:
                     txid = re.match(".*txn= [a-f0-9]+", line).group(0).split(' ')[-1]
                     txes.add(txid)
-                except:
+                except Exception:
                     print(line)
     # Return number of distinct transaction ids that were rejected with specified reject message
     return len(txes)
@@ -105,7 +101,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
                             '-txindex=1',
                             ], []]
         self.setup_nodes()
-        connect_nodes_bi(self.nodes, 0,1)
+        connect_nodes_bi(self.nodes, 0, 1)
 
     def create_transaction(self, fee, op_codes, input_txs, no_outputs, amount, feerate=1.001, dustrelay=0, out0_value=0):
         ftx = CTransaction()
@@ -119,20 +115,20 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
             ftx.vout.append(CTxOut(int(out0_value), CScript(op_codes)))
             st = 1
         for _ in range(no_outputs):
-            ftx.vout.append(CTxOut(int((float(amount) - out0_value - fee)//no_outputs), CScript(op_codes)))
+            ftx.vout.append(CTxOut(int((float(amount) - out0_value - fee) // no_outputs), CScript(op_codes)))
         ftx.rehash()
         tx = self.nodes[0].signrawtransaction(ToHex(ftx))['hex']
         ftxSigned = FromHex(CTransaction(), tx)
-        if fee < len(tx)*feerate:
-            for i in range(st, no_outputs+st):
-                ftx.vout[i].nValue = (ftx.vout[i].nValue - ceil((len(ftxSigned.serialize())*feerate - fee)/no_outputs))
+        if fee < len(tx) * feerate:
+            for i in range(st, no_outputs + st):
+                ftx.vout[i].nValue = (ftx.vout[i].nValue - ceil((len(ftxSigned.serialize()) * feerate - fee) / no_outputs))
         if dustrelay > 0:
             ftx.vout[0].nValue = int(((len(ftx.vout[0].serialize()) + 148) * dustrelay) / 1000 * COIN)
         tx = self.nodes[0].signrawtransaction(ToHex(ftx))['hex']
         return tx
 
     def create_simple_datatx(self, utxo, fee, data_size):
-        amount = int(int(utxo['amount'] * COIN) - fee)/COIN
+        amount = int(int(utxo['amount'] * COIN) - fee) / COIN
         inputs = []
         inputs.append({"txid": utxo["txid"], "vout": utxo["vout"]})
         outputs = {}
@@ -171,13 +167,13 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         out_amount = 199000000
         while True:
             tx = CTransaction()
-            if(lock_script != None):
+            if lock_script is not None:
                 tx.vout.append(CTxOut(int(int(utxo['amount'] * COIN) - target_script_size - 200000000 - len(lock_script)), lock_script))
             elif target_script_size != 0:
                 script = self.make_script(target_script_size=target_script_size, op_codes=op_codes, elem=elem)
                 tx.vout.append(CTxOut(int(int(utxo['amount'] * COIN) - target_script_size - 205000000), script))
             else:
-                out_amount = int(utxo['amount'] * COIN) - target_tx_size//4 - 2000
+                out_amount = int(utxo['amount'] * COIN) - target_tx_size // 4 - 2000
             tx.vout.append(CTxOut(out_amount, CScript([OP_DUP, OP_HASH160,
                                                       hex_str_to_bytes(
                                                           "ab812dc588ca9d5787dde7eb29569da63c3a238c"),
@@ -189,8 +185,8 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
             txHex = self.nodes[0].signrawtransaction(ToHex(tx))['hex']
             txSigned = FromHex(CTransaction(), txHex)
             if target_tx_size != 0:
-                padding_size = (2*target_tx_size - len(ToHex(txSigned)))//2
-                txSigned.vout.append(CTxOut(1000, CScript([OP_FALSE, OP_RETURN] + [bytes(5)[:1] *(padding_size)])))
+                padding_size = (2 * target_tx_size - len(ToHex(txSigned))) // 2
+                txSigned.vout.append(CTxOut(1000, CScript([OP_FALSE, OP_RETURN] + [bytes(5)[:1] * (padding_size)])))
             txHex = ToHex(tx)
             tx = FromHex(CTransaction(), txHex)
 
@@ -199,7 +195,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
 
             if target_tx_size != 0 and len(txSigned.serialize()) > target_tx_size:
                 while True:
-                    padding_size-=1
+                    padding_size -= 1
                     txSigned.vout[-1] = (CTxOut(1000, CScript([OP_FALSE, OP_RETURN] + [bytes(5)[:1] * padding_size])))
                     txSigned = FromHex(CTransaction(), self.nodes[0].signrawtransaction(ToHex(txSigned))['hex'])
                     txSigned.rehash()
@@ -275,7 +271,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
     def prepare_base_txs(self, utxos, target_tx_size=0, target_script_size=0, lock_script=None):
         txs = [self.create_customscripts_tx(utxo, target_tx_size=target_tx_size, target_script_size=target_script_size, lock_script=lock_script) for utxo in utxos]
         txids = [self.nodes[0].sendrawtransaction(ToHex(tx), False, False) for tx in txs]
-        return [{'txid': txids[i], 'vout': 0, 'amount': txs[i].vout[0].nValue/ COIN} for i in range(len(txs))]
+        return [{'txid': txids[i], 'vout': 0, 'amount': txs[i].vout[0].nValue / COIN} for i in range(len(txs))]
 
     def create_utxos_value10000(self, node, utxo_count, min_confirmations, script=None, utxo=None):
         utxos = []
@@ -337,7 +333,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         test_node = TestNode()
         conn = NodeConn(dstaddr, p2p_port(dstportno), self.nodes[node_index], test_node)
         test_node.add_connection(conn)
-        return test_node,conn
+        return test_node, conn
 
     def run_test(self):
         #generate 500 utxos
@@ -356,8 +352,8 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
                                      "limitcpfpgroupmemberscount": 5,
                                      "minconsolidationfactor": 2, "minconfconsolidationinput": 3,
                                      "acceptnonstdconsolidationinput": False}
-        config_overrides_increase = {"maxtxsizepolicy": ONE_MEGABYTE*100, "datacarriersize": 99995000, "maxscriptsizepolicy": 20000000,
-                                     "maxscriptnumlengthpolicy": 250000, "maxstackmemoryusagepolicy": ONE_MEGABYTE*100,
+        config_overrides_increase = {"maxtxsizepolicy": ONE_MEGABYTE * 100, "datacarriersize": 99995000, "maxscriptsizepolicy": 20000000,
+                                     "maxscriptnumlengthpolicy": 250000, "maxstackmemoryusagepolicy": ONE_MEGABYTE * 100,
                                      "limitancestorcount": 7, "limitcpfpgroupmemberscount": 10,
                                      "minconsolidationfactor": 15, "minconfconsolidationinput": 8, "acceptnonstdconsolidationinput": True}
 
@@ -407,8 +403,8 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
                        + falses(3))
         overrides_pertx = [None for _ in range(8)] + [config_overrides_increase, None, None, None, {"datacarriersize": 99000}, None, None, None]
 
-        self.create_transactions_and_send_with_overridden_config(utxos[i_utxo:i_utxo+16], tx_params, config_overrides_increase, overrides_pertx, invalid_txs=invalid_txs)
-        i_utxo+=16
+        self.create_transactions_and_send_with_overridden_config(utxos[i_utxo:i_utxo + 16], tx_params, config_overrides_increase, overrides_pertx, invalid_txs=invalid_txs)
+        i_utxo += 16
 
         invalid_txs = (falses(4)
                        + [{'reject_reason': "datacarrier-size-exceeded"} for _ in range(4)]
@@ -432,31 +428,30 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         self.log.info("PASS\n")
 
         self.log.info("Test maxscriptsize")
-        base_utxos = self.prepare_base_txs(utxos[i_utxo:i_utxo + 16], target_script_size=self.maxscriptsize+1)
+        base_utxos = self.prepare_base_txs(utxos[i_utxo:i_utxo + 16], target_script_size=self.maxscriptsize + 1)
 
         invalid_txs = (
             [{'reject_reason': "non-mandatory-script-verify-flag (Script is too big)"} for _ in range(4)]
             + falses(5)
-            + [{'reject_reason': "non-mandatory-script-verify-flag (Script is too big)"} for _ in range(3)]
-            + [{'reject_reason': "mandatory-script-verify-flag-failed (Script is too big)"}]
+            + [{'reject_reason': "non-mandatory-script-verify-flag (Script is too big)"} for _ in range(4)]
             + falses(3))
 
         overrides_pertx = [None for _ in range(8)] + [config_overrides_increase, None, None, None,
                                                       {"maxscriptsizepolicy": self.maxscriptsize}, None, None, None]
-        tx_params = {"fee": 600, "script_size": self.maxscriptsize+1, "tx_size": 0}
+        tx_params = {"fee": 600, "script_size": self.maxscriptsize + 1, "tx_size": 0}
 
         self.create_transactions_and_send_with_overridden_config(base_utxos, tx_params,
                                                                  config_overrides_increase, overrides_pertx,
                                                                  invalid_txs=invalid_txs, custom_scripts=True)
         i_utxo += 16
 
-        base_utxos = self.prepare_base_txs(utxos[i_utxo:i_utxo+16], target_script_size=self.maxscriptsize)
+        base_utxos = self.prepare_base_txs(utxos[i_utxo:i_utxo + 16], target_script_size=self.maxscriptsize)
 
         invalid_txs = (falses(4)
-                       + [{'reject_reason': "mandatory-script-verify-flag-failed (Script is too big)"} for _ in range(4)]
-                       + [{'reject_reason': "mandatory-script-verify-flag-failed (Script is too big)"}]
+                       + [{'reject_reason': "non-mandatory-script-verify-flag (Script is too big)"} for _ in range(4)]
+                       + [{'reject_reason': "non-mandatory-script-verify-flag (Script is too big)"}]
                        + falses(4)
-                       + [{'reject_reason': "mandatory-script-verify-flag-failed (Script is too big)"} for _ in range(3)])
+                       + [{'reject_reason': "non-mandatory-script-verify-flag (Script is too big)"} for _ in range(3)])
 
         overrides_pertx = (
             [None for _ in range(8)]
@@ -464,7 +459,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
 
         tx_params = {"fee": 600, "script_size": self.maxscriptsize, "tx_size": 0}
 
-        self.create_transactions_and_send_with_overridden_config(base_utxos,tx_params,
+        self.create_transactions_and_send_with_overridden_config(base_utxos, tx_params,
                                                                  config_overrides_decrease, overrides_pertx,
                                                                  invalid_txs=invalid_txs, custom_scripts=True)
         i_utxo += 16
@@ -477,7 +472,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         lock_script_max = CScript(
             [bytearray([42] * (self.maxscriptnumlength + 1)), bytearray([42] * (self.maxscriptnumlength + 1)), OP_ADD])
 
-        base_utxos = self.prepare_base_txs(utxos[i_utxo:i_utxo+16], lock_script=lock_script_max)
+        base_utxos = self.prepare_base_txs(utxos[i_utxo:i_utxo + 16], lock_script=lock_script_max)
 
         invalid_txs = (
             [{'reject_reason': "max-script-num-length-policy-limit-violated (Script number overflow)"} for _ in range(4)]
@@ -570,11 +565,11 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         relayfee = 0.251
 
         # create oversized primary mempool chains, the last tx in the chain will be over the limit
-        outpoints = utxos[i_utxo: i_utxo+16]
+        outpoints = utxos[i_utxo: i_utxo + 16]
 
         invalid_txs = ([{'reject_reason': "too-long-mempool-chain"} for _ in range(4)]
                        + falses(5)
-                       + [{'reject_reason':"too-long-mempool-chain"} for _ in range(3)]
+                       + [{'reject_reason': "too-long-mempool-chain"} for _ in range(3)]
                        + [{'reject_reason': "too-long-mempool-chain"}]
                        + falses(3))
         overrides_pertx = [None for _ in range(8)] + [config_overrides_increase, None, None, None,
@@ -598,13 +593,13 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
 
         i_utxo += 16
 
-        outpoints = utxos[i_utxo:i_utxo+16]
+        outpoints = utxos[i_utxo:i_utxo + 16]
 
         invalid_txs = (falses(4)
                        + [{'reject_reason': "too-long-mempool-chain"} for _ in range(4)]
                        + [{'reject_reason': "too-long-mempool-chain"}]
                        + falses(4)
-                       + [{'reject_reason':"too-long-mempool-chain"} for _ in range(3)])
+                       + [{'reject_reason': "too-long-mempool-chain"} for _ in range(3)])
 
         overrides_pertx = [None for _ in range(8)] + [config_overrides_decrease, None, None, None,
                                                       {"limitancestorcount": 5}, None, None, None]
@@ -613,7 +608,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         outpoints = utxos[i_utxo: i_utxo + 16]
         txes = []
         for j in range(16):
-            for i in range(self.limitancestorcount-1):
+            for i in range(self.limitancestorcount - 1):
                 tx = self.create_transaction(int(ceil(len(ToHex(CTransaction())) * mining_fee * 2)), [OP_TRUE],
                                              [(outpoints[j], 0)], 1, int((outpoints[j]['amount']) * COIN))
 
@@ -630,7 +625,6 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         i_utxo += 16
 
         self.nodes[0].generate(1)
-        hash_ancestor_block = self.nodes[0].getbestblockhash()
         assert (len(self.nodes[0].getrawmempool()) == 0), "Not all transactions were mined"
         self.log.info("PASS\n")
 
@@ -651,8 +645,8 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
                                                       {"limitcpfpgroupmemberscount": 5}, None, None, None]
         txes_fee_too_low = falses(16)
         for j in range(16):
-            tx = self.create_transaction(0, [OP_TRUE], [(utxos[i_utxo+j], 0)], no_outputs,
-                                         int((utxos[i_utxo+j]['amount']) * COIN), feerate=relayfee)
+            tx = self.create_transaction(0, [OP_TRUE], [(utxos[i_utxo + j], 0)], no_outputs,
+                                         int((utxos[i_utxo + j]['amount']) * COIN), feerate=relayfee)
 
             txid = self.nodes[0].sendrawtransaction(tx, False, False)
 
@@ -668,7 +662,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
                 children[j].append([{'txid': txid, 'vout': 0, 'amount': FromHex(CTransaction(), tx).vout[0].nValue / COIN}, 0])
 
             tx = self.create_transaction(0, [OP_TRUE], children[j], 1,
-                                         int((children[j][0][0]['amount']) * COIN * no_outputs), feerate=mining_fee*(no_outputs+1))
+                                         int((children[j][0][0]['amount']) * COIN * no_outputs), feerate=mining_fee * (no_outputs + 1))
 
             txes.append({"hex": tx, "config": overrides_pertx[j]})
             invalid_txs[j]['txid'] = str(FromHex(CTransaction(), tx))[18:82]
@@ -700,7 +694,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
                        + [{'reject_reason': "too-long-mempool-chain"} for _ in range(4)]
                        + [{'reject_reason': "too-long-mempool-chain"}]
                        + falses(4)
-                       + [{'reject_reason':"too-long-mempool-chain"} for _ in range(3)])
+                       + [{'reject_reason': "too-long-mempool-chain"} for _ in range(3)])
 
         overrides_pertx = (
             [None for _ in range(8)]
@@ -726,7 +720,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
                     [{'txid': txid, 'vout': 0, 'amount': FromHex(CTransaction(), tx).vout[0].nValue / COIN}, 0])
 
             tx = self.create_transaction(0, [OP_TRUE], children[j], 1,
-                                         int((children[j][0][0]['amount']) * COIN * no_outputs), feerate=mining_fee*(no_outputs))
+                                         int((children[j][0][0]['amount']) * COIN * no_outputs), feerate=mining_fee * (no_outputs))
 
             txes.append({"hex": tx, "config": overrides_pertx[j]})
             invalid_txs[j]['txid'] = str(FromHex(CTransaction(), tx))[18:82]
@@ -748,13 +742,13 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         # Test acceptnonstdoutputs
         self.log.info("Test acceptnonstdoutputs")
         config_overrides_increase["acceptnonstdoutputs"] = False
-        base_utxos = self.prepare_base_txs(utxos[i_utxo:i_utxo+16], target_script_size=self.maxscriptsize + 1)
+        base_utxos = self.prepare_base_txs(utxos[i_utxo:i_utxo + 16], target_script_size=self.maxscriptsize + 1)
         tx_params = {"fee": 600, "script_size": self.maxscriptsize, "tx_size": 0}
 
         invalid_txs = (
             [{'reject_reason': "non-mandatory-script-verify-flag (Script is too big)"} for _ in range(4)]
             + [{'reject_reason': "scriptpubkey"} for _ in range(5)]
-            + [{'reject_reason':"non-mandatory-script-verify-flag" " (Script is too big)"} for _ in range(4)]
+            + [{'reject_reason': "non-mandatory-script-verify-flag" " (Script is too big)"} for _ in range(4)]
             + [{'reject_reason': "scriptpubkey"} for _ in range(3)])
 
         overrides_pertx = (
@@ -789,7 +783,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
 
         txes = []
         for j in range(16):
-            tx = self.create_simple_datatx(utxos[i_utxo+j], 500, data_size=1000)
+            tx = self.create_simple_datatx(utxos[i_utxo + j], 500, data_size=1000)
             txes.append({'hex': tx, 'config': overrides_pertx[j]})
             invalid_txs[j]['txid'] = str(FromHex(CTransaction(), tx))[18:82]
 
@@ -816,7 +810,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         enough_confirmations = self.minconfconsolidationinput
 
         invalid_txs = (falses(4)
-                       + [{'reject_reason':"mempool min fee not met"} for _ in range(5)]
+                       + [{'reject_reason': "mempool min fee not met"} for _ in range(5)]
                        + falses(4)
                        + [{'reject_reason': "mempool min fee not met"} for _ in range(3)])
 
@@ -856,11 +850,11 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         txes = []
         utxos_cons = []
         for j in range(16):
-            utxos_cons.append(self.create_utxos_value10000(self.nodes[0], enough_inputs-1, 0))
+            utxos_cons.append(self.create_utxos_value10000(self.nodes[0], enough_inputs - 1, 0))
 
         self.nodes[0].generate(enough_confirmations)
         for j in range(16):
-            tx = self.create_and_sign_consolidationtx(self.nodes[0], in_count=enough_inputs-1,
+            tx = self.create_and_sign_consolidationtx(self.nodes[0], in_count=enough_inputs - 1,
                                                       min_confirmations=enough_confirmations, utxos=utxos_cons[j])
             txes.append({"hex": tx, "config": overrides_pertx[j]})
             invalid_txs[j]['txid'] = str(FromHex(CTransaction(), tx))[18:82]
@@ -904,10 +898,10 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         utxos_cons = []
         for j in range(16):
             utxos_cons.append(self.create_utxos_value10000(self.nodes[0], enough_inputs, 0))
-        self.nodes[0].generate(enough_confirmations-1)
+        self.nodes[0].generate(enough_confirmations - 1)
         for j in range(16):
             tx = self.create_and_sign_consolidationtx(self.nodes[0], in_count=enough_inputs,
-                                                      min_confirmations=enough_confirmations-1, utxos=utxos_cons[j])
+                                                      min_confirmations=enough_confirmations - 1, utxos=utxos_cons[j])
             txes.append({"hex": tx, "config": overrides_pertx[j]})
             invalid_txs[j]['txid'] = str(FromHex(CTransaction(), tx))[18:82]
 
@@ -1040,7 +1034,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         assert_equal(res, {})
 
         # Create another transaction and test with global CLEANSTACK flag
-        ftx = self.create_transaction_for_skipscriptflags(1000, [OP_1, OP_1, OP_1], utxos[i_utxo+1], 0, int(utxos[i_utxo+1]['amount'] * COIN))
+        ftx = self.create_transaction_for_skipscriptflags(1000, [OP_1, OP_1, OP_1], utxos[i_utxo + 1], 0, int(utxos[i_utxo + 1]['amount'] * COIN))
         txid = self.nodes[0].sendrawtransaction(ftx)
 
         tx_one = self.nodes[0].getrawtransaction(txid, 1)
@@ -1062,7 +1056,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         logfile.close()
 
         txes_in_blocks = {}
-        for h in range(height1, height0+1):
+        for h in range(height1, height0 + 1):
             txes_in_blocks[self.nodes[0].getblockbyheight(h, 1)['hash']] = self.nodes[0].getblockbyheight(h, 1)['tx']
 
         self.stop_node(0)
@@ -1071,7 +1065,7 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         self.nodes[1].generate(height0 - height1 + 288) # to avoid safe mode
         self.extra_args[0][19] = "-minconfconsolidationinput=0"
         self.start_node(0)
-        connect_nodes_bi(self.nodes, 0,1)
+        connect_nodes_bi(self.nodes, 0, 1)
         sync_blocks(self.nodes, timeout=120)
         self.stop_node(1)
 

@@ -40,30 +40,37 @@ static const size_t MAX_HEADERS_SIZE = 8192;
  */
 static const size_t MIN_SUPPORTED_BODY_SIZE = 0x02000000;
 
-struct HTTPPathHandler {
-    HTTPPathHandler() {}
-    HTTPPathHandler(std::string _prefix, bool _exactMatch,
-                    HTTPRequestHandler _handler)
-        : prefix(_prefix), exactMatch(_exactMatch), handler(_handler) {}
+struct HTTPPathHandler
+{
+    HTTPPathHandler(std::string _prefix, bool _exactMatch, HTTPRequestHandler _handler)
+        : prefix{std::move(_prefix)},
+          exactMatch{_exactMatch},
+          handler{std::move(_handler)}
+    {
+    }
     std::string prefix;
-    bool exactMatch;
+    bool exactMatch{};
     HTTPRequestHandler handler;
 };
 
 /** HTTP module state */
 
-//! libevent event loop
-static struct event_base *eventBase = 0;
-//! HTTP server
-struct evhttp *eventHTTP = 0;
+namespace
+{
+    //! libevent event loop
+    struct event_base *eventBase = 0;
+    //! HTTP server
+    struct evhttp *eventHTTP = 0;
+}
+
 //! List of subnets to allow RPC connections from
 static std::vector<CSubNet> rpc_allow_subnets;
 //! Work queue for handling longer requests off the event loop thread
 static std::unique_ptr<CThreadPool<CQueueAdaptor>> pWorkQueue {nullptr};
 //! Handlers for (sub)paths
-std::vector<HTTPPathHandler> pathHandlers;
+static std::vector<HTTPPathHandler> pathHandlers;
 //! Bound listening sockets
-std::vector<evhttp_bound_socket *> boundSockets;
+static std::vector<evhttp_bound_socket *> boundSockets;
 
 /** Check if a network address is allowed to access the HTTP server */
 static bool ClientAllowed(const CNetAddr &netaddr) {
@@ -128,6 +135,7 @@ static std::string RequestMethodString(HTTPRequest::RequestMethod m) {
 
 /** HTTP request callback */
 static void http_request_cb(struct evhttp_request *req, void *arg) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     Config &config = *reinterpret_cast<Config *>(arg);
 
     std::shared_ptr<HTTPRequest> hreq { std::make_shared<HTTPRequest>(req) };
@@ -196,7 +204,8 @@ static void http_reject_request_cb(struct evhttp_request *req, void *) {
 }
 
 /** Event dispatcher thread */
-static bool ThreadHTTP(struct event_base *base, struct evhttp *http) {
+static bool ThreadHTTP(struct event_base* base, struct evhttp*)
+{
     RenameThread("http");
     LogPrint(BCLog::HTTP, "Entering http event loop\n");
     event_base_dispatch(base);
@@ -207,6 +216,7 @@ static bool ThreadHTTP(struct event_base *base, struct evhttp *http) {
 
 /** Bind HTTP server to specified addresses */
 static bool HTTPBindAddresses(struct evhttp *http) {
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     int defaultPort = gArgs.GetArg("-rpcport", BaseParams().RPCPort());
     std::vector<std::pair<std::string, uint16_t>> endpoints;
 
@@ -276,6 +286,7 @@ ev_ssize_t GetMaxBodySizeSafe(uint64_t maxBlockSize)
     }
     else
     {
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         maxBodySize = MIN_SUPPORTED_BODY_SIZE + 2 * maxBlockSize;
     }
     return maxBodySize;
@@ -328,6 +339,7 @@ bool InitHTTPServer(Config &config) {
     }
 
     evhttp_set_timeout(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         http, gArgs.GetArg("-rpcservertimeout", DEFAULT_HTTP_SERVER_TIMEOUT));
     evhttp_set_max_headers_size(http, MAX_HEADERS_SIZE);
     evhttp_set_max_body_size(http, GetMaxBodySizeSafe(config.GetMaxBlockSize()));
@@ -351,15 +363,15 @@ bool InitHTTPServer(Config &config) {
     eventHTTP = http;
     LogPrint(BCLog::HTTP, "Initialized HTTP server\n");
 
-    int rpcThreads = std::max(static_cast<long>(gArgs.GetArg("-rpcthreads", DEFAULT_HTTP_THREADS)), 1L);
+    const auto rpcThreads = std::max(static_cast<long>(gArgs.GetArg("-rpcthreads", DEFAULT_HTTP_THREADS)), 1L);
     LogPrintf("HTTP: creating work queue with %d threads\n", rpcThreads);
     pWorkQueue = std::make_unique<CThreadPool<CQueueAdaptor>>(true, "HTTPServer", rpcThreads);
 
     return true;
 }
 
-std::thread threadHTTP;
-std::future<bool> threadResult;
+static std::thread threadHTTP;
+static std::future<bool> threadResult;
 
 bool StartHTTPServer() {
     LogPrint(BCLog::HTTP, "Starting HTTP server\n");
@@ -427,17 +439,20 @@ struct event_base *EventBase() {
 // this callback is called after successful or failed transmission
 static void httpevent_callback_fn(evutil_socket_t, short, void *data) {
     // Static handler: simply call inner handler
-    HTTPEvent *self = ((HTTPEvent *)data);
+    HTTPEvent* self = static_cast<HTTPEvent*>(data);
     self->handler();
-    if (self->deleteWhenTriggered) delete self;
+    if(self->deleteWhenTriggered)
+        delete self; // NOLINT(cppcoreguidelines-owning-memory)
 }
 
 HTTPEvent::HTTPEvent(struct event_base *base, bool _deleteWhenTriggered,
-                     const std::function<void(void)> &_handler)
-    : deleteWhenTriggered(_deleteWhenTriggered), handler(_handler) {
-    ev = event_new(base, -1, 0, httpevent_callback_fn, this);
+                     const std::function<void(void)> &_handler):
+    deleteWhenTriggered(_deleteWhenTriggered), handler(_handler),
+    ev{event_new(base, -1, 0, httpevent_callback_fn, this)}
+{
     assert(ev);
 }
+
 HTTPEvent::~HTTPEvent() {
     event_free(ev);
 }
@@ -481,7 +496,10 @@ std::string HTTPRequest::ReadBody() {
      * better to not copy into an intermediate string but use a stream
      * abstraction to consume the evbuffer on the fly in the parsing algorithm.
      */
-    const char *data = (const char *)evbuffer_pullup(buf, size);
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast
+    // NOLINTNEXTLINE(*-narrowing-conversions)
+    const char* data = reinterpret_cast<const char*>(evbuffer_pullup(buf, size));
+    // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast
     // returns nullptr in case of empty buffer.
     if (!data) {
         return "";

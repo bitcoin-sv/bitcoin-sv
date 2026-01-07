@@ -48,7 +48,7 @@ class SafeModeReogNotification(BitcoinTestFramework):
         self.serverThread.join()
 
     def make_handler(self, *a, **kw):
-        return WebhookHandler(self,  *a, **kw)
+        return WebhookHandler(self, *a, **kw)
 
     def set_test_params(self):
         self.setup_clean_chain = True
@@ -63,7 +63,7 @@ class SafeModeReogNotification(BitcoinTestFramework):
     def make_chain(self, conn, root_block, n_blocks):
         result = []
         last_block = root_block
-        while(len(result) < n_blocks):
+        while len(result) < n_blocks:
             last_block, self.last_block_time = make_block(conn, last_block, last_block_time=self.last_block_time)
             result.append(last_block)
         return result
@@ -74,9 +74,9 @@ class SafeModeReogNotification(BitcoinTestFramework):
             json_messages.append(self.webhook_messages[-1])
         for safe_mode_json in json_messages:
             if not forks:
-                assert safe_mode_json["safemodeenabled"] == False
+                assert safe_mode_json["safemodeenabled"] is False
             else:
-                assert safe_mode_json["safemodeenabled"] == True
+                assert safe_mode_json["safemodeenabled"] is True
                 assert len(forks) == len(safe_mode_json["forks"])
                 for fork_expected, fork_json in zip(forks, safe_mode_json["forks"]):
                     assert fork_expected["forkfirstblock"] == fork_json["forkfirstblock"]["hash"]
@@ -96,11 +96,11 @@ class SafeModeReogNotification(BitcoinTestFramework):
 
     def check_last_webhook_msg_reorged_from(self, old_tip, numberofdisconnectedblocks=None):
         if old_tip is None:
-            assert self.webhook_messages[-1]["reorg"]["happened"] == False
-            assert self.webhook_messages[-1]["reorg"]["oldtip"] == None
+            assert self.webhook_messages[-1]["reorg"]["happened"] is False
+            assert self.webhook_messages[-1]["reorg"]["oldtip"] is None
             assert self.webhook_messages[-1]["reorg"]["numberofdisconnectedblocks"] == 0
         else:
-            assert self.webhook_messages[-1]["reorg"]["happened"] == True
+            assert self.webhook_messages[-1]["reorg"]["happened"] is True
             assert self.webhook_messages[-1]["reorg"]["oldtip"]["hash"] == old_tip
             if numberofdisconnectedblocks is not None:
                 assert self.webhook_messages[-1]["reorg"]["numberofdisconnectedblocks"] == numberofdisconnectedblocks

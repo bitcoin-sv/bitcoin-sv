@@ -8,22 +8,24 @@
 #include <vector>
 
 static void Base58Encode(benchmark::State &state) {
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,-warnings-as-errors)
     uint8_t buff[32] = {17,  79,  8,   99,  150, 189, 208, 162, 22,  23, 203,
                         163, 36,  58,  147, 227, 139, 2,   215, 100, 91, 38,
                         11,  141, 253, 40,  117, 21,  16,  90,  200, 24};
-    uint8_t *b = buff;
+    uint8_t *b = buff; // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     while (state.KeepRunning()) {
-        EncodeBase58(b, b + 32);
+        EncodeBase58(b, b + 32); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 }
 
 static void Base58CheckEncode(benchmark::State &state) {
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,-warnings-as-errors)
     uint8_t buff[32] = {17,  79,  8,   99,  150, 189, 208, 162, 22,  23, 203,
                         163, 36,  58,  147, 227, 139, 2,   215, 100, 91, 38,
                         11,  141, 253, 40,  117, 21,  16,  90,  200, 24};
-    uint8_t *b = buff;
+    uint8_t *b = buff; // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     std::vector<uint8_t> vch;
-    vch.assign(b, b + 32);
+    vch.assign(b, b + 32); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     while (state.KeepRunning()) {
         EncodeBase58Check(vch);
     }

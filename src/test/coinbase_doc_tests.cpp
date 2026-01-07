@@ -58,12 +58,12 @@ BOOST_AUTO_TEST_CASE(user_defined_constructor_equality)
     BOOST_CHECK_EQUAL(a, a);
 
     // symmetry
-    const CoinbaseDocument b{a};
+    const CoinbaseDocument b{a}; // NOLINT(performance-unnecessary-copy-initialization)
     BOOST_CHECK_EQUAL(a, b);
     BOOST_CHECK_EQUAL(b, a);
 
     // transitivity
-    const CoinbaseDocument c{a};
+    const CoinbaseDocument c{a}; // NOLINT(performance-unnecessary-copy-initialization)
     BOOST_CHECK_EQUAL(a, b);
     BOOST_CHECK_EQUAL(b, c);
     BOOST_CHECK_EQUAL(c, a);

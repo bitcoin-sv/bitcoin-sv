@@ -14,15 +14,14 @@ namespace
     uint256 zeroHash = {};
 }
 
-CFrozenTXOCheck::CFrozenTXOCheck(
-    std::int32_t nHeight,
-    const std::string& source,
-    const uint256& previousActiveBlockHash,
-    std::int64_t receivedTime)
-    : nHeight(nHeight)
-    , mSource{source}
-    , mPreviousActiveBlockHash{previousActiveBlockHash}
-    , mReceivedTime{receivedTime}
+CFrozenTXOCheck::CFrozenTXOCheck(std::int32_t height,
+                                 const std::string& source,
+                                 const uint256& previousActiveBlockHash,
+                                 std::int64_t receivedTime)
+    : mHeight{height},
+      mSource{source},
+      mPreviousActiveBlockHash{previousActiveBlockHash},
+      mReceivedTime{receivedTime}
 {}
 
 CFrozenTXOCheck::CFrozenTXOCheck( const CBlockIndex& blockIndex )
@@ -49,11 +48,11 @@ bool CFrozenTXOCheck::Check(const COutPoint& outpoint, std::uint8_t& effectiveBl
         return true;
     }
 
-    CFrozenTXODB::FrozenTXOData::Blacklist effective_blacklist;
+    CFrozenTXODB::FrozenTXOData::Blacklist effective_blacklist{};
     if(IsCheckOnBlock())
     {
         // When validating block, we only consider TXOs frozen on consensus blacklist
-        if(!ftd.IsFrozenOnConsensus(this->nHeight)) // NOTE: Assuming specified height is equal to height of the block that is currently being validated
+        if(!ftd.IsFrozenOnConsensus(mHeight)) // NOTE: Assuming specified height is equal to height of the block that is currently being validated
         {
             // TXO is not frozen on consensus blacklist
             return true;
@@ -64,15 +63,15 @@ bool CFrozenTXOCheck::Check(const COutPoint& outpoint, std::uint8_t& effectiveBl
     else
     {
         // When not validating block, we consider TXOs frozen on policy blacklist which includes those frozen on consensus
-        if(!ftd.IsFrozenOnPolicy(this->nHeight)) // NOTE: Assuming specified height is equal to height of the first block in which transaction could be included.
+        if(!ftd.IsFrozenOnPolicy(mHeight)) // NOTE: Assuming specified height is equal to height of the first block in which transaction could be included.
         {
             // TXO is not frozen on policy blacklist
             return true;
         }
 
         // Effective blacklist can be either policy-only or consensus, depending on frozen txo data.
-        effective_blacklist = ftd.IsFrozenOnConsensus(this->nHeight) ? CFrozenTXODB::FrozenTXOData::Blacklist::Consensus
-                                                                     : CFrozenTXODB::FrozenTXOData::Blacklist::PolicyOnly;
+        effective_blacklist = ftd.IsFrozenOnConsensus(mHeight) ? CFrozenTXODB::FrozenTXOData::Blacklist::Consensus
+                                                               : CFrozenTXODB::FrozenTXOData::Blacklist::PolicyOnly;
     }
 
     // This TXO is considered frozen.
@@ -106,7 +105,7 @@ void CFrozenTXOCheck::LogAttemptToSpendFrozenTXO(const COutPoint& outpoint, cons
 
 bool CFrozenTXOCheck::Check(const COutPoint& outpoint, const CTransaction& tx, std::int64_t receivedTime) const
 {
-    std::uint8_t effectiveBlacklist;
+    std::uint8_t effectiveBlacklist{};
     bool result = Check(outpoint, effectiveBlacklist);
     if(!result)
     {
@@ -135,7 +134,7 @@ bool CFrozenTXOCheck::CheckConfiscationTxWhitelisted(const CTransaction& tx, std
 {
     auto whitelistedTxData = CFrozenTXODB::WhitelistedTxData::Create_Uninitialized();
     bool isWhitelisted = CFrozenTXODB::Instance().IsTxWhitelisted(tx.GetId(), whitelistedTxData);
-    if(isWhitelisted && this->nHeight >= whitelistedTxData.enforceAtHeight)
+    if(isWhitelisted && mHeight >= whitelistedTxData.enforceAtHeight)
     {
         // Confiscation transaction is whitelisted and can be spent at specified height
         return true;

@@ -12,7 +12,8 @@
 #include <optional>
 #include <ostream>
 
-#include "fs.h"
+#include "config.h"
+#include "miner_id/miner_id_db.h"
 
 fs::path GetTempPath();
 
@@ -34,15 +35,49 @@ bool wait_for(T callback, std::chrono::milliseconds duration)
     return false;
 }
 
+CService ip(uint32_t ip_address);
+
 namespace std
 {
     // Serialisation for std::optional
     template<typename T>
-    ostream& operator<<(ostream& os, const optional<T>& o)
+    ostream& operator<<(ostream& os, const optional<T>& o) // NOLINT(cert-dcl58-cpp)
     {
         os << (o ? o.value() : "nullopt");
         return os;
     }
+}
+    
+const inline mining::CJournalChangeSetPtr nullChangeSet{nullptr};
+
+constexpr size_t script_len_1{1};
+constexpr size_t script_len_2{2};
+constexpr size_t script_len_3{3};
+constexpr size_t script_len_4{4};
+
+// RAII class to instantiate global miner ID database
+class MakeGlobalMinerIdDb
+{
+    public:
+    MakeGlobalMinerIdDb()
+    {
+        g_minerIDs = std::make_unique<MinerIdDatabase>(GlobalConfig::GetConfig());
+    }
+    ~MakeGlobalMinerIdDb()
+    {
+        g_minerIDs.reset();
+    }
+
+    MakeGlobalMinerIdDb(const MakeGlobalMinerIdDb&) = delete;
+    MakeGlobalMinerIdDb(MakeGlobalMinerIdDb&&) = delete;
+    MakeGlobalMinerIdDb& operator=(const MakeGlobalMinerIdDb&) = delete;
+    MakeGlobalMinerIdDb& operator=(MakeGlobalMinerIdDb&&) = delete;
+};
+
+inline std::vector<uint8_t> Serialize(const CScript& s)
+{
+    std::vector<uint8_t> sSerialized(s.begin(), s.end());
+    return sSerialized;
 }
 
 #endif // BITCOIN_TEST_TESTUTIL_H

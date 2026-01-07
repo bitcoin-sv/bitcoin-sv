@@ -92,7 +92,7 @@ class BSVBlockWithCBProof(BitcoinTestFramework):
         super().setup_network()
 
         # Connect the nodes up
-        connect_nodes_bi(self.nodes, 0,1)
+        connect_nodes_bi(self.nodes, 0, 1)
 
     def _send_transactions_to_node(self, node, num_trasactions):
         # Create UTXOs to build a bunch of transactions from
@@ -128,7 +128,7 @@ class BSVBlockWithCBProof(BitcoinTestFramework):
         candidate = blockNode.getminingcandidate(get_coinbase)
         assert 'id' in candidate
         assert 'prevhash' in candidate
-        if(get_coinbase):
+        if get_coinbase:
             assert 'coinbase' in candidate
         else:
             assert 'coinbase' not in candidate
@@ -168,10 +168,10 @@ class BSVBlockWithCBProof(BitcoinTestFramework):
         hdr = node.getblockheader(block_hash, 2)
         self.check_rest_header_extendeded_json(node, block_hash, hdr) # header returned via rest call must be the same
         assert_equal(hdr["tx"][0], obj["tx"][0]) # coinbase transaction must also be returned in a header
-        assert(len(hdr["merkleproof"]) > 0)
+        assert (len(hdr["merkleproof"]) > 0)
         # check if merkle root is correct by calculating root from merkleproof tree and coinbase tx hash
-        root_hash = merkle_root_from_merkle_proof(int(obj["tx"][0]["hash"],16), hdr["merkleproof"])
-        assert_equal(root_hash, int(obj["merkleroot"],16))
+        root_hash = merkle_root_from_merkle_proof(int(obj["tx"][0]["hash"], 16), hdr["merkleproof"])
+        assert_equal(root_hash, int(obj["merkleroot"], 16))
 
     def run_test(self):
         txnNode = self.nodes[0]

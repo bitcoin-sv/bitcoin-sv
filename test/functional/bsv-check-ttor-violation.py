@@ -173,7 +173,7 @@ class BSVCheckTTORViolation(BitcoinTestFramework):
                 if "active" in chaintips_status and "invalid" in chaintips_status:
                     active_chain_tip_hash = chaintips[0]["hash"] if chaintips[0]["status"] == "active" else chaintips[1]["hash"]
                     invalid_fork_tip_hash = chaintips[0]["hash"] if chaintips[0]["status"] == "invalid" else chaintips[1]["hash"]
-                    assert(active_chain_tip_hash != invalid_fork_tip_hash)
+                    assert (active_chain_tip_hash != invalid_fork_tip_hash)
 
                     for block in blocks_invalid_ttor:
                         if block.hash == invalid_fork_tip_hash:
@@ -192,7 +192,7 @@ class BSVCheckTTORViolation(BitcoinTestFramework):
         # check log file that reorg didnt happen
         disconnect_block_log = False
         for line in open(glob.glob(self.options.tmpdir + "/node0" + "/regtest/bitcoind.log")[0]):
-            if f"Disconnect block" in line:
+            if "Disconnect block" in line:
                 disconnect_block_log = True
                 self.log.info("Found line: %s", line.strip())
                 break
@@ -203,7 +203,7 @@ class BSVCheckTTORViolation(BitcoinTestFramework):
         # check log file that contains information about TTOR violation
         ttor_violation_log = False
         for line in open(glob.glob(self.options.tmpdir + "/node0" + "/regtest/bitcoind.log")[0]):
-            if f"violates TTOR order" in line:
+            if "violates TTOR order" in line:
                 ttor_violation_log = True
                 self.log.info("Found line: %s", line.strip())
                 break

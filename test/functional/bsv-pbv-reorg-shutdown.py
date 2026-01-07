@@ -33,8 +33,6 @@ from bsv_pbv_common import (
     wait_for_validating_blocks
 )
 
-import time
-
 
 class PBVReorgShutdown(BitcoinTestFramework):
 
@@ -80,11 +78,10 @@ class PBVReorgShutdown(BitcoinTestFramework):
         self.log.info("waiting for block height 101 via rpc")
         self.nodes[0].waitforblockheight(101)
 
-        tip_block_num = block_count-1
+        tip_block_num = block_count - 1
 
         # left branch
         block2 = self.chain.next_block(block_count, spend=out[0], extra_txns=8)
-        block2_num = block_count
         block_count += 1
         node0.send_message(msg_block(block2))
         self.log.info(f"block2 hash: {block2.hash}")

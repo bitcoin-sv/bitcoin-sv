@@ -34,14 +34,20 @@ private:
         std::vector<std::byte> data;
         uint32_t nSequence;
 
-        ZMQMessage(void* socketPointer, const std::string& topic,  const void* data, size_t size, uint32_t nSequence) : 
-            socketPointer(socketPointer),
-            topic(topic),
-            // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-            data(std::vector<std::byte>(reinterpret_cast<const std::byte*>(data), reinterpret_cast<const std::byte*>(data) + size)),
-            // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
-            nSequence(nSequence)
+        ZMQMessage(void* socket_pointer,
+                   const std::string& t,
+                   const void* d,
+                   size_t size,
+                   uint32_t nSeq)
+            : socketPointer(socket_pointer),
+              topic(t),
+              // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+              // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              data(std::vector<std::byte>(reinterpret_cast<const std::byte*>(d),
+                                          reinterpret_cast<const std::byte*>(d) +
+                                              size)),
+              // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
+              nSequence(nSeq)
         {}
 
         // We need this function for thread safe queue, because sizes of ZMQMessages are not constant

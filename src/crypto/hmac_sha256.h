@@ -18,13 +18,17 @@ private:
 
 public:
     static const size_t OUTPUT_SIZE = 32;
+    using span = std::span<uint8_t, OUTPUT_SIZE>;
 
-    CHMAC_SHA256(const uint8_t *key, size_t keylen);
-    CHMAC_SHA256 &Write(const uint8_t *data, size_t len) {
+    CHMAC_SHA256(const uint8_t* key, size_t keylen);
+
+    CHMAC_SHA256& Write(const uint8_t* data, size_t len)
+    {
         inner.Write(data, len);
         return *this;
     }
-    void Finalize(uint8_t hash[OUTPUT_SIZE]);
+
+    void Finalize(span hash);
 };
 
 #endif // BITCOIN_CRYPTO_HMAC_SHA256_H

@@ -16,12 +16,10 @@ histograms and display them
 
 """
 import collections
-import datetime
 import dateutil.parser
 import decimal
 import itertools
 import os
-import pathlib
 from typing import Iterator, List, Callable
 from pathlib import Path
 
@@ -69,7 +67,7 @@ class Histogram(dict):
 
     @classmethod
     def parse(cls, ser):
-        return eval(ser, {"Histogram":cls})
+        return eval(ser, {"Histogram": cls})
 
 
 HistogramLog = collections.namedtuple("HistogramLog", "dataset, ts, name, histogram")
@@ -91,7 +89,7 @@ def open_at_offset(offset: int = 0):
     return opener
 
 
-def read_histograms(name: str, *, dataset=None, offset:int = 0) -> Iterator[HistogramLog]:
+def read_histograms(name: str, *, dataset=None, offset: int = 0) -> Iterator[HistogramLog]:
     bug = "An invalid reference: Node doesn't exist"
     pattern = " = Histogram("
     with open(name, opener=open_at_offset(offset)) as fd:
@@ -101,11 +99,11 @@ def read_histograms(name: str, *, dataset=None, offset:int = 0) -> Iterator[Hist
                 continue
             b = line.find(bug)
             if b >= 0:
-                line = line.replace(bug,"")
+                line = line.replace(bug, "")
                 found = line.find(pattern)
-            histogram = line[found+3:].strip()
+            histogram = line[found + 3:].strip()
             parts = line[:found].strip().split()
-            # , {"Histogram":Histogram}
+            #, {"Histogram":Histogram}
             yield HistogramLog(dataset if dataset is not None else name,
                                " ".join(parts[0:2]),
                                parts[-1],
@@ -145,8 +143,8 @@ def strip_common_prefix(names):
     return [name[cp:] for name in names]
 
 
-def assert_eq(a,b):
-    assert (a==b), f"{a} != {b}"
+def assert_eq(a, b):
+    assert (a == b), f"{a} != {b}"
 
 
 assert_eq(strip_common_prefix(["a/b"]), ["a"])
@@ -176,8 +174,8 @@ assert_eq(unique_parts(["a/b/c"]), ["a"])
 
 def plot_histogram(ax, ls, *, bins=20):
     hide_overmax = ls[0].name.lower().endswith("_us")
-    ps = [np.asarray(list(l.histogram.items_(hide_overmax))).transpose()
-          for l in ls]
+    ps = [np.asarray(list(x.histogram.items_(hide_overmax))).transpose()
+          for x in ls]
     minp = min(p[0].min() for p in ps)
     maxp = max(p[0].max() for p in ps)
     hs = [np.histogram(p[0], range=(minp, maxp), bins=bins, weights=p[1], density=False)
@@ -185,18 +183,18 @@ def plot_histogram(ax, ls, *, bins=20):
     hists, bins = list(zip(*hs))
     bins = [list(bin) for bin in bins]
     hists = [list(hist) for hist in hists]
-    plt.hist([bin[:-1] for bin in bins], bins[0], weights=hists, label=unique_parts(l.dataset for l in ls), log=True)
+    plt.hist([bin[:-1] for bin in bins], bins[0], weights=hists, label=unique_parts(x.dataset for x in ls), log=True)
     plt.title(ls[0].name)
 
 
 def plot_percentiles(ax, ls, *, key):
     pr = list(percentile_range(12, 5))
-    for l, p in zip(ls, unique_parts(l.dataset for l in ls)):
-        ps = list(l.histogram.percentiles(pr))
+    for x, p in zip(ls, unique_parts(x.dataset for x in ls)):
+        ps = list(x.histogram.percentiles(pr))
         if not ps:
             continue
         x, y = tuple(zip(*ps))
-        plt.plot(x, y, label=f"{p} - {l.name}")
+        plt.plot(x, y, label=f"{p} - {x.name}")
 #        for t in [1-3237/100000]:
 #            xy = [(x,y) for x,y in zip(ps, pr) if y >= t]
 #            if xy:
@@ -204,22 +202,22 @@ def plot_percentiles(ax, ls, *, key):
 #                plt.annotate(f"{100*xy[1]:.3f}% < {xy[0]}", xy)
     plt.title(key(ls[0]))
     plt.yscale("logit")
-    plt.ylim((1e-1,1-1e-6))
+    plt.ylim((1e-1, 1 - 1e-6))
 
 
-def prefix(l):
-    return l.name
+def prefix(x):
+    return x.name
 
 
-def prefix_t(l):
-    return l.name.replace("_CPU_", ".").replace("_TIME_", ".")
+def prefix_t(x):
+    return x.name.replace("_CPU_", ".").replace("_TIME_", ".")
 
 
 HistogramFilter = Callable[[HistogramLog], bool]
 
 
 def load_histograms(fs: List[str], histogram_filter: HistogramFilter) -> List[HistogramLog]:
-    def keep_last(it, *, key=lambda x:x.name):
+    def keep_last(it, *, key=lambda x: x.name):
         return {key(elt): elt for elt in it}.values()
 
     def read_last(f, dataset):
@@ -256,9 +254,9 @@ def show_percentiles(logs, *,
                      key=prefix_t,
                      histogram_filter: HistogramFilter = histogram_filter_all):
 
-    for r, (k,v) in enumerate(grouped(load_histograms(logs, histogram_filter), key=key).items(), 1):
-        print("percentiles =======", k, [l.dataset for l in v])
-        fig = plt.figure(figsize=(8,6))
+    for r, (k, v) in enumerate(grouped(load_histograms(logs, histogram_filter), key=key).items(), 1):
+        print("percentiles =======", k, [x.dataset for x in v])
+        fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111)
         plot_percentiles(ax, v, key=key)
         plt.grid(which='major', axis='both')
@@ -268,9 +266,9 @@ def show_percentiles(logs, *,
 def show_histograms(logs, *, key=prefix,
                     histogram_filter: HistogramFilter = histogram_filter_all):
 
-    for r, (k,v) in enumerate(grouped(load_histograms(logs, histogram_filter), key=key).items(), 1):
-        print("histogram =======", k, [l.dataset for l in v])
-        fig = plt.figure(figsize=(8,6))
+    for r, (k, v) in enumerate(grouped(load_histograms(logs, histogram_filter), key=key).items(), 1):
+        print("histogram =======", k, [x.dataset for x in v])
+        fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111)
         plot_histogram(ax, v)
         plt.grid(which='major', axis='both')

@@ -73,9 +73,12 @@ e. Announce one more that doesn't connect.
    Expect: disconnect.
 """
 
-from test_framework.mininode import *
+from test_framework.mininode import CBlockHeader, CInv, NetworkThread, \
+    NodeConn, NodeConnCB, \
+    mininode_lock, msg_block, msg_getblocks, msg_getdata, msg_getheaders, \
+    msg_headers, msg_sendheaders, msg_inv
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_equal, p2p_port, sync_blocks, wait_until
 from test_framework.blocktools import create_block, create_coinbase
 
 
@@ -126,10 +129,12 @@ class TestNode(NodeConnCB):
     # right header or the right inv
     # inv and headers should be lists of block hashes
     def check_last_announcement(self, headers=None, inv=None):
-        expect_headers = headers if headers != None else []
-        expect_inv = inv if inv != None else []
+        expect_headers = headers if headers is not None else []
+        expect_inv = inv if inv is not None else []
 
-        def test_function(): return self.block_announced
+        def test_function():
+            return self.block_announced
+
         wait_until(test_function, timeout=60, lock=mininode_lock)
         with mininode_lock:
             self.block_announced = False
@@ -157,13 +162,18 @@ class TestNode(NodeConnCB):
         if hash_list == []:
             return
 
-        def test_function(): return "getdata" in self.last_message and [
-            x.hash for x in self.last_message["getdata"].inv] == hash_list
+        def test_function():
+            return "getdata" in self.last_message \
+                and [x.hash for x in self.last_message["getdata"].inv] == hash_list
+
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
         return
 
     def wait_for_block_announcement(self, block_hash, timeout=60):
-        def test_function(): return self.last_blockhash_announced == block_hash
+
+        def test_function():
+            return self.last_blockhash_announced == block_hash
+
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
         return
 

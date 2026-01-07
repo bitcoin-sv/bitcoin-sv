@@ -163,8 +163,8 @@ bool IsValid(const DSDetected::BlockDetails& fork)
     if(contains_coinbase_tx(fork.mMerkleProof))
     {
         LogPrint(BCLog::NETMSG,
-                 "Invalid double-spend detected message: contains coinbase"
-                 " transaction\n");
+                 "Invalid double-spend detected message: contains coinbase "
+                 "transaction\n");
         return false;
     }
 
@@ -175,7 +175,7 @@ bool IsValid(const DSDetected::BlockDetails& fork)
                  "merkle root\n");
         return false;
     }
-    
+
     if(!FormsChain(fork.mBlockHeaders))
     {
         LogPrint(BCLog::NETMSG,
@@ -198,7 +198,14 @@ bool IsValid(const DSDetected::BlockDetails& fork)
                  "Invalid double-spend detected message: merkle proof is invalid\n");
         return false;
     }
-    
+
+    if(fork.mMerkleProof.Target() != fork.mBlockHeaders.front().hashMerkleRoot)
+    {
+        LogPrint(BCLog::NETMSG,
+                 "Invalid double-spend detected message: merkle proof / block mismatch\n");
+        return false;
+    }
+
     return true; 
 }
 

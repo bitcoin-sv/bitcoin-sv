@@ -32,6 +32,7 @@
 #include "miner_id/revokemid.h"
 #include "net/authconn.h"
 #include "net/block_download_tracker.h"
+#include "net/mempool_msg.h"
 #include "net/net.h"
 #include "net/netbase.h"
 #include "net/node_state.h"
@@ -338,7 +339,6 @@ static void FindNextBlocksToDownload(
     unsigned int count,
     std::vector<const CBlockIndex*>& vBlocks,
     NodeId& nodeStaller,
-    const Consensus::Params& consensusParams,
     const CNodeStatePtr& state,
     CConnman& connman)
 {
@@ -563,15 +563,6 @@ private:
 
 } // namespace
 
-static bool ProcessMessage(const Config& config,
-                           const CNodePtr& pfrom,
-                           const std::string& strCommand,
-                           msg_buffer& vRecv,
-                           int64_t nTimeReceived,
-                           const CChainParams& chainparams,
-                           CConnman& connman,
-                           const std::atomic<bool>& interruptMsgProc);
-
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
     // Try to obtain an access to the node's state data.
     const CNodeStateRef stateRef { GetState(nodeid) };
@@ -670,8 +661,10 @@ void PeerLogicValidation::UnregisterValidationInterface()
 }
 
 void PeerLogicValidation::BlockConnected(
-    const std::shared_ptr<const CBlock> &pblock, const CBlockIndex *pindex,
-    const std::vector<CTransactionRef> &vtxConflicted) {
+    const std::shared_ptr<const CBlock>& pblock,
+    const CBlockIndex*,
+    const std::vector<CTransactionRef>&)
+{
     LOCK(cs_main);
     std::vector<uint256> vOrphanErase {};
     for (const CTransactionRef &ptx : pblock->vtx) {
@@ -1369,23 +1362,33 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                         }
                     }
                 }
-            } else if (inv.type == MSG_TX) {
+            }
+            else if (inv.type == MSG_TX)
+            {
                 // Send stream from relay memory
                 bool push = false;
                 auto mi = mapRelay.find(inv.hash);
-                if (mi != mapRelay.end()) {
-                    connman.PushMessage(
-                        pfrom,
-                        msgMaker.Make(NetMsgType::TX, *mi->second));
-                    push = true;
-                } else if (pfrom->timeLastMempoolReq) {
+                if (mi != mapRelay.end())
+                {
+                    // Check we do actually have the transaction
+                    if(mi->second)
+                    {
+                        connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::TX, *mi->second));
+                        push = true;
+                    }
+                    else
+                    {
+                        LogPrintf("ERROR: NULL txn in mapRelay for %s\n", inv.hash.ToString());
+                    }
+                }
+                else if (pfrom->timeLastMempoolReq)
+                {
                     auto txinfo = mempool.Info(inv.hash);
                     // To protect privacy, do not answer getdata using the
                     // mempool when that TX couldn't have been INVed in reply to
                     // a MEMPOOL request.
-                    if (!txinfo.IsNull() &&
-                        txinfo.nTime <= pfrom->timeLastMempoolReq) {
-
+                    if (!txinfo.IsNull() && txinfo.nTime <= pfrom->timeLastMempoolReq)
+                    {
                         if(const auto& pTx{txinfo.GetTx()}; pTx)
                         {
                             connman.PushMessage(pfrom,
@@ -1966,6 +1969,15 @@ static bool ProcessAuthChMessage(const Config& config,
     if (pfrom->fAuthConnEstablished) {
         return true;
     }
+
+    // Limit message spamming
+    if(pfrom->authRateLimit += 1)
+    {
+        LogPrint(BCLog::MINERID | BCLog::NETCONN, "authch rate limit exceeded from peer=%d\n", pfrom->id);
+        Misbehaving(pfrom, 10, "authch-rate-limit");
+        return false;
+    }
+
     using namespace authconn;
     uint32_t nVersion {0};
     uint32_t nMsgLen {0};
@@ -1999,7 +2011,7 @@ static bool ProcessAuthChMessage(const Config& config,
         CHash256()
             .Write(msg.begin(), msg.size()) // (a)
             .Write(reinterpret_cast<uint8_t*>(&nClientNonce), 8) // (b)
-            .Finalize(hash.begin());
+            .Finalize(CHash256::span{hash.begin(), CHash256::OUTPUT_SIZE});
 
         // Get the current MinerID from this node
         std::optional<CPubKey> pubKeyOpt = g_BlockDatarefTracker->get_current_minerid();
@@ -2008,8 +2020,8 @@ static bool ProcessAuthChMessage(const Config& config,
             using namespace rpc::client;
             if (g_pWebhookClient) {
                 RPCClientConfig rpcConfig { RPCClientConfig::CreateForMinerIdGenerator(config, 5) };
-                using HTTPRequest = rpc::client::HTTPRequest;
-                auto request { std::make_shared<HTTPRequest>(HTTPRequest::CreateGetMinerIdRequest(
+                using HTTP_Request = rpc::client::HTTPRequest;
+                auto request { std::make_shared<HTTP_Request>(HTTP_Request::CreateGetMinerIdRequest(
                                         rpcConfig,
                                         config.GetMinerIdGeneratorAlias())) };
                 auto response { std::make_shared<StringHTTPResponse>() };
@@ -2054,8 +2066,8 @@ static bool ProcessAuthChMessage(const Config& config,
             } else {
                 LogPrint(BCLog::MINERID, "sending signature request to MinerID Generator\n");
                 RPCClientConfig rpcConfig { RPCClientConfig::CreateForMinerIdGenerator(config, 5) };
-                using HTTPRequest = rpc::client::HTTPRequest;
-                auto request { std::make_shared<HTTPRequest>(HTTPRequest::CreateMinerIdGeneratorSigningRequest(
+                using HTTP_Request = rpc::client::HTTPRequest;
+                auto request { std::make_shared<HTTP_Request>(HTTP_Request::CreateMinerIdGeneratorSigningRequest(
                         rpcConfig,
                         config.GetMinerIdGeneratorAlias(),
                         HexStr(hash))) };
@@ -2108,6 +2120,15 @@ static bool ProcessAuthRespMessage(const CNodePtr& pfrom,
     if (pfrom->fAuthConnEstablished) {
         return true;
     }
+
+    // Limit message spamming
+    if(pfrom->authRateLimit += 1)
+    {
+        LogPrint(BCLog::MINERID | BCLog::NETCONN, "authresp rate limit exceeded from peer=%d\n", pfrom->id);
+        Misbehaving(pfrom, 10, "authresp-rate-limit");
+        return false;
+    }
+
     using namespace authconn;
     std::vector<uint8_t> vPubKey {};
     uint64_t nClientNonce {0};
@@ -2195,13 +2216,13 @@ static bool ProcessAuthRespMessage(const CNodePtr& pfrom,
         CHash256()
             .Write(msgHash.begin(), msgHash.size()) // (a)
             .Write(reinterpret_cast<uint8_t*>(&nClientNonce), 8) // (b)
-            .Finalize(hash.begin());
+            .Finalize(CHash256::span{hash.begin(), CHash256::OUTPUT_SIZE});
         // Execute verification.
         if (!recvPubKey.Verify(hash, vSign)) {
             throw std::runtime_error("authresp message signature failed to verify.");
         }
     } catch(std::exception& e) {
-        LogPrint(BCLog::NETCONN, "peer=%d Failed to process authresp: (%s); disconnecting\n", pfrom->id, e.what());
+        LogPrint(BCLog::NETCONN, "peer=%d Failed to process authresp: (%s)\n", pfrom->id, e.what());
         connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
             .Make(NetMsgType::REJECT, strCommand, REJECT_AUTH_CONN_SETUP, std::string(e.what())));
 	    // We still connect if authentication failed.
@@ -2420,7 +2441,8 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
 
         bool fAlreadyHave = AlreadyHave(inv);
 
-        if(inv.type == MSG_BLOCK) {
+        if(inv.type == MSG_BLOCK)
+        {
             LogPrint(BCLog::NETMSG, "got block inv: %s %s peer=%d\n", inv.hash.ToString(),
                 fAlreadyHave ? "have" : "new", pfrom->id);
             UpdateBlockAvailability(inv.hash, GetState(pfrom->GetId()).get());
@@ -2443,7 +2465,8 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
                          pfrom->id);
             }
         }
-        else {
+        else if(inv.type == MSG_TX)
+        {
             LogPrint(BCLog::TXNSRC | BCLog::NETMSGVERB, "got txn inv: %s %s txnsrc peer=%d\n",
                 inv.hash.ToString(), fAlreadyHave ? "have" : "new", pfrom->id);
             pfrom->AddInventoryKnown(inv);
@@ -2454,6 +2477,12 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
             else if(!fAlreadyHave && !fImporting && !fReindex && !IsInitialBlockDownload()) {
                 pfrom->AskFor(inv, config);
             }
+        }
+        else
+        {
+            LogPrint(BCLog::NETMSG, "Got invalid inv type %d from peer=%d\n", static_cast<int>(inv.type), pfrom->id);
+            // Disconnect them
+            pfrom->fDisconnect = true;
         }
 
         // Track requests for our stuff
@@ -2665,7 +2694,7 @@ void SendBlockTransactions(const Config& config,
                            const std::atomic<bool>& interruptMsgProc,
                            const BlockTransactionsRequest& req,
                            BlockTransactionReader& reader,
-                           bool mostRecentBlock,
+                           bool most_recent_block,
                            CConnman& connman)
 {
     // If the peer wants more than the configured % of txns in the original block, just stream them the whole thing
@@ -2704,7 +2733,7 @@ void SendBlockTransactions(const Config& config,
 
     const CNetMsgMaker msgMaker { pfrom->GetSendVersion() };
     CSerializedNetMsg msg { msgMaker.Make(NetMsgType::BLOCKTXN, resp) };
-    if(! rejectIfMaxDownloadExceeded(config, msg, mostRecentBlock, pfrom, connman))
+    if(!rejectIfMaxDownloadExceeded(config, msg, most_recent_block, pfrom, connman))
     {
         connman.PushMessage(pfrom, std::move(msg));
     }
@@ -3034,10 +3063,10 @@ public:
     // Default constructor is only needed by serialization framework
     CBlockHeaderEnriched() = default;
 
-    CBlockHeaderEnriched(const CBlockIndex* blockIndex)
-    : blockHeader { blockIndex->GetBlockHeader() }
-    , nTx { blockIndex->GetBlockTxCount() }
-    , blockIndex { blockIndex }
+    CBlockHeaderEnriched(const CBlockIndex* block_index)
+    : blockHeader { block_index->GetBlockHeader() }
+    , nTx { block_index->GetBlockTxCount() }
+    , blockIndex { block_index }
     {
     }
 
@@ -3064,7 +3093,9 @@ public:
      * @param config Needed by CMerkleTreeFactory.
      * @param chainActiveHeight Current height of active chain. Needed by CMerkleTreeFactory.
      */
-    void SetCoinBaseInfo(int serializationVersion, const Config& config, int32_t chainActiveHeight)
+    void SetCoinBaseInfo(int /*serializationVersion*/,
+                         const Config& config,
+                         int32_t chainActiveHeight)
     {
         coinbaseAndProof.reset();
         try
@@ -3273,8 +3304,6 @@ static void ProcessGetHeadersEnrichedMessage(const CNodePtr& pfrom,
 */
 static void ProcessTxMessage(const Config& config,
                              const CNodePtr& pfrom,
-                             const CNetMsgMaker& msgMaker,
-                             const std::string& strCommand,
                              msg_buffer& vRecv,
                              CConnman& connman)
 {
@@ -3648,10 +3677,10 @@ static void ProcessBlockTxnMessage(const Config& config,
 
                 if(fNewBlock)
                 {
-                    auto pfrom = weakFrom.lock();
-                    if(pfrom)
+                    auto from = weakFrom.lock();
+                    if(from)
                     {
-                        pfrom->nLastBlockTime = GetTime();
+                        from->nLastBlockTime = GetTime();
                     }
                 }
             },
@@ -3666,17 +3695,23 @@ static bool ProcessCompactBlockMessage(
     const Config& config,
     const CNodePtr& pfrom,
     const CNetMsgMaker& msgMaker,
-    const std::string& strCommand,
     const CChainParams& chainparams,
-    const std::atomic<bool>& interruptMsgProc,
-    int64_t nTimeReceived,
     msg_buffer& vRecv,
     CConnman& connman)
 {
     CBlockHeaderAndShortTxIDs cmpctblock;
     vRecv >> cmpctblock;
 
-    LogPrint(BCLog::NETMSG, "Got compact block for %s from peer=%d\n", cmpctblock.header.GetHash().ToString(), pfrom->id);
+    if(LogAcceptCategory(BCLog::NETMSG | BCLog::BLOCKSRC))
+    {
+        std::stringstream src {};
+        src << "peer=" << pfrom->id;
+        if(fLogIPs)
+        {
+            src << " (" << pfrom->GetAssociation().GetPeerAddr().ToString() << ")";
+        }
+        LogPrintf("Received compact block for %s from %s\n", cmpctblock.header.GetHash().ToString(), src.str());
+    }
 
     {
         LOCK(cs_main);
@@ -3925,10 +3960,10 @@ static bool ProcessCompactBlockMessage(
 
                     if(fNewBlock)
                     {
-                        auto pfrom = weakFrom.lock();
-                        if(pfrom)
+                        auto from = weakFrom.lock();
+                        if(from)
                         {
-                            pfrom->nLastBlockTime = GetTime();
+                            from->nLastBlockTime = GetTime();
                         }
                     }
                 },
@@ -3946,13 +3981,21 @@ static bool ProcessCompactBlockMessage(
 */
 static void ProcessBlockMessage(const Config& config,
                                 const CNodePtr& pfrom,
-                                msg_buffer& vRecv,
-                                CConnman& connman)
+                                msg_buffer& vRecv)
 {
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
     vRecv >> *pblock;
     
-    LogPrint(BCLog::NETMSG, "received block %s peer=%d\n", pblock->GetHash().ToString(), pfrom->id);
+    if(LogAcceptCategory(BCLog::NETMSG | BCLog::BLOCKSRC))
+    {
+        std::stringstream src {};
+        src << "peer=" << pfrom->id;
+        if(fLogIPs)
+        {
+            src << " (" << pfrom->GetAssociation().GetPeerAddr().ToString() << ")";
+        }
+        LogPrintf("Received block for %s from %s\n", pblock->GetHash().ToString(), src.str());
+    }
 
     // Process all blocks from whitelisted peers, even if not requested,
     // unless we're still syncing with the network. Such an unrequested
@@ -3994,10 +4037,10 @@ static void ProcessBlockMessage(const Config& config,
 
             if(fNewBlock)
             {
-                auto pfrom = weakFrom.lock();
-                if(pfrom)
+                auto from = weakFrom.lock();
+                if(from)
                 {
-                    pfrom->nLastBlockTime = GetTime();
+                    from->nLastBlockTime = GetTime();
                 }
             }
         },
@@ -4008,7 +4051,6 @@ static void ProcessBlockMessage(const Config& config,
 * Process getaddr message.
 */
 static void ProcessGetAddrMessage(const CNodePtr& pfrom,
-                                  msg_buffer& vRecv,
                                   CConnman& connman)
 {
     // This asymmetric behavior for inbound and outbound connections was
@@ -4049,29 +4091,50 @@ static void ProcessMempoolMessage(const Config& config,
                                   msg_buffer& vRecv,
                                   CConnman& connman)
 {
-    if (config.GetRejectMempoolRequest() && !pfrom->fWhitelisted) {
-        LogPrint(BCLog::NETMSG, "mempool request from nonwhitelisted peer disabled, disconnect peer=%d\n",
-                 pfrom->GetId());
-        pfrom->fDisconnect = true;
-        return;
-    }
+    // Read full message
+    MempoolMsg msg {};
+    vRecv >> msg;
 
-    if(!(pfrom->GetLocalServices() & NODE_BLOOM) && !pfrom->fWhitelisted) {
-        LogPrint(BCLog::NETMSG, "mempool request with bloom filters disabled, disconnect peer=%d\n",
-                 pfrom->GetId());
-        pfrom->fDisconnect = true;
-        return;
-    }
+    if(! msg.GetAge().has_value())
+    {
+        // Apply checks to old-style mempool request
+        if(config.GetRejectMempoolRequest() && !pfrom->fWhitelisted)
+        {
+            LogPrint(BCLog::NETMSG, "mempool request from nonwhitelisted peer disabled, disconnect peer=%d\n",
+                     pfrom->GetId());
+            pfrom->fDisconnect = true;
+            return;
+        }
 
-    if(connman.OutboundTargetReached(false) && !pfrom->fWhitelisted) {
-        LogPrint(BCLog::NETMSG, "mempool request with bandwidth limit reached, disconnect peer=%d\n",
-                 pfrom->GetId());
-        pfrom->fDisconnect = true;
-        return;
+        if(!(pfrom->GetLocalServices() & NODE_BLOOM) && !pfrom->fWhitelisted)
+        {
+            LogPrint(BCLog::NETMSG, "mempool request with bloom filters disabled, disconnect peer=%d\n",
+                     pfrom->GetId());
+            pfrom->fDisconnect = true;
+            return;
+        }
+
+        if(connman.OutboundTargetReached(false) && !pfrom->fWhitelisted)
+        {
+            LogPrint(BCLog::NETMSG, "mempool request with bandwidth limit reached, disconnect peer=%d\n",
+                     pfrom->GetId());
+            pfrom->fDisconnect = true;
+            return;
+        }
+    }
+    else
+    {
+        // New extended mempool sync request can only come from peer we're configured to synchronise with
+        if(!pfrom->fMempoolSync)
+        {
+            // Ignore the request but don't disconnect, they might just have misconfigured
+            LogPrint(BCLog::NETMSG, "Ignoring mempool sync request from unknown peer=%d\n", pfrom->GetId());
+            return;
+        }
     }
 
     LOCK(pfrom->cs_inventory);
-    pfrom->fSendMempool = true;
+    pfrom->mempoolRequest = msg;
 }
  
 /**
@@ -4221,7 +4284,7 @@ static void ProcessFilterAddMessage(const CNodePtr& pfrom, msg_buffer& vRecv)
 /**
 * Process filter clear message.
 */
-static void ProcessFilterClearMessage(const CNodePtr& pfrom, msg_buffer& vRecv)
+static void ProcessFilterClearMessage(const CNodePtr& pfrom)
 {
     LOCK(pfrom->cs_filter);
     if(pfrom->GetLocalServices() & NODE_BLOOM) {
@@ -4538,8 +4601,8 @@ static void ProcessDoubleSpendMessage(const Config& config,
         if(!config.GetDoubleSpendDetectedWebhookAddress().empty() && g_pWebhookClient)
         {
             RPCClientConfig rpcConfig { RPCClientConfig::CreateForDoubleSpendDetectedWebhook(config) };
-            using HTTPRequest = rpc::client::HTTPRequest;
-            auto request { std::make_shared<HTTPRequest>(HTTPRequest::CreateJSONPostRequest(rpcConfig, msg.ToJSON(config))) };
+            using HTTP_Request = rpc::client::HTTPRequest;
+            auto request { std::make_shared<HTTP_Request>(HTTP_Request::CreateJSONPostRequest(rpcConfig, msg.ToJSON(config))) };
             auto response { std::make_shared<StringHTTPResponse>() };
             g_pWebhookClient->SubmitRequest(rpcConfig, std::move(request), std::move(response));
         }
@@ -4554,14 +4617,14 @@ static void ProcessDoubleSpendMessage(const Config& config,
 /**
 * Process next message.
 */
-static bool ProcessMessage(const Config& config,
-                           const CNodePtr& pfrom,
-                           const std::string& strCommand,
-                           msg_buffer& vRecv,
-                           int64_t nTimeReceived,
-                           const CChainParams& chainparams,
-                           CConnman& connman,
-                           const std::atomic<bool>& interruptMsgProc)
+bool ProcessMessage(const Config& config,
+                    const CNodePtr& pfrom,
+                    const std::string& strCommand,
+                    msg_buffer& vRecv,
+                    int64_t nTimeReceived,
+                    const CChainParams& chainparams,
+                    CConnman& connman,
+                    const std::atomic<bool>& interruptMsgProc)
 {
     LogPrint(BCLog::NETMSGVERB, "received: %s (%u bytes) peer=%d\n",
              SanitizeString(strCommand), vRecv.size(), pfrom->id);
@@ -4666,12 +4729,12 @@ static bool ProcessMessage(const Config& config,
     }
 
     else if (strCommand == NetMsgType::TX) {
-        ProcessTxMessage(config, pfrom, msgMaker, strCommand, vRecv, connman);
+        ProcessTxMessage(config, pfrom, vRecv, connman);
     }
 
     // Ignore blocks received while importing
     else if (strCommand == NetMsgType::CMPCTBLOCK && !fImporting && !fReindex) {
-        return ProcessCompactBlockMessage(config, pfrom, msgMaker, strCommand, chainparams, interruptMsgProc, nTimeReceived, vRecv, connman);
+        return ProcessCompactBlockMessage(config, pfrom, msgMaker, chainparams, vRecv, connman);
     }
 
     // Ignore blocks received while importing
@@ -4687,7 +4750,7 @@ static bool ProcessMessage(const Config& config,
 
     // Ignore blocks received while importing
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) {
-        ProcessBlockMessage(config, pfrom, vRecv, connman);
+        ProcessBlockMessage(config, pfrom, vRecv);
     }
 
     // Ignore double-spend detected notifications while importing
@@ -4696,7 +4759,7 @@ static bool ProcessMessage(const Config& config,
     }
 
     else if (strCommand == NetMsgType::GETADDR) {
-        ProcessGetAddrMessage(pfrom, vRecv, connman);
+        ProcessGetAddrMessage(pfrom, connman);
     }
 
     else if (strCommand == NetMsgType::MEMPOOL) {
@@ -4720,7 +4783,7 @@ static bool ProcessMessage(const Config& config,
     }
 
     else if (strCommand == NetMsgType::FILTERCLEAR) {
-        ProcessFilterClearMessage(pfrom, vRecv);
+        ProcessFilterClearMessage(pfrom);
     }
 
     else if (strCommand == NetMsgType::FEEFILTER) {
@@ -4829,7 +4892,16 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     }
 
     // Don't bother if send buffer is too full to respond anyway
-    if (pfrom->GetPausedForSending(true)) {
+
+    // If the send buffer is full, but we're still able to receive more, wait
+    // until the other end has drained some of the backlog to avoid filling
+    // the sending queue even more.
+    //
+    // In the unlikely event that both the send and recv buffers are full,
+    // then allow message processing a chance to free things up and drain some
+    // incoming data, but special handling in PushMessage will discard any
+    // resulting replies that would further saturate the send queue.
+    if (pfrom->GetPausedForSending(true) && ! pfrom->GetPausedForReceiving()) {
         return false;
     }
 
@@ -5400,9 +5472,27 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
     }
 
     // Respond to BIP35 mempool requests
-    if (fSendTrickle && pto->fSendMempool) {
-        auto vtxinfo = mempool.InfoAll();
-        pto->fSendMempool = false;
+    if (fSendTrickle && pto->mempoolRequest)
+    {
+        std::vector<TxMempoolInfo> vtxinfo {};
+        const auto& age { pto->mempoolRequest->GetAge() };
+        if(age)
+        {
+            // Only synchronise txns that are old enough and pay sufficient fee
+            int64_t now { GetTime() };
+            vtxinfo = mempool.InfoMatching(
+                [age=age.value(), now](const CTxMemPoolEntry& entry)
+                {
+                    int64_t txAge { now - entry.GetTime() };
+                    return txAge >= age && entry.IsInPrimaryMempool();
+                }
+            );
+        }
+        else
+        {
+            vtxinfo = mempool.InfoAll();
+        }
+
         Amount filterrate(0);
         {
             LOCK(pto->cs_feeFilter);
@@ -5411,26 +5501,32 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
 
         LOCK(pto->cs_filter);
 
-        for (const auto &txinfo : vtxinfo) {
+        for (const auto &txinfo : vtxinfo)
+        {
             const uint256 &txid = txinfo.GetTxId();
             CInv inv(MSG_TX, txid);
-            if (filterrate != Amount(0)) {
-                if (txinfo.feeRate.GetFeePerK() < filterrate) {
+            if (filterrate != Amount(0))
+            {
+                if (txinfo.feeRate.GetFeePerK() < filterrate)
+                {
                     continue;
                 }
             }
-            if (!pto->mFilter.IsRelevantAndUpdate(*txinfo.GetTx())) {
+            if (!pto->mFilter.IsRelevantAndUpdate(*txinfo.GetTx()))
+            {
                 continue;
             }
             pto->filterInventoryKnown.insert(txid);
             vInv.push_back(inv);
             // if next element will cause too large message, then we send it now, as message size is still under limit
-            if (vInv.size() == pto->maxInvElements) {
+            if (vInv.size() == pto->maxInvElements)
+            {
                 connman.PushMessage(pto, msgMaker.Make(NetMsgType::INV, vInv));
                 vInv.clear();
             }
         }
         pto->timeLastMempoolReq = GetTime();
+        pto->mempoolRequest = std::nullopt;
     }
 
     // Determine transactions to relay
@@ -5508,7 +5604,6 @@ void SendGetDataBlocks(const Config &config, const CNodePtr& pto, CConnman& conn
     const CNetMsgMaker& msgMaker, const CNodeStatePtr& state)
 {
     assert(state);
-    const Consensus::Params& consensusParams { config.GetChainParams().GetConsensus() };
     //
     // Message: getdata (blocks)
     //
@@ -5519,9 +5614,13 @@ void SendGetDataBlocks(const Config &config, const CNodePtr& pto, CConnman& conn
         state->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
         std::vector<const CBlockIndex *> vToDownload;
         NodeId staller = -1;
-        FindNextBlocksToDownload(config, pto->GetId(),
+        FindNextBlocksToDownload(config,
+                                 pto->GetId(),
                                  MAX_BLOCKS_IN_TRANSIT_PER_PEER - state->nBlocksInFlight,
-                                 vToDownload, staller, consensusParams, state, connman);
+                                 vToDownload,
+                                 staller,
+                                 state,
+                                 connman);
         for (const CBlockIndex *pindex : vToDownload) {
             vGetData.push_back(CInv(MSG_BLOCK, pindex->GetBlockHash()));
             blockDownloadTracker.MarkBlockAsInFlight(config, {pindex->GetBlockHash(), pto->id}, state, *pindex);
@@ -5620,13 +5719,21 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
     if (pto->nVersion >= FEEFILTER_VERSION && config.GetFeeFilter() &&
         !(pto->fWhitelisted && config.GetWhitelistForceRelay()))
     {
-        MempoolSizeLimits limits = MempoolSizeLimits::FromConfig();
-        Amount currentFilter =
-            mempool
-                .GetMinFee(limits.Total())
-                .GetFeePerK();
+        Amount currentFilter {};
+        if(IsInitialBlockDownload())
+        {
+            // Rate limit INVs during IBD with high fee filter
+            currentFilter = COIN;
+        }
+        else
+        {
+            MempoolSizeLimits limits { MempoolSizeLimits::FromConfig() };
+            currentFilter = mempool.GetMinFee(limits.Total()).GetFeePerK();
+        }
+
         int64_t timeNow = GetTimeMicros();
-        if (timeNow > pto->nextSendTimeFeeFilter) {
+        if (timeNow > pto->nextSendTimeFeeFilter)
+        {
             static CFeeRate default_feerate =
                 CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
             static FeeFilterRounder filterRounder(default_feerate);
@@ -5635,7 +5742,8 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
             // filter of at least minRelayTxFee
             filterToSend = std::max(filterToSend, config.GetMinFeePerKB().GetFeePerK());
 
-            if (filterToSend != pto->lastSentFeeFilter) {
+            if (filterToSend != pto->lastSentFeeFilter)
+            {
                 connman.PushMessage(
                     pto, msgMaker.Make(NetMsgType::FEEFILTER, filterToSend));
                 pto->lastSentFeeFilter = filterToSend;
@@ -5649,15 +5757,18 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
         else if (timeNow + MAX_FEEFILTER_CHANGE_DELAY * 1000000 <
                      pto->nextSendTimeFeeFilter &&
                  (currentFilter < 3 * pto->lastSentFeeFilter / 4 ||
-                  currentFilter > 4 * pto->lastSentFeeFilter / 3)) {
+                  currentFilter > 4 * pto->lastSentFeeFilter / 3))
+        {
             pto->nextSendTimeFeeFilter =
                 timeNow + GetRandInt(MAX_FEEFILTER_CHANGE_DELAY) * 1000000;
         }
     }
 }
 
-bool SendMessages(const Config &config, const CNodePtr& pto, CConnman &connman,
-                  const std::atomic<bool> &interruptMsgProc)
+bool SendMessages(const Config& config,
+                  const CNodePtr& pto,
+                  CConnman& connman,
+                  const std::atomic<bool>& /*interruptMsgProc*/)
 {
     // Don't send anything until the version handshake is complete
     if (!pto->fSuccessfullyConnected || pto->fDisconnect) {

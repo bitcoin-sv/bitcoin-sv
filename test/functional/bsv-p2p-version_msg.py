@@ -8,7 +8,7 @@ Test P2P version message error handling.
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.mininode import mininode_lock, NetworkThread, NodeConn, NodeConnCB, wait_until, msg_version, ser_string
-from test_framework.util import assert_equal, connect_nodes, p2p_port, check_for_log_msg
+from test_framework.util import assert_equal, p2p_port, check_for_log_msg
 
 import struct
 
@@ -74,7 +74,8 @@ class P2PVersion(BitcoinTestFramework):
 
         # Check initial state
         dummyCB.wait_for_protoconf()
-        with mininode_lock: assert_equal(len(badConnCB.message_count), 0)
+        with mininode_lock:
+            assert_equal(len(badConnCB.message_count), 0)
 
         # Send a badly formatted version message
         badConn.send_message(msg_version_bad())

@@ -2,10 +2,12 @@
 # Copyright (c) 2018-2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-import time
-from test_framework.mininode import *
+from test_framework.mininode import msg_sendheaders, NetworkThread, \
+    NodeConn, NodeConnCB
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_greater_than, p2p_port
+
+import time
 
 
 class TestNode(NodeConnCB):
@@ -18,7 +20,7 @@ class TestNode(NodeConnCB):
 class TestSendHeadersBanScore(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
-        self.num_nodes=1
+        self.num_nodes = 1
 
     def run_test(self):
         #assert_equal(self.nodes[0].getconnectioncount(), 2)
@@ -50,15 +52,15 @@ class TestSendHeadersBanScore(BitcoinTestFramework):
         inv_node.sync_with_ping()
         test_node.sync_with_ping()
 
-        peerInfoPreSendHeaderMsg=self.nodes[0].getpeerinfo()
+        peerInfoPreSendHeaderMsg = self.nodes[0].getpeerinfo()
         #print ([peer['banscore'] for peer in peerInfoPreSendHeaderMsg])
         #print (peerInfoPreSendHeaderMsg[1]['banscore'])
         for i in range(10):
             test_node.send_message(msg_sendheaders())
             time.sleep(1)
-        peerInfoPostSendHeaderMsg=self.nodes[0].getpeerinfo()
+        peerInfoPostSendHeaderMsg = self.nodes[0].getpeerinfo()
         #print (peerInfoPostSendHeaderMsg[1]['banscore'])
-        assert_greater_than(peerInfoPostSendHeaderMsg[1]['banscore'],peerInfoPreSendHeaderMsg[1]['banscore'])
+        assert_greater_than(peerInfoPostSendHeaderMsg[1]['banscore'], peerInfoPreSendHeaderMsg[1]['banscore'])
 
         return
 

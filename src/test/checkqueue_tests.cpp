@@ -38,7 +38,7 @@ namespace
             return true;
         }
 
-        void swap(CBlockingValidator& check)
+        void swap(CBlockingValidator& check) noexcept
         {
             std::atomic<bool>* tmp = mBlocking;
             mBlocking = check.mBlocking;
@@ -54,7 +54,8 @@ namespace
         {
             return true;
         }
-        void swap(CDummyValidator& check) {/**/}
+
+        void swap(CDummyValidator&) noexcept {}
     };
 
     struct CCancellingValidator
@@ -66,7 +67,7 @@ namespace
             return {};
         }
 
-        void swap(CCancellingValidator& check) {/**/}
+        void swap(CCancellingValidator&) noexcept {}
     };
 }
 
@@ -111,8 +112,8 @@ BOOST_AUTO_TEST_CASE(removal_of_threads_during_processing)
 
     for(size_t i=0; i<checksNumber; ++i)
     {
-        blocking[i] = true;
-        checks.emplace_back(blocking[i]);
+        blocking[i] = true; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+        checks.emplace_back(blocking[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
     
     auto source = task::CCancellationSource::Make();
@@ -182,6 +183,7 @@ BOOST_AUTO_TEST_CASE(premature_implicit_cancellation_and_reusing_the_worst_check
             1,
             source->GetToken(),
             &worstCancellationToken);
+    assert(worstCancellationToken);
 
     auto checker2 = scriptCheckQueuePool.GetChecker(2, source->GetToken());
     auto checker3 = scriptCheckQueuePool.GetChecker(3, source->GetToken());
@@ -206,6 +208,7 @@ BOOST_AUTO_TEST_CASE(premature_implicit_cancellation_and_reusing_the_worst_check
                 std::lock_guard lock{worstWaitSyncLock};
                 BOOST_CHECK(!checkerWorst.Wait().has_value());
             });
+    assert(future.valid());
 
     // since we do not have any idle checkers left in the pool checkerWorst
     // should be terminated by the pool without blocking
@@ -215,16 +218,28 @@ BOOST_AUTO_TEST_CASE(premature_implicit_cancellation_and_reusing_the_worst_check
         std::lock_guard lock{worstWaitSyncLock};
         BOOST_CHECK(!checkerWorst.Wait().has_value());
     }
-    BOOST_CHECK(checker2.Wait().value());
-    BOOST_CHECK(checker3.Wait().value());
-    BOOST_CHECK(checker4.Wait().value());
-    BOOST_CHECK(checkerBest.Wait().value());
+
+    const auto o2{checker2.Wait()};
+    assert(o2);
+    BOOST_CHECK(*o2);
+
+    const auto o3{checker3.Wait()};
+    assert(o3);
+    BOOST_CHECK(*o3);
+
+    const auto o4{checker4.Wait()};
+    assert(o4);
+    BOOST_CHECK(*o4);
+
+    const auto oBest{checkerBest.Wait()};
+    assert(oBest);
+    BOOST_CHECK(*oBest);
 
     threadGroup.interrupt_all();
     threadGroup.join_all();
 }
 
-BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_wait_before_session)
+BOOST_AUTO_TEST_CASE(checkqueue_invalid_use_call_wait_before_session)
 {
     CCheckQueue<CDummyValidator> scriptCheckQueue{128};
 
@@ -234,7 +249,7 @@ BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_wait_before_session)
     scriptCheckQueue.Wait();
 }
 
-BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_add_before_session)
+BOOST_AUTO_TEST_CASE(checkqueue_invalid_use_call_add_before_session)
 {
     CCheckQueue<CDummyValidator> scriptCheckQueue{128};
 
@@ -247,7 +262,7 @@ BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_add_before_session)
     scriptCheckQueue.Wait();
 }
 
-BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_add_after_wait)
+BOOST_AUTO_TEST_CASE(checkqueue_invalid_use_call_add_after_wait)
 {
     CCheckQueue<CDummyValidator> scriptCheckQueue{128};
 
@@ -261,7 +276,7 @@ BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_add_after_wait)
     BOOST_CHECK_THROW(scriptCheckQueue.Add(check), std::runtime_error);
 }
 
-BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_second_session_before_wait)
+BOOST_AUTO_TEST_CASE(checkqueue_invalid_use_call_second_session_before_wait)
 {
     CCheckQueue<CDummyValidator> scriptCheckQueue{128};
 

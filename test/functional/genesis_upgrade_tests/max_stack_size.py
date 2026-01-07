@@ -21,35 +21,35 @@ class MaxStackSizeTestWithCustomSize(GenesisHeightBasedSimpleTestsCase):
     TESTS = [
         # Before genesis, sum of concatenating elements sizes should be <= 520.
         # For following cases, UTXO is made before genesis.
-        SimpleTestDefinition("PRE-GENESIS", CScript([b"a"*(MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS - 1), b"b", OP_CAT]),
+        SimpleTestDefinition("PRE-GENESIS", CScript([b"a" * (MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS - 1), b"b", OP_CAT]),
                              "PRE-GENESIS", b""
                              ),
-        SimpleTestDefinition("PRE-GENESIS", CScript([b"a"*MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, b"b", OP_CAT]),
+        SimpleTestDefinition("PRE-GENESIS", CScript([b"a" * MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, b"b", OP_CAT]),
                              "PRE-GENESIS", b"",
                              p2p_reject_reason=b'genesis-script-verify-flag-failed (Push value size limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),
-        SimpleTestDefinition("PRE-GENESIS", CScript([b"a"*(MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS - 1), b"b", OP_CAT]),
+        SimpleTestDefinition("PRE-GENESIS", CScript([b"a" * (MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS - 1), b"b", OP_CAT]),
                              "MEMPOOL AT GENESIS", b""
                              ),
-        SimpleTestDefinition("PRE-GENESIS", CScript([b"a"*MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, b"b", OP_CAT]),
+        SimpleTestDefinition("PRE-GENESIS", CScript([b"a" * MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, b"b", OP_CAT]),
                              "MEMPOOL AT GENESIS", b"",
                              p2p_reject_reason=b'genesis-script-verify-flag-failed (Push value size limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),
-        SimpleTestDefinition("PRE-GENESIS", CScript([b"a"*(MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS - 1), b"b", OP_CAT]),
+        SimpleTestDefinition("PRE-GENESIS", CScript([b"a" * (MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS - 1), b"b", OP_CAT]),
                              "GENESIS", b""
                              ),
-        SimpleTestDefinition("PRE-GENESIS", CScript([b"a"*MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, b"b", OP_CAT]),
+        SimpleTestDefinition("PRE-GENESIS", CScript([b"a" * MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, b"b", OP_CAT]),
                              "GENESIS", b"",
                              p2p_reject_reason=b'genesis-script-verify-flag-failed (Push value size limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),
         # UTXO is in block at height "MEMPOOL AT GENESIS" which means pre genesis rules apply to this block
-        SimpleTestDefinition("MEMPOOL AT GENESIS", CScript([b"a"*(MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS - 1), b"b", OP_CAT]),
+        SimpleTestDefinition("MEMPOOL AT GENESIS", CScript([b"a" * (MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS - 1), b"b", OP_CAT]),
                              "GENESIS", b"",
                              ),
-        SimpleTestDefinition("MEMPOOL AT GENESIS", CScript([b"a"*MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, b"b", OP_CAT]),
+        SimpleTestDefinition("MEMPOOL AT GENESIS", CScript([b"a" * MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, b"b", OP_CAT]),
                              "GENESIS", b"",
                              p2p_reject_reason=b'genesis-script-verify-flag-failed (Push value size limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
@@ -57,20 +57,20 @@ class MaxStackSizeTestWithCustomSize(GenesisHeightBasedSimpleTestsCase):
 
         # For following cases, UTXO is made after genesis, so new rules apply here (500 bytes for policy and 600 bytes for consensus)
         # At some point of performing OP_CAT the stack size is size_of_first + 2 * size_of_second which in our case produce stack oversized error
-        SimpleTestDefinition("GENESIS", CScript([b"a"*(MAX_STACK_MEMORY_USAGE_POLICY - 1), b"b", OP_CAT]),
+        SimpleTestDefinition("GENESIS", CScript([b"a" * (MAX_STACK_MEMORY_USAGE_POLICY - 1), b"b", OP_CAT]),
                              "GENESIS", b""
                              ),
-        SimpleTestDefinition("GENESIS", CScript([b"a"*MAX_STACK_MEMORY_USAGE_POLICY, b"b", OP_CAT]),
+        SimpleTestDefinition("GENESIS", CScript([b"a" * MAX_STACK_MEMORY_USAGE_POLICY, b"b", OP_CAT]),
                              "GENESIS", b"",
                              p2p_reject_reason=b'non-mandatory-script-verify-flag (Stack size limit exceeded)',
                              block_reject_reason=None
                              ),
-        SimpleTestDefinition("GENESIS", CScript([b"a"*(MAX_STACK_MEMORY_USAGE_CONSENSUS - 1), b"b", OP_CAT]),
+        SimpleTestDefinition("GENESIS", CScript([b"a" * (MAX_STACK_MEMORY_USAGE_CONSENSUS - 1), b"b", OP_CAT]),
                              "GENESIS", b"",
                              p2p_reject_reason=b'non-mandatory-script-verify-flag (Stack size limit exceeded)',
                              block_reject_reason=None
                              ),
-        SimpleTestDefinition("GENESIS", CScript([b"a"*MAX_STACK_MEMORY_USAGE_CONSENSUS, b"b", OP_CAT]),
+        SimpleTestDefinition("GENESIS", CScript([b"a" * MAX_STACK_MEMORY_USAGE_CONSENSUS, b"b", OP_CAT]),
                              "GENESIS", b"",
                              p2p_reject_reason=b'mandatory-script-verify-flag-failed (Stack size limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
@@ -86,17 +86,17 @@ class MaxStackSizeTestWithElementsCount(GenesisHeightBasedSimpleTestsCase):
     TESTS = [
         # Script did not clean its stack means that stack size limit checks were successful
         # Usage of OP_DROP here would cause problems with MAX_OPS_PER_SCRIPT which is not configurable before genesis.
-        SimpleTestDefinition("PRE-GENESIS", CScript([b"a"]*MAX_STACK_ELEMENTS_BEFORE_GENESIS),
+        SimpleTestDefinition("PRE-GENESIS", CScript([b"a"] * MAX_STACK_ELEMENTS_BEFORE_GENESIS),
                              "PRE-GENESIS", b"",
                              p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)',
                              block_reject_reason=None
                              ),
-        SimpleTestDefinition("PRE-GENESIS", CScript([b"a"]*(MAX_STACK_ELEMENTS_BEFORE_GENESIS + 1)),
+        SimpleTestDefinition("PRE-GENESIS", CScript([b"a"] * (MAX_STACK_ELEMENTS_BEFORE_GENESIS + 1)),
                              "PRE-GENESIS", b"",
                              p2p_reject_reason=b'genesis-script-verify-flag-failed (Stack size limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),
-        SimpleTestDefinition("GENESIS", CScript([b"a"]*(MAX_STACK_ELEMENTS_BEFORE_GENESIS + 1)),
+        SimpleTestDefinition("GENESIS", CScript([b"a"] * (MAX_STACK_ELEMENTS_BEFORE_GENESIS + 1)),
                              "GENESIS", b"",
                              p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)',
                              block_reject_reason=None
@@ -112,12 +112,12 @@ class MaxStackSizeTest(GenesisHeightBasedSimpleTestsCase):
     # We mock big stack with the help of OP_DUP and OP_CAT combination which generates strings with the size of powers of 2.
     # Transactions: 2^26 = 67 MB  bytes (OK), 2^27 = 134 MB  bytes (FAIL because > 100 MB)
     TESTS = [
-        SimpleTestDefinition("PRE-GENESIS", CScript([b"a"] + [OP_DUP, OP_CAT]*18),
+        SimpleTestDefinition("PRE-GENESIS", CScript([b"a"] + [OP_DUP, OP_CAT] * 18),
                              "PRE-GENESIS", b"",
                              p2p_reject_reason=b'genesis-script-verify-flag-failed (Push value size limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),
-        SimpleTestDefinition("GENESIS", CScript([b"a"] + [OP_DUP, OP_CAT]*26),
+        SimpleTestDefinition("GENESIS", CScript([b"a"] + [OP_DUP, OP_CAT] * 26),
                              "GENESIS", b""
                              ),
     ]

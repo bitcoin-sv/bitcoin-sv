@@ -95,6 +95,7 @@ public:
             return {std::move(lock), lockProvider};
         }
 
+        // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
         Lock(std::unique_lock<std::mutex>&&, WPUSMutex& lockProvider)
             : mLockType{lockProvider.mLock > 0 ? Type::read : Type::write}
             , mLockProvider{&lockProvider}

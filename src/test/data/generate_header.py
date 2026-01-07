@@ -12,7 +12,7 @@ def main(test_name, input_file):
         contents = f.read()
 
     print("namespace json_tests{")
-    print("   static unsigned const char {}[] = {{".format(test_name))
+    print("   static unsigned const char {}[] = {{ // NOLINT(cppcoreguidelines-avoid-c-arrays)".format(test_name))
     print(", ".join(map(lambda x: "0x{:02x}".format(x), contents)))
     print(" };")
     print("};")

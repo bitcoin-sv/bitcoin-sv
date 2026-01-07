@@ -3,19 +3,27 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-import threading
-import json
-import http.client as httplib
+from ds_callback_service.CallbackService import CallbackService, RECEIVE, \
+    STATUS, RESPONSE_TIME, FLAG
+from test_framework.comptool import logger
+from test_framework.mininode import CallbackMessage, COutPoint, CTransaction, \
+    CTxIn, CTxOut, FromHex, msg_tx, NetworkThread, NodeConn, NodeConnCB, ToHex
+from test_framework.script import CScript, OP_ADD, OP_DROP, OP_FALSE, OP_MUL, \
+    OP_RETURN, OP_TRUE
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import assert_equal, p2p_port, check_for_log_msg, \
+    wait_until
+
 from functools import partial
 from http.server import HTTPServer
-from ds_callback_service.CallbackService import CallbackService, RECEIVE, STATUS, RESPONSE_TIME, FLAG, reset_proofs
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import p2p_port, check_for_log_msg, assert_equal
-from test_framework.mininode import *
-from test_framework.script import *
+
+import http.client as httplib
+import json
 import os
 import platform
+import socket
 import subprocess
+import threading
 import time
 
 '''
@@ -52,7 +60,7 @@ WRONG_IP2 = 0x7F000004
 # Returns True if host (str) responds to a ping6 request.
 def ping6(host):
     # option for the number of packets
-    param = '-n' if platform.system().lower()=='windows' else '-c'
+    param = '-n' if platform.system().lower() == 'windows' else '-c'
 
     # building the command. Ex: "ping -c 1 google.com"
     command = ['ping6', param, '1', host]
@@ -85,7 +93,7 @@ class DoubleSpendReport(BitcoinTestFramework):
                             '-whitelist=127.0.0.1',
                             '-genesisactivationheight=1',
                             '-maxscriptsizepolicy=0',
-                            '-maxscriptnumlengthpolicy=250000',
+                            '-maxscriptnumlengthpolicy=500000',
                             "-maxnonstdtxvalidationduration=15000",
                             "-maxtxnvalidatorasynctasksrunduration=15001",
                             "-dsnotifylevel=2"]]
@@ -152,7 +160,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         ]
         vout = [
             # inputs 0 and 2 are valid, input 9 is out of range
-            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP], [0,2,9]).serialize()]))
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP], [0, 2, 9]).serialize()]))
         ]
         tx1 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
@@ -211,7 +219,6 @@ class DoubleSpendReport(BitcoinTestFramework):
         # tx6 is dsnt enabled and double spends tx1. Both the txn in the mempool and the double-spend are dsnt
         # enabled, so in this case just the callback service specified by tx1 will get notified about tx6
         # (first seen rule).
-        reset_proofs()
         self.check_tx_not_received(tx1.hash)
         vin = [
             CTxIn(COutPoint(int(utxo[3]["txid"], 16), utxo[3]["vout"]), CScript([OP_FALSE]), 0xffffffff),
@@ -247,7 +254,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx8.hash), "/node0"))
         wait_until(lambda: self.check_tx_received(tx7.hash))
         wait_until(lambda: check_for_log_msg(self, "Txn {} is DS notification enabled on output 0".format(tx7.hash), "/node0"))
-        assert(not check_for_log_msg(self, "Txn {} is DS notification enabled on output 1".format(tx7.hash), "/node0"))
+        assert (not check_for_log_msg(self, "Txn {} is DS notification enabled on output 1".format(tx7.hash), "/node0"))
 
     # Check double-spend of mempool txn
     def check_ds_mempool_txn(self, utxo):
@@ -313,7 +320,7 @@ class DoubleSpendReport(BitcoinTestFramework):
     # Test that notifying callback server does not work for if double spend transaction has invalid script.
     def check_invalid_transactions(self, utxo):
 
-        assert(not check_for_log_msg(self, "Script verification for double-spend failed", "/node0"))
+        assert (not check_for_log_msg(self, "Script verification for double-spend failed", "/node0"))
 
         vin = [
             CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff)
@@ -352,12 +359,12 @@ class DoubleSpendReport(BitcoinTestFramework):
     # Also test setting dsnotifylevel
     def check_long_lasting_transactions(self):
 
-        assert(not check_for_log_msg(self, "Script verification for double-spend cancelled", "/node0"))
+        assert (not check_for_log_msg(self, "Script verification for double-spend cancelled", "/node0"))
 
         # Create funding transactions that will provide funds for other transcations
         ftx = CTransaction()
         ftx.vout.append(CTxOut(1000000, CScript([bytearray([42] * 250000), bytearray([42] * 200 * 1000), OP_MUL, OP_DROP, OP_TRUE])))
-        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx),{'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx), {'changePosition': len(ftx.vout)})['hex']
         ftxHex = self.nodes[0].signrawtransaction(ftxHex)['hex']
         ftx = FromHex(CTransaction(), ftxHex)
         ftx.rehash()
@@ -377,8 +384,13 @@ class DoubleSpendReport(BitcoinTestFramework):
 
         self.stop_node(0)
         # Restart bitcoind with parameters that reduce transaction validation time. Also set dsnotifylevel to 1, which means nonstandard transaction will not even validate.
-        self.start_node(0, extra_args=['-dsendpointport=8080', '-banscore=100000', '-genesisactivationheight=1', '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=250000',"-maxnonstdtxvalidationduration=11", "-dsnotifylevel=1"])
-
+        self.start_node(0, extra_args=['-dsendpointport=8080',
+                                       '-banscore=100000',
+                                       '-genesisactivationheight=1',
+                                       '-maxscriptsizepolicy=0',
+                                       '-maxscriptnumlengthpolicy=500000',
+                                       "-maxnonstdtxvalidationduration=11",
+                                       "-dsnotifylevel=1"])
         self.createConnection()
         # Create double spend of tx1
         vin = [
@@ -393,7 +405,13 @@ class DoubleSpendReport(BitcoinTestFramework):
 
         self.stop_node(0)
         # Restart bitcoind with parameters that reduce transaction validation time. Also set dsnotifylevel to 2, which means nonstandard transaction will validate.
-        self.start_node(0, extra_args=['-dsendpointport=8080', '-banscore=100000', '-genesisactivationheight=1', '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=250000',"-maxnonstdtxvalidationduration=11", "-dsnotifylevel=2"])
+        self.start_node(0, extra_args=['-dsendpointport=8080',
+                                       '-banscore=100000',
+                                       '-genesisactivationheight=1',
+                                       '-maxscriptsizepolicy=0',
+                                       '-maxscriptnumlengthpolicy=500000',
+                                       "-maxnonstdtxvalidationduration=11",
+                                       "-dsnotifylevel=2"])
 
         self.createConnection()
         vin = [
@@ -416,7 +434,7 @@ class DoubleSpendReport(BitcoinTestFramework):
             CTxIn(COutPoint(int(utxo[0]["txid"], 16), utxo[0]["vout"]), CScript([OP_FALSE]), 0xffffffff),
         ]
         vout = [
-            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP,WRONG_IP1,SKIP_IP,WRONG_IP2], [0]).serialize()]))
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP, WRONG_IP1, SKIP_IP, WRONG_IP2], [0]).serialize()]))
         ]
         tx1 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool())
@@ -431,7 +449,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         tx2 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: check_for_log_msg(self, "txn= {} rejected txn-mempool-conflict".format(tx2.hash), "/node0"))
         wait_until(lambda: check_for_log_msg(self, "Submitted proof ok to 127.0.0.1 for double-spend enabled txn {}".format(tx1.hash), "/node0"))
-        if(os.name == "nt"):
+        if os.name == "nt":
             wait_until(lambda: check_for_log_msg(self, "Error sending notification to endpoint 127.0.0.2", "/node0"))
         else:
             wait_until(lambda: check_for_log_msg(self, "Timeout sending slow-queue notification to endpoint 127.0.0.2", "/node0"))
@@ -443,7 +461,7 @@ class DoubleSpendReport(BitcoinTestFramework):
             CTxIn(COutPoint(int(utxo[1]["txid"], 16), utxo[1]["vout"]), CScript([OP_FALSE]), 0xffffffff),
         ]
         vout = [
-            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP,LOCAL_HOST_IP], [0]).serialize()]))
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(1, [LOCAL_HOST_IP, LOCAL_HOST_IP], [0]).serialize()]))
         ]
         tx3 = self.create_and_send_transaction(vin, vout)
         wait_until(lambda: tx3.hash in self.nodes[0].getrawmempool())
@@ -491,7 +509,7 @@ class DoubleSpendReport(BitcoinTestFramework):
             CTxIn(COutPoint(int(utxo["txid"], 16), utxo["vout"]), CScript([OP_FALSE]), 0xffffffff),
         ]
         vout = [
-            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(129, [LOCAL_HOST_IPV6],[0]).serialize()]))
+            CTxOut(25, CScript([OP_FALSE, OP_RETURN, 0x746e7364, CallbackMessage(129, [LOCAL_HOST_IPV6], [0]).serialize()]))
         ]
         tx1 = self.create_and_send_transaction(vin, vout)
         tx1.rehash()
@@ -522,7 +540,7 @@ class DoubleSpendReport(BitcoinTestFramework):
                                        '-dsnotifylevel=2'])
         self.createConnection()
 
-        assert(not check_for_log_msg(self, "Dropping new double-spend because the queue is full", "/node0"))
+        assert (not check_for_log_msg(self, "Dropping new double-spend because the queue is full", "/node0"))
 
         # tx1 is dsnt-enabled
         vin = [

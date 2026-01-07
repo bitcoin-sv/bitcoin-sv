@@ -16,16 +16,21 @@ BOOST_FIXTURE_TEST_SUITE(wallet_crypto, BasicTestingSetup)
 
 bool OldSetKeyFromPassphrase(const SecureString &strKeyData,
                              const std::vector<uint8_t> &chSalt,
-                             const unsigned int nRounds,
+                             const int nRounds,
                              const unsigned int nDerivationMethod,
                              uint8_t *chKey, uint8_t *chIV) {
     if (nRounds < 1 || chSalt.size() != WALLET_CRYPTO_SALT_SIZE) return false;
 
     int i = 0;
-    if (nDerivationMethod == 0)
-        i = EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha512(), &chSalt[0],
-                           (uint8_t *)&strKeyData[0], strKeyData.size(),
-                           nRounds, chKey, chIV);
+    if(nDerivationMethod == 0)
+        i = EVP_BytesToKey(EVP_aes_256_cbc(),
+                           EVP_sha512(),
+                           &chSalt[0],
+                           (uint8_t*)&strKeyData[0], // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+                           strKeyData.size(), // NOLINT(*-narrowing-conversions)
+                           nRounds,
+                           chKey,
+                           chIV);
 
     if (i != (int)WALLET_CRYPTO_KEY_SIZE) {
         memory_cleanse(chKey, sizeof(chKey));
@@ -36,11 +41,11 @@ bool OldSetKeyFromPassphrase(const SecureString &strKeyData,
 }
 
 bool OldEncrypt(const CKeyingMaterial &vchPlaintext,
-                std::vector<uint8_t> &vchCiphertext, const uint8_t chKey[32],
-                const uint8_t chIV[16]) {
+                std::vector<uint8_t> &vchCiphertext, const uint8_t chKey[32], // NOLINT(cppcoreguidelines-avoid-c-arrays)
+                const uint8_t chIV[16]) { // NOLINT(cppcoreguidelines-avoid-c-arrays)
     // max ciphertext len for a n bytes of plaintext is
     // n + AES_BLOCK_SIZE - 1 bytes
-    int nLen = vchPlaintext.size();
+    int nLen = vchPlaintext.size(); // NOLINT(*-narrowing-conversions)
     int nCLen = nLen + AES_BLOCK_SIZE, nFLen = 0;
     vchCiphertext = std::vector<uint8_t>(nCLen);
 
@@ -59,7 +64,7 @@ bool OldEncrypt(const CKeyingMaterial &vchPlaintext,
                                 &vchPlaintext[0], nLen) != 0;
     if (fOk)
         fOk =
-            EVP_EncryptFinal_ex(ctx, (&vchCiphertext[0]) + nCLen, &nFLen) != 0;
+            EVP_EncryptFinal_ex(ctx, (&vchCiphertext[0]) + nCLen, &nFLen) != 0; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     EVP_CIPHER_CTX_cleanup(ctx);
 
     EVP_CIPHER_CTX_free(ctx);
@@ -71,10 +76,10 @@ bool OldEncrypt(const CKeyingMaterial &vchPlaintext,
 }
 
 bool OldDecrypt(const std::vector<uint8_t> &vchCiphertext,
-                CKeyingMaterial &vchPlaintext, const uint8_t chKey[32],
-                const uint8_t chIV[16]) {
+                CKeyingMaterial &vchPlaintext, const uint8_t chKey[32], // NOLINT(cppcoreguidelines-avoid-c-arrays)
+                const uint8_t chIV[16]) { // NOLINT(cppcoreguidelines-avoid-c-arrays)
     // plaintext will always be equal to or lesser than length of ciphertext
-    int nLen = vchCiphertext.size();
+    int nLen = vchCiphertext.size(); // NOLINT(*-narrowing-conversions)
     int nPLen = nLen, nFLen = 0;
 
     vchPlaintext = CKeyingMaterial(nPLen);
@@ -93,7 +98,7 @@ bool OldDecrypt(const std::vector<uint8_t> &vchCiphertext,
         fOk = EVP_DecryptUpdate(ctx, &vchPlaintext[0], &nPLen,
                                 &vchCiphertext[0], nLen) != 0;
     if (fOk)
-        fOk = EVP_DecryptFinal_ex(ctx, (&vchPlaintext[0]) + nPLen, &nFLen) != 0;
+        fOk = EVP_DecryptFinal_ex(ctx, (&vchPlaintext[0]) + nPLen, &nFLen) != 0; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     EVP_CIPHER_CTX_cleanup(ctx);
 
     EVP_CIPHER_CTX_free(ctx);
@@ -108,41 +113,41 @@ class TestCrypter {
 public:
     static void TestPassphraseSingle(
         const std::vector<uint8_t> &vchSalt, const SecureString &passphrase,
-        uint32_t rounds,
+        int rounds,
         const std::vector<uint8_t> &correctKey = std::vector<uint8_t>(),
         const std::vector<uint8_t> &correctIV = std::vector<uint8_t>()) {
-        uint8_t chKey[WALLET_CRYPTO_KEY_SIZE];
-        uint8_t chIV[WALLET_CRYPTO_IV_SIZE];
+        uint8_t chKey[WALLET_CRYPTO_KEY_SIZE]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+        uint8_t chIV[WALLET_CRYPTO_IV_SIZE]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
 
         CCrypter crypt;
         crypt.SetKeyFromPassphrase(passphrase, vchSalt, rounds, 0);
 
-        OldSetKeyFromPassphrase(passphrase, vchSalt, rounds, 0, chKey, chIV);
+        OldSetKeyFromPassphrase(passphrase, vchSalt, rounds, 0, chKey, chIV); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 
         BOOST_CHECK_MESSAGE(
-            memcmp(chKey, crypt.vchKey.data(), crypt.vchKey.size()) == 0,
-            HexStr(chKey, chKey + sizeof(chKey)) + std::string(" != ") +
+            memcmp(chKey, crypt.vchKey.data(), crypt.vchKey.size()) == 0, // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+            HexStr(chKey, chKey + sizeof(chKey)) + std::string(" != ") + // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
                 HexStr(crypt.vchKey));
         BOOST_CHECK_MESSAGE(
-            memcmp(chIV, crypt.vchIV.data(), crypt.vchIV.size()) == 0,
-            HexStr(chIV, chIV + sizeof(chIV)) + std::string(" != ") +
+            memcmp(chIV, crypt.vchIV.data(), crypt.vchIV.size()) == 0, // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+            HexStr(chIV, chIV + sizeof(chIV)) + std::string(" != ") + // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
                 HexStr(crypt.vchIV));
 
         if (!correctKey.empty())
             BOOST_CHECK_MESSAGE(
-                memcmp(chKey, &correctKey[0], sizeof(chKey)) == 0,
-                HexStr(chKey, chKey + sizeof(chKey)) + std::string(" != ") +
+                memcmp(chKey, &correctKey[0], sizeof(chKey)) == 0, // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+                HexStr(chKey, chKey + sizeof(chKey)) + std::string(" != ") + // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
                     HexStr(correctKey.begin(), correctKey.end()));
         if (!correctIV.empty())
-            BOOST_CHECK_MESSAGE(memcmp(chIV, &correctIV[0], sizeof(chIV)) == 0,
-                                HexStr(chIV, chIV + sizeof(chIV)) +
+            BOOST_CHECK_MESSAGE(memcmp(chIV, &correctIV[0], sizeof(chIV)) == 0, // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+                                HexStr(chIV, chIV + sizeof(chIV)) + // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
                                     std::string(" != ") +
                                     HexStr(correctIV.begin(), correctIV.end()));
     }
 
     static void TestPassphrase(
         const std::vector<uint8_t> &vchSalt, const SecureString &passphrase,
-        uint32_t rounds,
+        int rounds,
         const std::vector<uint8_t> &correctKey = std::vector<uint8_t>(),
         const std::vector<uint8_t> &correctIV = std::vector<uint8_t>()) {
         TestPassphraseSingle(vchSalt, passphrase, rounds, correctKey,
@@ -158,7 +163,7 @@ public:
         const std::vector<uint8_t> &vchPlaintext = std::vector<uint8_t>()) {
         CKeyingMaterial vchDecrypted1;
         CKeyingMaterial vchDecrypted2;
-        int result1, result2;
+        int result1, result2; // NOLINT(cppcoreguidelines-init-variables)
         result1 = crypt.Decrypt(vchCiphertext, vchDecrypted1);
         result2 = OldDecrypt(vchCiphertext, vchDecrypted2, crypt.vchKey.data(),
                              crypt.vchIV.data());
@@ -240,9 +245,8 @@ BOOST_AUTO_TEST_CASE(passphrase) {
 
     std::string hash(GetRandHash().ToString());
     std::vector<uint8_t> vchSalt(8);
-    GetRandBytes(&vchSalt[0], vchSalt.size());
-    uint32_t rounds = insecure_rand();
-    if (rounds > 30000) rounds = 30000;
+    GetRandBytes(&vchSalt[0], vchSalt.size()); // NOLINT(*-narrowing-conversions)
+    const int rounds{static_cast<int>(std::clamp(insecure_rand(), 0u, 30'000u))};
     TestCrypter::TestPassphrase(vchSalt, SecureString(hash.begin(), hash.end()),
                                 rounds);
 }

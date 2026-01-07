@@ -26,7 +26,8 @@ class CScriptNum10 {
      * cross-comparison.
      */
 public:
-    explicit CScriptNum10(const int64_t &n) { m_value = n; }
+    explicit CScriptNum10(const int64_t& n):m_value{n}
+    {}
 
     static const size_t nDefaultMaxNumSize = 4;
 
@@ -58,7 +59,6 @@ public:
     }
 
     inline bool operator==(const int64_t &rhs) const { return m_value == rhs; }
-    inline bool operator!=(const int64_t &rhs) const { return m_value != rhs; }
     inline bool operator<=(const int64_t &rhs) const { return m_value <= rhs; }
     inline bool operator<(const int64_t &rhs) const { return m_value < rhs; }
     inline bool operator>=(const int64_t &rhs) const { return m_value >= rhs; }
@@ -66,9 +66,6 @@ public:
 
     inline bool operator==(const CScriptNum10 &rhs) const {
         return operator==(rhs.m_value);
-    }
-    inline bool operator!=(const CScriptNum10 &rhs) const {
-        return operator!=(rhs.m_value);
     }
     inline bool operator<=(const CScriptNum10 &rhs) const {
         return operator<=(rhs.m_value);
@@ -136,7 +133,7 @@ public:
             return std::numeric_limits<int>::max();
         else if (m_value < std::numeric_limits<int>::min())
             return std::numeric_limits<int>::min();
-        return m_value;
+        return m_value; // NOLINT(*-narrowing-conversions)
     }
 
     std::vector<uint8_t> getvch() const { return serialize(m_value); }

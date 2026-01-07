@@ -72,7 +72,7 @@ int32_t CBlock::GetHeightFromCoinbase()
         throw std::runtime_error("Badly formatted height in coinbase");
     std::vector<unsigned char> heightScript(numlen);
     copy(sig.begin() + 1, sig.begin() + 1 + numlen, heightScript.begin());
-    CScriptNum coinbaseHeight(heightScript, false, numlen);
+    CScriptNum coinbaseHeight(heightScript, min_encoding_check::no, numlen);
     return coinbaseHeight.getint();
 }
 
@@ -83,9 +83,9 @@ size_t ser_size(const CBlock& block)
     return std::accumulate(block.cbegin(),
                            block.cend(),
                            total,
-                           [](auto total, const auto& sp_tx) {
-                               total += ser_size(*sp_tx);
-                               return total;
+                           [](auto acc, const auto& sp_tx) {
+                               acc += ser_size(*sp_tx);
+                               return acc;
                            });
 }
 

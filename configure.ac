@@ -1,10 +1,10 @@
 dnl require autoconf 2.60 (AS_ECHO/AS_ECHO_N)
 AC_PREREQ([2.60])
 define(_CLIENT_VERSION_MAJOR, 1)
-define(_CLIENT_VERSION_MINOR, 1)
-define(_CLIENT_VERSION_REVISION, 1)
+define(_CLIENT_VERSION_MINOR, 2)
+define(_CLIENT_VERSION_REVISION, 0)
 define(_CLIENT_VERSION_BUILD, 0)
-define(_COPYRIGHT_YEAR, 2025)
+define(_COPYRIGHT_YEAR, 2026)
 define(_COPYRIGHT_HOLDERS,[The %s Association])
 define(_COPYRIGHT_HOLDERS_SUBSTITUTION,[[Bitcoin]])
 AC_INIT([Bitcoin SV],[_CLIENT_VERSION_MAJOR._CLIENT_VERSION_MINOR._CLIENT_VERSION_REVISION],[https://github.com/bitcoin-sv/bitcoin-sv/issues],[bitcoin-sv],[https://bitcoinsv.io/])
@@ -166,9 +166,9 @@ AC_ARG_ENABLE([asm],
 
 AC_ARG_ENABLE([tcmalloc],
   [AS_HELP_STRING([--enable-tcmalloc],
-  [Link with Google tcmalloc (default is no)])],
+  [Link with Google tcmalloc (default is yes)])],
   [use_tcmalloc=$enableval],
-  [use_tcmalloc=no])
+  [use_tcmalloc=yes])
 
 AC_ARG_ENABLE([jemalloc],
   [AS_HELP_STRING([--enable-jemalloc],
@@ -334,11 +334,12 @@ if test "x$enable_metrics" = xyes; then
 fi
 
 ERROR_CXXFLAGS=
+
 if test "x$enable_werror" = "xyes"; then
   if test "x$CXXFLAG_WERROR" = "x"; then
     AC_MSG_ERROR("enable-werror set but -Werror is not usable")
   fi
-  AX_CHECK_COMPILE_FLAG([-Werror=vla],[ERROR_CXXFLAGS="$ERROR_CXXFLAGS -Werror=vla"],,[[$CXXFLAG_WERROR]])
+  AX_CHECK_COMPILE_FLAG([-Werror],[ERROR_CXXFLAGS="$ERROR_CXXFLAGS -Werror"],,[[$CXXFLAG_WERROR]])
 fi
 
 if test "x$CXXFLAGS_overridden" = "xno"; then
@@ -347,11 +348,13 @@ if test "x$CXXFLAGS_overridden" = "xno"; then
   AX_CHECK_COMPILE_FLAG([-Wformat],[CXXFLAGS="$CXXFLAGS -Wformat"],,[[$CXXFLAG_WERROR]])
   AX_CHECK_COMPILE_FLAG([-Wvla],[CXXFLAGS="$CXXFLAGS -Wvla"],,[[$CXXFLAG_WERROR]])
   AX_CHECK_COMPILE_FLAG([-Wformat-security],[CXXFLAGS="$CXXFLAGS -Wformat-security"],,[[$CXXFLAG_WERROR]])
+  AX_CHECK_COMPILE_FLAG([-Wshadow], [CXXFLAGS_EXTRA="$CXXFLAGS_EXTRA -Wshadow"])
+  AC_SUBST([CXXFLAGS_EXTRA])
 
   ## Some compilers (gcc) ignore unknown -Wno-* options, but warn about all
   ## unknown options if any other warning is produced. Test the -Wfoo case, and
-  ## set the -Wno-foo case if it works.
-  AX_CHECK_COMPILE_FLAG([-Wunused-parameter],[CXXFLAGS="$CXXFLAGS -Wno-unused-parameter"],,[[$CXXFLAG_WERROR]])
+  ## set the -Wno-foo case if it works. e.g.
+  ## AX_CHECK_COMPILE_FLAG([-Wfoo],[CXXFLAGS="$CXXFLAGS -Wno-foo"],,[[$CXXFLAG_WERROR]])
 fi
 
 # Check for optional instruction set support. Enabling these does _not_ imply that all code will
@@ -566,18 +569,6 @@ if test x$use_lcov = xyes; then
     [AC_MSG_ERROR("lcov testing requested but --coverage linker flag does not work")])
   AX_CHECK_COMPILE_FLAG([--coverage],[CXXFLAGS="$CXXFLAGS --coverage"],
     [AC_MSG_ERROR("lcov testing requested but --coverage flag does not work")])
-fi
-
-if test x$use_tcmalloc = xyes; then
-  AC_MSG_RESULT([Enabling tcmalloc])
-  AC_CHECK_LIB([tcmalloc], [malloc],
-    [CXXFLAGS="$CXXFLAGS -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free"; LIBS="-ltcmalloc $LIBS"],
-    [AC_MSG_ERROR(tcmalloc not found)])
-else
-  if test x$use_jemalloc = xyes; then
-    AC_MSG_RESULT([Enabling jemalloc])
-    AC_CHECK_LIB([jemalloc], [malloc],, [AC_MSG_ERROR(jemalloc not found)])
-  fi
 fi
 
 dnl Check for endianness
@@ -906,7 +897,6 @@ fi
 
 if test x$use_reduce_exports = xyes; then
     CXXFLAGS="$CXXFLAGS $RE_CXXFLAGS"
-    AX_CHECK_LINK_FLAG([[-Wl,--exclude-libs,ALL]], [RELDFLAGS="-Wl,--exclude-libs,ALL"])
 fi
 
 if test x$use_tests = xyes; then
@@ -1032,6 +1022,18 @@ if test x$boost_sleep != xyes; then
   AC_MSG_ERROR(No working boost sleep implementation found.)
 fi
 
+fi
+
+if test x$use_tcmalloc = xyes; then
+  AC_MSG_RESULT([Enabling tcmalloc])
+  AC_CHECK_LIB([tcmalloc_minimal], [main],
+    [CXXFLAGS="$CXXFLAGS -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free"; LIBS="-ltcmalloc_minimal $LIBS"],
+    [AC_MSG_ERROR(tcmalloc not found)])
+else
+  if test x$use_jemalloc = xyes; then
+    AC_MSG_RESULT([Enabling jemalloc])
+    AC_CHECK_LIB([jemalloc], [main],, [AC_MSG_ERROR(jemalloc not found)])
+  fi
 fi
 
 if test x$use_pkgconfig = xyes; then

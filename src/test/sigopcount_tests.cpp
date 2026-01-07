@@ -3,20 +3,21 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "config.h"
+#include "config.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
 #include "key.h"
+#include "protocol_era.h"
 #include "pubkey.h"
 #include "script/script.h"
+#include "script/script_error.h"
+#include "script/script_num.h"
+#include "script/sign.h"
 #include "script/standard.h"
 #include "taskcancellation.h"
-#include "script/script_num.h"
 #include "test/test_bitcoin.h"
+#include "testutil.h"
 #include "uint256.h"
-#include "validation.h"
-#include "chainparams.h"
-#include "config.h"
-#include "script/sign.h"
 
 #include <limits>
 #include <tuple>
@@ -24,22 +25,15 @@
 
 #include <boost/test/unit_test.hpp>
 
-namespace
-{
-    // Helpers:
-    std::vector<uint8_t> Serialize(const CScript &s)
-    {
-        std::vector<uint8_t> sSerialized(s.begin(), s.end());
-        return sSerialized;
-    }
-}
-
 BOOST_FIXTURE_TEST_SUITE(sigopcount_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(GetSigOpCount_WithReturn)
 {
     // Tests for GitHub #296 & SVN-2388
-    CScriptNum BigNum { std::vector<uint8_t>{1,2,3,4,5}, false, 6, true };
+    const CScriptNum BigNum{std::vector<uint8_t>{1, 2, 3, 4, 5},
+                            min_encoding_check::no,
+                            6,
+                            true};
     using TestParams = std::tuple<CScript, bool, uint64_t>; // <Script, triggers error, sig op count>
     std::vector<TestParams> tests {
         {
@@ -74,7 +68,7 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount_WithReturn)
     for(const auto& [script, errorExpected, sigOpsExpected] : tests)
     {
         bool sigOpCountError {false};
-        uint64_t sigOps { script.GetSigOpCount(true, true, sigOpCountError) };
+        uint64_t sigOps { script.GetSigOpCount(true, ProtocolEra::PostGenesis, sigOpCountError) };
         BOOST_CHECK_EQUAL(sigOpCountError, errorExpected);
         BOOST_CHECK_EQUAL(sigOps, sigOpsExpected);
     }
@@ -83,23 +77,23 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount_WithReturn)
 BOOST_AUTO_TEST_CASE(GetSigOpCount) {
     // Test CScript::GetSigOpCount()
 
-    bool sigOpCountError;
+    bool sigOpCountError; // NOLINT(cppcoreguidelines-init-variables)
     CScript s1;
-    BOOST_CHECK_EQUAL(s1.GetSigOpCount(false, false, sigOpCountError), 0U);
-    BOOST_CHECK_EQUAL(s1.GetSigOpCount(true, false, sigOpCountError), 0U);
+    BOOST_CHECK_EQUAL(s1.GetSigOpCount(false, ProtocolEra::PreGenesis, sigOpCountError), 0U);
+    BOOST_CHECK_EQUAL(s1.GetSigOpCount(true, ProtocolEra::PreGenesis, sigOpCountError), 0U);
 
     uint160 dummy;
     s1 << OP_1 << ToByteVector(dummy) << ToByteVector(dummy) << OP_2
        << OP_CHECKMULTISIG;
-    BOOST_CHECK_EQUAL(s1.GetSigOpCount(true, false, sigOpCountError), 2U);
+    BOOST_CHECK_EQUAL(s1.GetSigOpCount(true, ProtocolEra::PreGenesis, sigOpCountError), 2U);
     s1 << OP_IF << OP_CHECKSIG << OP_ENDIF;
-    BOOST_CHECK_EQUAL(s1.GetSigOpCount(true, false, sigOpCountError), 3U);
-    BOOST_CHECK_EQUAL(s1.GetSigOpCount(false, false, sigOpCountError), 21U);
+    BOOST_CHECK_EQUAL(s1.GetSigOpCount(true, ProtocolEra::PreGenesis, sigOpCountError), 3U);
+    BOOST_CHECK_EQUAL(s1.GetSigOpCount(false, ProtocolEra::PreGenesis, sigOpCountError), 21U);
 
     CScript p2sh = GetScriptForDestination(CScriptID(s1));
     CScript scriptSig;
     scriptSig << OP_0 << Serialize(s1);
-    BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(scriptSig, false, sigOpCountError), 3U);
+    BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(scriptSig, ProtocolEra::PreGenesis, sigOpCountError), 3U);
 
     std::vector<CPubKey> keys;
     for (int i = 0; i < 3; i++) {
@@ -108,126 +102,121 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount) {
         keys.push_back(k.GetPubKey());
     }
     CScript s2 = GetScriptForMultisig(1, keys);
-    BOOST_CHECK_EQUAL(s2.GetSigOpCount(true, false, sigOpCountError), 3U);
-    BOOST_CHECK_EQUAL(s2.GetSigOpCount(false, false, sigOpCountError), 20U);
+    BOOST_CHECK_EQUAL(s2.GetSigOpCount(true, ProtocolEra::PreGenesis, sigOpCountError), 3U);
+    BOOST_CHECK_EQUAL(s2.GetSigOpCount(false, ProtocolEra::PreGenesis, sigOpCountError), 20U);
 
     p2sh = GetScriptForDestination(CScriptID(s2));
-    BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(true, false, sigOpCountError), 0U);
-    BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(false, false, sigOpCountError), 0U);
+    BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(true, ProtocolEra::PreGenesis, sigOpCountError), 0U);
+    BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(false, ProtocolEra::PreGenesis, sigOpCountError), 0U);
     CScript scriptSig2;
     scriptSig2 << OP_1 << ToByteVector(dummy) << ToByteVector(dummy)
                << Serialize(s2);
-    BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(scriptSig2, false, sigOpCountError), 3U);
+    BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(scriptSig2, ProtocolEra::PreGenesis, sigOpCountError), 3U);
 
-    uint64_t maxPubKeysPerMultiSig = 100;   // larger than before genesis limit
+    int64_t maxPubKeysPerMultiSig = 100;   // larger than before genesis limit
     std::vector<CPubKey> keysAfterGenesis;
-    for (uint64_t i = 0; i < maxPubKeysPerMultiSig; i++) {
+    for (int64_t i = 0; i < maxPubKeysPerMultiSig; i++) {
         CKey k;
         k.MakeNewKey(true);
         keysAfterGenesis.push_back(k.GetPubKey());
     }
 
     CScript s3 = GetScriptForMultisig(1, keysAfterGenesis);
-    BOOST_CHECK_EQUAL(s3.GetSigOpCount(false, true, sigOpCountError), maxPubKeysPerMultiSig);
+    BOOST_CHECK_EQUAL(s3.GetSigOpCount(false, ProtocolEra::PostGenesis, sigOpCountError), maxPubKeysPerMultiSig);
 
     // Test policy after Genesis
     testConfig.Reset();
     CScript s4;
     s4 << OP_1 << ToByteVector(dummy) << maxPubKeysPerMultiSig - 1 << OP_CHECKMULTISIG;
-    BOOST_CHECK_EQUAL(s4.GetSigOpCount(false, true, sigOpCountError), maxPubKeysPerMultiSig - 1);
+    BOOST_CHECK_EQUAL(s4.GetSigOpCount(false, ProtocolEra::PostGenesis, sigOpCountError), maxPubKeysPerMultiSig - 1);
     CScript s5;
     s5 << OP_1 << ToByteVector(dummy) << maxPubKeysPerMultiSig + 1 << OP_CHECKMULTISIG;
-    BOOST_CHECK_EQUAL(s5.GetSigOpCount(false, true, sigOpCountError), maxPubKeysPerMultiSig + 1);
+    BOOST_CHECK_EQUAL(s5.GetSigOpCount(false, ProtocolEra::PostGenesis, sigOpCountError), maxPubKeysPerMultiSig + 1);
 
     // Test default policy before Genesis with fAccurate == true
-    BOOST_CHECK_EQUAL(s4.GetSigOpCount(true, false, sigOpCountError), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
-    BOOST_CHECK_EQUAL(s5.GetSigOpCount(true, false, sigOpCountError), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
+    BOOST_CHECK_EQUAL(s4.GetSigOpCount(true, ProtocolEra::PreGenesis, sigOpCountError), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
+    BOOST_CHECK_EQUAL(s5.GetSigOpCount(true, ProtocolEra::PreGenesis, sigOpCountError), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
 
     // Test default policy before Genesis with fAccurate == false
-    BOOST_CHECK_EQUAL(s4.GetSigOpCount(false, false, sigOpCountError), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
-    BOOST_CHECK_EQUAL(s5.GetSigOpCount(false, false, sigOpCountError), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
+    BOOST_CHECK_EQUAL(s4.GetSigOpCount(false, ProtocolEra::PreGenesis, sigOpCountError), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
+    BOOST_CHECK_EQUAL(s5.GetSigOpCount(false, ProtocolEra::PreGenesis, sigOpCountError), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
 
 
     CScript scriptMinus1 = CScript() << OP_1 << ToByteVector(dummy) << ToByteVector(dummy) << CScriptNum(-1) << OP_CHECKMULTISIG;
-    BOOST_CHECK(scriptMinus1.GetSigOpCount(false, false, sigOpCountError) == MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
+    BOOST_CHECK(scriptMinus1.GetSigOpCount(false, ProtocolEra::PreGenesis, sigOpCountError) == MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
     BOOST_CHECK(!sigOpCountError);
 
-    BOOST_CHECK(scriptMinus1.GetSigOpCount(true, false, sigOpCountError) == MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
+    BOOST_CHECK(scriptMinus1.GetSigOpCount(true, ProtocolEra::PreGenesis, sigOpCountError) == MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
     BOOST_CHECK(!sigOpCountError);
 
-    BOOST_CHECK(scriptMinus1.GetSigOpCount(false, true, sigOpCountError) == 0); // treated as error after Genesis
+    BOOST_CHECK(scriptMinus1.GetSigOpCount(false, ProtocolEra::PostGenesis, sigOpCountError) == 0); // treated as error after Genesis
     BOOST_CHECK(sigOpCountError);
 
-    BOOST_CHECK(scriptMinus1.GetSigOpCount(true, true, sigOpCountError) == 0); // treated as error after Genesis
+    BOOST_CHECK(scriptMinus1.GetSigOpCount(true, ProtocolEra::PostGenesis, sigOpCountError) == 0); // treated as error after Genesis
     BOOST_CHECK(sigOpCountError);
 
 
     CScript script_OP_9 = CScript() << OP_1 << ToByteVector(dummy) << ToByteVector(dummy) << OP_9 << OP_CHECKMULTISIG;
-    BOOST_CHECK(script_OP_9.GetSigOpCount(false, false, sigOpCountError) == MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
+    BOOST_CHECK(script_OP_9.GetSigOpCount(false, ProtocolEra::PreGenesis, sigOpCountError) == MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
     BOOST_CHECK(!sigOpCountError);
 
-    BOOST_CHECK(script_OP_9.GetSigOpCount(true, false, sigOpCountError) == 9);
+    BOOST_CHECK(script_OP_9.GetSigOpCount(true, ProtocolEra::PreGenesis, sigOpCountError) == 9);
     BOOST_CHECK(!sigOpCountError);
 
-    BOOST_CHECK(script_OP_9.GetSigOpCount(false, true, sigOpCountError) == 9);
+    BOOST_CHECK(script_OP_9.GetSigOpCount(false, ProtocolEra::PostGenesis, sigOpCountError) == 9);
     BOOST_CHECK(!sigOpCountError);
 
-    BOOST_CHECK(script_OP_9.GetSigOpCount(true, true, sigOpCountError) == 9);
+    BOOST_CHECK(script_OP_9.GetSigOpCount(true, ProtocolEra::PostGenesis, sigOpCountError) == 9);
     BOOST_CHECK(!sigOpCountError);
 
     CScript script_OP_19 = CScript() << OP_1 << ToByteVector(dummy) << ToByteVector(dummy) << CScriptNum(19) << OP_CHECKMULTISIG;
-    BOOST_CHECK(script_OP_19.GetSigOpCount(false, false, sigOpCountError) == MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
+    BOOST_CHECK(script_OP_19.GetSigOpCount(false, ProtocolEra::PreGenesis, sigOpCountError) == MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
     BOOST_CHECK(!sigOpCountError);
 
-    BOOST_CHECK(script_OP_19.GetSigOpCount(true, false, sigOpCountError) == MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS); // more than OP_16 is not recognized before geneis
+    BOOST_CHECK(script_OP_19.GetSigOpCount(true, ProtocolEra::PreGenesis, sigOpCountError) == MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS); // more than OP_16 is not recognized before geneis
     BOOST_CHECK(!sigOpCountError);
 
-    BOOST_CHECK(script_OP_19.GetSigOpCount(false, true, sigOpCountError) == 19);
+    BOOST_CHECK(script_OP_19.GetSigOpCount(false, ProtocolEra::PostGenesis, sigOpCountError) == 19);
     BOOST_CHECK(!sigOpCountError);
 
-    BOOST_CHECK(script_OP_19.GetSigOpCount(true, true, sigOpCountError) == 19);
+    BOOST_CHECK(script_OP_19.GetSigOpCount(true, ProtocolEra::PostGenesis, sigOpCountError) == 19);
     BOOST_CHECK(!sigOpCountError);
 
     std::vector<uint8_t> bignum = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
     CScript script_bigNum = CScript() << OP_1 << ToByteVector(dummy) << ToByteVector(dummy) << bignum << OP_CHECKMULTISIG;
-    BOOST_CHECK(script_bigNum.GetSigOpCount(false, false, sigOpCountError) == MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
+    BOOST_CHECK(script_bigNum.GetSigOpCount(false, ProtocolEra::PreGenesis, sigOpCountError) == MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
     BOOST_CHECK(!sigOpCountError);
 
-    BOOST_CHECK(script_bigNum.GetSigOpCount(true, false, sigOpCountError) == MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS); 
+    BOOST_CHECK(script_bigNum.GetSigOpCount(true, ProtocolEra::PreGenesis, sigOpCountError) == MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS); 
     BOOST_CHECK(!sigOpCountError);
 
-    BOOST_CHECK(script_bigNum.GetSigOpCount(false, true, sigOpCountError) == 0);
+    BOOST_CHECK(script_bigNum.GetSigOpCount(false, ProtocolEra::PostGenesis, sigOpCountError) == 0);
     BOOST_CHECK(sigOpCountError); // treated as error after Genesis
 
-    BOOST_CHECK(script_bigNum.GetSigOpCount(true, true, sigOpCountError) == 0);
+    BOOST_CHECK(script_bigNum.GetSigOpCount(true, ProtocolEra::PostGenesis, sigOpCountError) == 0);
     BOOST_CHECK(sigOpCountError); // treated as error after Genesis
-
-
-
-
 }
 
 /**
  * Verifies script execution of the zeroth scriptPubKey of tx output and zeroth
  * scriptSig and witness of tx input.
  */
-ScriptError VerifyWithFlag(const CTransaction &output,
-                           const CMutableTransaction &input, int flags) {
-    ScriptError error;
-    const Config& config = GlobalConfig::GetConfig();
+ScriptError VerifyWithFlag(const CTransaction& output,
+                           const CMutableTransaction& input,
+                           const int flags)
+{
+    const auto params{make_verify_script_params(GlobalConfig::GetConfig().GetConfigScriptPolicy(), flags, true)};
     CTransaction inputi(input);
-    auto ret =
-        VerifyScript(
-            config, true,
-            task::CCancellationSource::Make(),
-            inputi.vin[0].scriptSig,
-            output.vout[0].scriptPubKey,
-            flags,
-            TransactionSignatureChecker(&inputi, 0, output.vout[0].nValue),
-            &error);
-    BOOST_CHECK((ret.value() == true) == (error == SCRIPT_ERR_OK));
-
-    return error;
+    const auto ret =
+        VerifyScript(params,
+                     task::CCancellationSource::Make(),
+                     inputi.vin[0].scriptSig,
+                     output.vout[0].scriptPubKey,
+                     flags,
+                     TransactionSignatureChecker(&inputi, 0, output.vout[0].nValue));
+    BOOST_REQUIRE(ret);
+    BOOST_CHECK_NE(SCRIPT_ERR_OK, ret.value());
+    return ret.value();
 }
 
 /**
@@ -274,7 +263,7 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
     // Default flags
     int flags = SCRIPT_VERIFY_P2SH;
     
-    uint64_t genesisHeight = 10;
+    int32_t genesisHeight = 10;
     testConfig.SetGenesisActivationHeight(genesisHeight);
     
 
@@ -285,30 +274,29 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
                                          << OP_CHECKMULTISIGVERIFY;
         // Do not use a valid signature to avoid using wallet operations.
         CScript scriptSig = CScript() << OP_0 << OP_0;
-
         for(int nHeight : {genesisHeight-1, genesisHeight}){ // test before and after genesis (should be the same)
             BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, nHeight);
-            
-            bool genesisEnabled =  IsGenesisEnabled(testConfig, nHeight);
-            bool sigOpCountError;
+
+            ProtocolEra era { GetProtocolEra(testConfig.GetConfigScriptPolicy(), nHeight) };
+            bool sigOpCountError {false};
 
             // Legacy counting only includes signature operations in scriptSigs and
             // scriptPubKeys of a transaction and does not take the actual executed
             // sig operations into account. spendingTx in itself does not contain a
             // signature operation.
             BOOST_REQUIRE(GetTransactionSigOpCount(testConfig, CTransaction(spendingTx), coins,
-                                            true, genesisEnabled, sigOpCountError) == 0);
+                                            true, era, sigOpCountError) == 0);
             // creationTx contains two signature operations in its scriptPubKey, but
             // legacy counting is not accurate.
-            if (!genesisEnabled)
+            if (!IsProtocolActive(era, ProtocolName::Genesis))
             {
                 BOOST_REQUIRE(GetTransactionSigOpCount(testConfig, CTransaction(creationTx), coins,
-                                                true, genesisEnabled, sigOpCountError) == MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
+                                                true, era, sigOpCountError) == MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);
             }
             else
             {
                 BOOST_REQUIRE(GetTransactionSigOpCount(testConfig, CTransaction(creationTx), coins,
-                                                true, genesisEnabled, sigOpCountError) == 2);
+                                                true, era, sigOpCountError) == 2);
             }
             // Sanity check: script verification fails because of an invalid
             // signature.
@@ -327,18 +315,18 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
         CScript scriptSig = CScript()
                             << OP_0 << OP_0 << ToByteVector(redeemScript);
         { // testing before genesis
-            bool sigOpCountError;
+            bool sigOpCountError; // NOLINT(cppcoreguidelines-init-variables)
             BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight-1);
             BOOST_REQUIRE(GetTransactionSigOpCount(testConfig, CTransaction(spendingTx), coins,
-                                            true, false, sigOpCountError) == 2);
+                                            true, ProtocolEra::PreGenesis, sigOpCountError) == 2);
             BOOST_REQUIRE(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) ==
                     SCRIPT_ERR_CHECKMULTISIGVERIFY);
         }
         { // testing after genesis
-            bool sigOpCountError;
+            bool sigOpCountError; // NOLINT(cppcoreguidelines-init-variables)
             BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight);
             BOOST_REQUIRE(GetTransactionSigOpCount(testConfig, CTransaction(spendingTx), coins,
-                                            true, true, sigOpCountError) == 0);
+                                            true, ProtocolEra::PostGenesis, sigOpCountError) == 0);
             BOOST_REQUIRE(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) ==
                     SCRIPT_ERR_CHECKMULTISIGVERIFY);
         }
@@ -359,16 +347,16 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
 
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight);
 
-        bool sigOpCountError;
+        bool sigOpCountError; // NOLINT(cppcoreguidelines-init-variables)
 
         // Legacy counting only includes signature operations in scriptSigs and
         // scriptPubKeys of a transaction and does not take the actual executed
         // sig operations into account. spendingTx in itself does not contain a
         // signature operation.
-        BOOST_CHECK(GetTransactionSigOpCount(testConfig, CTransaction(spendingTx), coins, false, true, sigOpCountError) == 0);
+        BOOST_CHECK(GetTransactionSigOpCount(testConfig, CTransaction(spendingTx), coins, false, ProtocolEra::PostGenesis, sigOpCountError) == 0);
         // creationTx contains two signature operations in its scriptPubKey, but
         // legacy counting is not accurate.
-        BOOST_CHECK(GetTransactionSigOpCount(testConfig, CTransaction(creationTx), coins, false, true, sigOpCountError) == 100);
+        BOOST_CHECK(GetTransactionSigOpCount(testConfig, CTransaction(creationTx), coins, false, ProtocolEra::PostGenesis, sigOpCountError) == 100);
         // Sanity check: script verification fails because of an invalid
         // signature.
         flags = SCRIPT_UTXO_AFTER_GENESIS;
@@ -383,9 +371,9 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
             << OP_CHECKMULTISIGVERIFY;
         CScript scriptSig = CScript() << OP_0 << OP_0;
 
-        bool sigOpCountError;
+        bool sigOpCountError {false};
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight);
-        BOOST_CHECK(GetTransactionSigOpCount(testConfig, CTransaction(creationTx), coins, true, true, sigOpCountError) == 0);
+        BOOST_CHECK(GetTransactionSigOpCount(testConfig, CTransaction(creationTx), coins, true, ProtocolEra::PostGenesis, sigOpCountError) == 0);
         BOOST_CHECK(sigOpCountError == true);
     }
 
@@ -396,19 +384,17 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
             << OP_CHECKMULTISIGVERIFY;
         CScript scriptSig = CScript() << OP_0 << OP_0;
 
-        bool sigOpCountError;
+        bool sigOpCountError {false};
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight);
-        BOOST_CHECK(GetTransactionSigOpCount(testConfig, CTransaction(creationTx), coins, true, true, sigOpCountError) == 0);
+        BOOST_CHECK(GetTransactionSigOpCount(testConfig, CTransaction(creationTx), coins, true, ProtocolEra::PostGenesis, sigOpCountError) == 0);
         BOOST_CHECK(sigOpCountError == true);
 
         BOOST_CHECK(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) == SCRIPT_ERR_PUBKEY_COUNT);
     }
-    
 }
 
 BOOST_AUTO_TEST_CASE(test_sigops_limits) {
     Config& config = GlobalConfig::GetConfig();
-    std::string error;
     uint64_t expected_res = MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS;
 
     BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(1), expected_res);
@@ -422,7 +408,7 @@ BOOST_AUTO_TEST_CASE(test_sigops_limits) {
     BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(std::numeric_limits<uint32_t>::max()), 4295 * expected_res);
 }
 
-void TestMaxSigOps(const Config& globalConfig, uint64_t maxTxSigOpsCount, uint64_t maxTxSize)
+void TestMaxSigOps(uint64_t maxTxSigOpsCount, uint64_t maxTxSize)
 {
     CMutableTransaction tx;
     tx.nVersion = 1;
@@ -435,8 +421,8 @@ void TestMaxSigOps(const Config& globalConfig, uint64_t maxTxSigOpsCount, uint64
 
     {
         CValidationState state;
-        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, false));
-        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, true));
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, ProtocolEra::PreGenesis));
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, ProtocolEra::PostGenesis));
     }
 
     // Get just before the limit.
@@ -446,8 +432,8 @@ void TestMaxSigOps(const Config& globalConfig, uint64_t maxTxSigOpsCount, uint64
 
     {
         CValidationState state;
-        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, false));
-        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, true));
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, ProtocolEra::PreGenesis));
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, ProtocolEra::PostGenesis));
     }
 
     // And go over.
@@ -455,52 +441,50 @@ void TestMaxSigOps(const Config& globalConfig, uint64_t maxTxSigOpsCount, uint64
 
     {
         CValidationState state;
-        BOOST_CHECK(!CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, false));
+        BOOST_CHECK(!CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, ProtocolEra::PreGenesis));
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txn-sigops");
-        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, true));
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, ProtocolEra::PostGenesis));
     }
 }
 
 BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx)
 {
-
-
     /* Case 1: Genesis is not enabled, consensus - MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS */
     uint64_t maxTxSigOpsCountConsensusBeforeGenesis = testConfig.GetMaxTxSigOpsCountConsensusBeforeGenesis();
     BOOST_CHECK_EQUAL(maxTxSigOpsCountConsensusBeforeGenesis, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS);
-    TestMaxSigOps(testConfig, maxTxSigOpsCountConsensusBeforeGenesis, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS);
+    TestMaxSigOps(maxTxSigOpsCountConsensusBeforeGenesis, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS);
 
     /* Case 2: Genesis is not enabled, policy - MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS */
-    uint64_t maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(false);
+    uint64_t maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(ProtocolEra::PreGenesis);
     BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS);
 
     /* Case 3: Genesis is enabled, default policy - MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS */
-    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(true);
+    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(ProtocolEra::PostGenesis);
     BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS);
 
     /* Case 4: policy is applied with value 0 - returns MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS */
     std::string error("");
     BOOST_CHECK(testConfig.SetMaxTxSigOpsCountPolicy(0, &error));
     BOOST_CHECK_EQUAL(error, "");
-    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(true);
+    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(ProtocolEra::PostGenesis);
     BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS);
 
     /* Case 5: policy is applied - returns set value */
     BOOST_CHECK(testConfig.SetMaxTxSigOpsCountPolicy(20500, &error));
     BOOST_CHECK_EQUAL(error,"");
-    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(true);
+    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(ProtocolEra::PostGenesis);
     BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, 20500U);
     
     /* Case 6: Policy is applied with too big value - previous value must not be changed */
     BOOST_CHECK(!testConfig.SetMaxTxSigOpsCountPolicy(static_cast<int64_t>(MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS) + 1, &error));
     BOOST_CHECK(error.find("Policy value for maximum allowed number of signature operations per transaction must not exceed limit of") != std::string::npos);
-    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(true);
+    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(ProtocolEra::PostGenesis);
     BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, 20500U);
 
     /* Case 7: Policy is applied with negative value - previous value must not be changed */
     BOOST_CHECK(!testConfig.SetMaxTxSigOpsCountPolicy(-123, &error));
     BOOST_CHECK_EQUAL(error, "Policy value for maximum allowed number of signature operations per transaction cannot be less than 0");
-    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(true);
+    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(ProtocolEra::PostGenesis);
     BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, 20500U);
 }
 

@@ -35,7 +35,12 @@ class P2PPendingResponses(BitcoinTestFramework):
                 self.command = request_command.encode("ascii")
 
             def serialize(self):
-                return b'\xCF\x07\x81\x11\x01' + b'\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11' +b'\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11'
+                return b'\xCF\x07\x81\x11\x01\x11\x11\x11\x11\x11\x11\x11' \
+                    + b'\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11' \
+                    + b'\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11' \
+                    + b'\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11' \
+                    + b'\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11' \
+                    + b'\x11\x11\x11\x11\x11'
 
         with self.run_node_with_connections("P2PPendingResponses", node_index=0, cb_class=NodeConnCBWithHeadersCount, args=node_args, number_of_connections=1) as conns:
             conn = conns[0]
@@ -48,7 +53,10 @@ class P2PPendingResponses(BitcoinTestFramework):
 
             self.log.info("Disable reading from socket in mininode")
             conn.orig_conn_readable = conn.readable
-            def conn_readable_false(self): return False
+
+            def conn_readable_false(self):
+                return False
+
             conn.readable = types.MethodType(conn_readable_false, conn)
 
             num_sent_before_disconnect = 0
@@ -57,7 +65,7 @@ class P2PPendingResponses(BitcoinTestFramework):
                 try:
                     conn.send_message(msg_raw(request_command))
                     num_sent_before_disconnect = num_sent_before_disconnect + 1
-                except:
+                except Exception:
                     # If send_message() throws, connection was already closed.
                     # NOTE: This is unlikely to happen because requests can be sent much faster than the node can process them
                     #       and will be stored in received buffer until then.
@@ -70,12 +78,12 @@ class P2PPendingResponses(BitcoinTestFramework):
                 assert num_sent_before_disconnect > 0
                 # Wait until node closes the connection
                 # NOTE: We cannot wait for disconnect in mininode because that would require enabling reading from socket and if we do that, disconnect may not happen.
-                wait_until(lambda: len(conn.rpc.getpeerinfo())==0, check_interval=1)
+                wait_until(lambda: len(conn.rpc.getpeerinfo()) == 0, check_interval=1)
             else:
                 # If disconnect is not expected, we should be able to send all requests even without reading the responses
                 assert num_sent_before_disconnect == num_requests
                 self.log.info("Waiting until node receives all requests")
-                wait_until(lambda: count_log_msg(conn.rpc, log_msg_request_received) == initial_request_cnt+num_requests, check_interval=1)
+                wait_until(lambda: count_log_msg(conn.rpc, log_msg_request_received) == initial_request_cnt + num_requests, check_interval=1)
                 # Check that connection was not closed
                 assert_equal(len(conn.rpc.getpeerinfo()), 1)
 
@@ -116,8 +124,8 @@ class P2PPendingResponses(BitcoinTestFramework):
         self.send_requests_without_reading_responses([], "gethdrsen", 25, False)
 
         self.log.info("--- Part 4: Check that maximum pending responses for getheaders/gethdrsen is not enforced for whitelisted peers")
-        self.send_requests_without_reading_responses(["-whitelist=127.0.0.1","-maxpendingresponses_getheaders=50"], "getheaders", 100, False)
-        self.send_requests_without_reading_responses(["-whitelist=127.0.0.1","-maxpendingresponses_gethdrsen=10"], "gethdrsen", 25, False)
+        self.send_requests_without_reading_responses(["-whitelist=127.0.0.1", "-maxpendingresponses_getheaders=50"], "getheaders", 100, False)
+        self.send_requests_without_reading_responses(["-whitelist=127.0.0.1", "-maxpendingresponses_gethdrsen=10"], "gethdrsen", 25, False)
 
 
 if __name__ == '__main__':

@@ -73,16 +73,24 @@ void AssertLockHeldInternal(const char *pszName, const char *pszFile, int nLine,
                             void *cs);
 void DeleteLock(void *cs);
 #else
-static inline void EnterCritical(const char *pszName, const char *pszFile,
-                                 int nLine, void *cs, bool fTry = false) {}
+static inline void EnterCritical(const char* /*pszName*/,
+                                 const char* /*pszFile*/,
+                                 int /*nLine*/,
+                                 void* /*cs*/,
+                                 bool /*fTry*/ = false)
+{}
+
 static inline void LeaveCritical() {}
-static inline void AssertLockHeldInternal(const char *pszName,
-                                          const char *pszFile, int nLine,
-                                          void *cs) {}
-static inline void DeleteLock(void *cs) {}
+static inline void AssertLockHeldInternal(const char* /*pszName*/,
+                                          const char* /*pszFile*/,
+                                          int /*nLine*/,
+                                          void* /*cs*/)
+{}
+
+static inline void DeleteLock(void* /*cs*/) {}
+
 #endif
-// NOLINTNEXTLINE(bugprone-macro-parentheses)
-#define AssertLockHeld(cs) AssertLockHeldInternal(#cs, __FILE__, __LINE__, &cs)
+#define AssertLockHeld(cs) AssertLockHeldInternal(#cs, __FILE__, __LINE__, &(cs))
 
 /**
  * Wrapped boost mutex: supports recursive locking, but no waiting
@@ -174,10 +182,9 @@ typedef CMutexLock<CCriticalSection> CCriticalBlock;
 #define TRY_LOCK(cs, name)                                                     \
     CCriticalBlock name(cs, #cs, __FILE__, __LINE__, true)
 
-// NOLINTBEGIN(bugprone-macro-parentheses)
 #define ENTER_CRITICAL_SECTION(cs)                                             \
     {                                                                          \
-        EnterCritical(#cs, __FILE__, __LINE__, (void *)(&cs));                 \
+        EnterCritical(#cs, __FILE__, __LINE__, (void *)(&(cs)));               \
         (cs).lock();                                                           \
     }
 
@@ -186,7 +193,6 @@ typedef CMutexLock<CCriticalSection> CCriticalBlock;
         (cs).unlock();                                                         \
         LeaveCritical();                                                       \
     }
-// NOLINTEND(bugprone-macro-parentheses)
 
 class CSemaphore {
 private:
@@ -256,8 +262,8 @@ public:
     CSemaphoreGrant() = default;
 
     CSemaphoreGrant(const std::shared_ptr<CSemaphore>& sema, bool fTry = false)
-        // NOLINTNEXTLINE(cppcoreguidelines-use-default-member-init)
-        : sem(sema), fHaveGrant(false) {
+        : sem(sema)
+    {
         if (fTry)
             TryAcquire();
         else

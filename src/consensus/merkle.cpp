@@ -5,6 +5,7 @@
 #include "merkle.h"
 #include "hash.h"
 #include "utilstrencodings.h"
+#include <cstdint>
 
 /*     WARNING! If you're reading this because you're learning about crypto
        and/or designing a new system that will use merkle trees, keep in mind
@@ -87,7 +88,7 @@ static void MerkleComputation(const std::vector<uint256> &leaves,
             CHash256()
                 .Write(inner[level].begin(), 32)
                 .Write(h.begin(), 32)
-                .Finalize(h.begin());
+                .Finalize(CHash256::span{h.begin(), CHash256::OUTPUT_SIZE});
         }
         // Store the resulting hash at inner position level.
         inner[level] = h;
@@ -116,7 +117,7 @@ static void MerkleComputation(const std::vector<uint256> &leaves,
         CHash256()
             .Write(h.begin(), 32)
             .Write(h.begin(), 32)
-            .Finalize(h.begin());
+            .Finalize(CHash256::span{h.begin(), CHash256::OUTPUT_SIZE});
         // Increment count to the value it would have if two entries at this
         // level had existed.
         count += (((uint32_t)1) << level);
@@ -134,7 +135,7 @@ static void MerkleComputation(const std::vector<uint256> &leaves,
             CHash256()
                 .Write(inner[level].begin(), 32)
                 .Write(h.begin(), 32)
-                .Finalize(h.begin());
+                .Finalize(CHash256::span{h.begin(), CHash256::OUTPUT_SIZE});
             level++;
         }
     }

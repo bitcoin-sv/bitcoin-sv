@@ -9,8 +9,10 @@
 
 #include <set>
 
-static void addCoin(const Amount nValue, const CWallet &wallet,
-                    std::vector<COutput> &vCoins) {
+static void addCoin(const Amount& nValue,
+                    const CWallet &wallet,
+                    std::vector<COutput>& vCoins)
+{
     int nInput = 0;
 
     static int nextLockTime = 0;
@@ -35,7 +37,7 @@ static void addCoin(const Amount nValue, const CWallet &wallet,
 // either for measurements."
 // (https://github.com/bitcoin/bitcoin/issues/7883#issuecomment-224807484)
 static void CoinSelection(benchmark::State &state) {
-    SelectParams(CBaseChainParams::TESTNET);
+    SelectParams(CBaseChainParams::TESTNET, MagicBytesFromCommandLine());
     GlobalConfig::GetModifiableGlobalConfig().SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
     const CWallet wallet(Params());
     std::vector<COutput> vCoins;
@@ -43,6 +45,7 @@ static void CoinSelection(benchmark::State &state) {
 
     auto ClearCoins = [&vCoins]() {
         for (auto& output : vCoins) {
+            // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
             delete output.tx;
         }
         vCoins.clear();

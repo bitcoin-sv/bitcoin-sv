@@ -2,10 +2,9 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.blocktools import create_coinbase, create_block_from_candidate, merkle_root_from_merkle_proof, solve_bad
+from test_framework.blocktools import create_block_from_candidate, solve_bad
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import *
-from test_framework.util import *
+from test_framework.mininode import ToHex
 
 # This test checks verifyblockcandidate RPC call. VerifyBlock tests a block template for validity without a valid PoW.
 # Test scenario: a block with invalid POW is created.
@@ -32,7 +31,7 @@ class VerifyWithoutPowTest(BitcoinTestFramework):
         assert submitResult == 'high-hash'
 
         submitResult = node.verifyblockcandidate(ToHex(block))
-        assert submitResult == None
+        assert submitResult is None
 
 
 if __name__ == '__main__':

@@ -37,9 +37,12 @@ namespace {
 
 struct CoinEntry {
     COutPoint *outpoint;
-    char key;
-    CoinEntry(const COutPoint *ptr)
-        : outpoint(const_cast<COutPoint *>(ptr)), key(DB_COIN) {}
+    char key{DB_COIN};
+
+    CoinEntry(const COutPoint* ptr):
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+        outpoint(const_cast<COutPoint*>(ptr))
+    {}
 
     template <typename Stream> void Serialize(Stream &s) const {
         s << key;
@@ -82,12 +85,15 @@ struct CDataStreamInput_NoScr : TBase
 {
     using Base = TBase;
 
-    CDataStreamInput_NoScr(std::string_view buf, const std::vector<uint8_t>& key, std::size_t maxScriptSize, std::optional<std::size_t>& actualScriptSize)
-    : Base(buf, key)
-    , maxScriptSize(maxScriptSize)
-    , actualScriptSize(actualScriptSize)
-    , wasUnserializeScriptCalled(false)
-    {}
+    CDataStreamInput_NoScr(std::string_view buf,
+                           const std::vector<uint8_t>& key,
+                           std::size_t max_script_size,
+                           std::optional<std::size_t>& actual_script_size)
+        : Base(buf, key),
+          maxScriptSize{max_script_size},
+          actualScriptSize{actual_script_size}
+    {
+    }
 
     template<typename T>
     CDataStreamInput_NoScr& operator>>(T& obj)
@@ -96,9 +102,11 @@ struct CDataStreamInput_NoScr : TBase
         return *this;
     }
 
+    // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
     const std::size_t maxScriptSize;
     std::optional<std::size_t>& actualScriptSize;
-    bool wasUnserializeScriptCalled;
+    // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
+    bool wasUnserializeScriptCalled{};
 };
 
 } // anonymous namespace
@@ -115,9 +123,10 @@ public:
 
     static void Unserialize(CScriptCompressor* self, Stream& s, unsigned int nSize)
     {
-        assert([](auto& s){
-            bool result = !s.wasUnserializeScriptCalled;
-            s.wasUnserializeScriptCalled = true;
+        // NOLINTNEXTLINE(bugprone-assert-side-effect)
+        assert([](auto& stream){
+            bool result = !stream.wasUnserializeScriptCalled;
+            stream.wasUnserializeScriptCalled = true;
             return result;
         }(s)); // Cannot unserialize more than one script using only one CDataStreamInput_NoScr object!
                // NOTE: Lambda is used because we want to remember within assert expression that Unserialize was called since
@@ -198,6 +207,7 @@ bool CoinsDB::DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
     size_t changed = 0;
     size_t batch_size =
         (size_t)gArgs.GetArgAsBytes("-dbbatchsize", nDefaultDbBatchSize);
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     int crash_simulate = gArgs.GetArg("-dbcrashratio", 0);
     assert(!hashBlock.IsNull());
 
@@ -294,9 +304,10 @@ bool CBlockTreeDB::ReadLastBlockFile(int &nFile) {
     return Read(DB_LAST_BLOCK, nFile);
 }
 
-CCoinsViewDBCursor *CoinsDB::Cursor() const {
-    CCoinsViewDBCursor *i = new CCoinsViewDBCursor(
-        const_cast<CDBWrapper &>(db).NewIterator(), GetBestBlock());
+CCoinsViewDBCursor* CoinsDB::Cursor() const
+{
+    CCoinsViewDBCursor* i = new CCoinsViewDBCursor(db.NewIterator(),
+                                                   GetBestBlock());
     /**
      * It seems that there are no "const iterators" for LevelDB. Since we only
      * need read operations on it, use a const-cast to get around that
@@ -316,10 +327,11 @@ CCoinsViewDBCursor *CoinsDB::Cursor() const {
 }
 
 // Same as CCoinsViewCursor::Cursor() with added Seek() to key txId
-CCoinsViewDBCursor* CoinsDB::Cursor(const TxId &txId) const {
-    CCoinsViewDBCursor* i = new CCoinsViewDBCursor(
-        const_cast<CDBWrapper&>(db).NewIterator(), GetBestBlock());
-    
+CCoinsViewDBCursor* CoinsDB::Cursor(const TxId& txId) const
+{
+    CCoinsViewDBCursor* i = new CCoinsViewDBCursor(db.NewIterator(),
+                                                   GetBestBlock());
+
     COutPoint op = COutPoint(txId, 0);
     CoinEntry key = CoinEntry(&op);
 
@@ -425,6 +437,7 @@ bool CBlockTreeDB::WriteBatchSync(
              blockinfo.begin();
          it != blockinfo.end(); it++) {
         batch.Write(std::make_pair(DB_BLOCK_INDEX, (*it)->GetBlockHash()),
+                    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
                     CDiskBlockIndex(const_cast<CBlockIndex&>(**it)));
     }
     return WriteBatch(batch, true);
@@ -449,7 +462,7 @@ bool CBlockTreeDB::WriteFlag(const std::string &name, bool fValue) {
 }
 
 bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue) {
-    char ch;
+    char ch{};
     if (!Read(std::make_pair(DB_FLAG, name), ch)) return false;
     fValue = ch == '1';
     return true;
@@ -474,10 +487,11 @@ bool CoinsDB::IsOldDBFormat()
 CoinsDB::CoinsDB(
         uint64_t cacheSizeThreshold,
         size_t nCacheSize,
+        size_t nMaxFileSize,
         CDBWrapper::MaxFiles maxFiles,
         bool fMemory,
         bool fWipe)
-    : db{ GetDataDir() / "chainstate", nCacheSize, fMemory, fWipe, true, maxFiles }
+    : db{ GetDataDir() / "chainstate", nCacheSize, fMemory, fWipe, true, maxFiles, nMaxFileSize }
     , mCacheSizeThreshold{cacheSizeThreshold}
 {}
 
@@ -659,16 +673,16 @@ bool CoinsDB::HaveCoinInCache(const COutPoint &outpoint) const {
 
 uint256 CoinsDB::GetBestBlock() const {
     std::shared_lock lock { mCoinsViewCacheMtx };
-    if (hashBlock.IsNull()) {
-        hashBlock = DBGetBestBlock();
+    if(hashBlock_.IsNull()) {
+        hashBlock_ = DBGetBestBlock();
     }
-    return hashBlock;
+    return hashBlock_;
 }
 
 bool CoinsDB::BatchWrite(
     const WPUSMutex::Lock& writeLock,
     const uint256& hashBlockIn,
-    CCoinsMap&& mapCoins)
+    CCoinsMap&& mapCoins) // NOLINT(cppcoreguidelines-rvalue-reference-param-not-moved)
 {
     assert( writeLock.GetLockType() == WPUSMutex::Lock::Type::write );
     std::unique_lock lock { mCoinsViewCacheMtx };
@@ -680,7 +694,7 @@ bool CoinsDB::BatchWrite(
     else
     {
         mCache.BatchWrite(mapCoins);
-        hashBlock = hashBlockIn;
+        hashBlock_ = hashBlockIn;
     }
     return true;
 }
@@ -690,7 +704,7 @@ bool CoinsDB::Flush()
     WPUSMutex::Lock writeLock = mMutex.WriteLock();
     std::unique_lock lock { mCoinsViewCacheMtx };
 
-    if(hashBlock.IsNull())
+    if(hashBlock_.IsNull())
     {
         // nothing new was added
         return true;
@@ -698,7 +712,7 @@ bool CoinsDB::Flush()
 
     auto coins = mCache.MoveOutCoins();
 
-    return DBBatchWrite(coins, hashBlock);
+    return DBBatchWrite(coins, hashBlock_);
 }
 
 void CoinsDB::Uncache(const std::vector<COutPoint>& vOutpoints)

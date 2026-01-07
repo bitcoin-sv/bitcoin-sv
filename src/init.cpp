@@ -12,6 +12,8 @@
 #include "amount.h"
 #include "block_index_store.h"
 #include "block_index_store_loader.h"
+#include "block_read_cache.h"
+#include "cfile_util.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "compat/sanity.h"
@@ -19,6 +21,7 @@
 #include "consensus/validation.h"
 #include "consensus/consensus.h"
 #include "double_spend/dsattempt_handler.h"
+#include "double_spend/dsdetected_defaults.h"
 #include "fs.h"
 #include "httprpc.h"
 #include "httpserver.h"
@@ -45,6 +48,7 @@
 #include "taskcancellation.h"
 #include "timedata.h"
 #include "txdb.h"
+#include "txdb_defaults.h"
 #include "txmempool.h"
 #include "txn_validation_config.h"
 #include "txn_validator.h"
@@ -88,13 +92,15 @@ static const bool DEFAULT_REST_ENABLE = false;
 static const bool DEFAULT_DISABLE_SAFEMODE = false;
 static const bool DEFAULT_STOPAFTERBLOCKIMPORT = false;
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 std::unique_ptr<CConnman> g_connman;
 std::unique_ptr<PeerLogicValidation> peerLogic;
 
 #if ENABLE_ZMQ
-CCriticalSection cs_zmqNotificationInterface;
-CZMQNotificationInterface *pzmqNotificationInterface = nullptr;
+CCriticalSection cs_zmqNotificationInterface; // NOLINT(cert-err58-cpp)
+std::unique_ptr<CZMQNotificationInterface> pzmqNotificationInterface;
 #endif
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 #ifdef WIN32
 // Win32 LevelDB doesn't use filedescriptors, and the ones used for accessing
@@ -136,8 +142,9 @@ enum BindFlags {
 // the parent exits from main().
 //
 
-std::shared_ptr<task::CCancellationSource> shutdownSource(task::CCancellationSource::Make());
-std::atomic<bool> fDumpMempoolLater(false);
+// NOLINTNEXTLINE(cert-err58-cpp)
+static std::shared_ptr<task::CCancellationSource> shutdownSource(task::CCancellationSource::Make());
+static std::atomic<bool> fDumpMempoolLater(false);
 
 void StartShutdown() {
     shutdownSource->Cancel();
@@ -184,7 +191,7 @@ void Shutdown() {
     StopRPC();
     StopHTTPServer();
 #ifdef ENABLE_WALLET
-    for (CWalletRef pwallet : vpwallets) {
+    for(const auto& pwallet : vpwallets) {
         pwallet->Flush(false);
     }
 #endif
@@ -221,8 +228,7 @@ void Shutdown() {
             FlushStateToDisk();
         }
         pcoinsTip.reset();
-        delete pblocktree;
-        pblocktree = nullptr;
+        pblocktree.reset();
     }
 
     // Flush/destroy miner ID database
@@ -230,8 +236,11 @@ void Shutdown() {
     // Destroy dataRef index
     g_dataRefIndex.reset();
 
+    // Destroy block read cache
+    g_blockReadCache.reset();
+
 #ifdef ENABLE_WALLET
-    for (CWalletRef pwallet : vpwallets) {
+    for(const auto& pwallet : vpwallets) {
         pwallet->Flush(true);
     }
 #endif
@@ -243,8 +252,7 @@ void Shutdown() {
         LOCK(cs_zmqNotificationInterface);
         if (pzmqNotificationInterface) {
             pzmqNotificationInterface->UnregisterValidationInterface();
-            delete pzmqNotificationInterface;
-            pzmqNotificationInterface = nullptr;
+            pzmqNotificationInterface.reset();
         }
     }
 #endif
@@ -258,13 +266,10 @@ void Shutdown() {
 #endif
     UnregisterAllValidationInterfaces();
 #ifdef ENABLE_WALLET
-    for (CWalletRef pwallet : vpwallets) {
-        delete pwallet;
-    }
     vpwallets.clear();
 #endif
     ShutdownFrozenTXO();
-    BlockIndexStoreLoader(mapBlockIndex).ForceClear();
+    mapBlockIndex.clear();
 
     LogPrintf("%s: done\n", __func__);
 }
@@ -277,7 +282,7 @@ void HandleSIGTERM(int) {
 }
 
 void HandleSIGHUP(int) {
-    GetLogger().fReopenDebugLog = true;
+    GetLogger().SetReopenDebugLog(true);
 }
 
 static bool Bind(CConnman &connman, const CService &addr, unsigned int flags) {
@@ -564,6 +569,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                                 "the getrawtransaction rpc call (default: %d)"),
                               DEFAULT_TXINDEX));
     strUsage += HelpMessageOpt(
+        "-preferredblockfilesize", strprintf(_("Preferred size (in bytes) of a single datafile containing "
+        "blocks. When this size is reached, new datafile is created. If preferred size is less than "
+        "size of a single block, block will still be stored, meaning datafile size can be larger than "
+        "preferred size. (default: %u)."), DEFAULT_PREFERRED_BLOCKFILE_SIZE));
+    strUsage += HelpMessageOpt(
         "-maxmerkletreediskspace", strprintf(_("Maximum disk size in bytes that "
         "can be taken by stored merkle trees. This size should not be less than default size "
         "(default: %uMB for a maximum 4GB block size). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
@@ -701,11 +711,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "-maxsendbuffer=<n>", strprintf(_("Maximum per-connection send buffer "
                                           "in kilobytes (default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB)."),
                                         DEFAULT_MAXSENDBUFFER));
-    strUsage += HelpMessageOpt("-maxsendbuffermult=<n>",
-        strprintf(_("Temporary multiplier applied to the -maxsendbuffer size to "
-                    "allow connections to unblock themselves in the unlikely "
-                    "situation where they have become paused for both sending and "
-                    "receiving (default: %d)"), DEFAULT_MAXSENDBUFFER_MULTIPLIER));
     strUsage += HelpMessageOpt(
         "-factormaxsendqueuesbytes=<n>",
         strprintf(_("Factor that will be multiplied with excessiveBlockSize"
@@ -1003,7 +1008,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                                _("Shrink bitcoind.log file on client startup "
                                  "(default: 1 when no -debug)"));
 
-    AppendParamsHelpMessages(strUsage, showDebug);
+    AppendParamsHelpMessages(strUsage);
 
     strUsage += HelpMessageGroup(_("Node relay options:"));
     strUsage +=
@@ -1028,7 +1033,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             strprintf(
                 "Relay and mine transactions that create or consume non standard"
                 " outputs after Genesis is activated. (default: %u)",
-                config.GetAcceptNonStandardOutput(true)));
+                config.GetAcceptNonStandardOutput(ProtocolEra::PostGenesis)));
 
     }
     strUsage += HelpMessageOpt(
@@ -1137,9 +1142,26 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
 
     strUsage += HelpMessageOpt(
         "-maxscriptnumlengthpolicy=<n>",
-        strprintf("Set maximum allowed number length we're willing to relay/mine in scripts (default: %d, 0 = unlimited) after Genesis is activated. "
+        strprintf("Set maximum allowed number length we're willing to relay/mine in scripts (default: %d, 0 = unlimited). "
             "The value may be given in bytes or with unit (B, kB, MB, GB).",
-            DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS));
+            DEFAULT_SCRIPT_NUM_LENGTH_POLICY));
+
+    strUsage += HelpMessageOpt(
+        "-mempoolsyncpeer=<ip or subnet>",
+        strprintf("Specify IPs or subnets of peers with which we want to periodically synchronise "
+            "mempools. NOTE: As well as specifying the address here you must also add a "
+            "corresponding entry on the other peer specifying OUR address otherwise they will "
+            "ignore our requests to synchronise with them. Can be used more than once to specify "
+            "multiple peers / networks."));
+    strUsage += HelpMessageOpt(
+        "-mempoolsyncage=<n>",
+        strprintf("An inventory of transactions greater than or equal to this age (in seconds) "
+            "will periodically be requested from all peers listed using -mempoolsyncpeer (default: %lus).",
+            MempoolMsg::DEFAULT_AGE));
+    strUsage += HelpMessageOpt(
+        "-mempoolsyncperiod",
+        strprintf("Set how frequently mempool synchronisation should be performed (in seconds, "
+            "default: %lus).", MempoolMsg::DEFAULT_PERIOD));
 
     strUsage += HelpMessageOpt(
         "-softconsensusfreezeduration",
@@ -1396,7 +1418,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
             "-txnvalidationschedulestrategy=<strategy>",
             "Set task scheduling strategy to use in parallel transaction validation."
-                      "Available strategies: CHAIN_DETECTOR (legacy), TOPO_SORT (default)");
+                      "Available strategies: CHAIN_DETECTOR (legacy, deprecated), TOPO_SORT (default)");
     strUsage += HelpMessageOpt(
         "-maxtxnvalidatorasynctasksrunduration=<n>",
         strprintf("Set the maximum validation duration for async tasks in a single run (default: %dms)",
@@ -1416,6 +1438,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("Set maximum number of files used by coins leveldb (default: %d). "),
                   CoinsDB::MaxFiles::Default().maxFiles));
     strUsage += HelpMessageOpt(
+        "-maxcoinsdbfilesize=<n>",
+        strprintf(_("Set maximum file size used by the coins leveldb (default: %d MB). "
+            "The value may be given in bytes or with unit (B, kB, MB, GB)."),
+            CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE / ONE_MEBIBYTE));
+    strUsage += HelpMessageOpt(
         "-txnvalidationqueuesmaxmemory=<n>",
         strprintf("Set the maximum memory usage for the transaction queues in MB (default: %d). The value may be given in megabytes or with unit (B, kB, MB, GB).",
             CTxnValidator::DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES)) ;
@@ -1430,7 +1457,14 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     "for violating Genesis rules in case the calling node is not yet on Genesis height and vice versa. "
                     "Seting 0 will disable Genesis graceful period. Genesis graceful period range :"
                     "(GENESIS_ACTIVATION_HEIGHT - n |...| GENESIS_ACTIVATION_HEIGHT |...| GENESIS_ACTIVATION_HEIGHT + n)"),
-            DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD));
+            DEFAULT_GENESIS_GRACEFUL_ACTIVATION_PERIOD));
+    strUsage += HelpMessageOpt(
+        "-maxchroniclegracefulperiod=<n>",
+        strprintf(_("Set maximum allowed number of blocks for Chronicle graceful period (default: %d) where nodes will not be banned "
+                    "for violating Chronicle rules in case the calling node is not yet on Chronicle height and vice versa. "
+                    "Seting 0 will disable Chronicle graceful period. Chronicle graceful period range :"
+                    "(CHRONICLE_ACTIVATION_HEIGHT - n |...| CHRONICLE_ACTIVATION_HEIGHT |...| CHRONICLE_ACTIVATION_HEIGHT + n)"),
+            DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD));
 
     strUsage += HelpMessageGroup(_("Invalid transactions sink options:"));
     std::string availableSinks = StringJoin(", ", config.GetAvailableInvalidTxSinks());
@@ -1650,8 +1684,8 @@ static void BlockNotifyCallback(bool initialSync,
 }
 
 static bool fHaveGenesis = false;
-static boost::mutex cs_GenesisWait;
-static CConditionVariable condvar_GenesisWait;
+static boost::mutex cs_GenesisWait; // NOLINT(cert-err58-cpp)
+static CConditionVariable condvar_GenesisWait; // NOLINT(cert-err58-cpp)
 
 static void BlockNotifyGenesisWait(bool, const CBlockIndex *pBlockIndex) {
     if (pBlockIndex != nullptr) {
@@ -1714,7 +1748,7 @@ void CleanupBlockRevFiles() {
     // removing block files.
     int nContigCounter = 0;
     for (const auto& item : mapBlockFiles) {
-        if (atoi(item.first) == nContigCounter) {
+        if (atoi(item.first) == nContigCounter) { // NOLINT(cert-err34-c)
             nContigCounter++;
             continue;
         }
@@ -1725,7 +1759,12 @@ void CleanupBlockRevFiles() {
 /* shutdownToken must be passed by value to prevent access violation because
  * "import_files" thread can have longer life span than shutdownToken presented with a reference.
  */
-void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, const task::CCancellationToken shutdownToken) {
+void ThreadImport(const Config& config,
+                  // NOLINTBEGIN(performance-unnecessary-value-param)
+                  std::vector<fs::path> vImportFiles,
+                  const task::CCancellationToken shutdownToken)
+                  // NOLINTEND(performance-unnecessary-value-param)
+{
     RenameThread("loadblk");
 
     {
@@ -1733,7 +1772,7 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, cons
 
         // -reindex
         if (fReindex) {
-            ReindexAllBlockFiles(config, pblocktree, fReindex);
+            ReindexAllBlockFiles(config, pblocktree.get(), fReindex);
         }
 
         // hardcoded $DATADIR/bootstrap.dat
@@ -1818,7 +1857,8 @@ bool InitSanityCheck(void) {
     return true;
 }
 
-static bool AppInitServers(Config &config, boost::thread_group &threadGroup) {
+static bool AppInitServers(Config& config)
+{
     RPCServer::OnStarted(&OnRPCStarted);
     RPCServer::OnStopped(&OnRPCStopped);
     RPCServer::OnPreCommand(&OnRPCPreCommand);
@@ -1928,11 +1968,9 @@ static std::string ResolveErrMsg(const char *const optname,
 
 void InitLogging() {
     BCLog::Logger &logger = GetLogger();
-    logger.fPrintToConsole = gArgs.GetBoolArg("-printtoconsole", false);
-    logger.fLogTimestamps =
-        gArgs.GetBoolArg("-logtimestamps", DEFAULT_LOGTIMESTAMPS);
-    logger.fLogTimeMicros =
-        gArgs.GetBoolArg("-logtimemicros", DEFAULT_LOGTIMEMICROS);
+    logger.SetPrintToConsole(gArgs.GetBoolArg("-printtoconsole", false));
+    logger.SetLogTimestamps(gArgs.GetBoolArg("-logtimestamps", DEFAULT_LOGTIMESTAMPS));
+    logger.SetLogTimeMicros(gArgs.GetBoolArg("-logtimemicros", DEFAULT_LOGTIMEMICROS));
 
     fLogIPs = gArgs.GetBoolArg("-logips", DEFAULT_LOGIPS);
 
@@ -2000,7 +2038,7 @@ bool AppInitBasicSetup() {
     }
 
     // Clean shutdown on SIGTERM
-    struct sigaction sa;
+    struct sigaction sa{};
     sa.sa_handler = HandleSIGTERM;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
@@ -2008,7 +2046,7 @@ bool AppInitBasicSetup() {
     sigaction(SIGINT, &sa, nullptr);
 
     // Reopen bitcoind.log on SIGHUP
-    struct sigaction sa_hup;
+    struct sigaction sa_hup{};
     sa_hup.sa_handler = HandleSIGHUP;
     sigemptyset(&sa_hup.sa_mask);
     sa_hup.sa_flags = 0;
@@ -2016,7 +2054,7 @@ bool AppInitBasicSetup() {
 
     // Ignore SIGPIPE, otherwise it will bring the daemon down if the client
     // closes unexpectedly
-    signal(SIGPIPE, SIG_IGN);
+    std::ignore = signal(SIGPIPE, SIG_IGN);
 #endif
 
     std::set_new_handler(new_handler_terminate);
@@ -2040,6 +2078,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 
     // Make sure enough file descriptors are available
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     const int nBind = std::max(
         (gArgs.IsArgSet("-bind") ? gArgs.GetArgs("-bind").size() : 0) +
             (gArgs.IsArgSet("-whitebind") ? gArgs.GetArgs("-whitebind").size()
@@ -2050,10 +2089,12 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         static_cast<int>(gArgs.GetArg("-maxconnections", DEFAULT_MAX_PEER_CONNECTIONS));
     nMaxConnections = std::max(nUserMaxConnections, 0);
 
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     const int nUserMaxOutboundConnections = gArgs.GetArg(
         "-maxoutboundconnections", DEFAULT_MAX_OUTBOUND_CONNECTIONS);
 
     // Trim requested connection counts, to fit into system limitations
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     if(std::string err; !config.SetMaxAddNodeConnections(gArgs.GetArg("-maxaddnodeconnections", DEFAULT_MAX_ADDNODE_CONNECTIONS), &err)) {
         return InitError(err);
     }
@@ -2092,7 +2133,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         if (find(categories.begin(), categories.end(), std::string("0")) ==
             categories.end()) {
             for (const auto &cat : categories) {
-                BCLog::LogFlags flag;
+                BCLog::LogFlags flag{};
                 if (!GetLogCategory(flag, cat)) {
                     InitWarning(
                         strprintf(_("Unsupported logging category %s=%s."),
@@ -2106,7 +2147,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     // Now remove the logging categories which were explicitly excluded
     if (gArgs.IsArgSet("-debugexclude")) {
         for (const std::string &cat : gArgs.GetArgs("-debugexclude")) {
-            BCLog::LogFlags flag;
+            BCLog::LogFlags flag{};
             if (!GetLogCategory(flag, cat)) {
                 InitWarning(strprintf(_("Unsupported logging category %s=%s."),
                                       "-debugexclude", cat));
@@ -2139,6 +2180,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     // Checkmempool and checkblockindex default to true in regtest mode
     int ratio = std::min<int>(
         std::max<int>(
+            // NOLINTNEXTLINE(*-narrowing-conversions)
             gArgs.GetArg("-checkmempool",
                          chainparams.DefaultConsistencyChecks() ? 1 : 0),
             0),
@@ -2187,6 +2229,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     const auto defaultMaxMempoolSizeDisk = int64_t(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         std::ceil(1.0 * config.GetMaxMempool() * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR
                   / ONE_MEGABYTE));
     if (std::string err; !config.SetMaxMempoolSizeDisk(
@@ -2202,16 +2245,19 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     // script validation settings
     if(std::string error; !config.SetBlockScriptValidatorsParams(
+        // NOLINTBEGIN(*-narrowing-conversions)
         gArgs.GetArg("-maxparallelblocks", DEFAULT_SCRIPT_CHECK_POOL_SIZE),
         gArgs.GetArg("-threadsperblock", DEFAULT_SCRIPTCHECK_THREADS),
         gArgs.GetArg("-txnthreadsperblock", DEFAULT_TXNCHECK_THREADS),
         gArgs.GetArg("-scriptvalidatormaxbatchsize", DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE),
+        // NOLINTEND(*-narrowing-conversions)
         &error))
     {
         return InitError(error);
     }
 
     if(std::string error; !config.SetMaxConcurrentAsyncTasksPerNode(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg("-maxparallelblocksperpeer", DEFAULT_NODE_ASYNC_TASKS_LIMIT),
         &error))
     {
@@ -2248,6 +2294,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     // Configure height to stop running
     if (std::string err; !config.SetStopAtHeight(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg("-stopatheight", DEFAULT_STOPATHEIGHT), &err))
     {
         return InitError(err);
@@ -2399,9 +2446,13 @@ bool AppInitParameterInteraction(ConfigInit &config) {
             return InitError(err);
         }
     }
-    // Configure genesis activation height.
+    // Configure genesis & chronicle activation heights.
     int32_t genesisActivationHeight = static_cast<int32_t>(gArgs.GetArg("-genesisactivationheight", chainparams.GetConsensus().genesisHeight));
     if (std::string err; !config.SetGenesisActivationHeight(genesisActivationHeight, &err)) {
+        return InitError(err);
+    }
+    int32_t chronicleActivationHeight = static_cast<int32_t>(gArgs.GetArg("-chronicleactivationheight", chainparams.GetConsensus().chronicleHeight));
+    if (std::string err; !config.SetChronicleActivationHeight(chronicleActivationHeight, &err)) {
         return InitError(err);
     }
 
@@ -2557,7 +2608,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     if (gArgs.IsArgSet("-invalidtxfileevictionpolicy"))
     {
-        assert(CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY == InvalidTxEvictionPolicy::IGNORE_NEW);
+        static_assert(CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY == InvalidTxEvictionPolicy::IGNORE_NEW);
         auto evictionPolicy = gArgs.GetArg("-invalidtxfileevictionpolicy", "IGNORE_NEW");
         if (std::string err; !config.SetInvalidTxFileSinkEvictionPolicy(evictionPolicy, &err))
         {
@@ -2612,11 +2663,13 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         fPruneMode = true;
     }
 
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     if(std::string err; !config.SetMinBlocksToKeep(gArgs.GetArg("-pruneminblockstokeep", DEFAULT_MIN_BLOCKS_TO_KEEP), &err)) {
         return InitError(err);
     }
 
     if(std::string err; !config.SetMaxStdTxnValidationDuration(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg(
             "-maxstdtxvalidationduration",
             DEFAULT_MAX_STD_TXN_VALIDATION_DURATION.count()),
@@ -2626,6 +2679,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 
     if(std::string err; !config.SetMaxNonStdTxnValidationDuration(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg(
             "-maxnonstdtxvalidationduration",
             DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION.count()),
@@ -2635,6 +2689,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 
     if(std::string err; !config.SetMaxTxnValidatorAsyncTasksRunDuration(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg(
             "-maxtxnvalidatorasynctasksrunduration",
             CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION.count()),
@@ -2644,6 +2699,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 
     if(std::string err; !config.SetMaxTxnChainValidationBudget(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg(
             "-maxtxchainvalidationbudget",
             DEFAULT_MAX_TXN_CHAIN_VALIDATION_BUDGET.count()),
@@ -2667,8 +2723,8 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     if (gArgs.IsArgSet("-txnvalidationschedulestrategy"))
     {
-        static_assert(DEFAULT_PTV_TASK_SCHEDULE_STRATEGY == PTVTaskScheduleStrategy::TOPO_SORT);
-        auto strategy = gArgs.GetArg("-txnvalidationschedulestrategy", "TOPO_SORT");
+        const std::string strategyStr { boost::to_upper_copy<std::string>(gArgs.GetArg("-txnvalidationschedulestrategy", "")) };
+        PTVTaskScheduleStrategy strategy { enum_cast<PTVTaskScheduleStrategy>(strategyStr) };
         if (std::string err; !config.SetPTVTaskScheduleStrategy(strategy, &err))
         {
             return InitError(err);
@@ -2680,32 +2736,39 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     {
         return InitError(err);
     }
-
     if(std::string err; !config.SetMaxCoinsProviderCacheSize(
         gArgs.GetArgAsBytes("-maxcoinsprovidercachesize", DEFAULT_COINS_PROVIDER_CACHE_SIZE),
         &err))
     {
         return InitError(err);
     }
-
     if(std::string err; !config.SetMaxCoinsDbOpenFiles(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg("-maxcoinsdbfiles", CoinsDB::MaxFiles::Default().maxFiles), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetCoinsDBMaxFileSize(
+        gArgs.GetArgAsBytes("-maxcoinsdbfilesize", CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE), &err))
     {
         return InitError(err);
     }
 
     // Double-Spend processing parameters
     if(std::string err; !config.SetDoubleSpendNotificationLevel(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg("-dsnotifylevel", static_cast<int>(DSAttemptHandler::DEFAULT_NOTIFY_LEVEL)), &err))
     {
         return InitError(err);
     }
     if(std::string err; !config.SetDoubleSpendEndpointFastTimeout(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg("-dsendpointfasttimeout", rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT), &err))
     {
         return InitError(err);
     }
     if(std::string err; !config.SetDoubleSpendEndpointSlowTimeout(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg("-dsendpointslowtimeout", rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT), &err))
     {
         return InitError(err);
@@ -2716,6 +2779,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     if(std::string err; !config.SetDoubleSpendEndpointPort(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg("-dsendpointport", rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT), &err))
     {
         return InitError(err);
@@ -2810,12 +2874,23 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
 
+    // Mempool sync parameters
+    if(std::string err; !config.SetMempoolSyncAge(gArgs.GetArg("-mempoolsyncage", MempoolMsg::DEFAULT_AGE), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetMempoolSyncPeriod(gArgs.GetArg("-mempoolsyncperiod", MempoolMsg::DEFAULT_PERIOD), &err))
+    {
+        return InitError(err);
+    }
+
     RegisterAllRPCCommands(tableRPC);
 #ifdef ENABLE_WALLET
     RegisterWalletRPCCommands(tableRPC);
     RegisterDumpRPCCommands(tableRPC);
 #endif
 
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     nConnectTimeout = gArgs.GetArg("-timeout", DEFAULT_CONNECT_TIMEOUT);
     if (nConnectTimeout <= 0) nConnectTimeout = DEFAULT_CONNECT_TIMEOUT;
 
@@ -2892,7 +2967,7 @@ bool AppInitParameterInteraction(ConfigInit &config) {
                       chainparams.NetworkIDString()));
 
     config.SetAcceptNonStandardOutput(
-        gArgs.GetBoolArg("-acceptnonstdoutputs", config.GetAcceptNonStandardOutput(true)));
+        gArgs.GetBoolArg("-acceptnonstdoutputs", config.GetAcceptNonStandardOutput(ProtocolEra::PostGenesis)));
 
 
     // Enable selfish mining detection
@@ -2965,20 +3040,30 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     // Configure maximum length of numbers in scripts
     if (gArgs.IsArgSet("-maxscriptnumlengthpolicy"))
     {
-        const int64_t value = gArgs.GetArgAsBytes("-maxscriptnumlengthpolicy", DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS);
+        const int64_t value = gArgs.GetArgAsBytes("-maxscriptnumlengthpolicy", DEFAULT_SCRIPT_NUM_LENGTH_POLICY);
         if (std::string err; !config.SetMaxScriptNumLengthPolicy(value, &err))
         {
             return InitError(err);
         }
     }
 
-    // Configure max number of blocks in which Genesis graceful period is active
+    // Configure max number of blocks in which Genesis/Chronicle graceful period is active
     if (gArgs.IsArgSet("-maxgenesisgracefulperiod"))
     {
-        const int64_t value = gArgs.GetArg("-maxgenesisgracefulperiod", DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD);
+        const int64_t value = gArgs.GetArg("-maxgenesisgracefulperiod", DEFAULT_GENESIS_GRACEFUL_ACTIVATION_PERIOD);
 
         std::string err;
         if (!config.SetGenesisGracefulPeriod(value, &err))
+        {
+            return InitError(err);
+        }
+    }
+    if (gArgs.IsArgSet("-maxchroniclegracefulperiod"))
+    {
+        const int64_t value = gArgs.GetArg("-maxchroniclegracefulperiod", DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD);
+
+        std::string err;
+        if (!config.SetChronicleGracefulPeriod(value, &err))
         {
             return InitError(err);
         }
@@ -3016,20 +3101,24 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 
     {
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int64_t maxBlockEstimate = std::min(config.GetMaxBlockSize(), config.GetMaxMempool());
         std::string err;
 
         // Configure preferred size of a single Merkle Tree data file.
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int64_t merkleTreeFileSizeArg = gArgs.GetArgAsBytes("-preferredmerkletreefilesize", CalculatePreferredMerkleTreeSize(maxBlockEstimate));
         if (!config.SetPreferredMerkleTreeFileSize(merkleTreeFileSizeArg, &err))
             return InitError(err);
 
         // Configure size of Merkle Trees memory cache.
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int64_t maxMerkleTreeMemCacheSizeArg = gArgs.GetArgAsBytes("-maxmerkletreememcachesize", CalculatePreferredMerkleTreeSize(maxBlockEstimate));
         if (!config.SetMaxMerkleTreeMemoryCacheSize(maxMerkleTreeMemCacheSizeArg, &err))
             return InitError(err);
 
         // Configure maximum disk space that can be taken by Merkle Tree data files.
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int64_t maxMerkleTreeDiskspaceArg = gArgs.GetArgAsBytes("-maxmerkletreediskspace", CalculateMinDiskSpaceForMerkleFiles(maxBlockEstimate));
         if (maxMerkleTreeDiskspaceArg < merkleTreeFileSizeArg || maxMerkleTreeDiskspaceArg < maxMerkleTreeMemCacheSizeArg)
         {
@@ -3068,32 +3157,41 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     return true;
 }
 
-static bool LockDataDirectory(bool probeOnly) {
+static bool LockDataDirectory(bool probeOnly)
+{
     std::string strDataDir = GetDataDir().string();
 
     // Make sure only a single Bitcoin process is using the data directory.
     fs::path pathLockFile = GetDataDir() / ".lock";
     // empty lock file; created if it doesn't exist.
-    FILE *file = fsbridge::fopen(pathLockFile, "a");
-    if (file) fclose(file);
+    UniqueCFile file{fsbridge::fopen(pathLockFile, "a")};
+    if(file)
+        file.reset();
 
-    try {
-        static boost::interprocess::file_lock lock(
-            pathLockFile.string().c_str());
-        if (!lock.try_lock()) {
+    try
+    {
+        static boost::interprocess::file_lock lock(pathLockFile.string().c_str());
+        if(!lock.try_lock())
+        {
             return InitError(
                 strprintf(_("Cannot obtain a lock on data directory %s. %s is "
                             "probably already running."),
-                          strDataDir, _(PACKAGE_NAME)));
+                          strDataDir,
+                          _(PACKAGE_NAME)));
         }
-        if (probeOnly) {
+        if(probeOnly)
+        {
             lock.unlock();
         }
-    } catch (const boost::interprocess::interprocess_exception &e) {
+    }
+    catch(const boost::interprocess::interprocess_exception& e)
+    {
         return InitError(strprintf(_("Cannot obtain a lock on data directory "
                                      "%s. %s is probably already running.") +
                                        " %s.",
-                                   strDataDir, _(PACKAGE_NAME), e.what()));
+                                   strDataDir,
+                                   _(PACKAGE_NAME),
+                                   e.what()));
     }
     return true;
 }
@@ -3163,7 +3261,7 @@ void preloadChainStateThreadFunction()
 
 void preloadChainState(boost::thread_group &threadGroup)
 {
-    int64_t preload;
+    int64_t preload{};
     preload = gArgs.GetArg("-preload", 0);
     if (preload == 0)
     {
@@ -3219,13 +3317,13 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
         logger.ShrinkDebugFile();
     }
 
-    if (logger.fPrintToDebugLog) {
+    if (logger.PrintToDebugLog()) {
         if (logger.OpenDebugLog()) {
             return InitError(strprintf(_("Unable to open log file.")));
         }
     }
 
-    if (!logger.fLogTimestamps) {
+    if (!logger.LogTimestamps()) {
         LogPrintf("Startup time: %s\n",
                   DateTimeStrFormat("%Y-%m-%d %H:%M:%S", GetTime()));
     }
@@ -3266,7 +3364,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
      */
     if (gArgs.GetBoolArg("-server", false)) {
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);
-        if (!AppInitServers(config, threadGroup)) {
+        if (!AppInitServers(config)) {
             return InitError(
                 _("Unable to start HTTP server. See debug log for details."));
         }
@@ -3284,6 +3382,9 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     }
 
     int64_t nStart=0;
+
+    // Create block read cache
+    g_blockReadCache = std::make_unique<BlockReadCache>();
 
 // Step 5: verify wallet database integrity
 #ifdef ENABLE_WALLET
@@ -3309,7 +3410,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     }
     CConnman &connman = *g_connman;
 
-    peerLogic.reset(new PeerLogicValidation(&connman));
+    peerLogic = std::make_unique<PeerLogicValidation>(&connman);
     if (gArgs.IsArgSet("-broadcastdelay")) {
         const int64_t nDelayMillisecs = gArgs.GetArg("-broadcastdelay", DEFAULT_INV_BROADCAST_DELAY);
         if(!SetInvBroadcastDelay(nDelayMillisecs)){
@@ -3342,6 +3443,20 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
                 return InitError(strprintf(
                     _("Invalid netmask specified in -whitelist: '%s'"), net));
             connman.AddWhitelistedRange(subnet);
+        }
+    }
+
+    if(gArgs.IsArgSet("-mempoolsyncpeer"))
+    {
+        for(const std::string& net : gArgs.GetArgs("-mempoolsyncpeer"))
+        {
+            CSubNet subnet {};
+            LookupSubNet(net.c_str(), subnet);
+            if(!subnet.IsValid())
+            {
+                return InitError(strprintf(_("Invalid netmask specified in -mempoolsyncpeer: '%s'"), net));
+            }
+            connman.AddMempoolSyncPeer(subnet);
         }
     }
 
@@ -3400,7 +3515,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
             }
         }
         if (!gArgs.IsArgSet("-bind") && !gArgs.IsArgSet("-whitebind")) {
-            struct in_addr inaddr_any;
+            struct in_addr inaddr_any{};
             inaddr_any.s_addr = INADDR_ANY;
             fBound |=
                 Bind(connman, CService(in6addr_any, GetListenPort()), BF_NONE);
@@ -3525,15 +3640,14 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
             try {
                 UnloadBlockIndex();
                 pcoinsTip.reset();
-                delete pblocktree;
+                pblocktree = std::make_unique<CBlockTreeDB>(nBlockTreeDBCache, false, fReindex);
 
-                pblocktree =
-                    new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
                 pMerkleTreeFactory = std::make_unique<CMerkleTreeFactory>(GetDataDir() / "merkle", static_cast<size_t>(nMerkleTreeIndexDBCache), GetMaxNumberOfMerkleTreeThreads());
                 pcoinsTip =
                     std::make_unique<CoinsDB>(
                         config.GetMaxCoinsProviderCacheSize(),
                         nCoinDBCache,
+                        config.GetCoinsDBMaxFileSize(),
                         CDBWrapper::MaxFiles{config.GetMaxCoinsDbOpenFiles()},
                         false,
                         fReindex || fReindexChainState);
@@ -3551,7 +3665,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
                 }
                 if (shutdownToken.IsCanceled()) break;
 
-                if (!LoadBlockIndex(chainparams)) {
+                if (!LoadBlockIndex()) {
                     strLoadError = _("Error loading block database");
                     break;
                 }
@@ -3643,8 +3757,10 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
 
                 if (!CVerifyDB().VerifyDB(
                         config, *pcoinsTip,
+                        // NOLINTBEGIN(*-narrowing-conversions)
                         gArgs.GetArg("-checklevel", DEFAULT_CHECKLEVEL),
                         gArgs.GetArg("-checkblocks", DEFAULT_CHECKBLOCKS),
+                        // NOLINTEND(*-narrowing-conversions)
                         shutdownToken)) {
                     strLoadError = _("Corrupted block database detected");
                     break;
@@ -3791,7 +3907,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     LogPrintf("mapBlockIndex.size() = %u\n", mapBlockIndex.Count());
     LogPrintf("nBestHeight = %d\n", chainActive.Height());
 
-    Discover(threadGroup);
+    Discover();
 
     // Map ports with UPnP
     MapPort(gArgs.GetBoolArg("-upnp", DEFAULT_UPNP));
@@ -3837,7 +3953,8 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     uiInterface.InitMessage(_("Done loading"));
 
 #ifdef ENABLE_WALLET
-    for (CWalletRef pwallet : vpwallets) {
+    for(const auto& pwallet : vpwallets)
+    {
         pwallet->postInitProcess(scheduler);
     }
 #endif

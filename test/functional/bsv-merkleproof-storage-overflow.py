@@ -18,7 +18,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-        args = ['-excessiveblocksize=15MB', '-maxmempool=1000', '-mindebugrejectionfee=0','-paytxfee=0.00003','-txindex=1']
+        args = ['-excessiveblocksize=15MB', '-maxmempool=1000', '-mindebugrejectionfee=0', '-paytxfee=0.00003', '-txindex=1']
         self.extra_args = [args]
 
     def make_block_with_coinbase(self):
@@ -62,9 +62,9 @@ class CreateMinerInfoTest(BitcoinTestFramework):
 
     def create_merkleproof(self, doOverflowMemory):
         if doOverflowMemory:
-            self.make_many_transactions (1024 * 64)
+            self.make_many_transactions(1024 * 64)
         else:
-            self.make_many_transactions (1024 * 32)
+            self.make_many_transactions(1024 * 32)
 
         test_txid = self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 0.0001)
         self.nodes[0].generate(1)
@@ -79,9 +79,9 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         return False
 
     def run_test(self):
-        self.create_merkleproof (False)
+        self.create_merkleproof(False)
         assert not self.find_overflow_message_in_logs()
-        self.create_merkleproof (True)
+        self.create_merkleproof(True)
         assert self.find_overflow_message_in_logs()
 
 

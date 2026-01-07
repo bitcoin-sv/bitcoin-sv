@@ -3,15 +3,15 @@
 
 #include "block_index.h"
 
-#include "block_file_access.h"
+#include "abort_node.h"
 #include "async_file_reader.h"
+#include "block_file_access.h"
 #include "blockfileinfostore.h"
 #include "blockstreams.h"
-#include "config.h"
 #include "clientversion.h"
+#include "config.h"
+#include "hash.h"
 #include "pow.h"
-#include "warnings.h"
-#include "abort_node.h"
 
 /** Turn the lowest '1' bit in the binary representation of a number into a '0'.
  */
@@ -62,10 +62,19 @@ namespace
         }
     }
 }
-std::mutex& CBlockIndex::GetMutex() const { return blockIndexMutexes[ hash_byte(reinterpret_cast<std::size_t>(this)) % blockIndexMutexes.size() ]; }
 
-CBlockIndex *CBlockIndex::GetAncestor(int32_t height) {
+std::mutex& CBlockIndex::GetMutex() const
+{
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
+    return blockIndexMutexes[hash_byte(reinterpret_cast<std::size_t>(this)) %
+                             blockIndexMutexes.size()];
+    // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
+}
 
+CBlockIndex *CBlockIndex::GetAncestor(int32_t height)
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
     return const_cast<CBlockIndex*>(static_cast<const CBlockIndex*>(this)->GetAncestor(height));
 }
 
@@ -104,8 +113,8 @@ void CBlockIndex::BuildSkipNL()
 
 arith_uint256 GetBlockProof(const CBlockIndex &block) {
     arith_uint256 bnTarget;
-    bool fNegative;
-    bool fOverflow;
+    bool fNegative{};
+    bool fOverflow{};
     bnTarget.SetCompact(block.GetBits(), &fNegative, &fOverflow);
     if (fNegative || fOverflow || bnTarget == 0) {
         return 0;
@@ -124,8 +133,8 @@ int64_t GetBlockProofEquivalentTime(const CBlockIndex &to,
                                     const Consensus::Params &params) {
     arith_uint256 r;
     int sign = 1;
-    const auto fromChainWork = from.GetChainWork();
-    const auto toChainWork = to.GetChainWork();
+    const auto& fromChainWork = from.GetChainWork();
+    const auto& toChainWork = to.GetChainWork();
     if (toChainWork > fromChainWork)
     {
         r = toChainWork - fromChainWork;
@@ -137,7 +146,7 @@ int64_t GetBlockProofEquivalentTime(const CBlockIndex &to,
     if (r.bits() > 63) {
         return sign * std::numeric_limits<int64_t>::max();
     }
-    return sign * r.GetLow64();
+    return sign * r.GetLow64(); // NOLINT(*-narrowing-conversions)
 }
 
 /**
@@ -262,7 +271,7 @@ void CBlockIndex::SetBlockIndexFileMetaDataIfNotSetNL(
             return;
         }
         LogPrintf("Setting block index file metadata for block %s\n", GetBlockHash().ToString());
-        SetDiskBlockMetaData(std::move(metadata.diskDataHash), metadata.diskDataSize, notifyDirty);
+        SetDiskBlockMetaData(metadata.diskDataHash, metadata.diskDataSize, notifyDirty);
     }
 }
 
@@ -341,7 +350,7 @@ bool CBlockIndex::PopulateBlockIndexBlockDiskMetaDataNL(
         size += chunk.Size();
     } while(!stream.EndOfStream());
 
-    hasher.Finalize(reinterpret_cast<uint8_t*>(&hash));
+    hasher.Finalize(CHash256::span{hash.begin(), CHash256::OUTPUT_SIZE});
 
     SetBlockIndexFileMetaDataIfNotSetNL(CDiskBlockMetaData{hash, size}, notifyDirty);
 

@@ -10,25 +10,22 @@
 #include "net/net.h"
 #include "net/net_processing.h"
 #include "pow.h"
+#include "protocol_era.h"
 #include "script/sign.h"
-#include "serialize.h"
-#include "txn_validator.h"
 #include "util.h"
 #include "validation.h"
+
 #include "test/test_bitcoin.h"
+#include "test/testutil.h"
 
 #include <cstdint>
 
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/test/unit_test.hpp>
 
-namespace {
-    CService ip(uint32_t i) {
-        struct in_addr s;
-        s.s_addr = i;
-        return CService(CNetAddr(s), Params().GetDefaultPort());
-    }
-    NodeId id = 0;
+namespace
+{
+    NodeId id = 0; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 }
 
 BOOST_FIXTURE_TEST_SUITE(DoS_tests, TestingSetup)
@@ -268,7 +265,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         tx.vout[0].nValue = 1 * CENT;
         tx.vout[0].scriptPubKey =
             GetScriptForDestination(key.GetPubKey().GetID());
-        SignSignature(testConfig, keystore, false, false, *txPrev, tx, 0, SigHashType());
+        SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PreGenesis, ProtocolEra::PreGenesis, *txPrev, tx, 0, SigHashType());
         // Add txn input data to the queue
         orphanTxns->addTxn(
             std::make_shared<CTxInputData>(
@@ -302,7 +299,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         for (size_t j = 0; j < tx.vin.size(); j++) {
             tx.vin[j].prevout = COutPoint(txPrev->GetId(), j);
         }
-        SignSignature(testConfig, keystore, false, false, *txPrev, tx, 0, SigHashType());
+        SignSignature(testConfig.GetConfigScriptPolicy(), keystore, ProtocolEra::PreGenesis, ProtocolEra::PreGenesis, *txPrev, tx, 0, SigHashType());
         // Re-use same signature for other inputs
         // (they don't have to be valid for this test)
         for (unsigned int j = 1; j < tx.vin.size(); j++)

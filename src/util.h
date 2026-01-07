@@ -132,7 +132,6 @@ protected:
     std::map<std::string, std::vector<std::string>> mapMultiArgs;
 
 public:
-    // NOLINTNEXTLINE(cert-err58-cpp)
     static inline const std::array<std::string, 3> sensitiveArgs{"-rpcuser", "-rpcpassword", "-rpcauth"};
 
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
@@ -252,6 +251,26 @@ std::string HelpMessageGroup(const std::string &message);
 std::string HelpMessageOpt(const std::string &option,
                            const std::string &message);
 
+
+
+/**
+ * Append the help messages for the chainparams options to the
+ * parameter string.
+ */
+void AppendParamsHelpMessages(std::string& strUsage);
+
+/**
+ * Looks for -regtest, -testnet and returns the appropriate BIP70 chain name.
+ * @return CBaseChainParams::MAX_NETWORK_TYPES if an invalid combination is
+ * given. CBaseChainParams::MAIN by default.
+ */
+std::string ChainNameFromCommandLine();
+
+/**
+ * Looks for -magicbytes if this is set
+ */
+std::optional<std::string> MagicBytesFromCommandLine();
+
 /**
  * Return the number of physical cores available on the current system.
  * @note This does not count virtual cores, such as those provided by
@@ -303,12 +322,5 @@ auto Average(InputIterator first, InputIterator last)
     T sum = std::accumulate(first, last, T{});
     return sum / rangeSize;
 }
-
-template <typename T>
-struct AnnotatedType {
-    T value = T{};
-    std::optional<std::string> hint = std::nullopt;
-};
-
 
 #endif // BITCOIN_UTIL_H

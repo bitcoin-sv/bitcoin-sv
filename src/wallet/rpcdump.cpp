@@ -68,7 +68,8 @@ std::string DecodeDumpString(const std::string &str) {
     return ret.str();
 }
 
-UniValue importprivkey(const Config &config, const JSONRPCRequest &request) {
+UniValue importprivkey(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -293,8 +294,9 @@ UniValue importaddress(const Config &config, const JSONRPCRequest &request) {
     return NullUniValue;
 }
 
-UniValue importprunedfunds(const Config &config,
-                           const JSONRPCRequest &request) {
+UniValue importprunedfunds(const Config&,
+                           const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -373,8 +375,9 @@ UniValue importprunedfunds(const Config &config,
         "No addresses in wallet correspond to included transaction");
 }
 
-UniValue removeprunedfunds(const Config &config,
-                           const JSONRPCRequest &request) {
+UniValue removeprunedfunds(const Config&,
+                           const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -420,7 +423,8 @@ UniValue removeprunedfunds(const Config &config,
     return NullUniValue;
 }
 
-UniValue importpubkey(const Config &config, const JSONRPCRequest &request) {
+UniValue importpubkey(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -491,7 +495,8 @@ UniValue importpubkey(const Config &config, const JSONRPCRequest &request) {
     return NullUniValue;
 }
 
-UniValue importwallet(const Config &config, const JSONRPCRequest &request) {
+UniValue importwallet(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -654,7 +659,8 @@ UniValue dumpprivkey(const Config &config, const JSONRPCRequest &request) {
     return CBitcoinSecret(vchSecret).ToString();
 }
 
-UniValue dumpwallet(const Config &config, const JSONRPCRequest &request) {
+UniValue dumpwallet(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -1171,7 +1177,8 @@ int64_t GetImportTimestamp(const UniValue &data, int64_t now) {
                        "Missing required timestamp field for key");
 }
 
-UniValue importmulti(const Config &config, const JSONRPCRequest &mainRequest) {
+UniValue importmulti(const Config&, const JSONRPCRequest& mainRequest)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(mainRequest);
     if (!EnsureWalletIsAvailable(pwallet, mainRequest.fHelp)) {
         return NullUniValue;
@@ -1322,26 +1329,26 @@ UniValue importmulti(const Config &config, const JSONRPCRequest &mainRequest) {
     return response;
 }
 
-// clang-format off
-static const CRPCCommand commands[] = {
-    //  category            name                        actor (function)          okSafeMode
-    //  ------------------- ------------------------    ----------------------    ----------
-    { "wallet",             "dumpprivkey",              dumpprivkey,              true,   {"address"}  },
-    { "wallet",             "dumpwallet",               dumpwallet,               true,   {"filename"} },
-    { "wallet",             "importmulti",              importmulti,              true,   {"requests","options"} },
-    { "wallet",             "importprivkey",            importprivkey,            true,   {"privkey","label","rescan"} },
-    { "wallet",             "importwallet",             importwallet,             true,   {"filename"} },
-    { "wallet",             "importaddress",            importaddress,            true,   {"address","label","rescan","p2sh"} },
-    { "wallet",             "importprunedfunds",        importprunedfunds,        true,   {"rawtransaction","txoutproof"} },
-    { "wallet",             "importpubkey",             importpubkey,             true,   {"pubkey","label","rescan"} },
-    { "wallet",             "removeprunedfunds",        removeprunedfunds,        true,   {"txid"} },
-};
-// clang-format on
-
-void RegisterDumpRPCCommands(CRPCTable &t) {
-    if (gArgs.GetBoolArg("-disablewallet", false)) {
+void RegisterDumpRPCCommands(CRPCTable& t)
+{
+    if(gArgs.GetBoolArg("-disablewallet", false))
         return;
-    }
+
+    // clang-format off
+    static const CRPCCommand commands[] = {
+        //  category            name                        actor (function)          okSafeMode
+        //  ------------------- ------------------------    ----------------------    ----------
+        { "wallet",             "dumpprivkey",              dumpprivkey,              true,   {"address"}  },
+        { "wallet",             "dumpwallet",               dumpwallet,               true,   {"filename"} },
+        { "wallet",             "importmulti",              importmulti,              true,   {"requests","options"} },
+        { "wallet",             "importprivkey",            importprivkey,            true,   {"privkey","label","rescan"} },
+        { "wallet",             "importwallet",             importwallet,             true,   {"filename"} },
+        { "wallet",             "importaddress",            importaddress,            true,   {"address","label","rescan","p2sh"} },
+        { "wallet",             "importprunedfunds",        importprunedfunds,        true,   {"rawtransaction","txoutproof"} },
+        { "wallet",             "importpubkey",             importpubkey,             true,   {"pubkey","label","rescan"} },
+        { "wallet",             "removeprunedfunds",        removeprunedfunds,        true,   {"txid"} },
+    };
+    // clang-format on
 
     for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++) {
         t.appendCommand(commands[vcidx].name, &commands[vcidx]);

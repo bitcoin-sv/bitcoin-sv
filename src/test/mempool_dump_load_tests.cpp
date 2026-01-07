@@ -3,20 +3,19 @@
 // LICENSE.
 
 #include "config.h"
-#include "mempooltxdb.h"
 #include "mining/journal_change_set.h"
 
 #include "mempool_test_access.h"
 
 #include "test/test_bitcoin.h"
+#include "test/testutil.h"
 
 #include <boost/test/unit_test.hpp>
 
 #include <vector>
 
-namespace {
-    mining::CJournalChangeSetPtr nullChangeSet{nullptr};
-
+namespace
+{
     std::vector<CTxMemPoolEntry> GetABunchOfEntries(int howMany, bool expired=false)
     {
         TestMemPoolEntryHelper entry;
@@ -45,7 +44,7 @@ namespace {
 
         CValidationState operator()(const TxInputDataSPtr& txInputData,
                                     const mining::CJournalChangeSetPtr& changeSet,
-                                    bool limitMempoolSize)
+                                    bool /*limitMempoolSize*/)
         {
             auto entry = std::make_shared<CTxMemPoolEntry>(
                 helper.Time(txInputData->GetAcceptTime())
@@ -57,7 +56,7 @@ namespace {
         }
 
     private:
-        CTxMemPool& pool;
+        CTxMemPool& pool; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
         TestMemPoolEntryHelper helper;
     };
 

@@ -100,8 +100,8 @@ private:
 
         std::unique_ptr<CDBIterator> db_iter;
 
-        IteratorBase(std::unique_ptr<CDBIterator>&& db_iter)
-        : db_iter(std::move(db_iter))
+        IteratorBase(std::unique_ptr<CDBIterator>&& iter)
+        : db_iter(std::move(iter))
         {
             // All keys are prefixed with one byte containing the record type.
             // We're also assuming that all keys in database are ordered after an empty key that contains just the record type
@@ -230,9 +230,9 @@ public:
 
             HeightInterval() = default;
 
-            HeightInterval(std::int32_t start, std::int32_t stop=std::numeric_limits<std::int32_t>::max())
-            : start(start)
-            , stop(stop)
+            HeightInterval(std::int32_t strt, std::int32_t stp=std::numeric_limits<std::int32_t>::max())
+            : start(strt)
+            , stop(stp)
             {}
 
             bool valid() const
@@ -244,11 +244,6 @@ public:
             {
                 return this->start == o.start &&
                        this->stop  == o.stop;
-            }
-
-            bool operator!=(const HeightInterval& o) const
-            {
-                return !(*this == o);
             }
 
             template<class Stream>
@@ -479,9 +474,9 @@ public:
 
     struct UnfreezeAllResult
     {
-        unsigned int numUnfrozenPolicyOnly;
-        unsigned int numUnfrozenConsensus;
-        unsigned int numUnwhitelistedTxs;
+        unsigned int numUnfrozenPolicyOnly{};
+        unsigned int numUnfrozenConsensus{};
+        unsigned int numUnwhitelistedTxs{};
     };
 
     /**
@@ -498,8 +493,8 @@ public:
 
     struct CleanExpiredRecordsResult
     {
-        unsigned int numConsensusRemoved;
-        unsigned int numConsensusUpdatedToPolicyOnly;
+        unsigned int numConsensusRemoved{};
+        unsigned int numConsensusUpdatedToPolicyOnly{};
     };
 
     /**
@@ -540,8 +535,8 @@ public:
     class FrozenTXOIterator : public IteratorBase<1>
     {
     private:
-        FrozenTXOIterator(std::unique_ptr<CDBIterator>&& db_iter)
-        : IteratorBase(std::move(db_iter))
+        FrozenTXOIterator(std::unique_ptr<CDBIterator>&& iter)
+        : IteratorBase(std::move(iter))
         {}
         friend class CFrozenTXODB;
 
@@ -670,8 +665,8 @@ public:
     class WhitelistedTxIterator : public IteratorBase<2>
     {
     private:
-        WhitelistedTxIterator(std::unique_ptr<CDBIterator>&& db_iter)
-        : IteratorBase(std::move(db_iter))
+        WhitelistedTxIterator(std::unique_ptr<CDBIterator>&& iter)
+        : IteratorBase(std::move(iter))
         {}
         friend class CFrozenTXODB;
 
@@ -695,8 +690,8 @@ public:
 
     struct ClearWhitelistResult
     {
-        unsigned int numFrozenBackToConsensus;
-        unsigned int numUnwhitelistedTxs;
+        unsigned int numFrozenBackToConsensus{};
+        unsigned int numUnwhitelistedTxs{};
     };
 
     /**

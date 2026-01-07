@@ -68,6 +68,7 @@ namespace
                                         treeProof.transactionIndex)};
 
         std::vector<MerkleProof::Node> nodes{};
+        nodes.reserve(treeProof.merkleTreeHashes.size());
         for(const auto& node : treeProof.merkleTreeHashes)
         {
             nodes.push_back(MerkleProof::Node{node});

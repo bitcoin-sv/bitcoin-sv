@@ -9,12 +9,22 @@
 #include "key.h"
 #include "pubkey.h"
 #include "script/standard.h"
-#include "sync.h"
 
-#include <boost/signals2/signal.hpp>
-#include <boost/variant.hpp>
+#ifndef __EMSCRIPTEN__
+// Use CCriticalSection from sync.h when it is not wasm build
+#include "sync.h"
+#else
+  #if defined(_REENTRANT)
+    #error "WASM build should not have threading enabled"
+  #endif
+  // WASM build can not have concurency and do not need it
+  // Stub the struct CCriticalSection and LOCK macro
+  struct CCriticalSection {};
+  #define LOCK(cs)   // empty macro, does nothing
+#endif
 
 /** A virtual base class for key stores */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CKeyStore {
 protected:
     mutable CCriticalSection cs_KeyStore;
@@ -64,45 +74,19 @@ protected:
 public:
     bool AddKeyPubKey(const CKey &key, const CPubKey &pubkey) override;
     bool GetPubKey(const CKeyID &address, CPubKey &vchPubKeyOut) const override;
-    bool HaveKey(const CKeyID &address) const override {
-        bool result;
-        {
-            LOCK(cs_KeyStore);
-            result = (mapKeys.count(address) > 0);
-        }
-        return result;
-    }
-    void GetKeys(std::set<CKeyID> &setAddress) const override {
-        setAddress.clear();
-        {
-            LOCK(cs_KeyStore);
-            KeyMap::const_iterator mi = mapKeys.begin();
-            while (mi != mapKeys.end()) {
-                setAddress.insert((*mi).first);
-                mi++;
-            }
-        }
-    }
-    bool GetKey(const CKeyID &address, CKey &keyOut) const override {
-        {
-            LOCK(cs_KeyStore);
-            KeyMap::const_iterator mi = mapKeys.find(address);
-            if (mi != mapKeys.end()) {
-                keyOut = mi->second;
-                return true;
-            }
-        }
-        return false;
-    }
-    virtual bool AddCScript(const CScript &redeemScript) override;
-    virtual bool HaveCScript(const CScriptID &hash) const override;
-    virtual bool GetCScript(const CScriptID &hash,
-                            CScript &redeemScriptOut) const override;
+    bool HaveKey(const CKeyID &address) const override;
+    void GetKeys(std::set<CKeyID> &setAddress) const override;
+    bool GetKey(const CKeyID &address, CKey &keyOut) const override;
 
-    virtual bool AddWatchOnly(const CScript &dest) override;
-    virtual bool RemoveWatchOnly(const CScript &dest) override;
-    virtual bool HaveWatchOnly(const CScript &dest) const override;
-    virtual bool HaveWatchOnly() const override;
+    bool AddCScript(const CScript& redeemScript) override;
+    bool HaveCScript(const CScriptID& hash) const override;
+    bool GetCScript(const CScriptID& hash,
+                    CScript& redeemScriptOut) const override;
+
+    bool AddWatchOnly(const CScript& dest) override;
+    bool RemoveWatchOnly(const CScript& dest) override;
+    bool HaveWatchOnly(const CScript& dest) const override;
+    bool HaveWatchOnly() const override;
 };
 
 typedef std::vector<uint8_t, secure_allocator<uint8_t>> CKeyingMaterial;

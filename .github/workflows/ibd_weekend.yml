@@ -1,0 +1,44 @@
+# Copyright (c) 2024 BSV Blockchain Association
+# Distributed under the Open BSV software license,
+# see the accompanying file LICENSE.
+
+name: IBD - Weekend
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ibd_weekend:
+    env:
+      GITHUB_TOKEN: ${{ secrets.ACTIONS_PAT }}
+    runs-on: [ self-hosted, docker, large, perf ]
+    container:
+      image: nchain/svn_dev:ubuntu_22.04
+      options: --cap-add CAP_PERFMON --cap-add CAP_BPF --volume /lib/modules:/lib/modules
+    strategy:
+      max-parallel: 1
+      matrix:
+        array: [
+          { duration: $((5 * 60 * 60 )), restore: false, save: true },
+          { duration: $((3 * 60 * 60 )), restore: true,  save: true },
+          { duration: $((5 * 60 * 60 )), restore: true,  save: false },
+        ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          clean: ''
+      - name: Build Bitcoin
+        uses: ./.github/actions/build_bitcoin_cmake
+        with: 
+          targets: bitcoind bitcoin-cli
+      - name: Initial Block Download
+        uses: ./.github/actions/ibd
+        with:
+          duration: ${{ matrix.array.duration }}
+          restore: ${{ matrix.array.restore }}
+          save: ${{ matrix.array.save }}

@@ -30,12 +30,16 @@ confirm 1/2/3/4 balances are same as before.
 Shutdown again, restore using importwallet,
 and confirm again balances are correct.
 """
-from random import randint
-import shutil
 
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from decimal import Decimal
+from random import randint
 from test_framework.blocktools import wait_for_tip
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import assert_equal, assert_raises_rpc_error, \
+    connect_nodes, sync_blocks, sync_mempools
+
+import os
+import shutil
 
 
 class WalletBackupTest(BitcoinTestFramework):

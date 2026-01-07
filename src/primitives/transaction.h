@@ -7,11 +7,12 @@
 #define BITCOIN_PRIMITIVES_TRANSACTION_H
 
 #include "amount.h"
+#include "protocol_era.h"
 #include "script/script.h"
 #include "serialize.h"
 #include "uint256.h"
-#include <optional>
-#include <ostream>
+
+#include <iosfwd>
 
 struct TxId;
 /**
@@ -69,18 +70,7 @@ public:
     const TxId &GetTxId() const { return txid; }
     uint32_t GetN() const { return n; }
 
-    friend bool operator<(const COutPoint &a, const COutPoint &b) {
-        int cmp = a.txid.Compare(b.txid);
-        return cmp < 0 || (cmp == 0 && a.n < b.n);
-    }
-
-    friend bool operator==(const COutPoint &a, const COutPoint &b) {
-        return (a.txid == b.txid && a.n == b.n);
-    }
-
-    friend bool operator!=(const COutPoint &a, const COutPoint &b) {
-        return !(a == b);
-    }
+    friend auto operator<=>(const COutPoint&, const COutPoint&) = default;
 
     std::string ToString() const;
 
@@ -100,7 +90,7 @@ class CTxIn {
 public:
     COutPoint prevout;
     CScript scriptSig;
-    uint32_t nSequence;
+    uint32_t nSequence{SEQUENCE_FINAL};
 
     /**
      * Setting nSequence to this value for every input in a transaction disables
@@ -138,17 +128,24 @@ public:
      */
     static inline constexpr int SEQUENCE_LOCKTIME_GRANULARITY = 9;
 
-    // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-    CTxIn() { nSequence = SEQUENCE_FINAL; }
+    CTxIn() = default;
 
-    explicit CTxIn(COutPoint prevoutIn, CScript scriptSigIn = CScript(),
+    explicit CTxIn(COutPoint prevoutIn,
+                   CScript scriptSigIn = CScript(),
                    uint32_t nSequenceIn = SEQUENCE_FINAL)
-        // NOLINTNEXTLINE(performance-unnecessary-value-param)
-        : prevout(prevoutIn), scriptSig(scriptSigIn), nSequence(nSequenceIn) {}
-    CTxIn(TxId prevTxId, uint32_t nOut, CScript scriptSigIn = CScript(),
+        : prevout(prevoutIn),
+          scriptSig(std::move(scriptSigIn)),
+          nSequence(nSequenceIn)
+    {
+    }
+
+    CTxIn(TxId prevTxId,
+          uint32_t nOut,
+          CScript scriptSigIn = CScript(),
           uint32_t nSequenceIn = SEQUENCE_FINAL)
-        // NOLINTNEXTLINE(performance-unnecessary-value-param)
-        : CTxIn(COutPoint(prevTxId, nOut), scriptSigIn, nSequenceIn) {}
+        : CTxIn(COutPoint(prevTxId, nOut), std::move(scriptSigIn), nSequenceIn)
+    {
+    }
 
     ADD_SERIALIZE_METHODS
 
@@ -163,8 +160,6 @@ public:
         return (a.prevout == b.prevout && a.scriptSig == b.scriptSig &&
                 a.nSequence == b.nSequence);
     }
-
-    friend bool operator!=(const CTxIn &a, const CTxIn &b) { return !(a == b); }
 
     std::string ToString() const;
 };
@@ -184,10 +179,11 @@ public:
 
     CTxOut() { SetNull(); }
 
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
-    CTxOut(Amount nValueIn, CScript scriptPubKeyIn)
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
-        : nValue(nValueIn), scriptPubKey(scriptPubKeyIn) {}
+    CTxOut(const Amount& nValueIn, CScript scriptPubKeyIn)
+        : nValue{nValueIn},
+          scriptPubKey{std::move(scriptPubKeyIn)}
+    {
+    }
 
     ADD_SERIALIZE_METHODS
 
@@ -204,24 +200,20 @@ public:
 
     bool IsNull() const { return (nValue == Amount(-1)); }
 
-    Amount GetDustThreshold(bool isGenesisEnabled) const {
+    Amount GetDustThreshold(ProtocolEra era) const {
         // dust threshold is now hardcoded to 1 satoshi per output
-        if (scriptPubKey.IsUnspendable(isGenesisEnabled))
+        if (scriptPubKey.IsUnspendable(era))
             return Amount{0};
 
         return Amount{1};
     }
 
-    bool IsDust(bool isGenesisEnabled) const {
-        return (nValue < GetDustThreshold(isGenesisEnabled));
+    bool IsDust(ProtocolEra era) const {
+        return (nValue < GetDustThreshold(era));
     }
 
     friend bool operator==(const CTxOut &a, const CTxOut &b) {
         return (a.nValue == b.nValue && a.scriptPubKey == b.scriptPubKey);
-    }
-
-    friend bool operator!=(const CTxOut &a, const CTxOut &b) {
-        return !(a == b);
     }
 
     std::string ToString() const;
@@ -312,7 +304,7 @@ public:
      */
     template <typename Stream>
     CTransaction(deserialize_type, Stream &s)
-        : CTransaction(CMutableTransaction(deserialize, s)) {}
+        : CTransaction(CMutableTransaction(::deserialize, s)) {}
 
     bool IsNull() const { return vin.empty() && vout.empty(); }
 
@@ -338,10 +330,6 @@ public:
         return a.hash == b.hash;
     }
 
-    friend bool operator!=(const CTransaction &a, const CTransaction &b) {
-        return a.hash != b.hash;
-    }
-
     bool HasP2SHOutput() const;
 
     std::string ToString() const;
@@ -352,7 +340,7 @@ size_t ser_size(const CTransaction&);
 /**
  * A mutable version of CTransaction.
  */
-class CMutableTransaction {
+class CMutableTransaction { // NOLINT(clang-analyzer-optin.performance.Padding)
 public:
     int32_t nVersion;
     std::vector<CTxIn> vin;

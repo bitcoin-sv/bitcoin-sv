@@ -5,7 +5,7 @@
 DIST_SUBDIRS = secp256k1 univalue
 
 AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS) $(HARDENED_LDFLAGS)
-AM_CXXFLAGS = $(HARDENED_CXXFLAGS) $(ERROR_CXXFLAGS)
+AM_CXXFLAGS = $(HARDENED_CXXFLAGS) $(ERROR_CXXFLAGS) @CXXFLAGS_EXTRA@
 AM_CPPFLAGS = $(HARDENED_CPPFLAGS)
 EXTRA_LIBRARIES =
 
@@ -84,6 +84,7 @@ BITCOIN_CORE_H = \
   block_index.h \
   block_index_store.h \
   block_index_store_loader.h \
+  block_read_cache.h \
   dirty_block_index_store.h \
   blockencodings.h \
   blockfileinfostore.h \
@@ -110,6 +111,7 @@ BITCOIN_CORE_H = \
   compiler_warnings.h \
   compressor.h \
   config.h \
+  configscriptpolicy.h \
   consensus/consensus.h \
   core_io.h \
   core_memusage.h \
@@ -143,6 +145,8 @@ BITCOIN_CORE_H = \
   limitedmap.h \
   limited_cache.h \
   locked_ref.h \
+  logging_flags.h \
+  logging_impl.h \
   logging.h \
   memusage.h \
   mempooltxdb.h \
@@ -184,6 +188,7 @@ BITCOIN_CORE_H = \
   net/cmpctblock_parser.h \
   net/fixed_len_multi_parser.h \
   net/fixed_len_parser.h \
+  net/mempool_msg.h \
   net/msg_buffer.h \
   net/msg_parser.h \
   net/msg_parser_buffer.h \
@@ -215,6 +220,7 @@ BITCOIN_CORE_H = \
   protocol.h \
   random.h \
   rawtxvalidator.h \
+  protocol_era.h \
   reverselock.h \
   rpc/blockchain.h \
   rpc/client.h \
@@ -235,7 +241,6 @@ BITCOIN_CORE_H = \
   rpc/webhook_client_defaults.h \
   safe_mode.h \
   scheduler.h \
-  script_config.h \
   script/scriptcache.h \
   script/sigcache.h \
   script/sign.h \
@@ -261,6 +266,7 @@ BITCOIN_CORE_H = \
   time_locked_mempool.h \
   transaction_specific_config.h \
   txdb.h \
+  txdb_defaults.h \
   txhasher.h \
   txmempool.h \
   txmempoolevictioncandidates.h \
@@ -278,7 +284,6 @@ BITCOIN_CORE_H = \
   txn_validator.h \
   ui_interface.h \
   undo.h \
-  unique_array.h \
   util.h \
   utilmoneystr.h \
   utiltime.h \
@@ -323,6 +328,7 @@ libbitcoin_server_a_SOURCES = \
   blockfileinfostore.cpp \
   block_file_access.cpp \
   block_index_store_loader.cpp \
+  block_read_cache.cpp \
   chain.cpp \
   checkpoints.cpp \
   miner_id/coinbase_doc.cpp \
@@ -411,7 +417,6 @@ libbitcoin_server_a_SOURCES = \
   script/scriptcache.cpp \
   script/sigcache.cpp \
   script/ismine.cpp \
-  taskcancellation.cpp \
   timedata.cpp \
   time_locked_mempool.cpp \
   txdb.cpp \
@@ -425,10 +430,10 @@ libbitcoin_server_a_SOURCES = \
   txn_recent_rejects.cpp \
   txn_validator.cpp \
   ui_interface.cpp \
-  unique_array.cpp \
   validation.cpp \
   validationinterface.cpp \
   vmtouch.cpp \
+  warnings.cpp \
   $(BITCOIN_CORE_H)
 
 if ENABLE_ZMQ
@@ -490,8 +495,6 @@ libbitcoin_consensus_a_SOURCES = \
   arith_uint256.h \
   big_int.cpp \
   big_int.h \
-  cfile_util.cpp \
-  cfile_util.h \
   consensus/merkle.cpp \
   consensus/merkle.h \
   consensus/params.h \
@@ -517,6 +520,7 @@ libbitcoin_consensus_a_SOURCES = \
   script/limitedstack.h \
   script/opcodes.cpp \
   script/opcodes.h \
+  script/script_flags.cpp \
   script/script_flags.h \
   script/script.cpp \
   script/script.h \
@@ -531,6 +535,8 @@ libbitcoin_consensus_a_SOURCES = \
   uint256.h \
   utilstrencodings.cpp \
   utilstrencodings.h \
+  verify_script_flags.cpp \
+  verify_script_flags.h \
   version.h
 
 # common: shared between bitcoind and non-server tools
@@ -539,8 +545,11 @@ libbitcoin_common_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_common_a_SOURCES = \
   amount.cpp \
   base58.cpp \
+  cfile_util.cpp \
+  cfile_util.h \
   chainparams.cpp \
   config.cpp \
+  configscriptpolicy.cpp \
   coins.cpp \
   compressor.cpp \
   dstencode.cpp \
@@ -548,16 +557,15 @@ libbitcoin_common_a_SOURCES = \
   core_write.cpp \
   key.cpp \
   keystore.cpp \
-  net/netaddress.cpp \
   net/netbase.cpp \
   protocol.cpp \
+  protocol_era.cpp \
   rpc/jsonwriter.cpp \
   scheduler.cpp \
   script/sign.cpp \
   script/standard.cpp \
   transaction_specific_config.cpp \
   txhasher.cpp \
-  warnings.cpp \
   write_preferring_upgradable_mutex.cpp \
   $(BITCOIN_CORE_H)
 
@@ -574,7 +582,11 @@ libbitcoin_util_a_SOURCES = \
   compat/glibcxx_sanity.cpp \
   compat/strnlen.cpp \
   fs.cpp \
+  logging_impl.cpp \
   logging.cpp \
+  overload.h \
+  net/netaddress.cpp \
+  net/netbase.cpp \
   random.cpp \
   rpc/protocol.cpp \
   rpc/text_writer.cpp \
@@ -763,7 +775,7 @@ clean-local:
 
 .mm.o:
 	$(AM_V_CXX) $(OBJCXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
-	  $(CPPFLAGS) $(AM_CXXFLAGS) $(AM_CXXFLAGS) $(PIE_FLAGS) $(CXXFLAGS) -c -o $@ $<
+	  $(CPPFLAGS) $(AM_CXXFLAGS) $(PIE_FLAGS) $(CXXFLAGS) -c -o $@ $<
 
 check-symbols: $(bin_PROGRAMS)
 if GLIBC_BACK_COMPAT

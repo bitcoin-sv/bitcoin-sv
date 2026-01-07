@@ -30,15 +30,12 @@ Two mechanisms for forcing a reorg are tested:
 
 '''
 from time import sleep
-import socket
 import itertools
-import heapq
 
 from test_framework.blocktools import create_block, create_coinbase
-from test_framework.cdefs import ONE_GIGABYTE
 from test_framework.key import CECKey
-from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block, msg_tx
-from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
+from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block
+from test_framework.script import CScript, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until
 
@@ -81,7 +78,7 @@ def knows_of_block(connection, block):
             print(f"node knows of block {tmp['hash']} by {_block_hash}")
             assert tmp["hash"] == _block_hash
             return True
-        except:
+        except Exception:
             print(f"node knows noting about block {_block_hash}")
             return False
     return predicate
@@ -138,7 +135,7 @@ def create_tx(utxos, n_outputs, fee_delta=0):
         tx.vin.append(CTxIn(COutPoint(utxo.tx.sha256, utxo.ndx), b"", 0xffffffff))
         total_input += utxo.tx.vout[utxo.ndx].nValue
 
-    amount_per_output = total_input // n_outputs - len(utxos)*300 - n_outputs*200 - 100 - fee_delta
+    amount_per_output = total_input // n_outputs - len(utxos) * 300 - n_outputs * 200 - 100 - fee_delta
 
     new_utxos = []
 
@@ -148,7 +145,7 @@ def create_tx(utxos, n_outputs, fee_delta=0):
         tx.vout.append(CTxOut(amount_per_output, CScript([k.get_pubkey(), OP_CHECKSIG])))
 
     for input_ndx, (utxo, input) in enumerate(zip(utxos, tx.vin)):
-        sighash = SignatureHashForkId(utxo.tx.vout[utxo.ndx].scriptPubKey, tx, input_ndx, SIGHASH_ALL | SIGHASH_FORKID, utxo.tx.vout[utxo.ndx].nValue)
+        sighash = SignatureHash(utxo.tx.vout[utxo.ndx].scriptPubKey, tx, input_ndx, SIGHASH_ALL | SIGHASH_FORKID, utxo.tx.vout[utxo.ndx].nValue)
         input.scriptSig = CScript([utxo.key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
     tx.rehash()
@@ -167,7 +164,7 @@ def split(utxos, n_inputs, n_outputs, fee_delta=0):
 def split_iter(utxos, n_inputs, n_outputs, new_utxos=None, transactions=None, fee_delta=0):
 
     for ndx in range(0, len(utxos), n_inputs):
-        tx, xx = create_tx(utxos[ndx : ndx+n_inputs], n_outputs, fee_delta)
+        tx, xx = create_tx(utxos[ndx: ndx + n_inputs], n_outputs, fee_delta)
         if new_utxos is not None:
             new_utxos.extend(xx)
         if transactions is not None:
@@ -198,7 +195,7 @@ def chop(x, n=2):
     def gen():
         m = len(x) / n
         i = 0
-        for _ in range(n-1):
+        for _ in range(n - 1):
             yield x[round(i):round(i + m)]
             i += m
         yield x[round(i):]
@@ -237,8 +234,11 @@ def submit_to_mempool(conn, *txs_lists):
 
 
 class property_dict(dict):
-    def __getattr__(self, k): return self.__getitem__(k)
-    def __setattr__(self, k, v): return self.__setitem__(k, v)
+    def __getattr__(self, k):
+        return self.__getitem__(k)
+
+    def __setattr__(self, k, v):
+        return self.__setitem__(k, v)
 
 
 def tx_ids(txs):
@@ -249,7 +249,7 @@ class tx_set_context(dict):
     def __init__(self, context={}, **subsets):
         context = dict(context)
         context.update(subsets)
-        super().__init__((k, tx_ids(v)) for k,v in context.items())
+        super().__init__((k, tx_ids(v)) for k, v in context.items())
 
 
 class tx_set(set):
@@ -294,7 +294,7 @@ class tx_set(set):
         if unexpected:
             if ret:
                 ret += "and "
-            ret += f"unexpected "
+            ret += "unexpected "
             for n, v in context.items():
                 if unexpected.intersection(v):
                     ret += self._explain_range(n, v, unexpected)
@@ -310,9 +310,9 @@ class tx_set(set):
             last = None
             for i in sorted(map(v.index, elements.intersection(v))):
                 if last is None:
-                    last = slice(i, i+1)
+                    last = slice(i, i + 1)
                 elif last.stop == i:
-                    last = slice(last.start, i+1)
+                    last = slice(last.start, i + 1)
                 else:
                     yield last
                     last = None
@@ -323,7 +323,7 @@ class tx_set(set):
             for s in slices:
                 start = str(s.start) if s.start > 0 else ""
                 stop = str(s.stop) if s.start > 0 or s.stop < len(v) else ""
-                yield f"{n}[{start}:{stop}]" if s.start+1 != s.stop else f"{n}[{s.start}]"
+                yield f"{n}[{start}:{stop}]" if s.start + 1 != s.stop else f"{n}[{s.start}]"
         return " ".join(show_slices(find_slices()))
 
 

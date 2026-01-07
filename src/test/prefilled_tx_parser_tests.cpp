@@ -16,98 +16,101 @@
 using namespace std;
 using namespace bsv;
 
-static const std::vector<uint8_t> tx = []
+namespace prefilled_tx_parser_tests_cpp // required for unity builds
 {
-    std::vector<uint8_t> tx;
+    static const std::vector<uint8_t> tx = []
+    {
+        std::vector<uint8_t> txn;
 
-    tx.insert(tx.end(), version_len, 3);    // tx version
-    tx.push_back(4);                        // n inputs 
-    
-    // ip 1
-    tx.insert(tx.end(), outpoint_len, 4);   // tx outpoint 
-    tx.push_back(1);                        // script length
-    tx.push_back(0x6a);                     // script (op_return)
-    tx.insert(tx.end(), seq_len, 5);        // sequence
-    // ip 2
-    tx.insert(tx.end(), outpoint_len, 6);   // tx outpoint 
-    tx.push_back(0xfd);                     // script length encoded 2 bytes
-    tx.push_back(2);                        // script length little endian 
-    tx.push_back(0);                        // 
-    tx.push_back(0x6a);                     // script (op_return)
-    tx.push_back(0x6a);                     // script (op_return)
-    tx.insert(tx.end(), seq_len, 7);        // sequence
-    // ip 3
-    tx.insert(tx.end(), outpoint_len, 12);  // tx outpoint 
-    tx.push_back(0xfe);                     // script length encoded 4 bytes
-    tx.push_back(3);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0x6a);                     // script (op_return)
-    tx.push_back(0x6a);                     // script (op_return)
-    tx.push_back(0x6a);                     // script (op_return)
-    tx.insert(tx.end(), seq_len, 13);       // sequence
-    // ip 4
-    tx.insert(tx.end(), outpoint_len, 14);  // tx outpoint 
-    tx.push_back(0xff);                     // script length encoded 4 bytes
-    tx.push_back(4);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0x6a);                     // script (op_return)
-    tx.push_back(0x6a);                     // script (op_return)
-    tx.push_back(0x6a);                     // script (op_return)
-    tx.push_back(0x6a);                     // script (op_return)
-    tx.insert(tx.end(), seq_len, 15);       // sequence
+        txn.insert(txn.end(), version_len, 3);    // txn version
+        txn.push_back(4);                        // n inputs 
+        
+        // ip 1
+        txn.insert(txn.end(), outpoint_len, 4);   // txn outpoint 
+        txn.push_back(1);                        // script length
+        txn.push_back(0x6a);                     // script (op_return)
+        txn.insert(txn.end(), seq_len, 5);        // sequence
+        // ip 2
+        txn.insert(txn.end(), outpoint_len, 6);   // txn outpoint 
+        txn.push_back(0xfd);                     // script length encoded 2 bytes
+        txn.push_back(2);                        // script length little endian 
+        txn.push_back(0);                        // 
+        txn.push_back(0x6a);                     // script (op_return)
+        txn.push_back(0x6a);                     // script (op_return)
+        txn.insert(txn.end(), seq_len, 7);        // sequence
+        // ip 3
+        txn.insert(txn.end(), outpoint_len, 12);  // txn outpoint 
+        txn.push_back(0xfe);                     // script length encoded 4 bytes
+        txn.push_back(3);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0x6a);                     // script (op_return)
+        txn.push_back(0x6a);                     // script (op_return)
+        txn.push_back(0x6a);                     // script (op_return)
+        txn.insert(txn.end(), seq_len, 13);       // sequence
+        // ip 4
+        txn.insert(txn.end(), outpoint_len, 14);  // txn outpoint 
+        txn.push_back(0xff);                     // script length encoded 4 bytes
+        txn.push_back(4);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0x6a);                     // script (op_return)
+        txn.push_back(0x6a);                     // script (op_return)
+        txn.push_back(0x6a);                     // script (op_return)
+        txn.push_back(0x6a);                     // script (op_return)
+        txn.insert(txn.end(), seq_len, 15);       // sequence
 
-    tx.push_back(4);                        // number of outputs
-    // op 1
-    tx.insert(tx.end(), value_len, 8);      // value
-    tx.push_back(1);                        // script length
-    tx.push_back(0x6a);                     // script (op_return)
-    // op 2
-    tx.insert(tx.end(), value_len, 9);      // value
-    tx.push_back(0xfd);                     // script length encoded 2 bytes
-    tx.push_back(2);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0x6a);                     // script (op_return)
-    tx.push_back(0x6a);                     // script (op_return)
-    // op 3
-    tx.insert(tx.end(), value_len, 16);     // value
-    tx.push_back(0xfe);                     // script length
-    tx.push_back(3);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0x6a);                     // script (op_return)
-    tx.push_back(0x6a);                     // script (op_return)
-    tx.push_back(0x6a);                     // script (op_return)
-    
-    // op 4
-    tx.insert(tx.end(), value_len, 17);     // value
-    tx.push_back(0xff);                     // script length
-    tx.push_back(4);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0);                        // script length
-    tx.push_back(0x6a);                     // script (op_return)
-    tx.push_back(0x6a);                     // script (op_return)
-    tx.push_back(0x6a);                     // script (op_return)
-    tx.push_back(0x6a);                     // script (op_return)
+        txn.push_back(4);                        // number of outputs
+        // op 1
+        txn.insert(txn.end(), value_len, 8);      // value
+        txn.push_back(1);                        // script length
+        txn.push_back(0x6a);                     // script (op_return)
+        // op 2
+        txn.insert(txn.end(), value_len, 9);      // value
+        txn.push_back(0xfd);                     // script length encoded 2 bytes
+        txn.push_back(2);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0x6a);                     // script (op_return)
+        txn.push_back(0x6a);                     // script (op_return)
+        // op 3
+        txn.insert(txn.end(), value_len, 16);     // value
+        txn.push_back(0xfe);                     // script length
+        txn.push_back(3);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0x6a);                     // script (op_return)
+        txn.push_back(0x6a);                     // script (op_return)
+        txn.push_back(0x6a);                     // script (op_return)
+        
+        // op 4
+        txn.insert(txn.end(), value_len, 17);     // value
+        txn.push_back(0xff);                     // script length
+        txn.push_back(4);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0);                        // script length
+        txn.push_back(0x6a);                     // script (op_return)
+        txn.push_back(0x6a);                     // script (op_return)
+        txn.push_back(0x6a);                     // script (op_return)
+        txn.push_back(0x6a);                     // script (op_return)
 
-    // locktime
-    tx.insert(tx.end(), locktime_len, 10);  // lock time
+        // locktime
+        txn.insert(txn.end(), locktime_len, 10);  // lock time
 
-    return tx;
-}();
+        return txn;
+    }();
+}
 
 BOOST_AUTO_TEST_SUITE(prefilled_tx_parser_tests)
 
@@ -117,9 +120,9 @@ BOOST_AUTO_TEST_CASE(parse_empty_input)
     std::span s{ip.data(), 0};
     prefilled_tx_parser parser;
     const auto [bytes_read, bytes_reqd] = parser(s);
-    BOOST_CHECK_EQUAL(0, bytes_read);
+    BOOST_CHECK_EQUAL(0U, bytes_read);
     BOOST_CHECK_EQUAL(var_int_len_1, bytes_reqd);
-    BOOST_CHECK_EQUAL(0, parser.size());
+    BOOST_CHECK_EQUAL(0U, parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(parse_index_var_int_len_3)
@@ -128,9 +131,9 @@ BOOST_AUTO_TEST_CASE(parse_index_var_int_len_3)
     std::span s{ip.data(), ip.size()};
     prefilled_tx_parser parser;
     const auto [bytes_read, bytes_reqd] = parser(s);
-    BOOST_CHECK_EQUAL(0, bytes_read);
+    BOOST_CHECK_EQUAL(0U, bytes_read);
     BOOST_CHECK_EQUAL(var_int_len_3, bytes_reqd);
-    BOOST_CHECK_EQUAL(0, parser.size());
+    BOOST_CHECK_EQUAL(0U, parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(parse_index_var_int_len_5)
@@ -139,9 +142,9 @@ BOOST_AUTO_TEST_CASE(parse_index_var_int_len_5)
     std::span s{ip.data(), ip.size()};
     prefilled_tx_parser parser;
     const auto [bytes_read, bytes_reqd] = parser(s);
-    BOOST_CHECK_EQUAL(0, bytes_read);
+    BOOST_CHECK_EQUAL(0U, bytes_read);
     BOOST_CHECK_EQUAL(var_int_len_5, bytes_reqd);
-    BOOST_CHECK_EQUAL(0, parser.size());
+    BOOST_CHECK_EQUAL(0U, parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(parse_index_var_int_len_9)
@@ -150,9 +153,9 @@ BOOST_AUTO_TEST_CASE(parse_index_var_int_len_9)
     std::span s{ip.data(), ip.size()};
     prefilled_tx_parser parser;
     const auto [bytes_read, bytes_reqd] = parser(s);
-    BOOST_CHECK_EQUAL(0, bytes_read);
+    BOOST_CHECK_EQUAL(0U, bytes_read);
     BOOST_CHECK_EQUAL(var_int_len_9, bytes_reqd);
-    BOOST_CHECK_EQUAL(0, parser.size());
+    BOOST_CHECK_EQUAL(0U, parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(parse_index_var_int_len_1)
@@ -161,13 +164,15 @@ BOOST_AUTO_TEST_CASE(parse_index_var_int_len_1)
     std::span s{ip.data(), ip.size()};
     prefilled_tx_parser parser;
     const auto [bytes_read, bytes_reqd] = parser(s);
-    BOOST_CHECK_EQUAL(1, bytes_read);
+    BOOST_CHECK_EQUAL(1U, bytes_read);
     BOOST_CHECK_EQUAL(bsv::version_len, bytes_reqd);
-    BOOST_CHECK_EQUAL(1, parser.size());
+    BOOST_CHECK_EQUAL(1U, parser.size());
 }
 
 BOOST_AUTO_TEST_CASE(parse_in_one_pass)
 {
+    using namespace prefilled_tx_parser_tests_cpp;
+
     prefilled_tx_parser parser;
     vector<uint8_t> ip;
     const size_t index{42};
@@ -176,10 +181,10 @@ BOOST_AUTO_TEST_CASE(parse_in_one_pass)
     std::span s{ip.data(), ip.size()};
     const auto [bytes_read, bytes_reqd] = parser(s);
     BOOST_CHECK_EQUAL(ip.size(), bytes_read);
-    BOOST_CHECK_EQUAL(0, bytes_reqd); 
+    BOOST_CHECK_EQUAL(0U, bytes_reqd); 
     BOOST_CHECK_EQUAL(ip.size(), parser.size());
 
-    unique_array a{std::move(parser).buffer()};
+    auto a{std::move(parser).buffer()};
     BOOST_CHECK_EQUAL(ip.size(), a.size());
     BOOST_CHECK_EQUAL_COLLECTIONS(ip.cbegin(), ip.cend(),
                                   a.cbegin(), a.cend());
@@ -187,6 +192,8 @@ BOOST_AUTO_TEST_CASE(parse_in_one_pass)
 
 BOOST_AUTO_TEST_CASE(parse_as_reqd)
 {
+    using namespace prefilled_tx_parser_tests_cpp;
+
     prefilled_tx_parser parser;
     vector<uint8_t> ip;
     ip.push_back(42); // index
@@ -197,7 +204,7 @@ BOOST_AUTO_TEST_CASE(parse_as_reqd)
     size_t passes{};
     while(total_bytes_read < ip.size())
     {
-        std::span s{ip.data() + offset, n};
+        std::span s{ip.data() + offset, n}; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         const auto [bytes_read, bytes_reqd] = parser(s);
         ++passes;
         if(bytes_read)
@@ -214,7 +221,7 @@ BOOST_AUTO_TEST_CASE(parse_as_reqd)
     }
     BOOST_CHECK_EQUAL(ip.size(), total_bytes_read);
     BOOST_CHECK_EQUAL(ip.size(), parser.size());
-    BOOST_CHECK_EQUAL(27, passes);
+    BOOST_CHECK_EQUAL(27U, passes);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

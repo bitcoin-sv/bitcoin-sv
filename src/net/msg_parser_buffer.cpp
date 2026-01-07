@@ -5,80 +5,70 @@
 #include "msg_parser_buffer.h"
 
 #include <cassert>
-#include <iostream>
-#include <numeric>
+#include <ios>
 
 using namespace std;
 
 // Always read all the bytes of input, by the parser or into the buffer.
 void msg_parser_buffer::operator()(span<const uint8_t> s)
 {
-    if(overflow_)
+    if(parser_full_)
     {
-        buffer_.insert(buffer_.cend(),
-                       s.begin(), 
-                       s.end());
+        buffer_.insert(buffer_.end(), s.begin(), s.end());
         return;
     }
 
     if(!buffer_.empty())
     {
-        size_t bytes_read{};
-        while(!bytes_read)
+        while(!s.empty())
         {
+            // Fill up the buffer to the required level
             const size_t reqd_bytes = min(s.size(), buffer_size_reqd_ - buffer_.size());
-            buffer_.append(s.first(reqd_bytes));
+            buffer_.insert(buffer_.cend(), s.begin(), s.begin() + reqd_bytes);
+
             s = s.subspan(reqd_bytes);
             if(buffer_.size() < buffer_size_reqd_)
                 return;
 
+            // Buffer filled, send the contents to the parser
             span ss(buffer_.data(), buffer_.size());
             const auto [bytes_read, bytes_reqd] = (*parser_)(ss);
-            if(bytes_read == buffer_.size())
+            // A parser may not read any bytes even though it was supplied
+            // with the bytes it stated it required. For example when
+            // reading a CompactSize the parser requires at least one byte, 
+            // but if that byte is a multi-byte CompactSize value the 
+            // parser will not read but ask for further bytes.
+            if(bytes_read)
             {
+                // If bytes are read, failure to read the bytes_reqd 
+                // represents a programming error in the parser.
+                // assert(bytes_read == buffer_size_reqd_);
+                if(bytes_read != buffer_size_reqd_)
+                    throw ios_base::failure("msg_parser_buffer::op(): parser error");
+
                 buffer_.clear();
-                buffer_size_reqd_ = 0;
-                if(s.empty())
-                    return;
-                break;
+                buffer_size_reqd_ = bytes_reqd;
+                if(!bytes_reqd)
+                {
+                    parser_full_ = true;
+                    break; // allow second parser::op() call to handle rest of input
+                }
             }
-
-            if(bytes_read == 0 && bytes_reqd == 0)
+            else
             {
-                overflow_ = true;
-                buffer_.insert(buffer_.cend(),
-                               s.begin(),
-                               s.end());
-                bytes_read_ += s.size();
-                return;
+                buffer_size_reqd_ = bytes_reqd;
+                if(bytes_reqd && s.empty())
+                    return;
             }
-
-            assert(bytes_read == 0);
-            assert(bytes_reqd > buffer_size_reqd_);
-            buffer_size_reqd_ = bytes_reqd;
         }
     }
 
     const auto [bytes_read, bytes_reqd]{(*parser_)(s)};
-    if(bytes_read == 0 && bytes_reqd == 0)
-    {
-        overflow_ = true;
-        buffer_.insert(buffer_.cend(),
-                       s.begin(),
-                       s.end());
-        bytes_read_ += s.size();
-        return;
-    }
-
-    bytes_read_ = bytes_read;
-    const size_t remaining_input_len{s.size() - bytes_read};
-    buffer_size_reqd_ = bytes_reqd ? bytes_reqd : remaining_input_len;
-    if(remaining_input_len) 
-    {
-        buffer_.insert(buffer_.cend(),
-                       s.begin() + bytes_read,
-                       s.end());
-    }
+    buffer_size_reqd_ = bytes_reqd; 
+    if(!bytes_reqd)
+        parser_full_ = true;
+    
+    buffer_.insert(buffer_.end(), s.begin() + bytes_read, s.end());
 }
 
 size_t msg_parser_buffer::read(size_t read_pos, span<uint8_t> s)
@@ -91,9 +81,9 @@ size_t msg_parser_buffer::size() const
     return parser_->size() + buffer_.size();
 }
 
-size_t msg_parser_buffer::parsed_size() const
+size_t msg_parser_buffer::readable_size() const
 {
-    return parser_->size();
+    return parser_->readable_size();
 }
 
 void msg_parser_buffer::clear()

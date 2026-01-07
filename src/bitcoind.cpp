@@ -98,32 +98,39 @@ bool AppInit(int argc, char *argv[]) {
             strUsage += "\n" + HelpMessage(HMM_BITCOIND, config);
         }
 
-        fprintf(stdout, "%s", strUsage.c_str()); // NOLINT(cert-err33-c)
+        std::cout << strUsage << '\n';
         return true;
     }
 
-    try {
-        if (!fs::is_directory(GetDataDir(false))) {
-            // NOLINTNEXTLINE(cert-err33-c)
-            fprintf(stderr,
-                    "Error: Specified data directory \"%s\" does not exist.\n",
-                    gArgs.GetArg("-datadir", "").c_str());
+    try
+    {
+        if(!fs::is_directory(GetDataDir(false)))
+        {
+            std::ignore = fprintf(stderr,
+                                  "Error: Specified data directory \"%s\" does not exist.\n",
+                                  gArgs.GetArg("-datadir", "").c_str());
             return false;
         }
-        try {
+
+        try
+        {
             gArgs.ReadConfigFile(gArgs.GetArg("-conf", BITCOIN_CONF_FILENAME));
-        } catch (const std::exception &e) {
-            // NOLINTNEXTLINE(cert-err33-c)
-            fprintf(stderr, "Error reading configuration file: %s\n", e.what());
+        }
+        catch(const std::exception& e)
+        {
+            std::cerr << "Error reading configuration file: " << e.what() << '\n';
             return false;
         }
+
         // Check for -testnet or -regtest parameter (Params() calls are only
         // valid after this clause)
-        try {
-            SelectParams(ChainNameFromCommandLine());
-        } catch (const std::exception &e) {
-            // NOLINTNEXTLINE(cert-err33-c)
-            fprintf(stderr, "Error: %s\n", e.what());
+        try
+        {
+            SelectParams(ChainNameFromCommandLine(), MagicBytesFromCommandLine());
+        }
+        catch(const std::exception& e)
+        {
+            std::cerr << "Error: " << e.what() << '\n';
             return false;
         }
 
@@ -131,23 +138,28 @@ bool AppInit(int argc, char *argv[]) {
         config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
 
         // maxstackmemoryusageconsensus and excessiveblocksize are required parameters
-        if (!gArgs.IsArgSet("-maxstackmemoryusageconsensus") || !gArgs.IsArgSet("-excessiveblocksize"))
+        if(!gArgs.IsArgSet("-maxstackmemoryusageconsensus") || !gArgs.IsArgSet("-excessiveblocksize"))
         {
-            // NOLINTNEXTLINE(cert-err33-c)
-            fprintf(stderr, "Mandatory consensus parameter is not set. In order to start bitcoind you must set the "
-                            "following consensus parameters: \"excessiveblocksize\" and "
-                            "\"maxstackmemoryusageconsensus\". In order to start bitcoind with no limits you can set "
-                            "both of these parameters to 0 however it is strongly recommended to ensure you understand "
-                            "the implications of this setting.\n\n"
-                            "For more information of how to choose these settings safely for your use case refer to: "
-                            "https://bitcoinsv.io/choosing-consensus-settings/");
+            std::cerr << "Mandatory consensus parameter is not set. In order to "
+                         "start bitcoind you must set the "
+                         "following consensus parameters: "
+                         "\"excessiveblocksize\" and "
+                         "\"maxstackmemoryusageconsensus\". In order to start "
+                         "bitcoind with no limits you can set "
+                         "both of these parameters to 0 however it is strongly "
+                         "recommended to ensure you understand "
+                         "the implications of this setting.\n\n"
+                         "For more information of how to choose these settings "
+                         "safely for your use case refer to: "
+                         "https://node.bitcoinsv.io/sv-node/installation/"
+                         "sv-node/genesis-settings/";
             return false;
         }
         if (!gArgs.IsArgSet("-minminingtxfee"))
         {
-            // NOLINTNEXTLINE(cert-err33-c)
-            fprintf(stderr, "Mandatory policy parameter is not set. In order to start bitcoind you must set the "
-                            "following policy parameters: \"minminingtxfee\"");
+            std::cerr << "Mandatory policy parameter is not set. In order to "
+                         "start bitcoind you must set the "
+                         "following policy parameters: \"minminingtxfee\"";
             return false;
         }
 
@@ -158,11 +170,11 @@ bool AppInit(int argc, char *argv[]) {
                 !boost::algorithm::istarts_with(argv[i], "bitcoin:"))
                 fCommandLine = true;
 
-        if (fCommandLine) {
-            // NOLINTNEXTLINE(cert-err33-c)
-            fprintf(stderr, "Error: There is no RPC client functionality in "
-                            "bitcoind anymore. Use the bitcoin-cli utility "
-                            "instead.\n");
+        if(fCommandLine)
+        {
+            std::cerr << "Error: There is no RPC client functionality in "
+                         "bitcoind anymore. Use the bitcoin-cli utility "
+                         "instead.\n";
             exit(EXIT_FAILURE);
         }
         // -server defaults to true for bitcoind
@@ -187,30 +199,28 @@ bool AppInit(int argc, char *argv[]) {
         }
         if (gArgs.GetBoolArg("-daemon", false)) {
 #if HAVE_DECL_DAEMON
-            // NOLINTNEXTLINE(cert-err33-c)
-            fprintf(stdout, "Bitcoin server starting\n");
+            std::cout << "Bitcoin server starting\n";
 
             // Daemonize
             if (daemon(1, 0)) {
                 // don't chdir (1), do close FDs (0)
-                // NOLINTNEXTLINE(cert-err33-c)
-                fprintf(stderr, "Error: daemon() failed: %s\n",
-                        strerror(errno));
+                std::cerr << "Error: daemon() failed: " << strerror(errno) << '\n';
                 return false;
             }
 #else
-            // NOLINTNEXTLINE(cert-err33-c)
-            fprintf(
-                stderr,
-                "Error: -daemon is not supported on this operating system\n");
+            std::cerr << "Error: -daemon is not supported on this operating system\n";
             return false;
 #endif // HAVE_DECL_DAEMON
         }
 
         fRet = AppInitMain(config, threadGroup, scheduler, GetShutdownToken());
-    } catch (const std::exception &e) {
+    }
+    catch(const std::exception& e)
+    {
         PrintExceptionContinue(&e, "AppInit()");
-    } catch (...) {
+    }
+    catch(...)
+    {
         PrintExceptionContinue(nullptr, "AppInit()");
     }
     GetAppInitCompleted().store(true);

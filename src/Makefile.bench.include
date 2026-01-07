@@ -24,10 +24,12 @@ bench_bench_bitcoin_SOURCES = \
   bench/mempooltxdb.cpp \
   bench/base58.cpp \
   bench/lockedpool.cpp \
+  bench/op_codes.cpp \
   bench/perf.cpp \
   bench/perf.h \
   bench/cscript.cpp \
   bench/interpreter.cpp \
+  bench/safe_mode.cpp \
   bench/serialisation.cpp \
   bench/thread_safe_queue.cpp
 

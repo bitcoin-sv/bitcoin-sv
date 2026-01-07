@@ -9,9 +9,6 @@ Run this script manually
 import socket
 import sys
 
-# adding this line to reach test_framework
-sys.path.append('../functional/')
-
 from test_framework.mininode import (
     NodeConn,
     NodeConnCB,
@@ -20,6 +17,9 @@ from test_framework.mininode import (
     NetworkThread,
     NETWORK_PORTS
 )
+
+# adding this line to reach test_framework
+sys.path.append('../functional/')
 
 # dns seed data is taken from chainparams.cpp
 # format of seeds: [(name1, host1), ... , (nameN, hostN)]
@@ -32,9 +32,9 @@ dnsseeds_testnet = [("bitcoinsv.io", "testnet-seed.bitcoinsv.io"),
                     ("bitcoincloud.net", "testnet-seed.bitcoincloud.net")]
 
 dnsseed_map = {
-    "mainnet" : dnsseeds_mainnet,
-    "stn" : dnsseeds_stn,
-    "testnet3" : dnsseeds_testnet
+    "mainnet": dnsseeds_mainnet,
+    "stn": dnsseeds_stn,
+    "testnet3": dnsseeds_testnet
 }
 
 
@@ -92,7 +92,7 @@ def check_seeds(network, dnsseeds, print_out=False):
                 node0.connection.close()
                 network_thread.join()
                 response_count += 1
-            except:
+            except Exception:
                 if print_out:
                     print("no response")
                 if node0.connection is not None:

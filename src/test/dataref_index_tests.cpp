@@ -103,7 +103,7 @@ BOOST_FIXTURE_TEST_CASE(StorageRetrieval, BasicTestingSetup)
         BOOST_CHECK_EQUAL(db_detail.mDiskUsage, SizeofOneTxnInDB);
         BOOST_CHECK_EQUAL(db_detail.GetAllDatarefEntries().size(), 1U);
         auto dbentry { db.GetDataRefEntry(dataRefTxn->GetId()) };
-        BOOST_CHECK (dbentry);
+        assert(dbentry);
         BOOST_CHECK_EQUAL(dbentry->blockId.ToString(), blockId.ToString());
         BOOST_CHECK_EQUAL(dbentry->txn->GetId().ToString(), dataRefTxn->GetId().ToString());
 
@@ -120,7 +120,7 @@ BOOST_FIXTURE_TEST_CASE(StorageRetrieval, BasicTestingSetup)
         BOOST_CHECK_EQUAL(db_detail.mDiskUsage, SizeofOneTxnInDB);
         BOOST_CHECK_EQUAL(db_detail.GetAllDatarefEntries().size(), 1U);
         auto dbentry { db.GetDataRefEntry(dataRefTxn->GetId()) };
-        BOOST_CHECK (dbentry);
+        assert(dbentry);
         BOOST_CHECK_EQUAL(dbentry->blockId.ToString(), blockId.ToString());
         BOOST_CHECK_EQUAL(dbentry->txn->GetId().ToString(), dataRefTxn->GetId().ToString());
         CTransactionRef readTxn { db.GetDataRefTxn(dataRefTxn->GetId()) };

@@ -1,24 +1,18 @@
 // Copyright (c) 2020 Bitcoin Association.
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include <config.h>
-#include <net/association.h>
-#include <net/stream.h>
-#include <net/stream_policy_factory.h>
-#include <test/test_bitcoin.h>
+#include "config.h"
+#include "net/association.h"
+#include "net/stream.h"
+#include "net/stream_policy_factory.h"
+#include "test/test_bitcoin.h"
+#include "test/testutil.h"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/test/unit_test.hpp>
 
 namespace
 {
-    CService ip(uint32_t i)
-    {
-        struct in_addr s;
-        s.s_addr = i;
-        return CService(CNetAddr(s), Params().GetDefaultPort());
-    }
-
     void CheckInitialStreamStats(const StreamStats& stats)
     {
         BOOST_CHECK_EQUAL(stats.streamType, enum_cast<std::string>(StreamType::GENERAL));

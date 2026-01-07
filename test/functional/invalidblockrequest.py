@@ -3,10 +3,13 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+from test_framework.blocktools import create_block, create_coinbase, \
+    create_transaction
+from test_framework.comptool import TestInstance, RejectResult
+from test_framework.mininode import COIN
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import *
-from test_framework.comptool import TestManager, TestInstance, RejectResult
-from test_framework.blocktools import *
+from test_framework.util import assert_equal
+
 import copy
 import time
 
@@ -95,7 +98,7 @@ class InvalidBlockRequestTest(ComparisonTestFramework):
         block2.vtx.append(tx2)
         assert_equal(block2.hashMerkleRoot, block2.calc_merkle_root())
         assert_equal(orig_hash, block2.rehash())
-        assert(block2_orig.vtx != block2.vtx)
+        assert (block2_orig.vtx != block2.vtx)
 
         self.tip = block2.sha256
         yield TestInstance([[block2, RejectResult(16, b'bad-txns-duplicate')], [block2_orig, True]])

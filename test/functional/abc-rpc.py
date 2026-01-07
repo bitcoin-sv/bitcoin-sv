@@ -5,8 +5,6 @@
 
 # Exercise the Bitcoin SV RPC calls.
 
-import time
-import random
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (assert_equal, assert_raises_rpc_error)
 from test_framework.cdefs import (ONE_MEGABYTE,
@@ -33,8 +31,6 @@ class ABC_RPC_Test (BitcoinTestFramework):
         getsize = self.nodes[0].getexcessiveblock()
         ebs = getsize['excessiveBlockSize']
         assert_equal(ebs, LEGACY_MAX_BLOCK_SIZE + 1)
-
-        x = self.nodes[0].setexcessiveblock, LEGACY_MAX_BLOCK_SIZE
 
         # Check that going below legacy size is not accepted
         assert_raises_rpc_error(-8, 'Excessive block size (excessiveblocksize) must be larger than %d' %

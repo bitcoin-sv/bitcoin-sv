@@ -24,6 +24,7 @@ namespace {
 
     using Queue = CThreadSafeQueue<std::uint64_t>;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
     struct BlockedLogger
     {
         using Cnt = std::unordered_map<const char*, int>;
@@ -34,7 +35,7 @@ namespace {
             {
                 for (const auto& [method, count] : counters)
                     std::cout << "Blocked in " << method << " " << count
-                              << " times in " << thread_name << std::endl;
+                              << " times in " << thread_name << '\n';
             }
         }
 

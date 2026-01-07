@@ -72,7 +72,8 @@ BOOST_AUTO_TEST_CASE(validation_load_external_block_file) {
         fp = outs.release();
     }
 
-    fseek(fp.get(), 0, SEEK_SET);
+    const auto n = fseek(fp.get(), 0, SEEK_SET);
+    assert(n == 0);
     BOOST_CHECK_NO_THROW({ LoadExternalBlockFile(config, std::move(fp), 0); });
 }
 

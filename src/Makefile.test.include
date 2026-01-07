@@ -33,6 +33,7 @@ BITCOIN_TESTS =\
   test/array_parser_tests.cpp \
   test/base32_tests.cpp \
   test/base58_tests.cpp \
+  test/base58data_tests.cpp \
   test/base64_tests.cpp \
   test/bip32_tests.cpp \
   test/big_int_tests.cpp \
@@ -44,6 +45,7 @@ BITCOIN_TESTS =\
   test/block_info_tests.cpp \
   test/blockindex_with_descendants_tests.cpp \
   test/blockmaxsize_tests.cpp \
+  test/block_read_cache_tests.cpp \
   test/block_parser_tests.cpp \
   test/blocktxn_parser_tests.cpp \
   test/blockstatus_tests.cpp \
@@ -52,6 +54,7 @@ BITCOIN_TESTS =\
   test/bn_helpers.h \
   test/bn_op_tests.cpp \
   test/bswap_tests.cpp \
+  test/chain_guard.h \
   test/checkpoints_tests.cpp \
   test/checkqueue_tests.cpp \
   test/check_selfish_mining_tests.cpp \
@@ -61,6 +64,7 @@ BITCOIN_TESTS =\
   test/write_preferring_upgradable_mutex_tests.cpp \
   test/compress_tests.cpp \
   test/config_tests.cpp \
+  test/configscriptpolicy_tests.cpp \
   test/coinbase_doc_tests.cpp \
   test/core_io_tests.cpp \
   test/cpfp_tests.cpp \
@@ -73,6 +77,8 @@ BITCOIN_TESTS =\
   test/dsdetected_tests.cpp \
   test/dstxn_serialiser_tests.cpp \
   test/dbwrapper_tests.cpp \
+  test/dummy_config.cpp \
+  test/dummy_config.h \
   test/frozentxo_db_tests.cpp \
   test/frozentxo_mempool_tests.cpp \
   test/frozentxo_tests.cpp \
@@ -100,6 +106,7 @@ BITCOIN_TESTS =\
   test/limitedmap_tests.cpp \
   test/limitedstack_tests.cpp \
   test/locked_ref_tests.cpp \
+  test/lrshiftnum_tests.cpp \
   test/m_candidates_tests.cpp \
   test/main_tests.cpp \
   test/mempool_test_access.h \
@@ -135,12 +142,14 @@ BITCOIN_TESTS =\
   test/prefilled_txs_parser_tests.cpp \
   test/pow_tests.cpp \
   test/prevector_tests.cpp \
+  test/protocol_era_tests.cpp \
   test/protocol_tests.cpp \
   test/raii_event_tests.cpp \
   test/random_tests.cpp \
   test/reverselock_tests.cpp \
   test/revokemid_tests.cpp \
   test/rpc_tests.cpp \
+  test/safe_mode_tests.cpp \
   test/sanity_tests.cpp \
   test/scheduler_tests.cpp \
   test/script_P2SH_tests.cpp \
@@ -186,11 +195,11 @@ BITCOIN_TESTS =\
   test/txvalidationcache_tests.cpp \
   test/uint256_tests.cpp \
   test/undo_tests.cpp \
-  test/unique_array_tests.cpp \
   test/univalue_tests.cpp \
   test/util_tests.cpp \
   test/validation_scheduler_tests.cpp \
   test/validation_tests.cpp \
+  test/verify_script_flags_tests.cpp \
   test/webhook_client_tests.cpp
 
 if ENABLE_WALLET

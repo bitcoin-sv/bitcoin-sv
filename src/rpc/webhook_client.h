@@ -10,7 +10,7 @@
 #include <future>
 #include <memory>
 
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 
 namespace rpc::client
 {
@@ -57,6 +57,7 @@ class WebhookClient
 
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern std::unique_ptr<WebhookClient> g_pWebhookClient;
 
 }   // namespace

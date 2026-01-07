@@ -75,7 +75,12 @@ typedef enum ScriptError_t
     SCRIPT_ERR_ILLEGAL_FORKID,
     SCRIPT_ERR_MUST_USE_FORKID,
 
+    /** Chronicle malleability control */
+    SCRIPT_ERR_ILLEGAL_CHRONICLE,
+
     SCRIPT_ERR_BIG_INT,
+
+    SCRIPT_ERR_INVALID_FLAGS,
 
     SCRIPT_ERR_ERROR_COUNT
 } ScriptError;

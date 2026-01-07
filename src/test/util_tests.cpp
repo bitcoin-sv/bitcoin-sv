@@ -11,6 +11,7 @@
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 
+#include <array>
 #include <boost/test/unit_test_suite.hpp>
 #include <cstdint>
 #include <vector>
@@ -37,7 +38,7 @@ BOOST_AUTO_TEST_CASE(util_criticalsection) {
     } while (0);
 }
 
-static const uint8_t ParseHex_expected[65] = {
+static const std::array<uint8_t, 65> ParseHex_expected = {
     0x04, 0x67, 0x8a, 0xfd, 0xb0, 0xfe, 0x55, 0x48, 0x27, 0x19, 0x67,
     0xf1, 0xa6, 0x71, 0x30, 0xb7, 0x10, 0x5c, 0xd6, 0xa8, 0x28, 0xe0,
     0x39, 0x09, 0xa6, 0x79, 0x62, 0xe0, 0xea, 0x1f, 0x61, 0xde, 0xb6,
@@ -46,8 +47,8 @@ static const uint8_t ParseHex_expected[65] = {
     0x8d, 0x57, 0x8a, 0x4c, 0x70, 0x2b, 0x6b, 0xf1, 0x1d, 0x5f};
 BOOST_AUTO_TEST_CASE(util_ParseHex) {
     std::vector<uint8_t> result;
-    std::vector<uint8_t> expected(
-        ParseHex_expected, ParseHex_expected + sizeof(ParseHex_expected));
+    std::vector<uint8_t> expected(ParseHex_expected.begin(),
+                                  ParseHex_expected.end());
     // Basic test vector
     result = ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0"
                       "ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d"
@@ -71,18 +72,18 @@ BOOST_AUTO_TEST_CASE(util_ParseHex) {
 }
 
 BOOST_AUTO_TEST_CASE(util_HexStr) {
-    BOOST_CHECK_EQUAL(HexStr(ParseHex_expected,
-                             ParseHex_expected + sizeof(ParseHex_expected)),
+    BOOST_CHECK_EQUAL(HexStr(ParseHex_expected.begin(),
+                             ParseHex_expected.end()),
                       "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0"
                       "ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d"
                       "578a4c702b6bf11d5f");
 
-    BOOST_CHECK_EQUAL(HexStr(ParseHex_expected, ParseHex_expected + 5, true),
+    BOOST_CHECK_EQUAL(HexStr(ParseHex_expected.begin(), ParseHex_expected.begin() + 5, true),
                       "04 67 8a fd b0");
 
-    BOOST_CHECK_EQUAL(HexStr(ParseHex_expected, ParseHex_expected, true), "");
+    BOOST_CHECK_EQUAL(HexStr(ParseHex_expected.begin(), ParseHex_expected.begin(), true), "");
 
-    std::vector<uint8_t> ParseHex_vec(ParseHex_expected, ParseHex_expected + 5);
+    std::vector<uint8_t> ParseHex_vec(ParseHex_expected.begin(), ParseHex_expected.begin() + 5);
 
     BOOST_CHECK_EQUAL(HexStr(ParseHex_vec, true), "04 67 8a fd b0");
 }
@@ -116,18 +117,18 @@ public:
 
 BOOST_AUTO_TEST_CASE(util_ParseParameters) {
     TestArgsManager testArgs;
-    const char *argv_test[] = {"-ignored",      "-a", "-b",  "-ccc=argument",
-                               "-ccc=multiple", "f",  "-d=e"};
+    const std::array<const char *, 7> argv_test = {
+        "-ignored", "-a", "-b", "-ccc=argument", "-ccc=multiple", "f", "-d=e"};
 
-    testArgs.ParseParameters(0, (char **)argv_test);
+    testArgs.ParseParameters(0, argv_test.data());
     BOOST_CHECK(testArgs.GetMapArgs().empty() &&
                 testArgs.GetMapMultiArgs().empty());
 
-    testArgs.ParseParameters(1, (char **)argv_test);
+    testArgs.ParseParameters(1, argv_test.data());
     BOOST_CHECK(testArgs.GetMapArgs().empty() &&
                 testArgs.GetMapMultiArgs().empty());
 
-    testArgs.ParseParameters(5, (char **)argv_test);
+    testArgs.ParseParameters(5, argv_test.data());
     // expectation: -ignored is ignored (program name argument),
     // -a, -b and -ccc end up in map, -d ignored because it is after
     // a non-option argument (non-GNU option parsing)
@@ -290,7 +291,7 @@ BOOST_AUTO_TEST_CASE(util_seed_insecure_rand) {
         int mask = 1;
         // Really rough binomal confidence approximation.
         int err =
-            30 * 10000. / mod * sqrt((1. / mod * (1 - 1. / mod)) / 10000.);
+            30 * 10000. / mod * sqrt((1. / mod * (1 - 1. / mod)) / 10000.); // NOLINT(*-narrowing-conversions)
         // mask is 2^ceil(log2(mod))-1
         while (mask < mod - 1)
             mask = (mask << 1) + 1;
@@ -298,7 +299,7 @@ BOOST_AUTO_TEST_CASE(util_seed_insecure_rand) {
         int count = 0;
         // How often does it get a zero from the uniform range [0,mod)?
         for (int i = 0; i < 10000; i++) {
-            uint32_t rval;
+            uint32_t rval; // NOLINT(cppcoreguidelines-init-variables)
             do {
                 rval = local_rand_ctx.rand32() & mask;
             } while (rval >= (uint32_t)mod);
@@ -355,7 +356,7 @@ BOOST_AUTO_TEST_CASE(gettime) {
 }
 
 BOOST_AUTO_TEST_CASE(test_ParseInt32) {
-    int32_t n;
+    int32_t n; // NOLINT(cppcoreguidelines-init-variables)
     // Valid values
     BOOST_CHECK(ParseInt32("1234", nullptr));
     BOOST_CHECK(ParseInt32("0", &n) && n == 0);
@@ -372,8 +373,8 @@ BOOST_AUTO_TEST_CASE(test_ParseInt32) {
     BOOST_CHECK(!ParseInt32("aap", &n));
     BOOST_CHECK(!ParseInt32("0x1", &n)); // no hex
     BOOST_CHECK(!ParseInt32("0x1", &n)); // no hex
-    const char test_bytes[] = {'1', 0, '1'};
-    std::string teststr(test_bytes, sizeof(test_bytes));
+    const std::array<char, 3> test_bytes = {'1', 0, '1'};
+    std::string teststr(test_bytes.begin(), test_bytes.end());
     BOOST_CHECK(!ParseInt32(teststr, &n)); // no embedded NULs
     // Overflow and underflow
     BOOST_CHECK(!ParseInt32("-2147483649", nullptr));
@@ -383,7 +384,7 @@ BOOST_AUTO_TEST_CASE(test_ParseInt32) {
 }
 
 BOOST_AUTO_TEST_CASE(test_ParseInt64) {
-    int64_t n;
+    int64_t n; // NOLINT(cppcoreguidelines-init-variables)
     // Valid values
     BOOST_CHECK(ParseInt64("1234", nullptr));
     BOOST_CHECK(ParseInt64("0", &n) && n == 0LL);
@@ -403,8 +404,8 @@ BOOST_AUTO_TEST_CASE(test_ParseInt64) {
     BOOST_CHECK(!ParseInt64("1a", &n));
     BOOST_CHECK(!ParseInt64("aap", &n));
     BOOST_CHECK(!ParseInt64("0x1", &n)); // no hex
-    const char test_bytes[] = {'1', 0, '1'};
-    std::string teststr(test_bytes, sizeof(test_bytes));
+    const std::array<char, 3> test_bytes = {'1', 0, '1'};
+    std::string teststr(test_bytes.begin(), test_bytes.end());
     BOOST_CHECK(!ParseInt64(teststr, &n)); // no embedded NULs
     // Overflow and underflow
     BOOST_CHECK(!ParseInt64("-9223372036854775809", nullptr));
@@ -414,7 +415,7 @@ BOOST_AUTO_TEST_CASE(test_ParseInt64) {
 }
 
 BOOST_AUTO_TEST_CASE(test_ParseUInt32) {
-    uint32_t n;
+    uint32_t n; // NOLINT(cppcoreguidelines-init-variables)
     // Valid values
     BOOST_CHECK(ParseUInt32("1234", nullptr));
     BOOST_CHECK(ParseUInt32("0", &n) && n == 0);
@@ -432,8 +433,8 @@ BOOST_AUTO_TEST_CASE(test_ParseUInt32) {
     BOOST_CHECK(!ParseUInt32("aap", &n));
     BOOST_CHECK(!ParseUInt32("0x1", &n)); // no hex
     BOOST_CHECK(!ParseUInt32("0x1", &n)); // no hex
-    const char test_bytes[] = {'1', 0, '1'};
-    std::string teststr(test_bytes, sizeof(test_bytes));
+    const std::array<char, 3> test_bytes = {'1', 0, '1'};
+    std::string teststr(test_bytes.begin(), test_bytes.end());
     BOOST_CHECK(!ParseUInt32(teststr, &n)); // no embedded NULs
     // Overflow and underflow
     BOOST_CHECK(!ParseUInt32("-2147483648", &n));
@@ -444,7 +445,7 @@ BOOST_AUTO_TEST_CASE(test_ParseUInt32) {
 }
 
 BOOST_AUTO_TEST_CASE(test_ParseUInt64) {
-    uint64_t n;
+    uint64_t n; // NOLINT(cppcoreguidelines-init-variables)
     // Valid values
     BOOST_CHECK(ParseUInt64("1234", nullptr));
     BOOST_CHECK(ParseUInt64("0", &n) && n == 0LL);
@@ -465,8 +466,8 @@ BOOST_AUTO_TEST_CASE(test_ParseUInt64) {
     BOOST_CHECK(!ParseUInt64("1a", &n));
     BOOST_CHECK(!ParseUInt64("aap", &n));
     BOOST_CHECK(!ParseUInt64("0x1", &n)); // no hex
-    const char test_bytes[] = {'1', 0, '1'};
-    std::string teststr(test_bytes, sizeof(test_bytes));
+    const std::array<char, 3> test_bytes = {'1', 0, '1'};
+    std::string teststr(test_bytes.begin(), test_bytes.end());
     BOOST_CHECK(!ParseUInt64(teststr, &n)); // no embedded NULs
     // Overflow and underflow
     BOOST_CHECK(!ParseUInt64("-9223372036854775809", nullptr));
@@ -478,7 +479,7 @@ BOOST_AUTO_TEST_CASE(test_ParseUInt64) {
 }
 
 BOOST_AUTO_TEST_CASE(test_ParseDouble) {
-    double n;
+    double n; // NOLINT(cppcoreguidelines-init-variables)
     // Valid values
     BOOST_CHECK(ParseDouble("1234", nullptr));
     BOOST_CHECK(ParseDouble("0", &n) && n == 0.0);
@@ -496,8 +497,8 @@ BOOST_AUTO_TEST_CASE(test_ParseDouble) {
     BOOST_CHECK(!ParseDouble("1a", &n));
     BOOST_CHECK(!ParseDouble("aap", &n));
     BOOST_CHECK(!ParseDouble("0x1", &n)); // no hex
-    const char test_bytes[] = {'1', 0, '1'};
-    std::string teststr(test_bytes, sizeof(test_bytes));
+    const std::array<char, 3> test_bytes = {'1', 0, '1'};
+    std::string teststr(test_bytes.begin(), test_bytes.end());
     BOOST_CHECK(!ParseDouble(teststr, &n)); // no embedded NULs
     // Overflow and underflow
     BOOST_CHECK(!ParseDouble("-1e10000", nullptr));

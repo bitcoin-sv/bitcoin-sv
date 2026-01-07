@@ -6,9 +6,9 @@ Test reducing false-positive orphans, during ptv, by detecting a continuous tran
 """
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.key import CECKey
-from test_framework.script import CScript, OP_TRUE, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
+from test_framework.script import CScript, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
 from test_framework.blocktools import create_transaction, PreviousSpendableOutput
-from test_framework.util import assert_equal, wait_until, wait_for_ptv_completion
+from test_framework.util import wait_until, wait_for_ptv_completion
 from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx
 import multiprocessing
@@ -34,8 +34,7 @@ class PTVTxnChains(ComparisonTestFramework):
     # Sign a transaction, using the key we know about.
     # This signs input 0 in tx, which is assumed to be spending output n in spend_tx
     def sign_tx(self, tx, spend_tx, n):
-        scriptPubKey = bytearray(spend_tx.vout[n].scriptPubKey)
-        sighash = SignatureHashForkId(
+        sighash = SignatureHash(
             spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
         tx.vin[0].scriptSig = CScript(
             [self.coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
@@ -70,7 +69,7 @@ class PTVTxnChains(ComparisonTestFramework):
         for tx in range(len(txchains)):
             conn.send_message(msg_tx(txchains[tx]))
         # Check if the validation queues are empty.
-        wait_for_ptv_completion(conn, num_of_chains*chain_length, timeout=timeout)
+        wait_for_ptv_completion(conn, num_of_chains * chain_length, timeout=timeout)
         # Check if required transactions are accepted by the mempool.
         self.check_mempool(conn.rpc, txchains, timeout)
 

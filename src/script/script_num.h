@@ -7,6 +7,7 @@
 #pragma once
 
 #include <cassert>
+#include <compare>
 #include <iosfwd>
 #include <stdexcept>
 #include <variant>
@@ -32,6 +33,12 @@ public:
     }
 };
 
+enum class min_encoding_check
+{
+    no,
+    yes
+};
+
 class CScriptNum
 {
     /**
@@ -44,14 +51,15 @@ class CScriptNum
      * arithmetic is done or the result is interpreted as an integer.
      */
 public:
-    static const size_t MAXIMUM_ELEMENT_SIZE = 4;
+    static constexpr size_t MAXIMUM_ELEMENT_SIZE{4};
+    static constexpr size_t INT64_SERIALIZED_SIZE{9};
 
-    CScriptNum():m_value(0){}
-    explicit CScriptNum(const int64_t& n) : m_value(n) {}
-    explicit CScriptNum(const bsv::bint& n) : m_value(n) {}
+    CScriptNum();
+    explicit CScriptNum(const int64_t& n, size_t max_length=MAXIMUM_ELEMENT_SIZE);
+    explicit CScriptNum(const bsv::bint& n, size_t max_length);
     explicit CScriptNum(std::span<const uint8_t>,
-                        bool fRequireMinimal,
-                        const size_t nMaxNumSize = MAXIMUM_ELEMENT_SIZE,
+                        min_encoding_check,
+                        size_t max_length = MAXIMUM_ELEMENT_SIZE,
                         bool big_int = false);
 
     CScriptNum& operator=(int64_t rhs)
@@ -60,17 +68,18 @@ public:
         return *this;
     }
 
+    friend std::strong_ordering operator<=>(const CScriptNum&, const CScriptNum&);
     friend bool operator==(const CScriptNum&, const CScriptNum&);
 
-    friend bool operator<(const CScriptNum&, const CScriptNum&);
-    friend bool operator<(const CScriptNum&, int64_t);
-    friend bool operator<(int64_t, const CScriptNum&);
+    friend auto operator<=>(const CScriptNum&, int64_t);
 
     CScriptNum& operator+=(const CScriptNum&);
     CScriptNum& operator-=(const CScriptNum&);
     CScriptNum& operator*=(const CScriptNum&);
     CScriptNum& operator/=(const CScriptNum&);
     CScriptNum& operator%=(const CScriptNum&);
+	CScriptNum& operator<<=(const CScriptNum&);
+	CScriptNum& operator>>=(const CScriptNum&);
 
     CScriptNum& operator&=(const CScriptNum&);
     CScriptNum& operator&=(int64_t);
@@ -80,59 +89,28 @@ public:
     friend std::ostream& operator<<(std::ostream&, const CScriptNum&);
 
     int getint() const;
+    int64_t getint64() const;
     std::vector<uint8_t> getvch() const;
 
     // Precondition: n <= numeric_limit<int32_t>::max() and n>=0
     size_t to_size_t_limited() const;
+
+    constexpr size_t max_length() const { return m_max_length; }
+    constexpr auto index() const { return m_value.index(); }
 
 private:
     bool equal_index(const CScriptNum&) const;
 
     using value_type = std::variant<int64_t, bsv::bint>;
     value_type m_value;
+    size_t m_max_length;
 };
 
-// Equality operators
-bool operator==(const CScriptNum&, const CScriptNum&);
-inline bool operator!=(const CScriptNum& a, const CScriptNum& b)
+inline auto operator<=>(const CScriptNum& a, int64_t b)
 {
-    return !(a == b);
+    return std::visit([b](const auto& aa) { return aa <=> b; }, a.m_value);
 }
 
-// Relational operators
-bool operator<(const CScriptNum&, const CScriptNum&);
-inline bool operator<(const CScriptNum& a, int64_t b)
-{
-    return std::visit([b](const auto& a) { return a < b; }, a.m_value);
-}
-
-inline bool operator<(int64_t a, const CScriptNum& b)
-{
-    return std::visit([a](const auto& b) { return a < b; }, b.m_value);
-}
-
-inline bool operator>=(const CScriptNum& a, const CScriptNum& b)
-{
-    return !(a < b);
-}
-inline bool operator>(const CScriptNum& a, const CScriptNum& b)
-{
-    return b < a;
-}
-inline bool operator<=(const CScriptNum& a, const CScriptNum& b)
-{
-    return !(b < a);
-}
-
-inline bool operator>=(const CScriptNum& a, int64_t b) { return !(a < b); }
-inline bool operator>(const CScriptNum& a, int64_t b) { return b < a; }
-inline bool operator<=(const CScriptNum& a, int64_t b) { return !(b < a); }
-
-inline bool operator>=(int64_t a, const CScriptNum& b) { return !(a < b); }
-inline bool operator>(int64_t a, const CScriptNum& b) { return b < a; }
-inline bool operator<=(int64_t a, const CScriptNum& b) { return !(b < a); }
-
-// Arithmetic operators
 inline CScriptNum operator+(CScriptNum a, const CScriptNum& b)
 {
     a += b;

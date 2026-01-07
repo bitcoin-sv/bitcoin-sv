@@ -23,7 +23,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
-        self.extra_args = [[],[]]
+        self.extra_args = [[], []]
 
     # Return a set containing chain tip hashes
     def chain_tips_hashes(self, conn):
@@ -34,7 +34,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         return hashes
 
     def wait_for_chain_tips(self, conn, hashes):
-        assert(type(hashes)==type(set())) # hashes parameter must be a set
+        assert isinstance(hashes, set)
         wait_until(lambda: self.chain_tips_hashes(conn) == hashes)
 
     # Return a set containing hashes of all soft rejected blocks
@@ -177,7 +177,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
                     'numblocks': 0
                 })
                 continue
-            raise AssertionError("Unexpected soft rejected block: "+h)
+            raise AssertionError("Unexpected soft rejected block: " + h)
 
         # Reconsider block b2 soft rejected until it has more than 1 descendant on the same chain (decrease number of descendants).
         self.nodes[0].acceptblock(b2_hash, 1)
@@ -700,7 +700,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         # create spendable tx
         tx_spendable = CTransaction()
         tx_spendable.vout = [CTxOut(4500000000, CScript([OP_TRUE]))]
-        tx_hex_funded = self.nodes[0].fundrawtransaction(ToHex(tx_spendable), {'changePosition' : len(tx_spendable.vout)})['hex']
+        tx_hex_funded = self.nodes[0].fundrawtransaction(ToHex(tx_spendable), {'changePosition': len(tx_spendable.vout)})['hex']
         tx_hex = self.nodes[0].signrawtransaction(tx_hex_funded)['hex']
         self.nodes[0].sendrawtransaction(tx_hex, True)
         tx_spendable = FromHex(CTransaction(), tx_hex)
@@ -771,7 +771,7 @@ class SoftRejectedBlocks(BitcoinTestFramework):
         # create spendable tx
         tx_spendable = CTransaction()
         tx_spendable.vout = [CTxOut(4500000000, CScript([OP_TRUE]))]
-        tx_hex_funded = self.nodes[0].fundrawtransaction(ToHex(tx_spendable), {'changePosition' : len(tx_spendable.vout)})['hex']
+        tx_hex_funded = self.nodes[0].fundrawtransaction(ToHex(tx_spendable), {'changePosition': len(tx_spendable.vout)})['hex']
         tx_hex = self.nodes[0].signrawtransaction(tx_hex_funded)['hex']
         self.nodes[0].sendrawtransaction(tx_hex, True)
         tx_spendable = FromHex(CTransaction(), tx_hex)

@@ -10,12 +10,10 @@
 #include <array>
 #include <set>
 
-namespace
+// This test fixture constructs a mempool with a standard set and structure
+// of transactions that will be used by all the snapshot tests.
+struct MemPoolSnapshotTestingSetup : public TestingSetup
 {
-    // This test fixture constructs a mempool with a standard set and structure
-    // of transactions that will be used by all the snapshot tests.
-    struct MemPoolSnapshotTestingSetup : public TestingSetup
-    {
         CTxMemPool testPool;
 
         // Structure of the entries in the test mempool:
@@ -127,8 +125,7 @@ namespace
             nextAmount += baseAmount;
             return nextAmount;
         }
-    };
-}
+};
 
 BOOST_FIXTURE_TEST_SUITE(mempool_snapshot_tests, MemPoolSnapshotTestingSetup)
 

@@ -10,8 +10,8 @@
 const std::string CURRENCY_UNIT = "BSV";
 
 std::string Amount::ToString() const {
-    return strprintf("%d.%08d %s", amount / COIN.GetSatoshis(),
-                     amount % COIN.GetSatoshis(), CURRENCY_UNIT);
+    return strprintf("%d.%08d %s", amount_ / COIN.GetSatoshis(),
+                     amount_ % COIN.GetSatoshis(), CURRENCY_UNIT);
 }
 
 CFeeRate::CFeeRate(const Amount nFeePaid, size_t nBytes_) {

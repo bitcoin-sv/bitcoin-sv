@@ -197,10 +197,10 @@ std::string CRPCTable::help(Config &config, const std::string &strCommand,
 
         jreq.strMethod = strMethod;
         try {
-            JSONRPCRequest jreq;
-            jreq.fHelp = true;
+            JSONRPCRequest json_req;
+            json_req.fHelp = true;
             if (setDone.insert(pcmd).second) {
-                pcmd->call(config, jreq);
+                pcmd->call(config, json_req);
             }
         } catch (const std::exception &e) {
             // Help text is returned in an exception
@@ -245,7 +245,8 @@ static UniValue help(Config &config, const JSONRPCRequest &jsonRequest) {
     return tableRPC.help(config, strCommand, jsonRequest);
 }
 
-static UniValue stop(const Config &config, const JSONRPCRequest &jsonRequest) {
+static UniValue stop(const Config&, const JSONRPCRequest& jsonRequest)
+{
     // Accept the deprecated and ignored 'detach' boolean argument
     if (jsonRequest.fHelp || jsonRequest.params.size() > 1)
         throw std::runtime_error("stop\n"
@@ -259,9 +260,10 @@ static UniValue stop(const Config &config, const JSONRPCRequest &jsonRequest) {
     return "Bitcoin server stopping";
 }
 
-static UniValue uptime(const Config &config,
-                       const JSONRPCRequest &jsonRequest) {
-    if (jsonRequest.fHelp || jsonRequest.params.size() > 1) {
+static UniValue uptime(const Config&, const JSONRPCRequest& jsonRequest)
+{
+    if(jsonRequest.fHelp || jsonRequest.params.size() > 1)
+    {
         throw std::runtime_error("uptime\n"
                                  "\nReturns the total uptime of the server.\n"
                                  "\nResult:\n"
@@ -583,9 +585,7 @@ void RPCRunLater(const std::string &name, std::function<void(void)> func,
     deadlineTimers.erase(name);
     LogPrint(BCLog::RPC, "queue run of timer %s in %i seconds (using %s)\n",
              name, nSeconds, timerInterface->Name());
-    deadlineTimers.emplace(
-        name, std::unique_ptr<RPCTimerBase>(
-                  timerInterface->NewTimer(func, nSeconds * 1000)));
+    deadlineTimers.emplace(name, timerInterface->NewTimer(func, nSeconds * 1'000));
 }
 
 int RPCSerializationFlags() {

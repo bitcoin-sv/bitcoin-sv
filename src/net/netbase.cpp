@@ -27,7 +27,7 @@
 #endif
 
 // Settings
-// NOLINTBEGIN (cppcoreguidelines-avoid-non-const-global-variable)
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variable)
 static proxyType proxyInfo[NET_MAX];
 static proxyType nameProxy;
 static CCriticalSection cs_proxyInfos;
@@ -38,7 +38,7 @@ bool fNameLookup = DEFAULT_NAME_LOOKUP;
 // (milliseconds)
 static const int SOCKS5_RECV_TIMEOUT = 20 * 1000;
 static std::atomic<bool> interruptSocks5Recv(false);
-// NOLINTEND (cppcoreguidelines-avoid-non-const-global-variable)
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variable)
 
 enum Network ParseNetwork(std::string net) {
     boost::to_lower(net);
@@ -88,7 +88,7 @@ static bool LookupIntern(const char *pszName, std::vector<CNetAddr> &vIP,
 
         if (aiTrav->ai_family == AF_INET6) {
             assert(aiTrav->ai_addrlen >= sizeof(sockaddr_in6));
-            // NOLINTNEXTLINE (cppcoreguidelines-pro-type-reinterpret-cast)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
             struct sockaddr_in6 *s6 = reinterpret_cast<sockaddr_in6 *>(aiTrav->ai_addr);
             vIP.push_back(CNetAddr(s6->sin6_addr, s6->sin6_scope_id));
         }
@@ -123,7 +123,7 @@ bool LookupHost(const char *pszName, CNetAddr &addr, bool fAllowLookup) {
 
 bool Lookup(const char *pszName, std::vector<CService> &vAddr, int portDefault,
             bool fAllowLookup, unsigned int nMaxSolutions) {
-    // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     if (pszName[0] == 0) return false;
     int port = portDefault;
     std::string hostname = "";
@@ -157,7 +157,6 @@ CService LookupNumeric(const char *pszName, int portDefault) {
 }
 
 struct timeval MillisToTimeval(int64_t nTimeout) {
-    // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
     struct timeval timeout;
     timeout.tv_sec = nTimeout / 1000;
     timeout.tv_usec = (nTimeout % 1000) * 1000;
@@ -184,10 +183,10 @@ static bool InterruptibleRecv(uint8_t* data, size_t len, int timeout,
     const int64_t maxWait = 1000;
     while (len > 0 && curTime < endTime) {
         // Optimistically try the recv first
-        ssize_t ret = recv(hSocket, reinterpret_cast<char*>(data), len, 0); // NOLINT (cppcoreguidelines-pro-type-reinterpret-cast)
+        ssize_t ret = recv(hSocket, reinterpret_cast<char*>(data), len, 0); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         if (ret > 0) {
             len -= ret;
-            data += ret; // NOLINT (cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            data += ret; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         } else if (ret == 0) {
             // Unexpected disconnection
             return false;
@@ -276,7 +275,7 @@ static bool Socks5(const std::string &strDest, int port,
         CloseSocket(hSocket);
         return error("Error sending to proxy");
     }
-    uint8_t pchRet1[2]; // NOLINT (cppcoreguidelines-avoid-c-arrays)
+    uint8_t pchRet1[2]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     if (!InterruptibleRecv(pchRet1, 2, SOCKS5_RECV_TIMEOUT, hSocket)) {
         CloseSocket(hSocket);
         LogPrint(BCLog::NETCONN, "Socks5() connect to %s:%d failed: InterruptibleRecv() "
@@ -306,7 +305,7 @@ static bool Socks5(const std::string &strDest, int port,
         }
         LogPrint(BCLog::PROXY, "SOCKS5 sending proxy authentication %s:%s\n",
                  auth->username, auth->password);
-        uint8_t pchRetA[2]; // NOLINT (cppcoreguidelines-avoid-c-arrays)
+        uint8_t pchRetA[2]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
         if (!InterruptibleRecv(pchRetA, 2, SOCKS5_RECV_TIMEOUT, hSocket)) {
             CloseSocket(hSocket);
             return error("Error reading proxy authentication response");
@@ -342,7 +341,7 @@ static bool Socks5(const std::string &strDest, int port,
         CloseSocket(hSocket);
         return error("Error sending to proxy");
     }
-    uint8_t pchRet2[4]; // NOLINT (cppcoreguidelines-avoid-c-arrays)
+    uint8_t pchRet2[4]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     if (!InterruptibleRecv(pchRet2, 4, SOCKS5_RECV_TIMEOUT, hSocket)) {
         CloseSocket(hSocket);
         return error("Error reading proxy response");
@@ -362,7 +361,7 @@ static bool Socks5(const std::string &strDest, int port,
         CloseSocket(hSocket);
         return error("Error: malformed proxy response");
     }
-    uint8_t pchRet3[256]; // NOLINT (cppcoreguidelines-avoid-c-arrays)
+    uint8_t pchRet3[256]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     switch (pchRet2[3]) {
         case 0x01:
             ret = InterruptibleRecv(pchRet3, 4, SOCKS5_RECV_TIMEOUT, hSocket);
@@ -555,7 +554,6 @@ static bool ConnectThroughProxy(const proxyType &proxy,
     }
     // do socks negotiation
     if (proxy.randomize_credentials) {
-        // NOLINTNEXTLINE (cppcoreguidelines-pro-type-member-init)
         ProxyCredentials random_auth;
         static std::atomic_int counter;
         random_auth.username = random_auth.password =
@@ -588,7 +586,7 @@ bool ConnectSocket(const CService &addrDest, SOCKET &hSocketRet, int nTimeout,
 bool ConnectSocketByName(CService &addr, SOCKET &hSocketRet,
                          const char *pszDest, int portDefault, int nTimeout,
                          bool *outProxyConnectionFailed) {
-    // NOLINTNEXTLINE (cppcoreguidelines-init-variables)
+    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
     std::string strDest;
     int port = portDefault;
 
@@ -625,7 +623,7 @@ bool LookupSubNet(const char *pszName, CSubNet &ret) {
         CNetAddr network = vIP[0];
         if (slash != strSubnet.npos) {
             std::string strNetmask = strSubnet.substr(slash + 1);
-            // NOLINTNEXTLINE (cppcoreguidelines-init-variables)
+            // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
             int32_t n;
             // IPv4 addresses start at offset 12, and first 12 bytes must match,
             // so just offset n
@@ -665,9 +663,9 @@ std::string NetworkErrorString(int err) {
 }
 #else
 std::string NetworkErrorString(int err) {
-    // NOLINTNEXTLINE (cppcoreguidelines-avoid-c-arrays)
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     char buf[256];
-    // NOLINTNEXTLINE (cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     const char *s = buf;
     buf[0] = 0;
 /* Too bad there are two incompatible implementations of the
@@ -677,7 +675,7 @@ std::string NetworkErrorString(int err) {
     s = strerror_r(err, buf, sizeof(buf));
 #else
     /* POSIX variant always returns message in buffer */
-    if (strerror_r(err, buf, sizeof(buf))) buf[0] = 0; // NOLINT (cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    if (strerror_r(err, buf, sizeof(buf))) buf[0] = 0; // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 #endif
     return strprintf("%s (%d)", s, err);
 }

@@ -10,6 +10,7 @@
 #include "core_io.h"
 #include "merkletreestore.h"
 #include "primitives/transaction.h"
+#include "protocol_era.h"
 #include "rpc/blockchain.h"
 #include "rpc/http_protocol.h"
 #include "rpc/jsonwriter.h"
@@ -20,8 +21,8 @@
 #include "txdb.h"
 #include "txmempool.h"
 #include "utilstrencodings.h"
-#include "validation.h"
 #include "version.h"
+
 #include <boost/algorithm/string.hpp>
 #include <univalue.h>
 
@@ -51,13 +52,26 @@ public:
     }
 };
 
+struct rf_name
+{
+    enum RetFormat rf;
+    const char* name;
+};
+
 } // namespace
+
+static constexpr std::array<rf_name, 4> rf_names = {{
+    {RF_UNDEF, ""},
+    {RF_BINARY, "bin"},
+    {RF_HEX, "hex"},
+    {RF_JSON, "json"},
+}};
 
 extern UniValue mempoolInfoToJSON(const Config& config);
 extern void writeMempoolToJson(CJSONWriter& jWriter, bool fVerbose = false);
 
 static bool RESTERR(HTTPRequest *req, enum HTTPStatusCode status,
-                    std::string message) {
+                    const std::string& message) {
     req->WriteHeader("Content-Type", "text/plain");
     req->WriteReply(status, message + "\r\n");
     return false;
@@ -74,10 +88,10 @@ static enum RetFormat ParseDataFormat(std::string &param,
     param = strReq.substr(0, pos);
     const std::string suff(strReq, pos + 1);
 
-    for (size_t i = 0; i < ARRAYLEN(rf_names); i++) {
-        if (suff == rf_names[i].name) {
-            return rf_names[i].rf;
-        }
+    for(const auto& rf_name : rf_names)
+    {
+        if(suff == rf_name.name)
+            return rf_name.rf;
     }
 
     /* If no suffix is found, return original string.  */
@@ -85,12 +99,15 @@ static enum RetFormat ParseDataFormat(std::string &param,
     return rf_names[0].rf;
 }
 
-static std::string AvailableDataFormatsString() {
+static std::string AvailableDataFormatsString()
+{
     std::string formats = "";
-    for (size_t i = 0; i < ARRAYLEN(rf_names); i++) {
-        if (strlen(rf_names[i].name) > 0) {
+    for(const auto& rf_name : rf_names)
+    {
+        if(strlen(rf_name.name) > 0)
+        {
             formats.append(".");
-            formats.append(rf_names[i].name);
+            formats.append(rf_name.name);
             formats.append(", ");
         }
     }
@@ -123,13 +140,25 @@ static bool CheckWarmup(HTTPRequest *req) {
 
 struct CHeadersData
 {
-    CHeadersData(const CBlockIndex* pblockIndex)
-    : pblockIndex(pblockIndex)
+    CHeadersData(const CBlockIndex* pblockIndex):pblockIndex_(pblockIndex)
     {}
 
-    const CBlockIndex* const pblockIndex;
-    std::optional<uint256> nextBlockHash;
-    std::optional<CDiskBlockMetaData> diskBlockMetaData;
+    const CBlockIndex* GetBlockIndex() const { return pblockIndex_; }
+
+    std::optional<uint256> NextBlockHash() const { return nextBlockHash_; }
+    void NextBlockHash(const std::optional<uint256>& nextBlockHash)
+    { nextBlockHash_ = nextBlockHash; }
+
+    std::optional<CDiskBlockMetaData> DiskBlockMetaData() const
+    { return diskBlockMetaData_; }
+
+    void DiskBlockMetaData(const std::optional<CDiskBlockMetaData>& diskBlockMetaData)
+    { diskBlockMetaData_ = diskBlockMetaData; }
+
+private:
+    const CBlockIndex* pblockIndex_;
+    std::optional<uint256> nextBlockHash_;
+    std::optional<CDiskBlockMetaData> diskBlockMetaData_;
 };
 
 static bool rest_headers(Config &config, HTTPRequest *req,
@@ -141,7 +170,8 @@ static bool rest_headers(Config &config, HTTPRequest *req,
     std::string param;
     const RetFormat rf = ParseDataFormat(param, strURIPart);
     std::vector<std::string> path;
-    boost::split(path, param, boost::is_any_of("/"));
+    boost::split(path, param,
+                 [](const char c) { return c == '/'; });
 
     if (path.size() != 2) {
         return RESTERR(req, HTTP_BAD_REQUEST, "No header count specified. Use "
@@ -181,7 +211,10 @@ static bool rest_headers(Config &config, HTTPRequest *req,
         while (pindex != nullptr && chainActive.Contains(pindex)) {
             auto& hd = headers.emplace_back(pindex);
             CDiskBlockMetaData diskBlockMetaData = pindex->GetDiskBlockMetaData();
-            hd.diskBlockMetaData = diskBlockMetaData.diskDataHash.IsNull() ? std::nullopt : std::optional<CDiskBlockMetaData>{ diskBlockMetaData };
+            hd.DiskBlockMetaData(
+                diskBlockMetaData.diskDataHash.IsNull()
+                    ? std::nullopt
+                    : std::optional<CDiskBlockMetaData>{diskBlockMetaData});
 
             pindex = chainActive.Next(pindex);
 
@@ -189,7 +222,7 @@ static bool rest_headers(Config &config, HTTPRequest *req,
             {
                 // pindex now points to next block.
                 // Store hash of the this block as the next block hash of previous block.
-                hd.nextBlockHash = pindex->GetBlockHash();
+                hd.NextBlockHash(pindex->GetBlockHash());
             }
 
             if (headers.size() == size_t(count))
@@ -201,7 +234,7 @@ static bool rest_headers(Config &config, HTTPRequest *req,
 
     CDataStream ssHeader(SER_NETWORK, PROTOCOL_VERSION);
     for (const CHeadersData& headersData : headers) {
-        ssHeader << headersData.pblockIndex->GetBlockHeader();
+        ssHeader << headersData.GetBlockIndex()->GetBlockHeader();
     }
 
     switch (rf) {
@@ -230,8 +263,8 @@ static bool rest_headers(Config &config, HTTPRequest *req,
                 jWritter.writeBeginObject();
                 if(showExtended)
                 {
-                    CDiskBlockMetaData diskBlockMetaData = headersData.pblockIndex->GetDiskBlockMetaData();
-                    auto reader = headersData.pblockIndex->GetDiskBlockStreamReader(diskBlockMetaData.diskDataHash.IsNull());
+                    CDiskBlockMetaData diskBlockMetaData = headersData.GetBlockIndex()->GetDiskBlockMetaData();
+                    auto reader = headersData.GetBlockIndex()->GetDiskBlockStreamReader(diskBlockMetaData.diskDataHash.IsNull());
                     const CTransaction* coinbaseTx = nullptr;
                     try
                     {
@@ -248,7 +281,7 @@ static bool rest_headers(Config &config, HTTPRequest *req,
                     std::optional<std::vector<uint256>> coinbaseMerkleProof;
                     if(coinbaseTx) // Merkle proof for CB is only needed if we were able to get CB txn
                     {
-                        if(CMerkleTreeRef merkleTree=pMerkleTreeFactory->GetMerkleTree(config, *headersData.pblockIndex, currentChainHeight))
+                        if(CMerkleTreeRef merkleTree=pMerkleTreeFactory->GetMerkleTree(config, *headersData.GetBlockIndex(), currentChainHeight))
                         {
                             coinbaseMerkleProof = merkleTree->GetMerkleProof(0, false).merkleTreeHashes;
                         }
@@ -259,18 +292,18 @@ static bool rest_headers(Config &config, HTTPRequest *req,
                         }
                     }
 
-                    writeBlockHeaderEnhancedJSONFields(jWritter, headersData.pblockIndex, confirmations,
-                        headersData.nextBlockHash,
-                        headersData.diskBlockMetaData,
+                    writeBlockHeaderEnhancedJSONFields(jWritter, headersData.GetBlockIndex(), confirmations,
+                        headersData.NextBlockHash(),
+                        headersData.DiskBlockMetaData(),
                         coinbaseMerkleProof,
                         coinbaseTx,
                         config);
                 }
                 else
                 {
-                    writeBlockHeaderJSONFields(jWritter, headersData.pblockIndex, confirmations,
-                        headersData.nextBlockHash,
-                        headersData.diskBlockMetaData);
+                    writeBlockHeaderJSONFields(jWritter, headersData.GetBlockIndex(), confirmations,
+                        headersData.NextBlockHash(),
+                        headersData.DiskBlockMetaData());
                 }
                 --confirmations;
                 jWritter.writeEndObject();
@@ -333,7 +366,7 @@ static bool rest_block(const Config &config, HTTPRequest *req,
     }
 
     std::optional<uint256> nextBlockHash;
-    int confirmations;
+    int confirmations{};
     {
         LOCK(cs_main);
 
@@ -447,8 +480,10 @@ static bool rest_mempool_info(Config &config, HTTPRequest *req,
     return true;
 }
 
-static bool rest_mempool_contents(Config &config, HTTPRequest *req,
-                                  const std::string &strURIPart) {
+static bool rest_mempool_contents(Config&,
+                                  HTTPRequest* req,
+                                  const std::string& strURIPart)
+{
     if (!CheckWarmup(req)) {
         return false;
     }
@@ -499,8 +534,8 @@ static bool rest_tx(Config &config, HTTPRequest *req,
 
     CTransactionRef tx;
     uint256 hashBlock = uint256();
-    bool isGenesisEnabled;
-    if (!GetTransaction(config, txid, tx, true, hashBlock, isGenesisEnabled)) {
+    ProtocolEra era {};
+    if (!GetTransaction(config, txid, tx, true, hashBlock, era)) {
         return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
     }
 
@@ -527,7 +562,7 @@ static bool rest_tx(Config &config, HTTPRequest *req,
             req->StartWritingChunks(HTTP_OK);
             CHttpTextWriter httpWriter(*req);
             CJSONWriter jWriter(httpWriter, false);
-            TxToJSON(*tx, hashBlock, isGenesisEnabled, 0, jWriter);
+            TxToJSON(*tx, hashBlock, era, 0, jWriter);
             httpWriter.WriteLine();
             httpWriter.Flush();
             req->StopWritingChunks();
@@ -558,7 +593,8 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
     std::vector<std::string> uriParts;
     if (param.length() > 1) {
         std::string strUriParams = param.substr(1);
-        boost::split(uriParts, strUriParams, boost::is_any_of("/"));
+        boost::split(uriParts, strUriParams,
+                     [](const char c) { return c == '/'; });
     }
 
     // throw exception in case of a empty request
@@ -585,10 +621,10 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
 
         for (size_t i = (fCheckMemPool) ? 1 : 0; i < uriParts.size(); i++) {
             uint256 txid;
-            int32_t nOutput;
-            std::string strTxid = uriParts[i].substr(0, uriParts[i].find("-"));
+            int32_t nOutput{};
+            std::string strTxid = uriParts[i].substr(0, uriParts[i].find('-'));
             std::string strOutput =
-                uriParts[i].substr(uriParts[i].find("-") + 1);
+                uriParts[i].substr(uriParts[i].find('-') + 1);
 
             if (!ParseInt32(strOutput, &nOutput) || !IsHex(strTxid)) {
                 return RESTERR(req, HTTP_BAD_REQUEST, "Parse error");
@@ -663,16 +699,16 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
     outs.reserve(vOutPoints.size()); // reserve space for max possible amount of coins
     std::string bitmapStringRepresentation( vOutPoints.size(), '0' );
 
-    auto handleUnspentCoin =
-        [&outs, &bitmapStringRepresentation, &bitmap]
-        (const CoinWithScript& coin, size_t idx)
-        {
-            outs.emplace_back( coin.MakeOwning() );
-            // form a binary string representation (human-readable
-            // for json output)
-            bitmapStringRepresentation[ idx ] = '1';
-            bitmap[idx / 8] |= (1 << (idx % 8));
-        };
+    auto handleUnspentCoin = [&outs,
+                              &bitmapStringRepresentation,
+                              &bitmap](const CoinWithScript& coin, size_t idx)
+    {
+        outs.emplace_back(coin.MakeOwning());
+        // form a binary string representation (human-readable
+        // for json output)
+        bitmapStringRepresentation[idx] = '1';
+        bitmap[idx / 8] |= (1 << (idx % 8));
+    };
 
     if( fCheckMemPool )
     {
@@ -691,7 +727,7 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
             if (auto coin = view.GetCoinWithScript( out );
                 coin.has_value() && !coin->IsSpent())
             {
-                handleUnspentCoin( std::move( coin.value() ), idx );
+                handleUnspentCoin(coin.value(), idx );
             }
 
             ++idx;
@@ -748,7 +784,7 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
                 // include the script in a json output
                 UniValue o(UniValue::VOBJ);
                 int32_t height = (coin.GetHeight() == MEMPOOL_HEIGHT) ? (chainActive.Height() + 1) : coin.GetHeight();
-                ScriptPubKeyToUniv(coin.GetScriptPubKey(), true, IsGenesisEnabled(config, height), o);
+                ScriptPubKeyToUniv(coin.GetScriptPubKey(), true, GetProtocolEra(config.GetConfigScriptPolicy(), height), o);
                 utxo.push_back(Pair("scriptPubKey", o));
                 utxos.push_back(utxo);
             }
@@ -772,11 +808,18 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
     return true;
 }
 
-static const struct {
-    const char *prefix;
-    bool (*handler)(Config &config, HTTPRequest *req,
-                    const std::string &strReq);
-} uri_prefixes[] = {
+namespace
+{
+    struct prefix_handler
+    {
+        const char *prefix;
+        bool (*handler)(Config&,
+                        HTTPRequest*,
+                        const std::string& req);
+    };
+}
+
+static const std::array<prefix_handler, 9> uri_prefixes = {{
     {"/rest/tx/", rest_tx},
     {"/rest/block/notxdetails/", rest_block_notxdetails},
     {"/rest/block/", rest_block_extended},
@@ -786,21 +829,20 @@ static const struct {
     {"/rest/headers/extended/", rest_headers_extended},
     {"/rest/headers/", rest_headers_not_extended},
     {"/rest/getutxos", rest_getutxos},
-};
+}};
 
-bool StartREST() {
-    for (size_t i = 0; i < ARRAYLEN(uri_prefixes); i++) {
-        RegisterHTTPHandler(uri_prefixes[i].prefix, false,
-                            uri_prefixes[i].handler);
-    }
+bool StartREST()
+{
+    for(const auto& uri_prefix : uri_prefixes)
+        RegisterHTTPHandler(uri_prefix.prefix, false, uri_prefix.handler);
 
     return true;
 }
 
 void InterruptREST() {}
 
-void StopREST() {
-    for (size_t i = 0; i < ARRAYLEN(uri_prefixes); i++) {
-        UnregisterHTTPHandler(uri_prefixes[i].prefix, false);
-    }
+void StopREST()
+{
+    for(const auto& uri_prefix : uri_prefixes)
+        UnregisterHTTPHandler(uri_prefix.prefix, false);
 }

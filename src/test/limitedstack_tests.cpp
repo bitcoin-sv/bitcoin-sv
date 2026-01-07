@@ -263,4 +263,45 @@ BOOST_AUTO_TEST_CASE(limitedvector_padright_test) {
     }
 }
 
+BOOST_AUTO_TEST_CASE(limitedvector_shrink_tests)
+{
+    using namespace std;
+
+    using test_args = tuple<int,              // start
+                            int,              // len
+                            vector<uint8_t>>; // expected remainder
+    const vector<test_args> test_data{
+                                        {0, 0, {}},
+                                        {0, 1, {0}},
+                                        {0, 2, {0, 1}},
+                                        {0, 3, {0, 1, 2}},
+                                        {0, 4, {0, 1, 2}},
+
+                                        {1, 0, {}},
+                                        {1, 1, {1}},
+                                        {1, 2, {1, 2}},
+                                        {1, 3, {0, 1, 2}},
+        
+                                        {2, 0, {}},
+                                        {2, 1, {2}},
+                                        {2, 2, {0, 1, 2}},
+
+                                        {3, 0, {}},
+                                        {3, 1, {0, 1, 2}},
+
+                                        {-1, 1, {0, 1, 2}},
+                                        {1, -1, {0, 1, 2}}
+                                     };
+    for(const auto& [start, len, exp ] : test_data)
+    {
+        const auto max_stack_size{42};
+        LimitedStack stack{max_stack_size};
+        stack.push_back({0, 1, 2});
+        LimitedVector& v = stack.stacktop(-1);
+        v.shrink(start, len);
+        BOOST_CHECK_EQUAL_COLLECTIONS(exp.begin(), exp.end(),
+                                      v.begin(), v.end());
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

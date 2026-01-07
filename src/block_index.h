@@ -28,7 +28,6 @@ class CBlockStreamReader;
  * Maximum amount of time that a block timestamp is allowed to exceed the
  * current network-adjusted time before the block will be accepted.
  */
-// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const int64_t MAX_FUTURE_BLOCK_TIME = 2 * 60 * 60;
 
 /**
@@ -517,7 +516,7 @@ public:
     void SetDiskBlockData(
         size_t transactionsCount,
         const CDiskBlockPos& pos,
-        CDiskBlockMetaData metaData,
+        const CDiskBlockMetaData& metaData,
         const CBlockSource& source,
         DirtyBlockIndexStore& notifyDirty)
     {
@@ -533,8 +532,7 @@ public:
 
         if (!metaData.diskDataHash.IsNull() && metaData.diskDataSize)
         {
-            // NOLINTNEXTLINE(performance-move-const-arg)
-            mDiskBlockMetaData = std::move(metaData);
+            mDiskBlockMetaData = metaData;
             nStatus = nStatus.withDiskBlockMetaData();
         }
 

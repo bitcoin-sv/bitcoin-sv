@@ -3,11 +3,13 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "zmqnotificationinterface.h"
-#include "zmqpublishnotifier.h"
-#include "zmq_publisher.h"
-#include "streams.h"
+
 #include "util.h"
 #include "validation.h"
+#include "zmqpublishnotifier.h"
+#include "zmq_publisher.h"
+
+#include <memory>
 
 void zmqError(const char *str) {
     LogPrint(BCLog::ZMQ, "zmq: Error: %s, errno=%s\n", str,
@@ -49,8 +51,8 @@ void CZMQNotificationInterface::UnregisterValidationInterface()
     slotConnections.clear();
 }
 
-CZMQNotificationInterface *CZMQNotificationInterface::Create() {
-    CZMQNotificationInterface *notificationInterface = nullptr;
+std::unique_ptr<CZMQNotificationInterface> CZMQNotificationInterface::Create()
+{
     std::map<std::string, CZMQNotifierFactory> factories;
     std::list<CZMQAbstractNotifier *> notifiers;
 
@@ -90,15 +92,15 @@ CZMQNotificationInterface *CZMQNotificationInterface::Create() {
             notifiers.push_back(notifier);
         }
     }
-
-    if (!notifiers.empty()) {
-        notificationInterface = new CZMQNotificationInterface();
+    
+    std::unique_ptr<CZMQNotificationInterface> notificationInterface;
+    if(!notifiers.empty())
+    {
+        notificationInterface = std::make_unique<CZMQNotificationInterface>();
         notificationInterface->notifiers = notifiers;
 
-        if (!notificationInterface->Initialize()) {
-            delete notificationInterface;
-            notificationInterface = nullptr;
-        }
+        if(!notificationInterface->Initialize())
+            notificationInterface.reset();
     }
 
     return notificationInterface;
@@ -288,10 +290,12 @@ void CZMQNotificationInterface::TransactionAdded(const CTransactionRef& ptx)
 }
 
 void CZMQNotificationInterface::BlockConnected(
-    const std::shared_ptr<const CBlock> &pblock,
-    const CBlockIndex *pindexConnected,
-    const std::vector<CTransactionRef> &vtxConflicted) {
-    for (const CTransactionRef &ptx : pblock->vtx) {
+    const std::shared_ptr<const CBlock>& pblock,
+    const CBlockIndex*,
+    const std::vector<CTransactionRef>&)
+{
+    for(const CTransactionRef& ptx : pblock->vtx)
+    {
         // Do a normal notify for each transaction added in the block
         TransactionAddedToMempool(ptx);
     }

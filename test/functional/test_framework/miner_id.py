@@ -18,7 +18,7 @@ from pathlib import Path
 from bip32utils import BIP32Key
 from io import BytesIO
 from .mininode import sha256, hex_str_to_bytes, bytes_to_hex_str, ser_uint256, COutPoint, ToHex, CTransaction
-from .script import SignatureHashForkId, CScript, SIGHASH_ALL, SIGHASH_FORKID, OP_0, OP_FALSE, OP_TRUE, OP_RETURN, CTxOut
+from .script import SignatureHash, CScript, SIGHASH_ALL, SIGHASH_FORKID, OP_0, OP_FALSE, OP_RETURN, CTxOut
 from .util import hashToHex, satoshi_round, assert_equal
 from .blocktools import create_coinbase, create_block
 import copy
@@ -38,14 +38,26 @@ class MinerIdKeys:
         self._signingKey = ecdsa.SigningKey.from_string(self._privateKeyBinary, curve=self._curve)
         self._verifyingKey = self._signingKey.get_verifying_key().to_string("compressed")
 
-    def privateKey(self): return self._privateKey
-    def signingKey(self): return self._signingKey
-    def verifyingKey(self): return self._verifyingKey
-    def verifyingKeyHex(self): return bytes_to_hex_str(self._verifyingKey)
-    def publicKeyBytes(self): return self._publicKey
-    def publicKeyHex(self): return bytes_to_hex_str(self._publicKey)
-    def verifyingKeyHex(self): return bytes_to_hex_str(self._verifyingKey)
-    def signingKeyHex(self): return bytes_to_hex_str(self._signingKey.to_string())
+    def privateKey(self):
+        return self._privateKey
+
+    def signingKey(self):
+        return self._signingKey
+
+    def verifyingKey(self):
+        return self._verifyingKey
+
+    def verifyingKeyHex(self):
+        return bytes_to_hex_str(self._verifyingKey)
+
+    def publicKeyBytes(self):
+        return self._publicKey
+
+    def publicKeyHex(self):
+        return bytes_to_hex_str(self._publicKey)
+
+    def signingKeyHex(self):
+        return bytes_to_hex_str(self._signingKey.to_string())
 
     def store_keys(self, tmpdir, nodenum):
         datapath = tmpdir + "/node{}/regtest".format(nodenum)
@@ -76,14 +88,14 @@ class MinerIdKeys:
                 break
         return signedMessage
 
-    def sign_tx_BIP143_with_forkid (self, tx_to_sign, txns_to_spend):
+    def sign_tx_BIP143_with_forkid(self, tx_to_sign, txns_to_spend):
         # txns_to_send is a dictionary of txid, tx pairs
         for i, vin in enumerate(tx_to_sign.vin):
             n = vin.prevout.n
             t = txns_to_spend[hashToHex(vin.prevout.hash)]
             p = t.vout[n].scriptPubKey
             a = t.vout[n].nValue
-            sighash = SignatureHashForkId(p, tx_to_sign, i, SIGHASH_ALL | SIGHASH_FORKID, a)
+            sighash = SignatureHash(p, tx_to_sign, i, SIGHASH_ALL | SIGHASH_FORKID, a)
             signature = self.signingKey().sign_digest_deterministic(sighash, sigencode=ecdsa.util.sigencode_der)
             vin.scriptSig = CScript([signature + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID])), self.publicKeyBytes()])
 
@@ -133,16 +145,16 @@ def create_miner_info_scriptPubKey(params, json_override_string=None):
         infoDoc['extensions'] = extensions
 
     # Convert dictionary to json string
-    if json_override_string != None:
+    if json_override_string is not None:
         infoDocJson = json_override_string
     else:
         infoDocJson = json.dumps(infoDoc, indent=0)
     infoDocJson = infoDocJson.replace('\n', '')
-    infoDocJson = infoDocJson.replace(' ','')
+    infoDocJson = infoDocJson.replace(' ', '')
     infoDocJson = infoDocJson.encode('utf8')
     infoDocJsonSig = minerKeys.sign_strmessage_bytes(infoDocJson)
 
-    return CScript([OP_0, OP_RETURN, bytearray([0x60, 0x1d, 0xfa, 0xce]),bytearray([0x00]), infoDocJson, infoDocJsonSig])
+    return CScript([OP_0, OP_RETURN, bytearray([0x60, 0x1d, 0xfa, 0xce]), bytearray([0x00]), infoDocJson, infoDocJsonSig])
 
 
 # Create a miner-info transaction containing the miner ID document
@@ -187,7 +199,7 @@ def create_dataref_txn(connection, dataref_json, utxo):
     # Add dataref json to output 0 of transaction
     docjson = json.dumps(dataref_json, indent=0)
     docjson = docjson.replace('\n', '')
-    docjson = docjson.replace(' ','')
+    docjson = docjson.replace(' ', '')
     docjson = docjson.encode('utf8')
     datarefTx.vout.append(CTxOut(0, CScript([OP_FALSE, OP_RETURN, bytearray([0x60, 0x1d, 0xfa, 0xce]), docjson])))
     datarefTx.vout[0], datarefTx.vout[1] = datarefTx.vout[1], datarefTx.vout[0]
@@ -201,7 +213,7 @@ def create_dataref_txn(connection, dataref_json, utxo):
     return datarefTx
 
 
-def create_dataref (brfcIds, txid, vout, compress=None):
+def create_dataref(brfcIds, txid, vout, compress=None):
 
     dataref = {
         'brfcIds': brfcIds,

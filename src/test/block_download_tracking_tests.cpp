@@ -1,23 +1,17 @@
 // Copyright (c) 2020 Bitcoin Association.
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include <consensus/validation.h>
-#include <config.h>
-#include <net/block_download_tracker.h>
-#include <net/net.h>
-#include <test/test_bitcoin.h>
+#include "config.h"
+#include "consensus/validation.h"
+#include "net/block_download_tracker.h"
+#include "net/net.h"
+#include "test/test_bitcoin.h"
+#include "test/testutil.h"
 
 #include <boost/test/unit_test.hpp>
 
 namespace
 {
-    CService ip(uint32_t i)
-    {
-        struct in_addr s;
-        s.s_addr = i;
-        return CService(CNetAddr(s), Params().GetDefaultPort());
-    }
-
     CNodePtr MakeDummyNode(const CAddress& dummyAddr, CConnman::CAsyncTaskPool& taskPool)
     {
         static NodeId id {1};
@@ -179,16 +173,16 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
         BOOST_CHECK_THROW(blockTracker.GetBlockDetails({blockID, pDummyNode3->id}), std::runtime_error);
         // But we will from node2
         BOOST_CHECK_NO_THROW(
-            auto blockDetails { blockTracker.GetBlockDetails({blockID, pDummyNode2->id}) };
-            BOOST_CHECK_EQUAL(blockDetails.block.GetNode(), pDummyNode2->id);
-            BOOST_CHECK(blockDetails.queuedBlockIt->partialBlock != nullptr);
+            auto block_details { blockTracker.GetBlockDetails({blockID, pDummyNode2->id}) };
+            BOOST_CHECK_EQUAL(block_details.block.GetNode(), pDummyNode2->id);
+            BOOST_CHECK(block_details.queuedBlockIt->partialBlock != nullptr);
         );
         // Will also find it from node1
         BOOST_CHECK_NO_THROW(
-            auto blockDetails = blockTracker.GetBlockDetails({blockID, pDummyNode1->id});
-            BOOST_CHECK_EQUAL(blockDetails.block.GetNode(), pDummyNode1->id);
+            auto block_details = blockTracker.GetBlockDetails({blockID, pDummyNode1->id});
+            BOOST_CHECK_EQUAL(block_details.block.GetNode(), pDummyNode1->id);
             // Node1 has null partial block however
-            BOOST_CHECK(blockDetails.queuedBlockIt->partialBlock == nullptr);
+            BOOST_CHECK(block_details.queuedBlockIt->partialBlock == nullptr);
         );
     }
 

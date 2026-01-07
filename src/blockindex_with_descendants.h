@@ -27,10 +27,8 @@ public:
         /**
          * Constructor creates an item that has no parent and no children.
          */
-        Item(CBlockIndex* blockIndex)
-        : blockIndex(blockIndex)
-        , parent(nullptr)
-        , children()
+        Item(CBlockIndex* block_index)
+        : blockIndex{block_index}
         {}
 
         /**
@@ -136,15 +134,15 @@ public:
 
     private:
         CBlockIndex* blockIndex;
-        const Item* parent;
-        prevector<1, const Item*> children; // prevector is used to reduce number of small heap allocations since most blocks have only one child
+        const Item* parent{nullptr};
+        prevector<1, const Item*> children{}; // prevector is used to reduce number of small heap allocations since most blocks have only one child
     };
 
     /**
      * Construct object containing a tree of all descendants for given block.
      *
      * @param blockIndex Root block in a tree.
-     * @param mapBlockIndex Container with pointers to CBlockIndex objects.
+     * @param block_indices Container with pointers to CBlockIndex objects.
      *                      All CBlockIndex objects in this container must have member nHeight set to correct value.
      *                      In addition, all objects higher than blockIndex must have pprev properly set to either
      *                      nullptr or its parent, which must also be present in container.
@@ -153,17 +151,17 @@ public:
      * @param maxHeight Descendants whose height is larger than this are not added to tree. This can be
      *                  used to avoid searching for and storing descendants that are not needed.
      */
-    // NOTE: Implementation iterates over all elements in array mapBlockIndex to find descendants.
+    // NOTE: Implementation iterates over all elements in array block_indices to find descendants.
     //       This is not scalable, but is probably fine as long as number of blocks is not really big.
     //       This class is only used for updating the soft rejection status of blocks, which are normally
     //       near the chain tip (small number of descendants) and we also don't expect this to be done very often.
     template<class TMapBlockIndex>
-    BlockIndexWithDescendants(CBlockIndex* blockIndex, const TMapBlockIndex& mapBlockIndex, std::int32_t maxHeight)
+    BlockIndexWithDescendants(CBlockIndex* blockIndex, const TMapBlockIndex& block_indices, std::int32_t maxHeight)
     : blocks( {blockIndex} ) // Item for block for which we need descendants is the root of the tree
     {
         // Find and store all blocks with larger height than given block up to maxHeight.
         // These blocks could be descendants or they could be on a different chain.
-        mapBlockIndex.ForEach(
+        block_indices.ForEach(
         [&](const CBlockIndex& index)
         {
             if(index.GetHeight() > blockIndex->GetHeight() &&

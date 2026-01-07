@@ -23,12 +23,11 @@ template <typename T> struct secure_allocator : public std::allocator<T> {
     template <typename U>
     secure_allocator(const secure_allocator<U> &a) throw() : base(a) {}
     ~secure_allocator() throw() {}
-    // NOLINTNEXTLINE(bugprone-reserved-identifier)
-    template <typename _Other> struct rebind {
-        typedef secure_allocator<_Other> other;
+    template <typename Other> struct rebind {
+        typedef secure_allocator<Other> other;
     };
 
-    T *allocate(std::size_t n, const void *hint = 0) {
+    T *allocate(std::size_t n, const void* /*hint*/ = 0) {
         return static_cast<T *>(
             LockedPoolManager::Instance().alloc(sizeof(T) * n));
     }

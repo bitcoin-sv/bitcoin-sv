@@ -13,16 +13,19 @@
 #include "rpc/mining.h"
 #include "script/instruction_iterator.h"
 #include "txn_validator.h"
+#include "test/testutil.h"
 
 #include "test/test_bitcoin.h"
 
+#include <array>
 #include <boost/test/unit_test.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <crypto/sha256.h>
 
 namespace
 {
     // Initial number of blocks to create
-    constexpr size_t INITIAL_NUM_BLOCKS { 100 + 1 + 10 };
+    constexpr size_t MINERID_DB_INITIAL_NUM_BLOCKS { 100 + 1 + 10 };
     // Miner ID protocol prefix
     const std::vector<uint8_t> ProtocolPrefix { 0xac, 0x1e, 0xed, 0x88 };
 
@@ -60,8 +63,10 @@ namespace
         transform_hex(minerIdPubKey, back_inserter(dataToSign));
         transform_hex(vctxid, back_inserter(dataToSign));
 
-        uint8_t hashPrevSignature[CSHA256::OUTPUT_SIZE] {};
-        CSHA256().Write(reinterpret_cast<const uint8_t*>(&dataToSign[0]), dataToSign.size()).Finalize(hashPrevSignature);
+        std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashPrevSignature{};
+        CSHA256()
+            .Write(reinterpret_cast<const uint8_t*>(dataToSign.data()), dataToSign.size())
+            .Finalize(hashPrevSignature);
         std::vector<uint8_t> prevMinerIdSignature {};
         BOOST_CHECK(prevMinerIdKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashPrevSignature), std::end(hashPrevSignature)}), prevMinerIdSignature));
         return HexStr(prevMinerIdSignature);
@@ -72,8 +77,10 @@ namespace
     {
         std::string document { coinbaseDocument.write() };
         std::vector<uint8_t> documentBytes { document.begin(), document.end() };
-        uint8_t hashSignature[CSHA256::OUTPUT_SIZE] {};
-        CSHA256().Write(documentBytes.data(), documentBytes.size()).Finalize(hashSignature);
+        std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashSignature{};
+        CSHA256()
+            .Write(documentBytes.data(), documentBytes.size())
+            .Finalize(hashSignature);
         std::vector<uint8_t> signature {};
         BOOST_CHECK(minerIdKey.Sign(uint256(std::vector<uint8_t> {std::begin(hashSignature), std::end(hashSignature)}), signature));
         return signature;
@@ -129,11 +136,12 @@ namespace
 
         return document;
     }
+}
 
-    // Testing fixture that creates a REGTEST-mode block chain with minerIDs
-    struct SetupMinerIDChain : public TestChain100Setup
-    {
-        SetupMinerIDChain() : TestChain100Setup{}
+// Testing fixture that creates a REGTEST-mode block chain with minerIDs
+struct SetupMinerIDDBChain : public TestChain100Setup
+{
+        SetupMinerIDDBChain() : TestChain100Setup{}
         {
             // Create dataref index
             int64_t nMerkleTreeIndexDBCache = 10; // MB
@@ -209,7 +217,7 @@ namespace
             forkBlockId = forkBlock.GetHash();
         }
 
-        ~SetupMinerIDChain()
+        ~SetupMinerIDDBChain()
         {
             g_dataRefIndex.reset();
             pMerkleTreeFactory.reset();
@@ -232,14 +240,17 @@ namespace
             }
 
             // Build and submit txn to mempool
-            auto SubmitTxn = [this](const CTransaction& fundTxn, const std::string& dataRefJson)
+            auto SubmitTxn = [this](const CTransaction& fundTxn, const std::string& dataref_json)
             {
                 CMutableTransaction txn {};
                 txn.vin.resize(1);
                 txn.vin[0].prevout = COutPoint { fundTxn.GetId(), 0 };
                 txn.vout.resize(1);
                 txn.vout[0].nValue = Amount{1000};
-                txn.vout[0].scriptPubKey = CScript() << OP_FALSE << OP_RETURN << ProtocolPrefix << std::vector<uint8_t> { dataRefJson.begin(), dataRefJson.end() };
+                txn.vout[0].scriptPubKey = CScript()
+                                           << OP_FALSE << OP_RETURN << ProtocolPrefix
+                                           << std::vector<uint8_t>{dataref_json.begin(),
+                                                                   dataref_json.end()};
 
                 // Sign
                 std::vector<uint8_t> vchSig {};
@@ -305,6 +316,7 @@ namespace
             {
                 // Update coinbase to include miner ID
                 CMutableTransaction txCoinbase { *(block.vtx[0]) };
+                assert(signature);
                 CreateMinerIDInTxn(*baseDocument, *signature, txCoinbase, invalid);
                 block.vtx[0] = MakeTransactionRef(std::move(txCoinbase));
                 block.hashMerkleRoot = BlockMerkleRoot(block);
@@ -341,29 +353,12 @@ namespace
         // Transactions containing dataRefs
         std::vector<CTransactionRef> dataRefTxns {};
         std::vector<std::string> dataRefTxnBrfcIds { "BrfcId1", "BrfcId2" };
-    };
+};
 
+namespace
+{
     // For ID only
     class miner_id_tests_id;
-
-    // RAII class to instantiate global miner ID database
-    class MakeGlobalMinerIdDb
-    {
-      public:
-        MakeGlobalMinerIdDb()
-        {
-            g_minerIDs = std::make_unique<MinerIdDatabase>(GlobalConfig::GetConfig());
-        }
-        ~MakeGlobalMinerIdDb()
-        {
-            g_minerIDs.reset();
-        }
-
-        MakeGlobalMinerIdDb(const MakeGlobalMinerIdDb&) = delete;
-        MakeGlobalMinerIdDb(MakeGlobalMinerIdDb&&) = delete;
-        MakeGlobalMinerIdDb& operator=(const MakeGlobalMinerIdDb&) = delete;
-        MakeGlobalMinerIdDb& operator=(MakeGlobalMinerIdDb&&) = delete;
-    };
 }
 
 // MinerIdDatabase class inspection
@@ -395,17 +390,17 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests_id>
 
     static MinerId GetLatestMinerIdByName(
         const MinerIdDatabase& db,
-        BlockIndexStore& mapBlockIndex,
+        BlockIndexStore& block_index_store,
         const std::string& name)
     {
         // Fetch from latest block from named miner
-        const auto& entry { GetMinerUUIdEntryByName(db, mapBlockIndex, name) };
-        CBlockIndex* blockindex { mapBlockIndex.Get(entry.second.mLastBlock) };
+        const auto& entry { GetMinerUUIdEntryByName(db, block_index_store, name) };
+        CBlockIndex* blockindex { block_index_store.Get(entry.second.mLastBlock) };
         BOOST_REQUIRE(blockindex);
         CBlock block {};
         BOOST_REQUIRE(blockindex->ReadBlockFromDisk(block, GlobalConfig::GetConfig()));
         std::optional<MinerId> minerId { FindMinerId(block, blockindex->GetHeight()) };
-        BOOST_REQUIRE(minerId);
+        assert(minerId);
         return *minerId;
     }
 
@@ -416,13 +411,13 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests_id>
 
     static const MinerIdDatabase::MinerUUIdMap::value_type GetMinerUUIdEntryByName(
         const MinerIdDatabase& db,
-        BlockIndexStore& mapBlockIndex,
+        BlockIndexStore& block_index_store,
         const std::string& name)
     {
         for(const auto& entry : db.GetAllMinerUUIdsNL())
         {
             // Lookup last block we saw from this miner and extract the miner ID JSON
-            CBlockIndex* blockindex { mapBlockIndex.Get(entry.second.mLastBlock) };
+            CBlockIndex* blockindex { block_index_store.Get(entry.second.mLastBlock) };
             BOOST_REQUIRE(blockindex);
             auto blockReader { blockindex->GetDiskBlockStreamReader() };
             const CTransaction& coinbase { blockReader->ReadTransaction() };
@@ -451,11 +446,11 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests_id>
 
     static const std::vector<MinerIdDatabase::MinerIdEntry> GetMinerIdsForMinerByName(
         const MinerIdDatabase& db,
-        BlockIndexStore& mapBlockIndex,
+        BlockIndexStore& block_index_store,
         const std::string& name)
     {
         // Get UUID for named miner
-        const MinerIdDatabase::MinerUUId& miner { GetMinerUUIdEntryByName(db, mapBlockIndex, name).first };
+        const MinerIdDatabase::MinerUUId& miner { GetMinerUUIdEntryByName(db, block_index_store, name).first };
 
         // Get all miner IDs for this miner
         return db.GetMinerIdsForMinerNL(miner);
@@ -463,11 +458,11 @@ struct MinerIdDatabase::UnitTestAccess<miner_id_tests_id>
 
     static size_t GetNumRecentBlocksForMinerByName(
         const MinerIdDatabase& db,
-        BlockIndexStore& mapBlockIndex,
+        BlockIndexStore& block_index_store,
         const std::string& name)
     {
         // Get UUID for named miner
-        const MinerIdDatabase::MinerUUId& miner { GetMinerUUIdEntryByName(db, mapBlockIndex, name).first };
+        const MinerIdDatabase::MinerUUId& miner { GetMinerUUIdEntryByName(db, block_index_store, name).first };
 
         // Get number of recent blocks from this miner
         return db.GetNumRecentBlocksForMinerNL(miner);
@@ -499,7 +494,7 @@ using UnitTestAccess = MinerIdDatabase::UnitTestAccess<miner_id_tests_id>;
 BOOST_AUTO_TEST_SUITE(miner_id_db)
 
 // Test initial create of miner ID database from an existing blockchain, and saving/restoring from disk
-BOOST_FIXTURE_TEST_CASE(InitialiseFromExistingChain, SetupMinerIDChain)
+BOOST_FIXTURE_TEST_CASE(InitialiseFromExistingChain, SetupMinerIDDBChain)
 {
     // Set M/N in config
     GlobalConfig::GetModifiableGlobalConfig().SetMinerIdReputationM(3, nullptr);
@@ -507,7 +502,7 @@ BOOST_FIXTURE_TEST_CASE(InitialiseFromExistingChain, SetupMinerIDChain)
 
     // Check we've got the expected number of blocks
     CBlockIndex* tip { chainActive.Tip() };
-    BOOST_CHECK_EQUAL(tip->GetHeight(), static_cast<int32_t>(INITIAL_NUM_BLOCKS));
+    BOOST_CHECK_EQUAL(tip->GetHeight(), static_cast<int32_t>(MINERID_DB_INITIAL_NUM_BLOCKS));
 
     // Check miner ID db contains the expected miner details
     auto dbCheckLambda = [this](const MinerIdDatabase& minerid_db)
@@ -599,7 +594,7 @@ BOOST_FIXTURE_TEST_CASE(InitialiseFromExistingChain, SetupMinerIDChain)
 }
 
 // Test updates to the miner ID database after updates to the chain
-BOOST_FIXTURE_TEST_CASE(UpdatesToBlockchain, SetupMinerIDChain)
+BOOST_FIXTURE_TEST_CASE(UpdatesToBlockchain, SetupMinerIDDBChain)
 {
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
@@ -671,7 +666,7 @@ BOOST_FIXTURE_TEST_CASE(UpdatesToBlockchain, SetupMinerIDChain)
 }
 
 // Test miner ID key rotation
-BOOST_FIXTURE_TEST_CASE(KeyRotation, SetupMinerIDChain)
+BOOST_FIXTURE_TEST_CASE(KeyRotation, SetupMinerIDDBChain)
 {
     // Create global miner ID database into which updates will be applied
     MakeGlobalMinerIdDb makedb {};
@@ -750,7 +745,7 @@ BOOST_FIXTURE_TEST_CASE(KeyRotation, SetupMinerIDChain)
 }
 
 // Test recent blocks tracking and expiry
-BOOST_FIXTURE_TEST_CASE(RecentBlocksTracking, SetupMinerIDChain)
+BOOST_FIXTURE_TEST_CASE(RecentBlocksTracking, SetupMinerIDDBChain)
 {
     // Increase speed of test by reducing the number of blocks we will need to mine
     GlobalConfig::GetModifiableGlobalConfig().SetMinerIdReputationN(200, nullptr);
@@ -766,7 +761,7 @@ BOOST_FIXTURE_TEST_CASE(RecentBlocksTracking, SetupMinerIDChain)
     BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner1"), 3U);
     BOOST_CHECK_EQUAL(UnitTestAccess::GetNumRecentBlocksForMinerByName(minerid_db, mapBlockIndex, "Miner2"), 1U);
     auto blocksList { UnitTestAccess::GetRecentBlocksOrderedByHeight(minerid_db) };
-    size_t blockListStartSize { INITIAL_NUM_BLOCKS + 1 };   // Mined blocks + Genesis
+    size_t blockListStartSize { MINERID_DB_INITIAL_NUM_BLOCKS + 1 };   // Mined blocks + Genesis
     BOOST_REQUIRE_EQUAL(blocksList.size(), blockListStartSize);
     BOOST_CHECK_EQUAL(blocksList[0].mHeight, 0);
     BOOST_CHECK_EQUAL(blocksList[blockListStartSize - 1].mHeight, static_cast<int32_t>(blockListStartSize - 1));
@@ -827,7 +822,7 @@ BOOST_FIXTURE_TEST_CASE(RecentBlocksTracking, SetupMinerIDChain)
 }
 
 // Test processing of an invalid block
-BOOST_FIXTURE_TEST_CASE(InvalidBlock, SetupMinerIDChain)
+BOOST_FIXTURE_TEST_CASE(InvalidBlock, SetupMinerIDDBChain)
 {
     // Set M/N in config
     GlobalConfig::GetModifiableGlobalConfig().SetMinerIdReputationM(3, nullptr);

@@ -11,7 +11,7 @@ Currently:
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
-from test_framework.cdefs import LEGACY_MAX_BLOCK_SIZE, UINT32_MAX, ONE_MEGABYTE
+from test_framework.cdefs import LEGACY_MAX_BLOCK_SIZE, UINT32_MAX
 
 
 class ABC_CmdLine_Test (BitcoinTestFramework):

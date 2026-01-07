@@ -8,12 +8,15 @@
 #include "block_file_access.h"
 #include "block_file_info.h"
 #include "config.h"
-#include "util.h"
-#include "txdb.h"  // CBlockTreeDB
 #include "consensus/validation.h" // CValidationState
+#include "txdb.h"  // CBlockTreeDB
+
+#include <algorithm>
 
 /** Access to info about block files */
-std::unique_ptr<CBlockFileInfoStore> pBlockFileInfoStore = std::make_unique<CBlockFileInfoStore>();
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+std::unique_ptr<CBlockFileInfoStore> pBlockFileInfoStore = // NOLINT(cert-err58-cpp)
+    std::make_unique<CBlockFileInfoStore>();
 
 void CBlockFileInfoStore::FindNextFileWithEnoughEmptySpace(const Config &config,
     uint64_t nAddSize, unsigned int& nFile)
@@ -40,17 +43,17 @@ void CBlockFileInfoStore::FlushBlockFile(bool fFinalize) {
 
     if ( !vinfoBlockFile.empty() )
     {
-        assert( nLastBlockFile >= 0 );
-        assert( vinfoBlockFile.size() > static_cast<std::size_t>(nLastBlockFile) );
+        assert( nLastBlockFile_ >= 0 );
+        assert( vinfoBlockFile.size() > static_cast<std::size_t>(nLastBlockFile_) );
 
         BlockFileAccess::FlushBlockFile(
-            nLastBlockFile,
-            vinfoBlockFile[nLastBlockFile],
+            nLastBlockFile_,
+            vinfoBlockFile[nLastBlockFile_],
             fFinalize );
     }
     else
     {
-        assert( nLastBlockFile == 0 );
+        assert( nLastBlockFile_ == 0 );
     }
 }
 
@@ -73,7 +76,7 @@ bool CBlockFileInfoStore::FindBlockPos(const Config &config, CValidationState &s
     uint64_t nTime, bool& fCheckForPruning, bool fKnown) {
     LOCK(cs_LastBlockFile);
 
-    unsigned int nFile = fKnown ? pos.File() : nLastBlockFile;
+    unsigned int nFile = fKnown ? pos.File() : nLastBlockFile_;
     if (vinfoBlockFile.size() <= nFile) {
         vinfoBlockFile.resize(nFile + 1);
     }
@@ -83,13 +86,13 @@ bool CBlockFileInfoStore::FindBlockPos(const Config &config, CValidationState &s
         pos = { static_cast<int>(nFile), static_cast<unsigned int>(vinfoBlockFile[nFile].Size()) };
     }
 
-    if ((int)nFile != nLastBlockFile) {
+    if ((int)nFile != nLastBlockFile_) {
         if (!fKnown) {
-            LogPrintf("Leaving block file %i: %s\n", nLastBlockFile,
-                vinfoBlockFile[nLastBlockFile].ToString());
+            LogPrintf("Leaving block file %i: %s\n", nLastBlockFile_,
+                vinfoBlockFile[nLastBlockFile_].ToString());
         }
         pBlockFileInfoStore->FlushBlockFile(!fKnown);
-        nLastBlockFile = nFile;
+        nLastBlockFile_ = nFile; // NOLINT(*-narrowing-conversions)
     }
 
     if (fKnown) {
@@ -117,7 +120,7 @@ bool CBlockFileInfoStore::FindBlockPos(const Config &config, CValidationState &s
         }
     }
 
-    setDirtyFileInfo.insert(nFile);
+    setDirtyFileInfo.insert(nFile); // NOLINT(*-narrowing-conversions)
     return true;
 }
 
@@ -190,7 +193,7 @@ void CBlockFileInfoStore::FindFilesToPruneManual(
         nManualPruneHeight :
         std::min(nManualPruneHeight, chainActive.Tip()->GetHeight() - config.GetMinBlocksToKeep());
     int count = 0;
-    for (int fileNumber = 0; fileNumber < nLastBlockFile; fileNumber++) {
+    for (int fileNumber = 0; fileNumber < nLastBlockFile_; fileNumber++) {
         if (vinfoBlockFile[fileNumber].Size() == 0 ||
             vinfoBlockFile[fileNumber].HeightLast() > nLastBlockWeCanPrune) {
             continue;
@@ -244,11 +247,11 @@ void CBlockFileInfoStore::FindFilesToPrune(
     // so we should leave a buffer under our target to account for another
     // allocation before the next pruning.
     uint64_t nBuffer = BLOCKFILE_CHUNK_SIZE + UNDOFILE_CHUNK_SIZE;
-    uint64_t nBytesToPrune;
+    uint64_t nBytesToPrune{};
     int count = 0;
 
     if (nCurrentUsage + nBuffer >= nPruneTarget) {
-        for (int fileNumber = 0; fileNumber < nLastBlockFile; fileNumber++) {
+        for (int fileNumber = 0; fileNumber < nLastBlockFile_; fileNumber++) {
             nBytesToPrune = vinfoBlockFile[fileNumber].Size() +
                 vinfoBlockFile[fileNumber].UndoSize();
 
@@ -284,7 +287,7 @@ void CBlockFileInfoStore::FindFilesToPrune(
 
 void CBlockFileInfoStore::LoadBlockFileInfo(int nLastBlockFile, CBlockTreeDB& blockTreeDb)
 {
-    this->nLastBlockFile = nLastBlockFile;
+    nLastBlockFile_ = nLastBlockFile;
     vinfoBlockFile.resize(nLastBlockFile + 1);
     LogPrintf("%s: last block file = %i\n", __func__, nLastBlockFile);
     for (int nFile = 0; nFile <= nLastBlockFile; nFile++) {
@@ -306,7 +309,7 @@ void CBlockFileInfoStore::LoadBlockFileInfo(int nLastBlockFile, CBlockTreeDB& bl
 void CBlockFileInfoStore::Clear()
 {
     vinfoBlockFile.clear();
-    nLastBlockFile = 0;
+    nLastBlockFile_ = 0;
     setDirtyFileInfo.clear();
 }
 

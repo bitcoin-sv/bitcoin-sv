@@ -9,6 +9,7 @@
 #include "consensus/params.h"
 #include "core_io.h"
 #include "hash.h"
+#include "logging.h"
 #include "mining/candidates.h"
 #include "mining/factory.h"
 #include "net/net.h"
@@ -20,9 +21,13 @@
 #include "validation.h"
 #include "versionbits.h"
 #include "invalid_txn_publisher.h"
+
+#include <cstdint>
 #include <iomanip>
 #include <limits>
+#include <optional>
 #include <queue>
+
 #include <boost/lexical_cast.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
@@ -66,7 +71,8 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
     static int64_t nStart = 0;
     static unsigned int nTransactionsUpdatedLast = std::numeric_limits<unsigned int>::max();
     static std::unique_ptr<CBlockTemplate> pblocktemplate { std::make_unique<CBlockTemplate>() };
-    if (pindexPrev != chainActive.Tip() || assembler->GetTemplateUpdated() ||
+    static std::optional<bool> containsCoinbase { std::nullopt };
+    if (containsCoinbase != coinbaseRequired || pindexPrev != chainActive.Tip() || assembler->GetTemplateUpdated() ||
         (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5)) 
     {
         // Clear pindexPrev so future calls make a new block, despite any failures from here on
@@ -75,6 +81,7 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
         // Update other fields for tracking state of this candidate
         nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
         nStart = GetTime();
+        containsCoinbase = coinbaseRequired;
 
         // Dummy script; the real one is either created by the wallet below, or will be replaced by one
         // from the miner when they submit the mining solution
@@ -133,7 +140,7 @@ void CalculateNextMerkleRoot(uint256 &merkle_root, const uint256 &merkle_branch)
     CHash256()
         .Write(merkle_root.begin(), merkle_root.size())
         .Write(merkle_branch.begin(), merkle_branch.size())
-        .Finalize(hash.begin());
+        .Finalize(CHash256::span{hash.begin(), CHash256::OUTPUT_SIZE});
     merkle_root = hash;
 }
 
@@ -268,7 +275,8 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
     CMiningCandidateRef result { mining::CMiningFactory::GetCandidateManager().Get(id) };
     if (!result)
     {
-        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block candidate ID not found");
+        LogPrint(BCLog::RPC, "Submit mining solution, block candidate id %s not found\n", idstr);
+        return "unknown-id";
     }
 
     // Make a copy of the block we're trying to submit so that we can safely update the fields
@@ -345,10 +353,10 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
         // Ensure we run full checks on submitted block
         block->fChecked = false;
 
-        auto submitBlock = [](const Config& config , const std::shared_ptr<CBlock>& blockptr) 
+        auto submitBlock = [](const Config& cfg , const std::shared_ptr<CBlock>& blockptr) 
         {
             CScopedBlockOriginRegistry reg(blockptr->GetHash(), "submitminingsolution");
-            return ProcessNewBlock(config, blockptr, true, nullptr, CBlockSource::MakeRPC());
+            return ProcessNewBlock(cfg, blockptr, true, nullptr, CBlockSource::MakeRPC());
         };
         submitted = processBlock(config, block, submitBlock); // returns string on failure
     }
@@ -368,18 +376,18 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
 
 /** Mining-Candidate end */
 
-const CRPCCommand commands[] =
-{
-  //  category              name                      actor (function)         okSafeMode
-  //  --------------------- ------------------------  -----------------------  ----------
-    { "mining",             "getminingcandidate",     getminingcandidate,     true, {"coinbase"}  },
-    { "mining",             "submitminingsolution",   submitminingsolution,   true, {}  },
-};
-
 } // namespace
 
-void RegisterMiningFBBRPCCommands(CRPCTable &t)
+void RegisterMiningFBBRPCCommands(CRPCTable& t)
 {
+    static const CRPCCommand commands[] =
+    {
+    //  category              name                      actor (function)         okSafeMode
+    //  --------------------- ------------------------  -----------------------  ----------
+        { "mining",             "getminingcandidate",     getminingcandidate,     true, {"coinbase"}  },
+        { "mining",             "submitminingsolution",   submitminingsolution,   true, {}  },
+    };
+
     for (auto& cmd : commands)
         t.appendCommand(cmd.name, &cmd);
 }

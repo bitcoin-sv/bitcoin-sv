@@ -12,10 +12,8 @@ Scenario:
 """
 from test_framework.authproxy import JSONRPCException
 from test_framework.blocktools import make_block, send_by_headers, wait_for_tip, wait_for_tip_status
-from test_framework.mininode import msg_block, CBlock, CTxOut, msg_headers, CBlockHeader
-from test_framework.script import CScript, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import wait_until, assert_equal
+from test_framework.util import wait_until
 from test_framework.cdefs import SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE, SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE
 
 
@@ -80,7 +78,7 @@ class ExitSafeModeForDistantFork(BitcoinTestFramework):
                 try:
                     conn1.rpc.getbalance()
                     return True
-                except JSONRPCException as e:
+                except JSONRPCException:
                     return False
             wait_until(is_not_safemode, timeout=10, check_interval=0.2) # Only a small timeout is needed since safe mode level is changed shortly after the block has become tip.
 

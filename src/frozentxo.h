@@ -127,7 +127,7 @@ public:
     static std::int32_t Get_max_WhitelistedTxData_enforceAtHeight();
 
 private:
-    std::int32_t nHeight;
+    std::int32_t mHeight;
     std::string mSource;
     const uint256& mPreviousActiveBlockHash;
     std::int64_t mReceivedTime{0};

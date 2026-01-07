@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 
+#include <type_traits>
 #if defined(HAVE_CONFIG_H)
 #include "config/bitcoin-config.h"
 #endif
@@ -41,6 +42,7 @@ bool static ScanHash(const CBlockHeader *pblock, uint32_t &nNonce, uint256 *phas
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     ss << *pblock;
     assert(ss.size() == 80);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     hasher.Write((unsigned char *)&ss[0], 76);
 
     while (true)
@@ -49,7 +51,11 @@ bool static ScanHash(const CBlockHeader *pblock, uint32_t &nNonce, uint256 *phas
 
         // Write the last 4 bytes of the block header (the nonce) to a copy of
         // the double-SHA256 state, and compute the result.
-        CHash256(hasher).Write((unsigned char *)&nNonce, 4).Finalize((unsigned char *)phash);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
+        CHash256(hasher)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
+            .Write((unsigned char*)&nNonce, 4)
+            .Finalize(CHash256::span{phash->begin(), CHash256::OUTPUT_SIZE});
 
         // Return the nonce if the hash has at least some zero bits,
         // caller will check if it has enough to reach the target
@@ -118,6 +124,7 @@ std::string HelpMessage()
 
 inline uint32_t nbits(const UniValue &candidate_props)
 {
+    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
     uint32_t val;
     std::stringstream ss;
     ss << std::hex << candidate_props["nBits"].get_str();
@@ -155,7 +162,7 @@ static void CalculateNextMerkleRoot(uint256 &merkle_root, const uint256 &merkle_
     CHash256()
         .Write(merkle_root.begin(), merkle_root.size())
         .Write(merkle_branch.begin(), merkle_branch.size())
-        .Finalize(hash.begin());
+        .Finalize(CHash256::span{hash.begin(), CHash256::OUTPUT_SIZE});
     merkle_root = hash;
 }
 
@@ -177,19 +184,20 @@ void print_coinbase_transaction(ostream& str, vector<unsigned char>& coinbase_by
     str << ".\n";
 }
 
-void Add_space_for_extra_nonce(vector<unsigned char>& coinbase_bytes, size_t offset_extra_nonce)
+void Add_space_for_extra_nonce(vector<unsigned char>& coinbase_bytes,
+                               vector<unsigned char>::difference_type offset_extra_nonce)
 {
     // Copy the first part of the coinbase transaction into the tmp vector
     vector<unsigned char> tmp(coinbase_bytes.begin(), coinbase_bytes.begin() + offset_extra_nonce);
 
     // Add space for the extra-nonce into the tmp vector
-    for(size_t i=0; i<sizeof(extra_nonce_type); i++)
+    for(size_t i=0; i < sizeof(extra_nonce_type); i++)
         tmp.push_back((unsigned char)OP_NOP1);
 
     // Add on the second part of the coinbase transaction onto the tmp vector
-    tmp.insert(tmp.begin() + offset_extra_nonce + sizeof(extra_nonce_type), 
-                coinbase_bytes.begin() + offset_extra_nonce, 
-                coinbase_bytes.end());
+    tmp.insert(tmp.begin() + offset_extra_nonce + sizeof(extra_nonce_type),
+               coinbase_bytes.begin() + offset_extra_nonce,
+               coinbase_bytes.end());
 
     // Copy the tmp vector into the original transaction 
     coinbase_bytes.assign(tmp.begin(), tmp.end());
@@ -225,10 +233,10 @@ static bool CpuMineBlockHasher(CBlockHeader *pblock, vector<unsigned char>& coin
     // 3/4 bytes - block height [start offset=42] RegTest: typically looks like {0x02, 0xA&, 0x00}
     // -- extra nonce -- [start offset=45/46]
 
-    size_t bytes_used_for_height = coinbaseBytes[42];
-    size_t offset_extra_nonce = 43 + bytes_used_for_height;
+    const vector<unsigned char>::difference_type bytes_used_for_height = coinbaseBytes[42];
+    const vector<unsigned char>::difference_type offset_extra_nonce = 43 + bytes_used_for_height;
     
-    if(coinbaseBytes.size() < offset_extra_nonce + 2) // crude.
+    if(ssize(coinbaseBytes) < offset_extra_nonce + 2) // crude.
     {
         cerr << "Invalid coinbase transaction supplied\n";
         return false;
@@ -247,10 +255,13 @@ static bool CpuMineBlockHasher(CBlockHeader *pblock, vector<unsigned char>& coin
         // hashMerkleRoot:
         {
             ++nExtraNonce;
-            unsigned char *pbytes = (unsigned char *)coinbaseBytes.data();            
+            unsigned char *pbytes = (unsigned char *)coinbaseBytes.data();
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             memcpy(pbytes + offset_extra_nonce, &nExtraNonce, sizeof(nExtraNonce));
             uint256 hash;
-            CHash256().Write(pbytes, coinbaseBytes.size()).Finalize(hash.begin());
+            CHash256()
+                .Write(pbytes, coinbaseBytes.size())
+                .Finalize(CHash256::span{hash.begin(), CHash256::OUTPUT_SIZE});
 
             pblock->hashMerkleRoot = CalculateMerkleRoot(hash, merkleproof);
         }
@@ -269,6 +280,7 @@ static bool CpuMineBlockHasher(CBlockHeader *pblock, vector<unsigned char>& coin
                     // Found a solution
                     pblock->nNonce = nNonce;
                     found = true;
+                    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
                     printf("proof-of-work found  \n  hash: %s  \ntarget: %s\n", hash.GetHex().c_str(),
                         hashTarget.GetHex().c_str());
                     break;
@@ -290,6 +302,7 @@ static bool CpuMineBlockHasher(CBlockHeader *pblock, vector<unsigned char>& coin
 
 static double GetDifficulty(uint64_t nBits)
 {
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     int nShift = (nBits >> 24) & 0xff;
 
     double dDiff = (double)0x0000ffff / (double)(nBits & 0x00ffffff);
@@ -335,8 +348,10 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
 
     // Set the version (only to test):
     {
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int blockversion = gArgs.GetArg("-blockversion", header.nVersion);
         if (blockversion != header.nVersion)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
             printf("Force header.nVersion to %d\n", blockversion);
         header.nVersion = blockversion;
     }
@@ -344,6 +359,7 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
     uint32_t startNonce = header.nNonce = random_int_func();
     std::string candidateId = params["id"].get_str();
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
     printf("Mining: id: %s parent: %s bits: %x difficulty: %.8e time: %d\n", candidateId.c_str(),
         header.hashPrevBlock.ToString().c_str(), header.nBits, GetDifficulty(header.nBits), header.nTime);
 
@@ -363,10 +379,12 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
     // Leave if not found:
     if (!found)
     {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
         printf("Checked %d possibilities\n", header.nNonce - startNonce);
         return ret;
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
     printf("Solution! Checked %d possibilities\n", header.nNonce - startNonce);
 
     tmpstr = HexStr(coinbaseBytes.begin(), coinbaseBytes.end());
@@ -384,37 +402,47 @@ static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
 {
     UniValue reply = CallRPC("submitminingsolution", solution);
 
-    const UniValue &error = find_value(reply, "error");
+    const UniValue error = find_value(reply, "error");
 
     if (!error.isNull())
     {
-        fprintf(stderr, "Block Candidate submission error: %d %s\n", error["code"].get_int(),
-            error["message"].get_str().c_str());
+        std::cerr << "Block Candidate submission error: "
+                  << error["code"].get_int() << ' '
+                  << error["message"].get_str() << '\n';
         return reply;
     }
 
-    const UniValue &result = find_value(reply, "result");
+    const UniValue result = find_value(reply, "result");
 
     if (result.isStr())
     {
-        fprintf(stderr, "Block Candidate rejected. Error: %s\n", result.get_str().c_str());
+        std::cerr << "Block Candidate rejected. Error: "
+                  << result.get_str() << '\n';
+
         // Print some debug info if the block is rejected
         UniValue dbg = solution[0].get_obj();
-        fprintf(stderr, "id: %s  time: %d  nonce: %d  version: 0x%x\n", dbg["id"].get_str().c_str(),
-            (uint32_t)dbg["time"].get_int64(), (uint32_t)dbg["nonce"].get_int64(), (uint32_t)dbg["version"].get_int());
-        fprintf(stderr, "coinbase: %s\n", dbg["coinbase"].get_str().c_str());
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+        std::ignore = fprintf(stderr,
+                              "id: %s  time: %d  nonce: %d  version: 0x%x\n",
+                              dbg["id"].get_str().c_str(),
+                              (uint32_t)dbg["time"].get_int64(),
+                              (uint32_t)dbg["nonce"].get_int64(),
+                              (uint32_t)dbg["version"].get_int());
+
+        std::cerr << "coinbase: " << dbg["coinbase"].get_str() << '\n';
     }
     else
     {
         if (result.isTrue())
         {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
             printf("Block Candidate accepted.\n");
             if (nblocks > 0)
                 nblocks--; // Processed a block
         }
         else
         {
-            fprintf(stderr, "Unknown \"submitminingsolution\" Response.\n");
+            std::cerr << "Unknown \"submitminingsolution\" Response.\n";
         }
     }
 
@@ -423,7 +451,9 @@ static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
 
 int CpuMiner(RandomIntGenerator & random_int_func)
 {
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     int searchDuration = gArgs.GetArg("-duration", 30);
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     int nblocks = gArgs.GetArg("-nblocks", -1); //-1 mine forever
 
     UniValue mineresult;
@@ -431,6 +461,7 @@ int CpuMiner(RandomIntGenerator & random_int_func)
 
     if (0 == nblocks)
     {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
         printf("Nothing to do for zero (0) blocks\n");
         return 0;
     }
@@ -466,7 +497,7 @@ int CpuMiner(RandomIntGenerator & random_int_func)
 
                     // Parse reply
                     result = find_value(reply, "result");
-                    const UniValue &error = find_value(reply, "error");
+                    const UniValue error = find_value(reply, "error");
 
                     if (!error.isNull())
                     {
@@ -510,6 +541,7 @@ int CpuMiner(RandomIntGenerator & random_int_func)
                 {
                     if (fWait)
                     {
+                        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
                         printf("Warning: %s\n", c.what());
                         MilliSleep(1000);
                     }
@@ -536,7 +568,8 @@ int CpuMiner(RandomIntGenerator & random_int_func)
         if (strPrint != "")
         {
             if (nRet != 0)
-                fprintf(stderr, "%s\n", strPrint.c_str());
+                std::cerr << strPrint << '\n';
+
             // Actually do some mining
             if (result.isNull())
             {
@@ -560,12 +593,13 @@ int CpuMiner(RandomIntGenerator & random_int_func)
     return 0;
 }
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char *argv[])
 {
     SetupEnvironment();
     if (!SetupNetworking())
     {
-        fprintf(stderr, "Error: Initializing networking failed\n");
+        std::cerr << "Error: Initializing networking failed\n";
         exit(1);
     }
 

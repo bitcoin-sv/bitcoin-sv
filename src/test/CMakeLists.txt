@@ -2,8 +2,6 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-project(bitcoin-test)
-
 # Process json files.
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")
 
@@ -60,6 +58,7 @@ add_test_to_suite(bitcoin test_bitcoin
     array_parser_tests.cpp
 	base32_tests.cpp
 	base58_tests.cpp
+	base58data_tests.cpp
 	base64_tests.cpp
     big_int_tests.cpp
 	bip32_tests.cpp
@@ -73,11 +72,13 @@ add_test_to_suite(bitcoin test_bitcoin
 	blockindex_with_descendants_tests.cpp
 	blockmaxsize_tests.cpp
 	blockfile_reading_tests.cpp
+    block_read_cache_tests.cpp
 	blockstatus_tests.cpp
 	blockvalidationstatus_tests.cpp
 	bloom_tests.cpp
     bn_op_tests.cpp
 	bswap_tests.cpp
+    chain_guard.h
 	checkpoints_tests.cpp
 	checkqueue_tests.cpp
 	check_selfish_mining_tests.cpp
@@ -88,6 +89,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	write_preferring_upgradable_mutex_tests.cpp
 	compress_tests.cpp
 	config_tests.cpp
+	configscriptpolicy_tests.cpp
 	core_io_tests.cpp
 	cpfp_tests.cpp
 	crypto_tests.cpp
@@ -101,6 +103,8 @@ add_test_to_suite(bitcoin test_bitcoin
     dsdetected_tests.cpp
 	dstencode_tests.cpp
     dstxn_serialiser_tests.cpp
+    dummy_config.h
+    dummy_config.cpp
 	enum_cast_tests.cpp
 	excessiveblock_tests.cpp
 	eviction_candidates_tracker_tests.cpp
@@ -125,6 +129,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	limitedmap_tests.cpp
 	limitedstack_tests.cpp
 	locked_ref_tests.cpp
+	lrshiftnum_tests.cpp
 	m_candidates_tests.cpp
 	main_tests.cpp
 	mempool_dump_load_tests.cpp
@@ -159,12 +164,14 @@ add_test_to_suite(bitcoin test_bitcoin
     prefilled_tx_parser_tests.cpp
     prefilled_txs_parser_tests.cpp
 	prevector_tests.cpp
+    protocol_era_tests.cpp
 	protocol_tests.cpp
 	raii_event_tests.cpp
 	random_tests.cpp
 	reverselock_tests.cpp
     revokemid_tests.cpp
 	rpc_tests.cpp
+    safe_mode_tests.cpp
 	sanity_tests.cpp
 	scheduler_tests.cpp
 	script_P2SH_tests.cpp
@@ -204,16 +211,18 @@ add_test_to_suite(bitcoin test_bitcoin
 	txvalidationcache_tests.cpp
 	uint256_tests.cpp
 	undo_tests.cpp
-    unique_array_tests.cpp
 	univalue_tests.cpp
 	util_tests.cpp
     validation_scheduler_tests.cpp
 	validation_tests.cpp
+    verify_script_flags_tests.cpp
     webhook_client_tests.cpp
 
 	# Tests generated from JSON
 	${JSON_HEADERS}
 )
+
+enable_coverage(test_bitcoin)
 
 target_include_directories(test_bitcoin
 	PUBLIC
@@ -223,8 +232,7 @@ target_include_directories(test_bitcoin
 		${OPENSSL_INCLUDE_DIR}
 )
 
-target_compile_options(test_bitcoin PRIVATE -Wno-return-std-move)
-
+set(Boost_NO_WARN_NEW_VERSIONS TRUE)
 find_package(Boost 1.74 REQUIRED unit_test_framework)
 
 target_link_libraries(
@@ -256,4 +264,9 @@ if(BUILD_BITCOIN_WALLET)
 			../wallet/test/walletdb_tests.cpp
 			../wallet/test/crypto_tests.cpp
 	)
+endif()
+
+if(ENABLE_CLANG_TIDY)
+    include(ClangTidy)
+	AddClangTidy(test_bitcoin)
 endif()

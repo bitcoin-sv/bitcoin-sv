@@ -38,9 +38,9 @@ namespace
         }
 
     private:
-        std::mutex& mMutex;
-        std::condition_variable& mProcessPublish;
-        std::optional<InvalidTxnInfo>& mReceived;
+        std::mutex& mMutex; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+        std::condition_variable& mProcessPublish; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+        std::optional<InvalidTxnInfo>& mReceived; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     };
 
     CMutableTransaction MakeLargeTxn(
@@ -167,7 +167,7 @@ BOOST_AUTO_TEST_CASE(publish_no_sinks)
 
     // publishing invalid transactions is still valid but they will just be
     // discarded
-    publisher.Publish( std::move(invalid) );
+    publisher.Publish(invalid);
 
     // ClearStored() is a no-op
     BOOST_CHECK_EQUAL(publisher.ClearStored(), 0);
@@ -190,11 +190,12 @@ BOOST_AUTO_TEST_CASE(publish_enough_space_for_info)
         {},
         item.GetInvalidTxnInfo().DynamicMemoryUsage() }; // we want enough queue space for the whole transaction
 
-    publisher.Publish( std::move(item) );
+    publisher.Publish(item);
 
     std::unique_lock lock{ mutex };
     using namespace std::chrono_literals;
     BOOST_CHECK( processPublish.wait_for(lock, 200ms, [&received]{return received.has_value();}) );
+    assert(received);
     BOOST_CHECK_EQUAL( InvalidTxnInfoToJson(received.value()), expectedJson );
 }
 
@@ -220,11 +221,12 @@ BOOST_AUTO_TEST_CASE(publish_missing_some_space_for_info)
         {},
         expected.DynamicMemoryUsage() }; // last collided item won't be able to go into cache
 
-    publisher.Publish( std::move(item) );
+    publisher.Publish(item);
 
     std::unique_lock lock{ mutex };
     using namespace std::chrono_literals;
     BOOST_CHECK( processPublish.wait_for(lock, 200ms, [&received]{return received.has_value();}) );
+    assert(received);
     BOOST_CHECK_EQUAL( InvalidTxnInfoToJson(received.value()), InvalidTxnInfoToJson(expected) );
 }
 
@@ -245,7 +247,7 @@ BOOST_AUTO_TEST_CASE(publish_not_enough_space_for_info)
         1 }; // cache is to small to send anything
 
 
-    publisher.Publish( std::move(item) );
+    publisher.Publish(item);
 
     std::unique_lock lock{ mutex };
     using namespace std::chrono_literals;
@@ -290,7 +292,7 @@ BOOST_AUTO_TEST_CASE(callback_throw_exception)
 
     auto check =
         [&callbackTriggered]
-        (const InvalidTxnPublisher::InvalidTxnInfoWithTxn& info)
+        (const InvalidTxnPublisher::InvalidTxnInfoWithTxn& /*info*/)
         {
             callbackTriggered = true;
 
@@ -307,15 +309,15 @@ BOOST_AUTO_TEST_CASE(callback_throw_exception)
             , mTriggered{ triggered }
         {}
 
-        void Publish(const InvalidTxnInfo& invalidTxInfo) override
+        void Publish(const InvalidTxnInfo& /*invalidTxInfo*/) override
         {
             mTriggered = true;
             mProcessPublish.notify_one();
         }
 
     private:
-        std::condition_variable& mProcessPublish;
-        std::atomic_bool& mTriggered;
+        std::condition_variable& mProcessPublish; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+        std::atomic_bool& mTriggered; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     };
 
     std::vector<std::unique_ptr<InvalidTxnPublisher::CInvalidTxnSink>> sinks;

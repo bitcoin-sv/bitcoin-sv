@@ -25,9 +25,10 @@ Mine a >4GB block on the node.
 """
 
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.comptool import logger
 from test_framework.mininode import MY_VERSION, NodeConnCB, CTxOut, msg_tx, msg_block
-from test_framework.util import wait_until, logger, check_for_log_msg, connect_nodes, disconnect_nodes_bi, sync_blocks
-from test_framework.script import CScript, OP_TRUE, OP_FALSE, OP_RETURN, OP_DROP, OP_CHECKSIG, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
+from test_framework.util import wait_until, check_for_log_msg, connect_nodes, disconnect_nodes_bi, sync_blocks
+from test_framework.script import CScript, OP_TRUE, OP_FALSE, OP_RETURN, OP_DROP, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.cdefs import ONE_MEGABYTE, ONE_GIGABYTE
 from test_framework.key import CECKey
 from test_framework.blocktools import create_block, create_coinbase, create_tx
@@ -100,8 +101,7 @@ class BigBlockTests(BitcoinTestFramework):
         return coinbase_tx
 
     def sign_tx(self, tx, spendtx, n):
-        scriptPubKey = bytearray(spendtx.vout[n].scriptPubKey)
-        sighash = SignatureHashForkId(spendtx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spendtx.vout[n].nValue)
+        sighash = SignatureHash(spendtx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spendtx.vout[n].nValue)
         tx.vin[0].scriptSig = CScript([self.coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
     # Generate some large transactions and put them in the mempool
@@ -115,8 +115,8 @@ class BigBlockTests(BitcoinTestFramework):
 
             conn.send_message(msg_tx(tx))
             wait_until(lambda: tx.hash in conn.rpc.getrawmempool(), timeout=int(360 * self.options.timeoutfactor))
-            logger.info("Submitted txn {} of {}".format(i+1, num_of_transactions))
-            assert conn.rpc.getmempoolinfo()['size'] == i+1
+            logger.info("Submitted txn {} of {}".format(i + 1, num_of_transactions))
+            assert conn.rpc.getmempoolinfo()['size'] == i + 1
 
             spendtx = tx
 
@@ -131,9 +131,9 @@ class BigBlockTests(BitcoinTestFramework):
         # Disconnect node1 and node2 for now
         disconnect_nodes_bi(self.nodes, 1, 2)
 
-        connArgs = [{"versionNum":MY_VERSION}, {"versionNum":70015}]
+        connArgs = [{"versionNum": MY_VERSION}, {"versionNum": 70015}]
         with self.run_node_with_connections("Test old and new protocol versions", 0, self.nodeArgs, number_of_connections=2,
-                                            connArgs=connArgs, cb_class=MyConnCB) as (newVerConn,oldVerConn):
+                                            connArgs=connArgs, cb_class=MyConnCB) as (newVerConn, oldVerConn):
             assert newVerConn.connected
             assert oldVerConn.connected
 
@@ -152,15 +152,15 @@ class BigBlockTests(BitcoinTestFramework):
             # Reconnect node0 and node2 and sync their blocks. Node2 will end up receiving the
             # large block via compact blocks
             connect_nodes(self.nodes, 0, 2)
-            sync_blocks(itemgetter(0,2)(self.nodes))
+            sync_blocks(itemgetter(0, 2)(self.nodes))
 
             # Mine a >4GB block, verify we only get it over the new connection
             old_block_count = newVerConn.cb.block_count
             logger.info("Mining a big block")
             self.nodes[0].generate(1)
-            assert(self.nodes[0].getmempoolinfo()['size'] == 0)
+            assert (self.nodes[0].getmempoolinfo()['size'] == 0)
             logger.info("Waiting for block to arrive at test")
-            wait_until(lambda: newVerConn.cb.block_count == old_block_count+1, timeout=int(1200 * self.options.timeoutfactor))
+            wait_until(lambda: newVerConn.cb.block_count == old_block_count + 1, timeout=int(1200 * self.options.timeoutfactor))
 
             # Look for log message saying we won't send to old peer
             wait_until(lambda: check_for_log_msg(self, "cannot be sent because it exceeds max P2P message limit", "/node0"))
@@ -168,8 +168,8 @@ class BigBlockTests(BitcoinTestFramework):
             # Verify node2 gets the big block via a (not very) compact block
             wait_until(lambda: self.nodes[0].getbestblockhash() == self.nodes[2].getbestblockhash())
             peerinfo = self.nodes[2].getpeerinfo()
-            assert(peerinfo[0]['bytesrecv_per_msg']['cmpctblock'] > 0)
-            assert(peerinfo[0]['bytesrecv_per_msg']['blocktxn'] > 0)
+            assert (peerinfo[0]['bytesrecv_per_msg']['cmpctblock'] > 0)
+            assert (peerinfo[0]['bytesrecv_per_msg']['blocktxn'] > 0)
 
             # Reconnect node0 to node1
             logger.info("Syncing bitcoind nodes to big block")
@@ -177,7 +177,7 @@ class BigBlockTests(BitcoinTestFramework):
             self.sync_all(timeout=int(1200 * self.options.timeoutfactor))
 
             # Verify node1 also got the big block
-            assert(self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
+            assert (self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
 
 if __name__ == '__main__':

@@ -3,7 +3,7 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 from genesis_upgrade_tests.test_base import GenesisHeightBasedSimpleTestsCase
 from test_framework.height_based_test_framework import SimpleTestDefinition
-from test_framework.script import CScript, OP_TRUE, OP_NOP, OP_DUP, OP_DROP
+from test_framework.script import CScript, OP_TRUE, OP_NOP
 from test_framework.cdefs import MAX_OPS_PER_SCRIPT_BEFORE_GENESIS
 
 

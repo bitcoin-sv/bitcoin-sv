@@ -25,7 +25,7 @@
  *  expected behavior. For example improving the hit rate may cause some tests
  *  using BOOST_CHECK_CLOSE to fail.
  */
-FastRandomContext local_rand_ctx(true);
+FastRandomContext local_rand_ctx(true); // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 BOOST_AUTO_TEST_SUITE(cuckoocache_tests)
 
@@ -33,8 +33,8 @@ BOOST_AUTO_TEST_SUITE(cuckoocache_tests)
  * insecure_GetRandHash fills in a uint256 from local_rand_ctx
  */
 void insecure_GetRandHash(uint256 &t) {
-    const auto begin = reinterpret_cast<uint32_t*>(t.begin());
-    const auto end = reinterpret_cast<uint32_t*>(t.end());
+    const auto begin = reinterpret_cast<uint32_t*>(t.begin()); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    const auto end = reinterpret_cast<uint32_t*>(t.end()); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
     for (auto ptr = begin; ptr < end; ++ptr)
     {
         *ptr = local_rand_ctx.rand32();
@@ -71,6 +71,7 @@ template <typename Cache> double test_cache(size_t megabytes, double load) {
     Cache set{};
     size_t bytes = megabytes * (1 << 20);
     set.setup_bytes(bytes);
+    // NOLINTNEXTLINE(*-narrowing-conversions, bugprone-integer-division)
     uint32_t n_insert = static_cast<uint32_t>(load * (bytes / sizeof(uint256)));
     hashes.resize(n_insert);
     for (uint32_t i = 0; i < n_insert; ++i) {
@@ -122,7 +123,8 @@ BOOST_AUTO_TEST_CASE(cuckoocache_hit_rate_ok) {
      */
     double HitRateThresh = 0.98;
     size_t megabytes = 32;
-    for (double load = 0.1; load < 2; load *= 2) {
+    // NOLINTNEXTLINE(clang-analyzer-security.FloatLoopCounter)
+    for (double load = 0.1; load < 2; load *= 2) { // NOLINT(cert-flp30-c)
         double hits =
             test_cache<CuckooCache::cache<uint256, SignatureCacheHasher>>(
                 megabytes, load);
@@ -139,6 +141,7 @@ template <typename Cache> void test_cache_erase(size_t megabytes) {
     Cache set{};
     size_t bytes = megabytes * (1 << 20);
     set.setup_bytes(bytes);
+    // NOLINTNEXTLINE(*-narrowing-conversions, bugprone-integer-division)
     uint32_t n_insert = static_cast<uint32_t>(load * (bytes / sizeof(uint256)));
     hashes.resize(n_insert);
     for (uint32_t i = 0; i < n_insert; ++i) {
@@ -199,6 +202,7 @@ template <typename Cache> void test_cache_erase_parallel(size_t megabytes) {
     Cache set{};
     size_t bytes = megabytes * (1 << 20);
     set.setup_bytes(bytes);
+    // NOLINTNEXTLINE(*-narrowing-conversions, bugprone-integer-division)
     uint32_t n_insert = static_cast<uint32_t>(load * (bytes / sizeof(uint256)));
     hashes.resize(n_insert);
     for (uint32_t i = 0; i < n_insert; ++i) {
@@ -222,6 +226,7 @@ template <typename Cache> void test_cache_erase_parallel(size_t megabytes) {
     /** Spin up 3 threads to run contains with erase.
      */
     std::vector<std::thread> threads;
+    threads.reserve(3);
     /** Erase the first quarter */
     for (uint32_t x = 0; x < 3; ++x)
         /** Each thread is emplaced with x copy-by-value */
@@ -326,7 +331,7 @@ template <typename Cache> void test_cache_generations() {
     const size_t megabytes = 32;
     const size_t bytes = megabytes * (1 << 20);
     const uint32_t n_insert =
-        static_cast<uint32_t>(load * (bytes / sizeof(uint256)));
+        static_cast<uint32_t>(load * (bytes / sizeof(uint256))); // NOLINT(bugprone-integer-division)
 
     std::vector<block_activity> hashes;
     Cache set{};

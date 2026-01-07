@@ -42,14 +42,14 @@ Test case 4:
     - receive conflict in block tx notification
 """
 
-import json
-
+from test_framework.mininode import COutPoint, CTxIn, FromHex, ToHex
 from test_framework.script import CTransaction, CScript, OP_TRUE, CTxOut
-from test_framework.test_framework import BitcoinTestFramework, SkipTest, ToHex, FromHex
+from test_framework.test_framework import BitcoinTestFramework, SkipTest
 from test_framework.util import (assert_equal, check_zmq_test_requirements,
                                  disconnect_nodes_bi, connect_nodes_bi, sync_blocks,
                                  zmq_port)
-from test_framework.mininode import CTxIn, COutPoint
+
+import json
 
 
 class ZMQRemovedFromMempool(BitcoinTestFramework):
@@ -132,7 +132,7 @@ class ZMQRemovedFromMempool(BitcoinTestFramework):
 
         """Test case 3"""
         # bring both nodes on same height
-        self.nodes[1].invalidateblock(block_hashes[len(block_hashes)-2])
+        self.nodes[1].invalidateblock(block_hashes[len(block_hashes) - 2])
         self.nodes[0].generate(4)
         sync_blocks(self.nodes)
         unspent = self.nodes[0].listunspent()[0]
@@ -163,7 +163,7 @@ class ZMQRemovedFromMempool(BitcoinTestFramework):
         tx2.vin = [CTxIn(COutPoint(int(tx_spendable_output.hash, 16), 0))]
 
         tx_hex = self.nodes[1].signrawtransaction(ToHex(tx2))['hex']
-        tx2_size = len(tx_hex)/2
+        tx2_size = len(tx_hex) / 2
         tx2 = FromHex(CTransaction(), tx_hex)
         tx2.rehash()
         self.nodes[1].sendrawtransaction(tx_hex, True)
@@ -222,7 +222,7 @@ class ZMQRemovedFromMempool(BitcoinTestFramework):
         tx2.vin = [CTxIn(COutPoint(int(tx_spendable_output.hash, 16), 0))]
 
         tx_hex = self.nodes[1].signrawtransaction(ToHex(tx2))['hex']
-        tx2_size = len(tx_hex)/2
+        tx2_size = len(tx_hex) / 2
         tx2 = FromHex(CTransaction(), tx_hex)
         tx2.rehash()
         self.nodes[1].sendrawtransaction(tx_hex, True)

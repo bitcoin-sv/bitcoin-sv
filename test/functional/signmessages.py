@@ -4,7 +4,6 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
 
 
 class SignMessagesTest(BitcoinTestFramework):
@@ -21,14 +20,14 @@ class SignMessagesTest(BitcoinTestFramework):
         signature = self.nodes[0].signmessagewithprivkey(privKey, message)
 
         # Verify the message
-        assert(self.nodes[0].verifymessage(address, signature, message))
+        assert (self.nodes[0].verifymessage(address, signature, message))
 
         # Test the signing with an address with wallet
         address = self.nodes[0].getnewaddress()
         signature = self.nodes[0].signmessage(address, message)
 
         # Verify the message
-        assert(self.nodes[0].verifymessage(address, signature, message))
+        assert (self.nodes[0].verifymessage(address, signature, message))
 
 
 if __name__ == '__main__':

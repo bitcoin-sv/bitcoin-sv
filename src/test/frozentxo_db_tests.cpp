@@ -21,7 +21,7 @@ BOOST_FIXTURE_TEST_SUITE(frozentxo, TestingSetup)
 
 namespace {
 
-class RandomTXOGenerator
+class RandomTXOGenerator // NOLINT(cert-msc32-c,cert-msc51-cpp)
 {
     std::mt19937 engine;
     std::uniform_int_distribution<unsigned int> uniform_dist{0, 255};
@@ -76,7 +76,7 @@ BOOST_AUTO_TEST_CASE(db_tests)
     // FrozenTXOData with invalid value
     const auto ftd0 = []{
         CFrozenTXODB::FrozenTXOData ftd = CFrozenTXODB::FrozenTXOData::Create_Uninitialized();
-        ftd.blacklist = static_cast<CFrozenTXODB::FrozenTXOData::Blacklist>(0);
+        ftd.blacklist = static_cast<CFrozenTXODB::FrozenTXOData::Blacklist>(0); // NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange)
         return ftd;
     }();
 
@@ -109,63 +109,63 @@ BOOST_AUTO_TEST_CASE(db_tests)
             }
 
             // If start >= stop, TXO must not be considered frozen on consensus at any height
-            auto ftd = ftd_con(h);
-            ftd.enforceAtHeight[0].stop = ftd.enforceAtHeight[0].start;
-            BOOST_CHECK( !ftd.IsFrozenOnConsensus(h2) );
-            BOOST_CHECK( ftd.IsFrozenOnPolicy(h2) ); // must still be considered frozen on policy ...
-            ftd.policyExpiresWithConsensus = true;
-            BOOST_CHECK( !ftd.IsFrozenOnPolicy(h2) ); // ... unless policy expires together with consensus
+            auto ftxd = ftd_con(h);
+            ftxd.enforceAtHeight[0].stop = ftxd.enforceAtHeight[0].start;
+            BOOST_CHECK( !ftxd.IsFrozenOnConsensus(h2) );
+            BOOST_CHECK( ftxd.IsFrozenOnPolicy(h2) ); // must still be considered frozen on policy ...
+            ftxd.policyExpiresWithConsensus = true;
+            BOOST_CHECK( !ftxd.IsFrozenOnPolicy(h2) ); // ... unless policy expires together with consensus
 
             // If start < stop, TXO must be considered frozen only at heights between start and stop
-            ftd = ftd_con(h);
-            ftd.enforceAtHeight[0].stop = ftd.enforceAtHeight[0].start+2;
-            if(h2<h || h2>=ftd.enforceAtHeight[0].stop)
+            ftxd = ftd_con(h);
+            ftxd.enforceAtHeight[0].stop = ftxd.enforceAtHeight[0].start+2;
+            if(h2<h || h2>=ftxd.enforceAtHeight[0].stop)
             {
-                BOOST_CHECK( !ftd.IsFrozenOnConsensus(h2) );
+                BOOST_CHECK( !ftxd.IsFrozenOnConsensus(h2) );
             }
             else
             {
-                BOOST_CHECK( ftd.IsFrozenOnConsensus(h2) );
+                BOOST_CHECK( ftxd.IsFrozenOnConsensus(h2) );
             }
 
-            if(h2>=ftd.enforceAtHeight[0].stop)
+            if(h2>=ftxd.enforceAtHeight[0].stop)
             {
-                BOOST_CHECK( ftd.IsFrozenOnPolicy(h2) ); // must be considered frozen on policy after stop height ...
-                ftd.policyExpiresWithConsensus = true;
-                BOOST_CHECK( !ftd.IsFrozenOnPolicy(h2) ); // ... unless policy expires together with consensus
+                BOOST_CHECK( ftxd.IsFrozenOnPolicy(h2) ); // must be considered frozen on policy after stop height ...
+                ftxd.policyExpiresWithConsensus = true;
+                BOOST_CHECK( !ftxd.IsFrozenOnPolicy(h2) ); // ... unless policy expires together with consensus
             }
             else
             {
-                BOOST_CHECK( ftd.IsFrozenOnPolicy(h2) ); // must be considered frozen on policy before stop height ...
-                ftd.policyExpiresWithConsensus = true;
-                BOOST_CHECK( ftd.IsFrozenOnPolicy(h2) ); // ... even if policy expires together with consensus
+                BOOST_CHECK( ftxd.IsFrozenOnPolicy(h2) ); // must be considered frozen on policy before stop height ...
+                ftxd.policyExpiresWithConsensus = true;
+                BOOST_CHECK( ftxd.IsFrozenOnPolicy(h2) ); // ... even if policy expires together with consensus
             }
 
             // Check multiple consensus freeze intervals
-            ftd = ftd_con(h);
-            ftd.enforceAtHeight = {{h, h+2}, {h+4, h+6}, {h+5, h+7}, {h+8, h+8}}; // three valid intervals (two overlapping) and one ignored interval
+            ftxd = ftd_con(h);
+            ftxd.enforceAtHeight = {{h, h+2}, {h+4, h+6}, {h+5, h+7}, {h+8, h+8}}; // three valid intervals (two overlapping) and one ignored interval
 
             // Must be considered frozen on consensus only at heights [h,h+2) and [h+4,h+7).
             if( (h2>=h && h2<h+2) || (h2>=h+4 && h2<h+7) )
             {
-                BOOST_CHECK( ftd.IsFrozenOnConsensus(h2) );
+                BOOST_CHECK( ftxd.IsFrozenOnConsensus(h2) );
             }
             else
             {
-                BOOST_CHECK( !ftd.IsFrozenOnConsensus(h2) );
+                BOOST_CHECK( !ftxd.IsFrozenOnConsensus(h2) );
             }
 
             if(h2>=h+7)
             {
-                BOOST_CHECK( ftd.IsFrozenOnPolicy(h2) ); // must be considered frozen on policy after the end of last valid interval ...
-                ftd.policyExpiresWithConsensus = true;
-                BOOST_CHECK( !ftd.IsFrozenOnPolicy(h2) ); // ... unless policy expires together with consensus
+                BOOST_CHECK( ftxd.IsFrozenOnPolicy(h2) ); // must be considered frozen on policy after the end of last valid interval ...
+                ftxd.policyExpiresWithConsensus = true;
+                BOOST_CHECK( !ftxd.IsFrozenOnPolicy(h2) ); // ... unless policy expires together with consensus
             }
             else
             {
-                BOOST_CHECK( ftd.IsFrozenOnPolicy(h2) ); // must be considered frozen on policy before the end of last valid interval ...
-                ftd.policyExpiresWithConsensus = true;
-                BOOST_CHECK( ftd.IsFrozenOnPolicy(h2) ); // ... even if policy expires together with consensus. note that this includes any gaps between intervals
+                BOOST_CHECK( ftxd.IsFrozenOnPolicy(h2) ); // must be considered frozen on policy before the end of last valid interval ...
+                ftxd.policyExpiresWithConsensus = true;
+                BOOST_CHECK( ftxd.IsFrozenOnPolicy(h2) ); // ... even if policy expires together with consensus. note that this includes any gaps between intervals
             }
         }
     }
@@ -420,12 +420,12 @@ BOOST_AUTO_TEST_CASE(db_tests)
 
                 // Check that records are actually removed from DB
 
-                CFrozenTXODB::FrozenTXOData ftd = CFrozenTXODB::FrozenTXOData::Create_Uninitialized();
+                CFrozenTXODB::FrozenTXOData ft_data = CFrozenTXODB::FrozenTXOData::Create_Uninitialized();
                 for(auto& txoid: txoid_front)
                 {
-                    BOOST_CHECK( !db.GetFrozenTXOData(txoid, ftd) );
+                    BOOST_CHECK( !db.GetFrozenTXOData(txoid, ft_data) );
                 }
-                BOOST_CHECK( !db.GetFrozenTXOData(txoid_last, ftd) );
+                BOOST_CHECK( !db.GetFrozenTXOData(txoid_last, ft_data) );
             });
             thd.join();
         }
@@ -607,7 +607,7 @@ BOOST_AUTO_TEST_CASE(db_tests)
     {
         auto t = it.GetWhitelistedTx();
         if(t.first == ctx1.GetId() && t.second.enforceAtHeight == 50 && t.second.confiscatedTXOs == std::vector<COutPoint>{txo2})
-        {
+        { // NOLINT(bugprone-branch-clone)
             continue;
         }
         else if(t.first == ctx2.GetId() && t.second.enforceAtHeight == 654 && t.second.confiscatedTXOs == std::vector<COutPoint>{txo3})
@@ -768,7 +768,10 @@ BOOST_AUTO_TEST_CASE(ValidateConfiscationTxContents_test)
     };
     // clang-format on
 
+    CLANG_WARNINGS_PUSH
+    GCC_WARNINGS_IGNORE(-Wshadow)
     for(const auto& [preamble, op_push, version, order_hash_len, location_hint_len, exp] : v)
+    CLANG_WARNINGS_POP
     {
         vector<uint8_t> scr{preamble};
         scr.push_back(op_push);
@@ -804,7 +807,7 @@ BOOST_AUTO_TEST_CASE(ValidateConfiscationTxContents_test)
 namespace {
 // Helper to run function in two threads.
 template<typename Cnt, typename F>
-void run_in_two_threads(Cnt (&cnt)[2], F f)
+void run_in_two_threads(std::array<Cnt, 2>& cnt, F f)
 {
     cnt[0] = {};
     std::thread thd(f, &cnt[0]);
@@ -903,7 +906,8 @@ BOOST_AUTO_TEST_CASE(db_thread_safety_tests)
     {
         std::size_t ok = 0;
         std::size_t alt = 0;
-    } cnt[2];
+    };
+    std::array<Cnt, 2> cnt;
 
     // Freeze all TXOs on policy-only blacklist while checking if they are frozen
     start_frozen_txo_checker(0);

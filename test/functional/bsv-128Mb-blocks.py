@@ -8,13 +8,10 @@ This test checks that by using the newly promoted -excessiveblocksize
 flag we can actually process very big blocks.
 """
 
+from test_framework.cdefs import ONE_MEGABYTE
+from test_framework.blocktools import prepare_init_chain
+from test_framework.mininode import msg_block
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import assert_equal, assert_raises_rpc_error
-from test_framework.comptool import TestManager, TestInstance, RejectResult
-from test_framework.blocktools import *
-import time
-from test_framework.script import *
-from test_framework.cdefs import (ONE_MEGABYTE)
 
 
 class BSV128MBlocks(ComparisonTestFramework):
@@ -25,7 +22,7 @@ class BSV128MBlocks(ComparisonTestFramework):
 
     def add_options(self, parser):
         super().add_options(parser)
-        parser.add_option("--excessiveblocksize", dest="excessive_block_size", default=128*ONE_MEGABYTE, type='int')
+        parser.add_option("--excessiveblocksize", dest="excessive_block_size", default=128 * ONE_MEGABYTE, type='int')
 
     def run_test(self):
         self.extra_args = [['-whitelist=127.0.0.1',
@@ -35,7 +32,7 @@ class BSV128MBlocks(ComparisonTestFramework):
 
     def get_tests(self):
         self.log.info("Testing with -excessiveblocksize set to {} MB ({} bytes)"
-                      .format((self.options.excessive_block_size/ONE_MEGABYTE),
+                      .format((self.options.excessive_block_size / ONE_MEGABYTE),
                               self.options.excessive_block_size))
 
         node = self.nodes[0]
@@ -55,11 +52,11 @@ class BSV128MBlocks(ComparisonTestFramework):
         yield self.accepted()
 
         # Oversized blocks will cause us to be disconnected
-        assert(not self.test.test_nodes[0].closed)
+        assert (not self.test.test_nodes[0].closed)
         block(2, spend=out[1], block_size=self.options.excessive_block_size + 1)
         self.test.connections[0].send_message(msg_block((self.chain.tip)))
         self.test.wait_for_disconnections()
-        assert(self.test.test_nodes[0].closed)
+        assert (self.test.test_nodes[0].closed)
 
         # Rewind bad block and remake connection to node
         self.chain.set_tip(1)

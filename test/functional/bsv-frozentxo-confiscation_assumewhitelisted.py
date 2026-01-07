@@ -39,7 +39,7 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self.chain = ChainManager()
         self.extra_args_common = ["-whitelist=127.0.0.1", "-minrelaytxfee=0", "-minminingtxfee=0", "-limitfreerelay=999999"]
         self.extra_args = [self.extra_args_common,
-                           self.extra_args_common+["-enableassumewhitelistedblockdepth=1", "-assumewhitelistedblockdepth=5"]]
+                           self.extra_args_common + ["-enableassumewhitelistedblockdepth=1", "-assumewhitelistedblockdepth=5"]]
         self.block_count = 0
 
     def _init(self):
@@ -48,7 +48,9 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self.prvkey.set_secretbytes(b"horsebattery")
         self.pubkey = self.prvkey.get_pubkey()
 
-        class Node: pass # P2P connection is not needed, but we want RPC connection as member in node object for consistency with other confiscation tests
+        class Node:
+            pass # P2P connection is not needed, but we want RPC connection as member in node object for consistency with other confiscation tests
+
         node = Node()
         node.rpc = self.nodes[0]
         node1 = Node()
@@ -78,14 +80,14 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
     def _wait_for_block_status(self, node, blockhash, status):
         def wait_predicate():
             for tips in node.rpc.getchaintips():
-                if (status=="" or tips["status"] == status) and tips["hash"] == blockhash:
+                if (status == "" or tips["status"] == status) and tips["hash"] == blockhash:
                     return True
             return False
         wait_until(wait_predicate, check_interval=0.15, timeout=10)
 
     def make_block_with_tx(self, node, tx, block_time_offset=None):
         block, _ = make_block(node.rpc)
-        if block_time_offset != None:
+        if block_time_offset is not None:
             # Changing the block time can be used to create block with same contents and different hash
             block.nTime += block_time_offset
         block.vtx.append(tx)
@@ -118,7 +120,15 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         return ctx
 
     def _create_and_send_tx(self, node):
-        tx = self._create_tx(self.chain.get_spendable_output(), b'', CScript([OP_DUP, OP_HASH160, hash160(self.pubkey), OP_EQUALVERIFY, OP_CHECKSIG])) # TXO with standard P2PKH script that can normally only be spent if private key is known
+        tx = self._create_tx(self.chain.get_spendable_output(),
+                             b'',
+                             # TXO with standard P2PKH script that can
+                             # normally only be spent if private key is known
+                             CScript([OP_DUP,
+                                      OP_HASH160,
+                                      hash160(self.pubkey),
+                                      OP_EQUALVERIFY,
+                                      OP_CHECKSIG]))
         self.log.info(f"Sending transaction {tx.hash} and generating a new block")
         node.rpc.sendrawtransaction(ToHex(tx))
         assert_equal(node.rpc.getrawmempool(), [tx.hash])
@@ -148,7 +158,7 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self.log.info("Restarting node with options -enableassumewhitelistedblockdepth=0, -assumewhitelistedblockdepth=0")
         node.rpc.stop_node()
         node.rpc.wait_until_stopped()
-        node.rpc.start(True, self.extra_args[0]+["-enableassumewhitelistedblockdepth=0", "-assumewhitelistedblockdepth=0"])
+        node.rpc.start(True, self.extra_args[0] + ["-enableassumewhitelistedblockdepth=0", "-assumewhitelistedblockdepth=0"])
         node.rpc.wait_for_rpc_connection()
         connect_nodes_bi(self.nodes, 0, 1)
 
@@ -161,12 +171,12 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self.log.info("Restarting node with options -enableassumewhitelistedblockdepth=1, -assumewhitelistedblockdepth=1")
         node.rpc.stop_node()
         node.rpc.wait_until_stopped()
-        node.rpc.start(True, self.extra_args[0]+["-enableassumewhitelistedblockdepth=1", "-assumewhitelistedblockdepth=1"])
+        node.rpc.start(True, self.extra_args[0] + ["-enableassumewhitelistedblockdepth=1", "-assumewhitelistedblockdepth=1"])
         node.rpc.wait_for_rpc_connection()
         connect_nodes_bi(self.nodes, 0, 1)
 
         block_rej3 = self.make_block_with_tx(node, confiscate_tx1, 3)
-        self.log.info(f"Submitting block {block_rej3.hash} containing a non-whitelisted confiscation transaction {confiscate_tx1.hash} and checking it is rejected because -assumewhitelistedblockdepth=1 requires at least one descendant")
+        self.log.info(f"Submitting block {block_rej3.hash} containing a non-whitelisted confiscation transaction {confiscate_tx1.hash} and checking it is rejected because -assumewhitelistedblockdepth=1 requires at least one descendant") # noqa: E501
         node.rpc.submitblock(block_rej3.serialize().hex())
         self._wait_for_block_status(node, block_rej3.hash, "invalid")
         assert_equal(root_block_hash, node.rpc.getbestblockhash())
@@ -174,7 +184,7 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self.log.info("Restarting node with options -enableassumewhitelistedblockdepth=1, -assumewhitelistedblockdepth=0")
         node.rpc.stop_node()
         node.rpc.wait_until_stopped()
-        node.rpc.start(True, self.extra_args[0]+["-enableassumewhitelistedblockdepth=1", "-assumewhitelistedblockdepth=0"])
+        node.rpc.start(True, self.extra_args[0] + ["-enableassumewhitelistedblockdepth=1", "-assumewhitelistedblockdepth=0"])
         node.rpc.wait_for_rpc_connection()
         connect_nodes_bi(self.nodes, 0, 1)
 

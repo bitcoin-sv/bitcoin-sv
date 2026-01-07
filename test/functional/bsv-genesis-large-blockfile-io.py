@@ -10,13 +10,12 @@ Scenario:
 5. Retrieve generated blocks to check that all I/O operations were correct
 """
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.script import CScript, OP_RETURN, OP_TRUE, OP_NOP, OP_FALSE
+from test_framework.script import CScript, OP_RETURN, OP_TRUE
 from test_framework.blocktools import create_transaction, prepare_init_chain
-from test_framework.util import assert_equal, p2p_port
-from test_framework.comptool import TestManager, TestInstance, RejectResult
+from test_framework.util import assert_equal
 from test_framework.mininode import msg_tx
 from test_framework.cdefs import ONE_GIGABYTE, ONE_MEGABYTE
-from test_framework.util import get_rpc_proxy, wait_until, sync_blocks
+from test_framework.util import get_rpc_proxy
 from time import sleep
 
 
@@ -42,6 +41,7 @@ class LargeBlockFileIO(ComparisonTestFramework):
                 '-maxtxnvalidatorasynctasksrunduration=15002',
                 '-rpcservertimeout=6000',
                 '-rpcclienttimeout=0',
+                '-dbcache=256MB',
                 '-genesisactivationheight=%d' % self.genesisactivationheight
             ]
         ]
@@ -65,7 +65,7 @@ class LargeBlockFileIO(ComparisonTestFramework):
         yield test
 
         # Create transaction that will almost fill block file when next block will be generated (~130 MB)
-        tx1 = create_transaction(out[0].tx, out[0].n, b"", ONE_MEGABYTE * 120,  CScript([OP_TRUE, OP_RETURN, bytearray([42] * (ONE_MEGABYTE * 120))]))
+        tx1 = create_transaction(out[0].tx, out[0].n, b"", ONE_MEGABYTE * 120, CScript([OP_TRUE, OP_RETURN, bytearray([42] * (ONE_MEGABYTE * 120))]))
         self.test.connections[0].send_message(msg_tx(tx1))
         # Wait for transaction processing
         self.check_mempool(node, [tx1], timeout=6000)

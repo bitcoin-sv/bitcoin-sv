@@ -12,7 +12,6 @@ from decimal import Decimal
 
 import copy
 import ecdsa
-import os
 
 '''
 Test P2P handling of getdata requests for dataref txns.
@@ -45,7 +44,7 @@ class TestNode(NodeConnCB):
 
     def GetDatarefTx(self, txid):
         for msg in self.datarefTx:
-            if(msg.tx.hash == txid):
+            if msg.tx.hash == txid:
                 return msg
         return None
 
@@ -81,19 +80,19 @@ class GetdataDataref(BitcoinTestFramework):
             dataref1_brfcid_json = {}
             dataref1_brfcid_json['example1'] = 'value1'
             dataref1_json = {}
-            dataref1_json['data'] = {'id1' : dataref1_brfcid_json}
+            dataref1_json['data'] = {'id1': dataref1_brfcid_json}
             dataref1 = create_dataref_txn(conn, dataref1_json, utxos.pop())
 
             dataref2_brfcid_json = {}
             dataref2_brfcid_json['example2'] = 'value2'
             dataref2_json = {}
-            dataref2_json['data'] = {'id2' : dataref2_brfcid_json}
+            dataref2_json['data'] = {'id2': dataref2_brfcid_json}
             dataref2 = create_dataref_txn(conn, dataref2_json, utxos.pop())
 
             dataref3_brfcid_json = {}
             dataref3_brfcid_json['example3'] = 'value3'
             dataref3_json = {}
-            dataref3_json['data'] = {'id3' : dataref3_brfcid_json}
+            dataref3_json['data'] = {'id3': dataref3_brfcid_json}
             dataref3 = create_dataref_txn(conn, dataref3_json, utxos.pop())
 
             # Reference just 2 of the datarefs in the miner-info document
@@ -114,8 +113,8 @@ class GetdataDataref(BitcoinTestFramework):
             self.sync_all()
 
             minerids = self.nodes[0].dumpminerids()
-            assert(len(minerids['miners']) == 1)
-            assert(len(minerids['miners'][0]['minerids']) == 1)
+            assert (len(minerids['miners']) == 1)
+            assert (len(minerids['miners'][0]['minerids']) == 1)
 
             # Send getdata request for each dataref txn
             conn.send_message(msg_getdata([CInv(CInv.DATAREF_TX, dataref1.sha256), CInv(CInv.DATAREF_TX, dataref2.sha256)]))

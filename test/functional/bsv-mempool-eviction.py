@@ -38,7 +38,7 @@ class Evictions(BitcoinTestFramework):
     def tx_size(self, tx):
         return len(tx.serialize())
 
-    def create_tx(self, outpoints, noutput, feerate, totalSize = 0, size_of_nonpayin_txs=0):
+    def create_tx(self, outpoints, noutput, feerate, totalSize=0, size_of_nonpayin_txs=0):
         tx = CTransaction()
         total_input = 0
         for parent_tx, n in outpoints:
@@ -46,13 +46,13 @@ class Evictions(BitcoinTestFramework):
             total_input += parent_tx.vout[n].nValue
 
         for _ in range(noutput):
-            tx.vout.append(CTxOut(total_input//noutput, CScript([OP_TRUE])))
+            tx.vout.append(CTxOut(total_input // noutput, CScript([OP_TRUE])))
 
         if totalSize:
             tx.rehash()
             missingSize = totalSize - self.tx_size(tx)
             assert missingSize >= 0
-            tx.vout[0].scriptPubKey = CScript([b"X"*(missingSize - 10), OP_DROP, OP_TRUE])
+            tx.vout[0].scriptPubKey = CScript([b"X" * (missingSize - 10), OP_DROP, OP_TRUE])
 
         tx.rehash()
         overall_size = self.tx_size(tx) + size_of_nonpayin_txs
@@ -122,12 +122,12 @@ class Evictions(BitcoinTestFramework):
             group1tx1 = self.create_tx([(funding_tx, 0)], noutput=1, feerate=0, totalSize=ONE_MEGABYTE)
             group1tx2 = self.create_tx([(group1tx1, 0)], noutput=2, feerate=0, totalSize=ONE_MEGABYTE)
             group1paying = self.create_tx([(group1tx2, 0)], noutput=1, feerate=1.4, totalSize=ONE_MEGABYTE,
-                                          size_of_nonpayin_txs=self.tx_size(group1tx1)+self.tx_size(group1tx2))
+                                          size_of_nonpayin_txs=self.tx_size(group1tx1) + self.tx_size(group1tx2))
 
             group2tx1 = self.create_tx([(group1tx2, 1)], noutput=1, feerate=0, totalSize=ONE_MEGABYTE)
             group2tx2 = self.create_tx([(group2tx1, 0)], noutput=1, feerate=0, totalSize=ONE_MEGABYTE)
             group2paying = self.create_tx([(group2tx2, 0)], noutput=1, feerate=1.6, totalSize=ONE_MEGABYTE,
-                                          size_of_nonpayin_txs=self.tx_size(group2tx1)+self.tx_size(group2tx2))
+                                          size_of_nonpayin_txs=self.tx_size(group2tx1) + self.tx_size(group2tx2))
 
             tx1 = self.create_tx([(funding_tx, 2)], noutput=1, feerate=1.1, totalSize=ONE_MEGABYTE)
             tx2 = self.create_tx([(tx1, 0)], noutput=1, feerate=1.8, totalSize=ONE_MEGABYTE)
@@ -148,10 +148,10 @@ class Evictions(BitcoinTestFramework):
             wait_until(lambda: conn.rpc.getminingcandidate()["num_tx"] == len(primaryMempoolTxs) + 1)
 
             txs_in_mempool = set(primaryMempoolTxs + secondaryMempoolTxs)
-            outpoints_to_spend = [(funding_tx, n) for n in range(4,15)]
+            outpoints_to_spend = [(funding_tx, n) for n in range(4, 15)]
 
             while len(txs_in_mempool) < 299:
-                tx = self.create_tx([outpoints_to_spend.pop(0),], noutput=2, feerate=5, totalSize=ONE_MEGABYTE)
+                tx = self.create_tx([outpoints_to_spend.pop(0), ], noutput=2, feerate=5, totalSize=ONE_MEGABYTE)
                 outpoints_to_spend.append((tx, 0))
                 outpoints_to_spend.append((tx, 1))
                 conn.send_message(msg_tx(tx))
@@ -183,7 +183,7 @@ class Evictions(BitcoinTestFramework):
             outpoint_to_spend = (funding_tx, 15)
 
             for evicting in eviction_order:
-                tx = self.create_tx([outpoint_to_spend,], noutput=1, feerate=30, totalSize=ONE_MEGABYTE)
+                tx = self.create_tx([outpoint_to_spend, ], noutput=1, feerate=30, totalSize=ONE_MEGABYTE)
                 outpoint_to_spend = (tx, 0)
                 conn.send_message(msg_tx(tx))
                 txs_in_mempool.add(tx)
@@ -218,7 +218,7 @@ class Evictions(BitcoinTestFramework):
 
             #now we have room for some more txs
             for _ in range(3):
-                tx = self.create_tx([outpoint_to_spend,], noutput=1, feerate=1, totalSize=ONE_MEGABYTE)
+                tx = self.create_tx([outpoint_to_spend, ], noutput=1, feerate=1, totalSize=ONE_MEGABYTE)
                 outpoint_to_spend = (tx, 0)
                 conn.send_message(msg_tx(tx))
                 txs_in_mempool.add(tx)

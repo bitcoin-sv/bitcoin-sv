@@ -42,8 +42,8 @@ public:
         // and actual size is written in separate 64 bit field. 
         // When reading, separate 64 bit value should be read when 32 bit value
         // is max (0xFFFFFFFF).
-        unsigned int nSizeLegacy; 
-        unsigned int nUndoSizeLegacy;
+        unsigned int nSizeLegacy; // NOLINT(cppcoreguidelines-init-variables)
+        unsigned int nUndoSizeLegacy; // NOLINT(cppcoreguidelines-init-variables)
         if (nSize >= std::numeric_limits<uint32_t>::max())
         {
             nSizeLegacy = std::numeric_limits<uint32_t>::max();

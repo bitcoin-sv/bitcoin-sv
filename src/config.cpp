@@ -1,44 +1,21 @@
 // Copyright (c) 2017 The Bitcoin developers
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
-
 #include "config.h"
+
 #include "chainparams.h"
 #include "consensus/consensus.h"
-#include "validation.h"
-#include "util.h"
+#include "double_spend/dsdetected_defaults.h"
 #include "merkletree.h"
+#include "miner_id/miner_id_db_defaults.h"
+#include "rpc/webhook_client_defaults.h"
+#include "txdb_defaults.h"
+#include "txn_validator.h"
+#include "util.h"
+#include "validation.h"
 
 #include <boost/algorithm/string.hpp>
 #include <limits>
-
-namespace
-{
-    bool LessThan(
-        int64_t argValue,
-        std::string* err,
-        const std::string& errorMessage,
-        int64_t minValue)
-    {
-        if (argValue < minValue)
-        {
-            if (err)
-            {
-                *err = errorMessage;
-            }
-            return true;
-        }
-        return false;
-    }
-
-    bool LessThanZero(
-        int64_t argValue,
-        std::string* err,
-        const std::string& errorMessage)
-    {
-        return LessThan( argValue, err, errorMessage, 0 );
-    }
-}
 
 GlobalConfig::GlobalConfig() {
     Reset();
@@ -46,6 +23,9 @@ GlobalConfig::GlobalConfig() {
 
 void GlobalConfig::Reset()
 {
+
+    data->scriptPolicysettings.ResetDefault();
+
     data->feePerKB = CFeeRate {};
     data->dustLimitFactor = DEFAULT_DUST_LIMIT_FACTOR;
     data->preferredBlockFileSize = DEFAULT_PREFERRED_BLOCKFILE_SIZE;
@@ -59,20 +39,15 @@ void GlobalConfig::Reset()
     data->maxGeneratedBlockSizeBefore = 0;
     data->maxGeneratedBlockSizeAfter = 0;
     data->maxGeneratedBlockSizeOverridden =  false;
-    data->maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
     data->minConsolidationFactor = DEFAULT_MIN_CONSOLIDATION_FACTOR;
     data->maxConsolidationInputScriptSize = DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE;
     data->minConfConsolidationInput = DEFAULT_MIN_CONF_CONSOLIDATION_INPUT;
     data->acceptNonStdConsolidationInput = DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT;
-
-    data->dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
     data->limitAncestorCount = DEFAULT_ANCESTOR_LIMIT;
     data->limitSecondaryMempoolAncestorCount = DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT;
     
     data->testBlockCandidateValidity = false;
     data->blockAssemblerType = mining::DEFAULT_BLOCK_ASSEMBLER_TYPE;
-
-    data->genesisActivationHeight = 0;
 
     data->mMaxConcurrentAsyncTasksPerNode = DEFAULT_NODE_ASYNC_TASKS_LIMIT;
 
@@ -80,7 +55,6 @@ void GlobalConfig::Reset()
     data->mPerBlockTxnValidatorThreadsCount = DEFAULT_TXNCHECK_THREADS;
     data->mPerBlockScriptValidatorThreadsCount = DEFAULT_SCRIPTCHECK_THREADS;
     data->mPerBlockScriptValidationMaxBatchSize = DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE;
-    data->maxOpsPerScriptPolicy = DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS;
     data->maxTxSigOpsCountPolicy = DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS;
     data->maxPubKeysPerMultiSig = DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS;
 
@@ -88,17 +62,13 @@ void GlobalConfig::Reset()
     data->mMaxNonStdTxnValidationDuration = DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION;
     data->mMaxTxnValidatorAsyncTasksRunDuration = CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION;
 
-    data->maxStackMemoryUsagePolicy = DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS;
-    data->maxStackMemoryUsageConsensus = DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS;
-    data->maxScriptSizePolicy = DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS;
-
-    data->maxScriptNumLengthPolicy = DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS;
-    data->genesisGracefulPeriod = DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD;
+    data->mPTVTaskScheduleStrategy = DEFAULT_PTV_TASK_SCHEDULE_STRATEGY;
 
     data->mAcceptNonStandardOutput = true;
 
     data->mMaxCoinsViewCacheSize = 0;
     data->mMaxCoinsProviderCacheSize = DEFAULT_COINS_PROVIDER_CACHE_SIZE;
+    data->mMaxCoinsDBFileSize = CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE;
 
     data->maxProtocolRecvPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
     data->maxProtocolSendPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH * MAX_PROTOCOL_SEND_PAYLOAD_FACTOR;
@@ -210,6 +180,14 @@ void GlobalConfig::Reset()
     data->minBlockMempoolTimeDifferenceSelfish = DEFAULT_MIN_BLOCK_MEMPOOL_TIME_DIFFERENCE_SELFISH;
     data->mDetectSelfishMining = DEFAULT_DETECT_SELFISH_MINING;
     data->mSelfishTxThreshold = DEFAULT_SELFISH_TX_THRESHOLD_IN_PERCENT;
+
+    // Mempool syncing
+    data->mempoolSyncAge = MempoolMsg::DEFAULT_AGE;
+    data->mempoolSyncPeriod = MempoolMsg::DEFAULT_PERIOD;
+}
+
+const ConfigScriptPolicy& GlobalConfig::GetConfigScriptPolicy() const {
+    return data->scriptPolicysettings;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -283,7 +261,7 @@ uint64_t GlobalConfig::GetMaxSendQueuesBytes() const {
     return data->factorMaxSendQueuesBytes * maxBlockSize;
 }
 
-bool GlobalConfig::SetMaxGeneratedBlockSize(uint64_t maxSize, std::string* err) {
+bool GlobalConfig::SetMaxGeneratedBlockSize(uint64_t maxSize, std::string* /*err*/) {
     std::scoped_lock<std::shared_mutex> lock{data->configMtx};
     data->maxGeneratedBlockSizeAfter = maxSize;
     data->maxGeneratedBlockSizeOverridden = true;
@@ -313,7 +291,7 @@ bool GlobalConfig::MaxGeneratedBlockSizeOverridden() const {
     return data->maxGeneratedBlockSizeOverridden;
 }
 
-bool GlobalConfig::SetBlockSizeActivationTime(int64_t activationTime, std::string* err) {
+bool GlobalConfig::SetBlockSizeActivationTime(int64_t activationTime, std::string* /*err*/) {
     data->blockSizeActivationTime = activationTime;
     return true;
 }
@@ -325,53 +303,12 @@ int64_t GlobalConfig::GetBlockSizeActivationTime() const {
 
 bool GlobalConfig::SetMaxTxSizePolicy(int64_t maxTxSizePolicyIn, std::string* err)
 {
-    if (LessThanZero(maxTxSizePolicyIn, err, "Policy value for max tx size must not be less than 0"))
-    {
-        return false;
-    }
-    if (maxTxSizePolicyIn == 0)
-    {
-        data->maxTxSizePolicy = MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS;
-        return true;
-    }
-    uint64_t maxTxSizePolicyInUnsigned = static_cast<uint64_t>(maxTxSizePolicyIn);
-    if (maxTxSizePolicyInUnsigned > MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS)
-    {
-        if (err)
-        {
-            *err = "Policy value for max tx size must not exceed consensus limit of " + std::to_string(MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS);
-        }
-        return false;
-    }
-    else if (maxTxSizePolicyInUnsigned < MAX_TX_SIZE_POLICY_BEFORE_GENESIS)
-    {
-        if (err)
-        {
-            *err = "Policy value for max tx size must not be less than " + std::to_string(MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
-        }
-        return false;
-    }
-
-    data->maxTxSizePolicy = maxTxSizePolicyInUnsigned;
-    return true;
+    return data->scriptPolicysettings.SetMaxTxSizePolicy(maxTxSizePolicyIn, err);
 }
 
-uint64_t GlobalConfig::GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const
+uint64_t GlobalConfig::GetMaxTxSize(ProtocolEra era, bool isConsensus) const
 {
-    if (!isGenesisEnabled) // no changes before genesis
-    {
-        if (isConsensus)
-        {
-            return MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS;
-        }
-        return MAX_TX_SIZE_POLICY_BEFORE_GENESIS;
-    }
-
-    if (isConsensus)
-    {
-        return MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS;
-    }
-    return data->maxTxSizePolicy;
+    return data->scriptPolicysettings.GetMaxTxSize(era, isConsensus);
 }
 
 bool GlobalConfig::SetMinConsolidationFactor(int64_t minConsolidationFactorIn, std::string* err)
@@ -430,7 +367,7 @@ uint64_t GlobalConfig::GetMinConfConsolidationInput() const
     return data->minConfConsolidationInput;
 }
 
-bool GlobalConfig::SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err)
+bool GlobalConfig::SetAcceptNonStdConsolidationInput(bool flagValue, std::string* /*err*/)
 {
     data->acceptNonStdConsolidationInput = flagValue;
     return true;
@@ -442,19 +379,19 @@ bool GlobalConfig::GetAcceptNonStdConsolidationInput() const
 }
 
 void GlobalConfig::SetDataCarrierSize(uint64_t dataCarrierSizeIn) {
-    data->dataCarrierSize = dataCarrierSizeIn;
+    data->scriptPolicysettings.SetDataCarrierSize(dataCarrierSizeIn);
 }
 
 uint64_t GlobalConfig::GetDataCarrierSize() const {
-    return data->dataCarrierSize;
+    return data->scriptPolicysettings.GetDataCarrierSize();
 }
 
 void GlobalConfig::SetDataCarrier(bool dataCarrierIn) {
-    data->dataCarrier = dataCarrierIn;
+    data->scriptPolicysettings.SetDataCarrier(dataCarrierIn);
 }
 
 bool GlobalConfig::GetDataCarrier() const {
-    return data->dataCarrier;
+    return data->scriptPolicysettings.GetDataCarrier();
 }
 
 
@@ -498,30 +435,7 @@ const CChainParams &GlobalConfig::GetChainParams() const {
 
 bool GlobalConfig::SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err)
 {
-    if (LessThanZero(maxPubKeysPerMultiSigIn, err, "Policy value for maximum public keys per multisig must not be less than zero"))
-    {
-        return false;
-    }
-    
-    uint64_t maxPubKeysPerMultiSigUnsigned = static_cast<uint64_t>(maxPubKeysPerMultiSigIn);
-    if (maxPubKeysPerMultiSigUnsigned > MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS)
-    {
-        if (err)
-        {
-            *err = "Policy value for maximum public keys per multisig must not exceed consensus limit of " + std::to_string(MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS) + ".";
-        }
-        return false;
-    }
-    else if (maxPubKeysPerMultiSigUnsigned == 0)
-    {
-        data->maxPubKeysPerMultiSig = MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS;
-    }
-    else
-    {
-        data->maxPubKeysPerMultiSig = maxPubKeysPerMultiSigUnsigned;
-    }
-
-    return true;
+    return data->scriptPolicysettings.SetMaxPubKeysPerMultiSigPolicy(maxPubKeysPerMultiSigIn, err);
 }
 
 uint64_t GlobalConfig::GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const
@@ -536,37 +450,27 @@ uint64_t GlobalConfig::GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool cons
         return MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS; // use new limit after genesis
     }
 
-    return data->maxPubKeysPerMultiSig;
+    return data->scriptPolicysettings.GetMaxPubKeysPerMultiSig(isGenesisEnabled, consensus);
 }
 
 bool GlobalConfig::SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err)
 {
-    if (LessThanZero(genesisGracefulPeriodIn, err, "Value for Genesis graceful period must not be less than zero."))
-    {
-        return false;
-    }
-
-    uint64_t genesisGracefulPeriodUnsigned = static_cast<uint64_t>(genesisGracefulPeriodIn);
-    if (genesisGracefulPeriodUnsigned > MAX_GENESIS_GRACEFULL_ACTIVATION_PERIOD)
-    {
-        if (err)
-        {
-            *err = "Value for maximum number of blocks for Genesis graceful period must not exceed the limit of " + std::to_string(MAX_GENESIS_GRACEFULL_ACTIVATION_PERIOD) + ".";
-        }
-        return false;
-    }
-    else
-    {
-        data->genesisGracefulPeriod = genesisGracefulPeriodUnsigned;
-    }
-
-    return true;
-
+    return data->scriptPolicysettings.SetGenesisGracefulPeriod(genesisGracefulPeriodIn, err);
 }
 
 uint64_t GlobalConfig::GetGenesisGracefulPeriod() const
 {
-    return data->genesisGracefulPeriod;
+    return data->scriptPolicysettings.GetGenesisGracefulPeriod();
+}
+
+bool GlobalConfig::SetChronicleGracefulPeriod(int64_t chronicleGracefulPeriodIn, std::string* err)
+{
+    return data->scriptPolicysettings.SetChronicleGracefulPeriod(chronicleGracefulPeriodIn, err);
+}
+
+uint64_t GlobalConfig::GetChronicleGracefulPeriod() const
+{
+    return data->scriptPolicysettings.GetChronicleGracefulPeriod();
 }
 
 Config& GlobalConfig::GetConfig()
@@ -598,20 +502,19 @@ mining::CMiningFactory::BlockAssemblerType GlobalConfig::GetMiningCandidateBuild
 }
 
 bool GlobalConfig::SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err) {
-    if (genesisActivationHeightIn <= 0)
-    {
-        if (err)
-        {
-            *err = "Genesis activation height cannot be configured with a zero or negative value.";
-        }
-        return false;
-    }
-    data->genesisActivationHeight = genesisActivationHeightIn;
-    return true;
+    return data->scriptPolicysettings.SetGenesisActivationHeight(genesisActivationHeightIn, err);
 }
 
 int32_t GlobalConfig::GetGenesisActivationHeight() const {
-    return data->genesisActivationHeight;
+    return data->scriptPolicysettings.GetGenesisActivationHeight();
+}
+
+bool GlobalConfig::SetChronicleActivationHeight(int32_t chronicleActivationHeightIn, std::string* err) {
+    return data->scriptPolicysettings.SetChronicleActivationHeight(chronicleActivationHeightIn, err);
+}
+
+int32_t GlobalConfig::GetChronicleActivationHeight() const {
+    return data->scriptPolicysettings.GetChronicleActivationHeight();
 }
 
 bool GlobalConfig::SetMaxConcurrentAsyncTasksPerNode(
@@ -761,44 +664,12 @@ int GlobalConfig::GetPerBlockScriptValidationMaxBatchSize() const
 
 bool GlobalConfig::SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error)
 {
-    if (LessThanZero(maxOpsPerScriptPolicyIn, error, "Policy value for MaxOpsPerScript cannot be less than zero."))
-    {
-        return false;
-    }
-    uint64_t maxOpsPerScriptPolicyInUnsigned = static_cast<uint64_t>(maxOpsPerScriptPolicyIn);
-
-    if (maxOpsPerScriptPolicyInUnsigned > MAX_OPS_PER_SCRIPT_AFTER_GENESIS)
-    {
-        if (error)
-        {
-            *error = "Policy value for MaxOpsPerScript must not exceed consensus limit of " + std::to_string(MAX_OPS_PER_SCRIPT_AFTER_GENESIS) + ".";
-        }
-        return false;
-    }
-    else if (maxOpsPerScriptPolicyInUnsigned == 0)
-    {
-        data->maxOpsPerScriptPolicy = MAX_OPS_PER_SCRIPT_AFTER_GENESIS;
-    }
-    else
-    {
-        data->maxOpsPerScriptPolicy = maxOpsPerScriptPolicyInUnsigned;
-    }
-
-    return true;
+    return data->scriptPolicysettings.SetMaxOpsPerScriptPolicy(maxOpsPerScriptPolicyIn, error);
 }
 
 uint64_t GlobalConfig::GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const
 {
-    if (!isGenesisEnabled)
-    {
-        return MAX_OPS_PER_SCRIPT_BEFORE_GENESIS; // no changes before genesis
-    }
-
-    if (consensus)
-    {
-        return MAX_OPS_PER_SCRIPT_AFTER_GENESIS; // use new limit after genesis
-    }
-    return data->maxOpsPerScriptPolicy;
+    return data->scriptPolicysettings.GetMaxOpsPerScript(isGenesisEnabled, consensus);
 }
 
 bool GlobalConfig::SetMaxStdTxnValidationDuration(int ms, std::string* err)
@@ -895,25 +766,22 @@ bool GlobalConfig::GetValidationClockCPU() const {
     return data->mValidationClockCPU;
 }
 
-bool GlobalConfig::SetPTVTaskScheduleStrategy(std::string strategy, std::string *err)
+bool GlobalConfig::SetPTVTaskScheduleStrategy(PTVTaskScheduleStrategy strategy, std::string *err)
 {
-    if (strategy == "CHAIN_DETECTOR")
+    if(strategy != PTVTaskScheduleStrategy::UNKNOWN)
     {
-        data->mPTVTaskScheduleStrategy = PTVTaskScheduleStrategy::CHAIN_DETECTOR;
-        return true;
+        data->mPTVTaskScheduleStrategy = strategy;
     }
-    else if (strategy == "TOPO_SORT")
+    else
     {
-        data->mPTVTaskScheduleStrategy = PTVTaskScheduleStrategy::TOPO_SORT;
-        return true;
-    }
-
-    if (err)
-    {
-        *err = "Invalid value for task scheduling strategy. Available strategies are CHAIN_DETECTOR and TOPO_SORT. Got " + strategy;
+        if (err)
+        {
+            *err = "Invalid value for PTV task scheduling strategy";
+        }
+        return false;
     }
 
-    return false;
+    return true;
 }
 
 PTVTaskScheduleStrategy GlobalConfig::GetPTVTaskScheduleStrategy() const
@@ -955,110 +823,22 @@ uint64_t GlobalConfig::GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSiz
 
 bool GlobalConfig::SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err)
 {
-    if (maxStackMemoryUsageConsensusIn < 0 || maxStackMemoryUsagePolicyIn < 0)
-    {
-        if (err)
-        {
-            *err = "Policy and consensus value for max stack memory usage must not be less than 0.";
-        }
-        return false;
-    }
-
-    if (maxStackMemoryUsageConsensusIn == 0)
-    {
-        data->maxStackMemoryUsageConsensus = DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS;
-    }
-    else
-    {
-        data->maxStackMemoryUsageConsensus = static_cast<uint64_t>(maxStackMemoryUsageConsensusIn);
-    }
-
-    if (maxStackMemoryUsagePolicyIn == 0)
-    {
-        data->maxStackMemoryUsagePolicy = DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS;
-    }
-    else
-    {
-        data->maxStackMemoryUsagePolicy = static_cast<uint64_t>(maxStackMemoryUsagePolicyIn);
-    }
-
-    if (data->maxStackMemoryUsagePolicy > data->maxStackMemoryUsageConsensus)
-    {
-        if (err)
-        {
-            *err = _("Policy value of max stack memory usage must not exceed consensus limit of ") + std::to_string(data->maxStackMemoryUsageConsensus);
-        }
-        return false;
-    }
-
-    return true;
+    return data->scriptPolicysettings.SetMaxStackMemoryUsage(maxStackMemoryUsageConsensusIn, maxStackMemoryUsagePolicyIn, err);
 }
 
 uint64_t GlobalConfig::GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const
 {
-    // concept of max stack memory usage is not defined before genesis
-    // before Genesis stricter limitations exist, so maxStackMemoryUsage can be infinite
-    if (!isGenesisEnabled)
-    {
-        return INT64_MAX;
-    }
-
-    if (consensus)
-    {
-        return data->maxStackMemoryUsageConsensus;
-    }
-
-    return data->maxStackMemoryUsagePolicy;
+    return data->scriptPolicysettings.GetMaxStackMemoryUsage(isGenesisEnabled, consensus);
 }
 
 bool GlobalConfig::SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err)
 {
-    if (LessThanZero(maxScriptNumLengthIn, err, "Policy value for maximum script number length must not be less than 0."))
-    {
-        return false;
-    }
-
-    uint64_t maxScriptNumLengthUnsigned = static_cast<uint64_t>(maxScriptNumLengthIn);
-    if (maxScriptNumLengthUnsigned > MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
-    {
-        if (err)
-        {
-            *err = "Policy value for maximum script number length must not exceed consensus limit of " + std::to_string(MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS) + ".";
-        }
-        return false;
-    }
-    else if (maxScriptNumLengthUnsigned == 0)
-    {
-        data->maxScriptNumLengthPolicy = MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS;
-    }
-    else if (maxScriptNumLengthUnsigned < MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS)
-    {
-        if (err)
-        {
-            *err = "Policy value for maximum script number length must not be less than " + std::to_string(MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS) + ".";
-        }
-        return false;
-    }
-    else
-    {
-        data->maxScriptNumLengthPolicy = maxScriptNumLengthUnsigned;
-    }
-
-    return true;
+    return data->scriptPolicysettings.SetMaxScriptNumLengthPolicy(maxScriptNumLengthIn, err);
 }
 
-uint64_t GlobalConfig::GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const
+uint64_t GlobalConfig::GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) const
 {
-    if (!isGenesisEnabled)
-    {
-        return MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS; // no changes before genesis
-    }
-
-    if (isConsensus)
-    {
-        return MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS; // use new limit after genesis
-    }
-    return data->maxScriptNumLengthPolicy; // use policy
+    return data->scriptPolicysettings.GetMaxScriptNumLength(era, isConsensus);
 }
 
 void GlobalConfig::SetAcceptNonStandardOutput(bool accept)
@@ -1066,9 +846,9 @@ void GlobalConfig::SetAcceptNonStandardOutput(bool accept)
     data->mAcceptNonStandardOutput = accept;
 }
 
-bool GlobalConfig::GetAcceptNonStandardOutput(bool isGenesisEnabled) const
+bool GlobalConfig::GetAcceptNonStandardOutput(ProtocolEra era) const
 {
-    return isGenesisEnabled ? data->mAcceptNonStandardOutput : !fRequireStandard;
+    return IsProtocolActive(era, ProtocolName::Genesis) ? data->mAcceptNonStandardOutput : !fRequireStandard;
 }
 
 bool GlobalConfig::SetMaxCoinsViewCacheSize(int64_t max, std::string* err)
@@ -1110,6 +890,21 @@ bool GlobalConfig::SetMaxCoinsDbOpenFiles(int64_t max, std::string* err)
     }
 
     data->mMaxCoinsDbOpenFiles = static_cast<uint64_t>(max);
+
+    return true;
+}
+
+bool GlobalConfig::SetCoinsDBMaxFileSize(int64_t max, std::string* err)
+{
+    if(LessThan(max, err,
+        "Value for maximum coins DB file size must not be less than "
+            + std::to_string(CoinsDBDefaults::MIN_LEVELDB_FILE_SIZE),
+            CoinsDBDefaults::MIN_LEVELDB_FILE_SIZE))
+    {
+        return false;
+    }
+
+    data->mMaxCoinsDBFileSize = static_cast<uint64_t>(max);
 
     return true;
 }
@@ -1552,7 +1347,7 @@ bool GlobalConfig::SetP2PHandshakeTimeout(int64_t timeout, std::string* err)
     return true;
 }
 
-bool GlobalConfig::SetStreamSendRateLimit(int64_t limit, std::string* err)
+bool GlobalConfig::SetStreamSendRateLimit(int64_t limit, std::string* /*err*/)
 {
     data->streamSendRateLimit = limit;
     return true;
@@ -1601,7 +1396,7 @@ unsigned int GlobalConfig::GetBlockTxnMaxPercent() const
     return data->blockTxnMaxPercent;
 }
 
-bool GlobalConfig::SetMultistreamsEnabled(bool enabled, std::string* err)
+bool GlobalConfig::SetMultistreamsEnabled(bool enabled, std::string* /*err*/)
 {
     data->multistreamsEnabled = enabled;
     return true;
@@ -1611,7 +1406,7 @@ bool GlobalConfig::GetMultistreamsEnabled() const
     return data->multistreamsEnabled;
 }
 
-bool GlobalConfig::SetWhitelistRelay(bool relay, std::string* err)
+bool GlobalConfig::SetWhitelistRelay(bool relay, std::string* /*err*/)
 {
     data->whitelistRelay = relay;
     return true;
@@ -1621,7 +1416,7 @@ bool GlobalConfig::GetWhitelistRelay() const
     return data->whitelistRelay;
 }
 
-bool GlobalConfig::SetWhitelistForceRelay(bool relay, std::string* err)
+bool GlobalConfig::SetWhitelistForceRelay(bool relay, std::string* /*err*/)
 {
     data->whitelistForceRelay = relay;
     return true;
@@ -1631,7 +1426,7 @@ bool GlobalConfig::GetWhitelistForceRelay() const
     return data->whitelistForceRelay;
 }
 
-bool GlobalConfig::SetRejectMempoolRequest(bool reject, std::string* err)
+bool GlobalConfig::SetRejectMempoolRequest(bool reject, std::string* /*err*/)
 {
     data->rejectMempoolRequest = reject;
     return true;
@@ -1703,7 +1498,7 @@ unsigned int GlobalConfig::GetInvalidChecksumFreq() const
     return data->invalidChecksumFreq;
 }
 
-bool GlobalConfig::SetFeeFilter(bool feefilter, std::string* err)
+bool GlobalConfig::SetFeeFilter(bool feefilter, std::string* /*err*/)
 {
     data->feeFilter = feefilter;
     return true;
@@ -1890,7 +1685,7 @@ uint64_t GlobalConfig::GetDoubleSpendEndpointBlacklistSize() const
     return data->dsEndpointBlacklistSize;
 }
 
-bool GlobalConfig::SetDoubleSpendEndpointSkipList(const std::string& skip, std::string* err)
+bool GlobalConfig::SetDoubleSpendEndpointSkipList(const std::string& skip, std::string* /*err*/)
 {
     // Split comma separated list of IPs and trim whitespace
     std::vector<std::string> ips {};
@@ -2031,7 +1826,8 @@ int64_t GlobalConfig::GetSafeModeMinForkHeightDifference() const
     return data->safeModeMinHeightDifference;
 }
 
-bool GlobalConfig::SetSafeModeMinForkHeightDifference(int64_t heightDifference, std::string* err)
+bool GlobalConfig::SetSafeModeMinForkHeightDifference(int64_t heightDifference,
+                                                      std::string* /*err*/)
 {
     data->safeModeMinHeightDifference = heightDifference;
     return true;
@@ -2123,11 +1919,12 @@ bool GlobalConfig::GetDisableBIP30Checks() const
 }
 
 // MinerID
-bool GlobalConfig::SetMinerIdEnabled(bool enabled, std::string* err)
+bool GlobalConfig::SetMinerIdEnabled(bool enabled, std::string* /*err*/)
 {
     data->minerIdEnabled = enabled;
     return true;
 }
+
 bool GlobalConfig::GetMinerIdEnabled() const
 {
     return data->minerIdEnabled;
@@ -2291,11 +2088,13 @@ std::string GlobalConfig::GetMinerIdGeneratorPath() const
     return data->minerIdGeneratorPath;
 }
 
-bool GlobalConfig::SetMinerIdGeneratorAlias(const std::string& alias, std::string* err)
+bool GlobalConfig::SetMinerIdGeneratorAlias(const std::string& alias,
+                                            std::string* /*err*/)
 {
     data->minerIdGeneratorAlias = alias;
     return true;
 }
+
 std::string GlobalConfig::GetMinerIdGeneratorAlias() const
 {
     return data->minerIdGeneratorAlias;
@@ -2395,43 +2194,6 @@ unsigned int GlobalConfig::GetRecvInvQueueFactor() const
   return data->recvInvQueueFactor;
 }
 
-DummyConfig::DummyConfig()
-    : chainParams(CreateChainParams(CBaseChainParams::REGTEST)) {}
-
-DummyConfig::DummyConfig(std::string net)
-    : chainParams(CreateChainParams(net)) {}
-
-void DummyConfig::SetChainParams(std::string net) {
-    chainParams = CreateChainParams(net);
-}
-
-int DummyConfig::GetMaxConcurrentAsyncTasksPerNode() const
-{
-    return DEFAULT_NODE_ASYNC_TASKS_LIMIT;
-}
-
-int DummyConfig::GetMaxParallelBlocks() const
-{
-    return DEFAULT_SCRIPT_CHECK_POOL_SIZE;
-}
-
-int DummyConfig::GetPerBlockTxnValidatorThreadsCount() const
-{
-    return DEFAULT_SCRIPTCHECK_THREADS;
-}
-
-int DummyConfig::GetPerBlockScriptValidatorThreadsCount() const
-{
-    return DEFAULT_SCRIPTCHECK_THREADS;
-}
-
-int DummyConfig::GetPerBlockScriptValidationMaxBatchSize() const
-{
-    return DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE;
-}
-
-void DummyConfig::Reset() {}
-
 void GlobalConfig::SetMinFeePerKB(CFeeRate fee) {
     data->feePerKB = fee;
 }
@@ -2508,9 +2270,9 @@ uint64_t GlobalConfig::GetMaxTxSigOpsCountConsensusBeforeGenesis() const
     return MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS;
 }
 
-uint64_t GlobalConfig::GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const
+uint64_t GlobalConfig::GetMaxTxSigOpsCountPolicy(ProtocolEra era) const
 {
-    if (!isGenesisEnabled)
+    if (!IsProtocolActive(era, ProtocolName::Genesis))
     {
         return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS;
     }
@@ -2519,39 +2281,11 @@ uint64_t GlobalConfig::GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const
 }
 
 bool GlobalConfig::SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err) {
-    if (LessThanZero(maxScriptSizePolicyIn, err, "Policy value for max script size must not be less than 0"))
-    {
-        return false;
-    }
-    uint64_t maxScriptSizePolicyInUnsigned = static_cast<uint64_t>(maxScriptSizePolicyIn);
-    if (maxScriptSizePolicyInUnsigned > MAX_SCRIPT_SIZE_AFTER_GENESIS)
-    {
-        if (err)
-        {
-            *err = "Policy value for max script size must not exceed consensus limit of " + std::to_string(MAX_SCRIPT_SIZE_AFTER_GENESIS);
-        }
-        return false;
-    }
-    else if (maxScriptSizePolicyInUnsigned == 0 ) {
-        data->maxScriptSizePolicy = MAX_SCRIPT_SIZE_AFTER_GENESIS;
-    }
-    else
-    {
-        data->maxScriptSizePolicy = maxScriptSizePolicyInUnsigned;
-    }
-    return true;
+    return data->scriptPolicysettings.SetMaxScriptSizePolicy(maxScriptSizePolicyIn, err);
 }
 
 uint64_t GlobalConfig::GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const {
-    if (!isGenesisEnabled) 
-    {
-        return MAX_SCRIPT_SIZE_BEFORE_GENESIS;
-    }
-    if (isConsensus) 
-    {
-        return MAX_SCRIPT_SIZE_AFTER_GENESIS;
-    }
-    return data->maxScriptSizePolicy;
+    return data->scriptPolicysettings.GetMaxScriptSize(isGenesisEnabled, isConsensus);
 }
 
 bool GlobalConfig::SetMaxMempool(int64_t maxMempool, std::string* err) {
@@ -2769,6 +2503,45 @@ bool GlobalConfig::SetSelfishTxThreshold(uint64_t selfishTxPercentThreshold, std
         return false;
     }
     data->mSelfishTxThreshold = selfishTxPercentThreshold;
+    return true;
+}
+
+// Mempool syncing
+int64_t GlobalConfig::GetMempoolSyncAge() const
+{
+    return data->mempoolSyncAge;
+}
+
+bool GlobalConfig::SetMempoolSyncAge(int64_t age, std::string* err)
+{
+    if(age <= 0)
+    {
+        if(err)
+        {
+            *err = "Mempool sync age must be > 0";
+        }
+        return false;
+    }
+    data->mempoolSyncAge = age;
+    return true;
+}
+
+int64_t GlobalConfig::GetMempoolSyncPeriod() const
+{
+    return data->mempoolSyncPeriod;
+}
+
+bool GlobalConfig::SetMempoolSyncPeriod(int64_t period, std::string* err)
+{
+    if(period <= 0)
+    {
+        if(err)
+        {
+            *err = "Mempool sync period must be > 0";
+        }
+        return false;
+    }
+    data->mempoolSyncPeriod = period;
     return true;
 }
 

@@ -19,10 +19,10 @@ Test steps:
 3. create doublespend trransactions tx2, tx3 that use same input as tx1.
 4. send tx2, tx3, and receive that transactions tx2, tx3 collided with transaction tx1
 """
+from test_framework.mininode import CTxIn, COutPoint, FromHex, ToHex
 from test_framework.script import CTransaction, CScript, OP_TRUE, CTxOut
-from test_framework.test_framework import BitcoinTestFramework, ToHex, FromHex
+from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, wait_until
-from test_framework.mininode import CTxIn, COutPoint
 
 
 class BSVsendrawtransactionsCollided(BitcoinTestFramework):
@@ -85,7 +85,7 @@ class BSVsendrawtransactionsCollided(BitcoinTestFramework):
         assert_equal(response["invalid"][0]["txid"] in collidedtx_hashes, True)
         assert_equal(response["invalid"][0]["collidedWith"][0]["txid"] == tx1.hash, True)
         assert_equal(response["invalid"][0]["collidedWith"][0]["hex"] == tx1_hex, True)
-        assert_equal(response["invalid"][0]["collidedWith"][0]["size"], len(tx1_hex)//2)
+        assert_equal(response["invalid"][0]["collidedWith"][0]["size"], len(tx1_hex) // 2)
 
         assert_equal(response["invalid"][1]["txid"] in collidedtx_hashes, True)
         assert_equal(response["invalid"][1]["collidedWith"][0]["txid"] == tx1.hash, True)

@@ -2,9 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef _BITCOIN_PREVECTOR_H_
-// NOLINTNEXTLINE(bugprone-reserved-identifier)
-#define _BITCOIN_PREVECTOR_H_
+#ifndef BITCOIN_PREVECTOR_H_
+#define BITCOIN_PREVECTOR_H_
 
 #include <cassert>
 #include <cstdint>
@@ -107,12 +106,8 @@ public:
             ptr -= n;
             return *this;
         }
-        bool operator==(iterator x) const { return ptr == x.ptr; }
-        bool operator!=(iterator x) const { return ptr != x.ptr; }
-        bool operator>=(iterator x) const { return ptr >= x.ptr; }
-        bool operator<=(iterator x) const { return ptr <= x.ptr; }
-        bool operator>(iterator x) const { return ptr > x.ptr; }
-        bool operator<(iterator x) const { return ptr < x.ptr; }
+        
+        auto operator<=>(const iterator& other) const = default;
 
         friend iterator operator+(difference_type n, const iterator& it)
         {
@@ -155,7 +150,6 @@ public:
             return copy;
         }
         bool operator==(reverse_iterator x) const { return ptr == x.ptr; }
-        bool operator!=(reverse_iterator x) const { return ptr != x.ptr; }
     };
 
     class const_iterator {
@@ -208,12 +202,8 @@ public:
             ptr -= n;
             return *this;
         }
-        bool operator==(const_iterator x) const { return ptr == x.ptr; }
-        bool operator!=(const_iterator x) const { return ptr != x.ptr; }
-        bool operator>=(const_iterator x) const { return ptr >= x.ptr; }
-        bool operator<=(const_iterator x) const { return ptr <= x.ptr; }
-        bool operator>(const_iterator x) const { return ptr > x.ptr; }
-        bool operator<(const_iterator x) const { return ptr < x.ptr; }
+
+        auto operator<=>(const const_iterator& x) const = default;
 
         friend const_iterator operator+(difference_type n, const const_iterator& it)
         {
@@ -255,7 +245,6 @@ public:
             return copy;
         }
         bool operator==(const_reverse_iterator x) const { return ptr == x.ptr; }
-        bool operator!=(const_reverse_iterator x) const { return ptr != x.ptr; }
     };
 
 private:
@@ -575,10 +564,6 @@ public:
             ++b2;
         }
         return true;
-    }
-
-    bool operator!=(const prevector<N, T, Size, Diff> &other) const {
-        return !(*this == other);
     }
 
     bool operator<(const prevector<N, T, Size, Diff> &other) const {

@@ -20,7 +20,6 @@
 from test_framework.mininode import CBlock, CTransaction, msg_block, msg_gethdrsen, CTxOut, MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, CTxIn, COutPoint, uint256_from_str, ToHex, FromHex
 from test_framework.util import assert_equal, hex_str_to_bytes
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.cdefs import ONE_MEGABYTE
 from test_framework.blocktools import create_coinbase, merkle_root_from_merkle_proof
 from test_framework.script import CScript, OP_RETURN, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG
 import math
@@ -140,7 +139,7 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
             txsInSecondBlock = 18
             second_block, second_coinbase_tx = self.send_block(unspent_txns[3:])
 
-            assert_equal(startingHeight+2, self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height'])
+            assert_equal(startingHeight + 2, self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height'])
 
             self.send_gethdrsen(hash_at_120)
             self.test_node.cb.wait_for_hdrsen()
@@ -159,8 +158,8 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
             headersEnriched = []
 
             # Send block with coinbase transaction larger than 1MB.
-            big_coinbase_tx = self.send_block(unspent_txns, bigCoinbaseTx=True)
-            assert_equal(startingHeight+3, self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height'])
+            self.send_block(unspent_txns, bigCoinbaseTx=True)
+            assert_equal(startingHeight + 3, self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height'])
 
             # Obtain hdrsen for block with big coinbase transaction.
             self.send_gethdrsen(hash_at_122)

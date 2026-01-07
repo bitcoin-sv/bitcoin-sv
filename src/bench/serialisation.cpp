@@ -45,6 +45,7 @@ void encode_hex_tx(benchmark::State& state)
     {
         CStringWriter sw;
         const auto tx_size{tx.GetTotalSize()};
+        // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
         sw.ReserveAdditional(tx_size*2);
         CJSONWriter jw{sw, true};
         EncodeHexTx(tx, jw.getWriter());
@@ -52,6 +53,7 @@ void encode_hex_tx(benchmark::State& state)
 }
 BENCHMARK(encode_hex_tx);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static auto make_btxs = []
 {
     constexpr auto n{100'000};
@@ -85,6 +87,7 @@ static auto make_btxs = []
     return btxs;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static BlockTransactions btxs = make_btxs();
 
 static void ser_btxs_noreserve(benchmark::State& state)

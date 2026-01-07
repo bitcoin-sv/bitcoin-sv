@@ -62,7 +62,7 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
         assert_equal(tx1.hash, tx[1])
         self.log.info("Created transaction %s on height %d",
                       tx1.hash,
-                      self.genesisactivationheight-2)
+                      self.genesisactivationheight - 2)
 
         # Create transaction with OP_TRUE in the unlocking that tries to spend tx1.
         tx2 = create_transaction(tx1, 0, b'\x51', 1, CScript([OP_TRUE]))
@@ -76,8 +76,8 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
         assert_equal(len(tx), 1)
         self.log.info("Created transaction %s on height %d that tries to spend transaction on height %d",
                       tx2.hash,
-                      self.genesisactivationheight-1,
-                      self.genesisactivationheight-2)
+                      self.genesisactivationheight - 1,
+                      self.genesisactivationheight - 2)
 
         # Create transaction with OP_RETURN in the locking script.
         tx3 = create_transaction(out[2].tx, out[2].n, b"", 100000, CScript([OP_RETURN]))
@@ -87,7 +87,7 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
         self.test.connections[0].send_message(msg_tx(tx4))
         # Make sure transactions are in mempool
         wait_until(lambda: len(self.nodes[0].getrawmempool()) >= 2, timeout=10)
-        assert({tx3.hash, tx4.hash} == set(self.nodes[0].getrawmempool()))
+        assert ({tx3.hash, tx4.hash} == set(self.nodes[0].getrawmempool()))
 
         # Mine block (height 104) with new transactions.
         self.nodes[0].generate(1)

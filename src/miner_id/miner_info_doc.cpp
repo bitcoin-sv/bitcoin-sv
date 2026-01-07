@@ -153,7 +153,7 @@ namespace
         uint256 comp_miner_id_hash;
         CSHA256()
             .Write(comp_miner_id.data(), comp_miner_id.size())
-            .Finalize(comp_miner_id_hash.begin());
+            .Finalize(CSHA256::span{comp_miner_id_hash.begin(), CSHA256::OUTPUT_SIZE});
 
         if(!verify(comp_miner_id_hash, msg.sig_1(), rev_key))
             return miner_info_error::doc_parse_error_sig1_verification_failed;
@@ -172,7 +172,7 @@ namespace
         uint256 hash;
         CSHA256()
             .Write(hex_msg1.data(), hex_msg1.size())
-            .Finalize(hash.begin());
+            .Finalize(CSHA256::span{hash.begin(), CSHA256::OUTPUT_SIZE});
 
         return verify(hash, ks.prev_key_sig(), ks.prev_key()); 
     }
@@ -232,7 +232,7 @@ namespace
         return revocation_msg{key, sig1, sig2};
     }
 
-    std::variant<data_refs, miner_info_error>  parse_data_refs(const UniValue& uv)
+    std::variant<data_refs_type, miner_info_error>  parse_data_refs(const UniValue& uv)
     {
         using mie = miner_info_error;
 
@@ -417,7 +417,7 @@ std::variant<miner_info_doc, miner_info_error> ParseMinerInfoDoc(
         revocation_msg = rev_msg;
     }
 
-    std::variant<data_refs, miner_info_error> var_data_refs;
+    std::variant<data_refs_type, miner_info_error> var_data_refs;
 
     const auto extensions = doc["extensions"];
     if(!extensions.isNull() && extensions.isObject())
@@ -431,7 +431,7 @@ std::variant<miner_info_doc, miner_info_error> ParseMinerInfoDoc(
                           height,
                           miner_id_ks,
                           revocation_ks,
-                          get<data_refs>(var_data_refs),
+                          get<data_refs_type>(var_data_refs),
                           revocation_msg};
 }
 
@@ -497,7 +497,7 @@ std::ostream& operator<<(std::ostream& os, miner_info_doc::supported_version v)
     return os;
 }
 
-std::variant<data_refs, miner_info_error> ParseDataRefs(const std::string_view sv)
+std::variant<data_refs_type, miner_info_error> ParseDataRefs(const std::string_view sv)
 {
     UniValue uv;
     if(!uv.read(sv.data(), sv.size()))

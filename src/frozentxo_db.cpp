@@ -5,6 +5,7 @@
 
 #include "serialize.h"
 
+#include <memory>
 #include <mutex>
 
 
@@ -71,40 +72,40 @@ public:
 // Serializes key of a transaction output for frozen TXO that can be found by TXO
 class OutKeyTXO : public OutKey<RecordType::TXO>
 {
-    const COutPoint& txo;
+    const COutPoint* txo_;
     using Base = OutKey<RecordType::TXO>;
 
 public:
-    explicit OutKeyTXO(const COutPoint& txo)
-    : Base()
-    , txo(txo)
+    explicit OutKeyTXO(const COutPoint& txo):
+        Base{},
+        txo_{&txo}
     {}
 
     template<typename Stream>
     void Serialize(Stream &s) const
     {
         Base::Serialize(s);
-        s << this->txo;
+        s << *txo_;
     }
 };
 
 // Serializes key of a TxId for whitelisted confiscated transaction that can be found by TxId
 class OutKeyTxId : public OutKey<RecordType::TXID>
 {
-    const TxId& txid;
+    const TxId* txid_;
     using Base = OutKey<RecordType::TXID>;
 
 public:
-    explicit OutKeyTxId(const TxId& txid)
-    : Base()
-    , txid(txid)
+    explicit OutKeyTxId(const TxId& txid):
+        Base(),
+        txid_(&txid)
     {}
 
     template<typename Stream>
     void Serialize(Stream &s) const
     {
         Base::Serialize(s);
-        s << this->txid;
+        s << *txid_;
     }
 };
 
@@ -135,7 +136,7 @@ public:
     template<typename Stream>
     void Unserialize(Stream &s)
     {
-        std::uint8_t v;
+        std::uint8_t v{};
         ::Unserialize(s, v);
         this->isValid = ( RecordType(v) == RT );
     }
@@ -143,12 +144,13 @@ public:
 
 class InKeyTXO : public InKey<RecordType::TXO>
 {
-    COutPoint& txo;
+    COutPoint* txo_;
     using Base = InKey<RecordType::TXO>;
 
 public:
-    explicit InKeyTXO(COutPoint& txo)
-    : txo(txo)
+    explicit InKeyTXO(COutPoint& txo):
+       InKey<RecordType::TXO>{},
+       txo_{&txo}
     {}
 
     template<typename Stream>
@@ -160,18 +162,19 @@ public:
             return;
         }
 
-        s >> this->txo;
+        s >> *txo_;
     }
 };
 
 class InKeyTxId : public InKey<RecordType::TXID>
 {
-    TxId& txid;
+    TxId* txid_;
     using Base = InKey<RecordType::TXID>;
 
 public:
-    explicit InKeyTxId(TxId& txid)
-    : txid(txid)
+    explicit InKeyTxId(TxId& txid):
+        InKey<RecordType::TXID>{},
+        txid_{&txid}
     {}
 
     template<typename Stream>
@@ -183,7 +186,7 @@ public:
             return;
         }
 
-        s >> this->txid;
+        s >> *txid_;
     }
 };
 
@@ -191,29 +194,29 @@ public:
 // Serialization of FrozenTXOData object to value stored in database
 class OutValueFrozenTXOData
 {
-    const CFrozenTXODB::FrozenTXOData& frozenTXOData;
+    const CFrozenTXODB::FrozenTXOData* frozenTXOData_;
 
 public:
     explicit OutValueFrozenTXOData(const CFrozenTXODB::FrozenTXOData& frozenTXOData)
-    : frozenTXOData(frozenTXOData)
+    : frozenTXOData_{&frozenTXOData}
     {}
 
     template<typename Stream>
     void Serialize(Stream &s) const
     {
-        std::uint8_t black_list_and_policy_expires_flag = static_cast<std::uint8_t>(this->frozenTXOData.blacklist);
+        std::uint8_t black_list_and_policy_expires_flag = static_cast<std::uint8_t>(frozenTXOData_->blacklist);
         assert(black_list_and_policy_expires_flag < 0x80);
 
-        if(this->frozenTXOData.blacklist!=CFrozenTXODB::FrozenTXOData::Blacklist::PolicyOnly)
+        if(frozenTXOData_->blacklist!=CFrozenTXODB::FrozenTXOData::Blacklist::PolicyOnly)
         {
-            if(frozenTXOData.policyExpiresWithConsensus)
+            if(frozenTXOData_->policyExpiresWithConsensus)
             {
                 black_list_and_policy_expires_flag |= 0x80; // bit-7 is used to store value of 'policyExpiresWithConsensus'
             }
 
             // If TXO is on consensus/confiscation blacklist, serialized data contains blacklist and additional consensus specific data
             s << black_list_and_policy_expires_flag;
-            s << static_cast<const CFrozenTXODB::FrozenTXOData::EnforceAtHeightType::prevector&>(this->frozenTXOData.enforceAtHeight);
+            s << static_cast<const CFrozenTXODB::FrozenTXOData::EnforceAtHeightType::prevector&>(frozenTXOData_->enforceAtHeight);
         }
         else
         {
@@ -226,25 +229,25 @@ public:
 // Unserialization of FrozenTXOData object from value stored in database
 class InValueFrozenTXOData
 {
-    CFrozenTXODB::FrozenTXOData& frozenTXOData;
+    CFrozenTXODB::FrozenTXOData* frozenTXOData_;
 
 public:
     explicit InValueFrozenTXOData(CFrozenTXODB::FrozenTXOData& frozenTXOData)
-    : frozenTXOData(frozenTXOData)
+    : frozenTXOData_{&frozenTXOData}
     {}
 
     template<typename Stream>
     void Unserialize(Stream &s) const
     {
-        std::uint8_t black_list_and_policy_expires_flag;
+        std::uint8_t black_list_and_policy_expires_flag{};
         s >> black_list_and_policy_expires_flag;
 
-        this->frozenTXOData.blacklist = static_cast<decltype(this->frozenTXOData.blacklist)>(black_list_and_policy_expires_flag & 0x7f);
-        if(this->frozenTXOData.blacklist!=CFrozenTXODB::FrozenTXOData::Blacklist::PolicyOnly)
+        frozenTXOData_->blacklist = static_cast<decltype(frozenTXOData_->blacklist)>(black_list_and_policy_expires_flag & 0x7f);
+        if(frozenTXOData_->blacklist!=CFrozenTXODB::FrozenTXOData::Blacklist::PolicyOnly)
         {
             // Consensus specific data is only unserialized if TXO is on consensus/confiscation blacklist
-            this->frozenTXOData.policyExpiresWithConsensus = (black_list_and_policy_expires_flag & 0x80)!=0;
-            s >> static_cast<CFrozenTXODB::FrozenTXOData::EnforceAtHeightType::prevector&>(this->frozenTXOData.enforceAtHeight);
+            frozenTXOData_->policyExpiresWithConsensus = (black_list_and_policy_expires_flag & 0x80)!=0;
+            s >> static_cast<CFrozenTXODB::FrozenTXOData::EnforceAtHeightType::prevector&>(frozenTXOData_->enforceAtHeight);
         }
 
         // NOTE: If blacklist is PolicyOnly, values of other members in frozenTXOData are left unspecified since they are not applicable.
@@ -255,36 +258,36 @@ public:
 // Serialization of data for whitelisted transaction to value stored in database
 class OutValueWhitelistedTxData
 {
-    const CFrozenTXODB::WhitelistedTxData& whitelistedTxData;
+    const CFrozenTXODB::WhitelistedTxData* whitelistedTxData_;
 
 public:
     explicit OutValueWhitelistedTxData(const CFrozenTXODB::WhitelistedTxData& whitelistedTxData)
-    : whitelistedTxData(whitelistedTxData)
+    : whitelistedTxData_{&whitelistedTxData}
     {}
 
     template<typename Stream>
     void Serialize(Stream &s) const
     {
-        s << this->whitelistedTxData.enforceAtHeight;
-        s << this->whitelistedTxData.confiscatedTXOs;
+        s << whitelistedTxData_->enforceAtHeight;
+        s << whitelistedTxData_->confiscatedTXOs;
     }
 };
 
 // Unserialization of data for whitelisted transaction from value stored in database
 class InValueWhitelistedTxData
 {
-    CFrozenTXODB::WhitelistedTxData& whitelistedTxData;
+    CFrozenTXODB::WhitelistedTxData* whitelistedTxData_;
 
 public:
     explicit InValueWhitelistedTxData( CFrozenTXODB::WhitelistedTxData& whitelistedTxData)
-    : whitelistedTxData(whitelistedTxData)
+    : whitelistedTxData_{&whitelistedTxData}
     {}
 
     template<typename Stream>
     void Unserialize(Stream &s) const
     {
-        s >> this->whitelistedTxData.enforceAtHeight;
-        s >> this->whitelistedTxData.confiscatedTXOs;
+        s >> whitelistedTxData_->enforceAtHeight;
+        s >> whitelistedTxData_->confiscatedTXOs;
     }
 };
 
@@ -400,9 +403,6 @@ void CFrozenTXODB::Sync()
 auto CFrozenTXODB::UnfreezeAll(bool keepPolicyEntries) -> UnfreezeAllResult
 {
     UnfreezeAllResult res;
-    res.numUnfrozenPolicyOnly = 0;
-    res.numUnfrozenConsensus = 0;
-    res.numUnwhitelistedTxs = 0;
 
     // Lock db mutex for exclusive access
     auto lck = std::unique_lock<std::shared_mutex>(this->mtx_db);
@@ -450,8 +450,6 @@ auto CFrozenTXODB::UnfreezeAll(bool keepPolicyEntries) -> UnfreezeAllResult
 auto CFrozenTXODB::CleanExpiredRecords(std::int32_t nHeight) -> CleanExpiredRecordsResult
 {
     CleanExpiredRecordsResult res;
-    res.numConsensusRemoved = 0;
-    res.numConsensusUpdatedToPolicyOnly = 0;
 
     // Lock db mutex for exclusive access
     auto lck = std::unique_lock<std::shared_mutex>(this->mtx_db);
@@ -840,8 +838,6 @@ auto CFrozenTXODB::QueryAllWhitelistedTxs() -> WhitelistedTxIterator
 auto CFrozenTXODB::ClearWhitelist() -> ClearWhitelistResult
 {
     ClearWhitelistResult res;
-    res.numFrozenBackToConsensus = 0;
-    res.numUnwhitelistedTxs = 0;
 
     // Lock db mutex for exclusive access
     auto lck = std::unique_lock<std::shared_mutex>(this->mtx_db);
@@ -923,7 +919,8 @@ void CFrozenTXODB::Init(std::size_t cache_size)
         throw std::logic_error("Connection to FrozenTXODB has already been initialized!");
     }
 
-    frozenTXODB.reset( new CFrozenTXODB(cache_size) );
+    std::unique_ptr<CFrozenTXODB> tmp(new CFrozenTXODB{cache_size});
+    frozenTXODB.swap(tmp);
 }
 
 CFrozenTXODB& CFrozenTXODB::Instance()

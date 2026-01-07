@@ -12,6 +12,7 @@
 #include "compat.h"
 #include "serialize.h"
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -28,14 +29,17 @@ enum Network {
 class CNetAddr {
 protected:
     // in network byte order
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    uint8_t ip[16] = {0};
+    std::array<uint8_t, 16> ip{0};
     // for scoped/link-local ipv6 addresses
     uint32_t scopeId{0};
 
 public:
     CNetAddr() = default;
     CNetAddr(const struct in_addr &ipv4Addr);
+    
+    friend std::strong_ordering operator<=>(const CNetAddr&, const CNetAddr&);
+    friend bool operator==(const CNetAddr&, const CNetAddr&);
+
     void SetIP(const CNetAddr &ip);
 
     /**
@@ -90,10 +94,6 @@ public:
     CNetAddr(const struct in6_addr &pipv6Addr, const uint32_t scope = 0);
     bool GetIn6Addr(struct in6_addr *pipv6Addr) const;
 
-    friend bool operator==(const CNetAddr &a, const CNetAddr &b);
-    friend bool operator!=(const CNetAddr &a, const CNetAddr &b);
-    friend bool operator<(const CNetAddr &a, const CNetAddr &b);
-
     ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
@@ -104,8 +104,8 @@ public:
     friend class CSubNet;
 };
 
-class CSubNet {
-protected:
+class CSubNet
+{
     /// Network (base) address
     CNetAddr network;
     /// Netmask, in network byte order
@@ -127,14 +127,13 @@ public:
     std::string ToString() const;
     bool IsValid() const;
 
-    friend bool operator==(const CSubNet &a, const CSubNet &b);
-    friend bool operator!=(const CSubNet &a, const CSubNet &b);
-    friend bool operator<(const CSubNet &a, const CSubNet &b);
+    friend std::strong_ordering operator<=>(const CSubNet&, const CSubNet&);
+    friend bool operator==(const CSubNet&, const CSubNet&);
 
     ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream &s, Operation ser_action) {
+    void SerializationOp(Stream &s, Operation ser_action) {
         READWRITE(network);
         READWRITE(FLATDATA(netmask));
         READWRITE(FLATDATA(valid));
@@ -156,9 +155,9 @@ public:
     unsigned short GetPort() const;
     bool GetSockAddr(struct sockaddr *paddr, socklen_t *addrlen) const;
     bool SetSockAddr(const struct sockaddr *paddr);
-    friend bool operator==(const CService &a, const CService &b);
-    friend bool operator!=(const CService &a, const CService &b);
-    friend bool operator<(const CService &a, const CService &b);
+
+    friend auto operator<=>(const CService&, const CService&) = default;
+
     std::vector<uint8_t> GetKey() const;
     std::string ToString() const;
     std::string ToStringPort() const;
@@ -177,5 +176,5 @@ public:
         if (ser_action.ForRead()) port = ntohs(portN);
     }
 };
-
+    
 #endif // BITCOIN_NETADDRESS_H

@@ -54,7 +54,7 @@ BOOST_AUTO_TEST_CASE(token_joining)
         auto token =
             task::CCancellationToken::JoinToken(source->GetToken(), token2);
 
-        TestToken(std::move(token), source);
+        TestToken(token, source);
 
         BOOST_CHECK_EQUAL(token2.IsCanceled(), false);
         BOOST_CHECK_EQUAL(source->GetToken().IsCanceled(), true);
@@ -69,7 +69,7 @@ BOOST_AUTO_TEST_CASE(token_joining)
         auto token =
             task::CCancellationToken::JoinToken(source->GetToken(), token2);
 
-        TestToken(std::move(token), source2);
+        TestToken(token, source2);
 
         BOOST_CHECK_EQUAL(token2.IsCanceled(), true);
         BOOST_CHECK_EQUAL(source->GetToken().IsCanceled(), false);

@@ -5,8 +5,7 @@
 Test for calling (get/decode)rawtransaction and check if the response is returned properly as JSON
 """
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
-from test_framework.mininode import COIN
+from test_framework.util import assert_equal
 
 
 class DecodeRawTransactionsTest(BitcoinTestFramework):

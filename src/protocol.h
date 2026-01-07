@@ -560,13 +560,7 @@ public:
         READWRITE(hash);
     }
 
-    friend bool operator<(const CInv &a, const CInv &b) {
-        return a.type < b.type || (a.type == b.type && a.hash < b.hash);
-    }
-
-	friend bool operator==(const CInv &a, const CInv &b) {
-        return a.type == b.type && a.hash == b.hash;
-    }
+    friend auto operator<=>(const CInv&, const CInv&) = default;
 
     std::string GetCommand() const;
     std::string ToString() const;
@@ -610,9 +604,9 @@ public:
     std::string streamPolicies {};
 public:
     CProtoconf() = default;
-    CProtoconf(unsigned int maxRecvPayloadLengthIn, const std::string& streamPoliciesIn)
-    // NOLINTNEXTLINE(cppcoreguidelines-use-default-member-init)
-    : numberOfFields{2}, maxRecvPayloadLength{maxRecvPayloadLengthIn}, streamPolicies{streamPoliciesIn}
+    CProtoconf(unsigned int maxRecvPayloadLengthIn, const std::string& streamPoliciesIn):
+        maxRecvPayloadLength{maxRecvPayloadLengthIn},
+        streamPolicies{streamPoliciesIn}
     {}
 
     ADD_SERIALIZE_METHODS

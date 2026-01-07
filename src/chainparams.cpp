@@ -4,23 +4,32 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "chainparams.h"
-#include "consensus/merkle.h"
 
+#include "chainparamsseeds.h"
+#include "consensus/merkle.h"
+#include "logging.h"
 #include "policy/policy.h"
 #include "script/script_num.h"
-
 #include "tinyformat.h"
-#include "util.h"
 #include "utilstrencodings.h"
 
 #include <cassert>
-
-#include "chainparamsseeds.h"
+#include <cstdint>
 
 #define GENESIS_ACTIVATION_MAIN                 620538
 #define GENESIS_ACTIVATION_STN                  100
 #define GENESIS_ACTIVATION_TESTNET              1344302
 #define GENESIS_ACTIVATION_REGTEST              10000
+
+#define CHRONICLE_ACTIVATION_MAIN               943816
+#define CHRONICLE_ACTIVATION_STN                250
+#define CHRONICLE_ACTIVATION_TESTNET            1713168
+#define CHRONICLE_ACTIVATION_REGTEST            15000
+
+constexpr int32_t P2SH_ACTIVATION_MAIN{173'805};
+constexpr int32_t P2SH_ACTIVATION_STN{1};
+constexpr int32_t P2SH_ACTIVATION_TESTNET{519};
+constexpr int32_t P2SH_ACTIVATION_REGTEST{1};
 
 static CBlock CreateGenesisBlock(const char *pszTimestamp,
                                  const CScript &genesisOutputScript,
@@ -126,6 +135,11 @@ public:
 
         // February 2020, Genesis Upgrade
         consensus.genesisHeight = GENESIS_ACTIVATION_MAIN;
+
+        // TBD, Chronicle Upgrade
+        consensus.chronicleHeight = CHRONICLE_ACTIVATION_MAIN;
+        
+        consensus.p2shHeight = P2SH_ACTIVATION_MAIN;
 
         /**
          * The message start string is designed to be unlikely to occur in
@@ -283,6 +297,11 @@ public:
         // February 2020, Genesis Upgrade
         consensus.genesisHeight = GENESIS_ACTIVATION_STN;
 
+        // TBD, Chronicle Upgrade
+        consensus.chronicleHeight = CHRONICLE_ACTIVATION_STN;
+        
+        consensus.p2shHeight = P2SH_ACTIVATION_STN;
+
         /**
          * The message start string is designed to be unlikely to occur in
          * normal data. The characters are rarely used upper ASCII, not valid as
@@ -329,7 +348,8 @@ public:
                 {7, uint256S("000000001f15fe3dac966c6bb873c63348ca3d877cd606759d26bd9ad41e5545")},
                 {8, uint256S("0000000074230d332b2ed9d87af3ad817b6f2616c154372311c9b2e4f386c24c")},
                 {9, uint256S("00000000ca21de811f04f5ec031aa3a102f8e27f2a436cde588786da1996ec9b")},
-                {10, uint256S("0000000046ceee1b7d771594c6c75f11f14f96822fd520e86ec5c703ec231e87")}
+                {10, uint256S("0000000046ceee1b7d771594c6c75f11f14f96822fd520e86ec5c703ec231e87")},
+                {11, uint256S("00000000e1ad0ed45011a4c7fe5afde3211b4bdcf60370234355338afbf70e2d")}
         }};
 
         defaultBlockSizeParams = DefaultBlockSizeParams{
@@ -392,6 +412,11 @@ public:
 
         // February 2020, Genesis Upgrade
         consensus.genesisHeight = GENESIS_ACTIVATION_TESTNET;
+
+        // TBD, Chronicle Upgrade
+        consensus.chronicleHeight = CHRONICLE_ACTIVATION_TESTNET;
+        
+        consensus.p2shHeight = P2SH_ACTIVATION_TESTNET;
 
         diskMagic[0] = 0x0b;
         diskMagic[1] = 0x11;
@@ -515,6 +540,11 @@ public:
         // February 2020, Genesis Upgrade
         consensus.genesisHeight = GENESIS_ACTIVATION_REGTEST;
 
+        // TBD, Chronicle Upgrade
+        consensus.chronicleHeight = CHRONICLE_ACTIVATION_REGTEST;
+
+        consensus.p2shHeight = P2SH_ACTIVATION_REGTEST;
+
         diskMagic[0] = 0xfa;
         diskMagic[1] = 0xbf;
         diskMagic[2] = 0xb5;
@@ -625,15 +655,13 @@ std::unique_ptr<CChainParams> CreateChainParams(const std::string &chain) {
         strprintf("%s: Unknown chain %s.", __func__, chain));
 }
 
-void SelectParams(const std::string &network) {
+void SelectParams(const std::string &network, const std::optional<std::string>& magicBytes) {
     SelectBaseParams(network);
     globalChainParams = CreateChainParams(network);
 
     // If not mainnet, allow to set the parameter magicbytes (for testing propose)
-    const bool isMagicBytesSet = gArgs.IsArgSet("-magicbytes");
-    if(network != CBaseChainParams::MAIN && isMagicBytesSet){
-        const std::string magicbytesStr = gArgs.GetArg("-magicbytes", "0f0f0f0f");
-        LogPrintf("Manually set magicbytes [%s].\n",magicbytesStr);
-        ResetNetMagic(*globalChainParams,magicbytesStr);
+    if (network != CBaseChainParams::MAIN && magicBytes.has_value()) {
+        LogPrintf("Manually set magicbytes [%s].\n", magicBytes->c_str());
+        ResetNetMagic(*globalChainParams, *magicBytes);
     }
 }

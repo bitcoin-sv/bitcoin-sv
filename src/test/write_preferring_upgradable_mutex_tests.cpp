@@ -142,9 +142,9 @@ BOOST_AUTO_TEST_CASE(prefering_write_to_read_request_lock)
                 std::launch::async,
                 [&mutex]
                 {
-                    WPUSMutex::Lock read_lock;
-                    mutex.ReadLock( read_lock );
-                    BOOST_TEST((read_lock.GetLockType() == WPUSMutex::Lock::Type::read));
+                    WPUSMutex::Lock lock;
+                    mutex.ReadLock( lock );
+                    BOOST_TEST((lock.GetLockType() == WPUSMutex::Lock::Type::read));
                 });
 
         // make sure that read lock can't be obtained as write lock request is pending
@@ -246,8 +246,8 @@ BOOST_AUTO_TEST_CASE(multiple_consecutive_exclusive_write_locks)
     auto write_lock_task =
         [&mutex](std::atomic<int>& step)
         {
-            WPUSMutex::Lock write_lock = mutex.WriteLock();
-            BOOST_TEST((write_lock.GetLockType() == WPUSMutex::Lock::Type::write));
+            WPUSMutex::Lock lock = mutex.WriteLock();
+            BOOST_TEST((lock.GetLockType() == WPUSMutex::Lock::Type::write));
             step = 1;
 
             // wait for asserts to finish
@@ -319,18 +319,18 @@ BOOST_AUTO_TEST_CASE(prefer_exclusive_to_non_exclusive_write_locks)
             std::launch::async,
             [&mutex]
             {
-                WPUSMutex::Lock read_lock;
-                mutex.ReadLock( read_lock );
-                BOOST_TEST((read_lock.GetLockType() == WPUSMutex::Lock::Type::read));
+                WPUSMutex::Lock lck;
+                mutex.ReadLock( lck );
+                BOOST_TEST((lck.GetLockType() == WPUSMutex::Lock::Type::read));
 
                 // provide read lock to write lock to make sure that write lock
                 // that won't step back on dead lock will not randomly be obtained
                 // before it as write lock without read lock has no ordering side
                 // effects so we allow such race conditions
-                bool locked = mutex.TryWriteLock( read_lock );
+                bool locked = mutex.TryWriteLock( lck );
                 // make sure that we didn't obtain the lock
                 BOOST_TEST( locked == false );
-                BOOST_TEST((read_lock.GetLockType() == WPUSMutex::Lock::Type::read));
+                BOOST_TEST((lck.GetLockType() == WPUSMutex::Lock::Type::read));
             });
 
     // make sure that write lock can't be obtained as we are already holding a

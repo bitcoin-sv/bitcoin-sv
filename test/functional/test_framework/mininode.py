@@ -22,7 +22,6 @@ ser_*, deser_*: functions that handle serialization/deserialization
 """
 
 import asyncore
-import binascii
 from codecs import encode
 from collections import defaultdict
 import copy
@@ -99,10 +98,10 @@ network_thread_loop_intent_lock = RLock()
 
 # ports used by chain type
 NETWORK_PORTS = {
-    "mainnet" : 8333,
-    "testnet3" : 18333,
-    "stn" : 9333,
-    "regtest" : 18444
+    "mainnet": 8333,
+    "testnet3": 18333,
+    "stn": 9333,
+    "regtest": 18444
 }
 
 # Serialization/deserialization tools
@@ -120,16 +119,16 @@ def hash256(s):
     return sha256(sha256(s))
 
 
-def ser_compact_size(l):
+def ser_compact_size(n):
     r = b""
-    if l < 253:
-        r = struct.pack("B", l)
-    elif l < 0x10000:
-        r = struct.pack("<BH", 253, l)
-    elif l < 0x100000000:
-        r = struct.pack("<BI", 254, l)
+    if n < 253:
+        r = struct.pack("B", n)
+    elif n < 0x10000:
+        r = struct.pack("<BH", 253, n)
+    elif n < 0x100000000:
+        r = struct.pack("<BI", 254, n)
     else:
-        r = struct.pack("<BQ", 255, l)
+        r = struct.pack("<BQ", 255, n)
     return r
 
 
@@ -158,7 +157,7 @@ def ser_varint(v):
     length = 0
     while True:
         r += struct.pack("<B", (v & 0x7F) | (0x80 if length > 0 else 0x00))
-        if(v <= 0x7F):
+        if v <= 0x7F:
             return r[::-1] # Need as little-endian
         v = (v >> 7) - 1
         length += 1
@@ -169,7 +168,7 @@ def deser_varint(f):
     while True:
         n = struct.unpack("<B", f.read(1))[0]
         ntot = (n << 7) | (n & 0x7F)
-        if((n & 0x80) == 0):
+        if (n & 0x80) == 0:
             return ntot
 
 
@@ -226,9 +225,9 @@ def deser_vector(f, c):
 # ser_function_name: Allow for an alternate serialization function on the
 # entries in the vector.
 @generator_based_serializator
-def ser_vector(l, ser_function_name=""):
+def ser_vector(v, ser_function_name=""):
     # using generator because of need for lazy evaluation
-    return (getattr(i, ser_function_name, i.serialize)() for i in l)
+    return (getattr(i, ser_function_name, i.serialize)() for i in v)
 
 
 def deser_uint256_vector(f):
@@ -241,8 +240,8 @@ def deser_uint256_vector(f):
 
 
 @generator_based_serializator
-def ser_uint256_vector(l):
-    return (ser_uint256(i) for i in l)
+def ser_uint256_vector(v):
+    return (ser_uint256(i) for i in v)
 
 
 def deser_string_vector(f):
@@ -255,8 +254,8 @@ def deser_string_vector(f):
 
 
 @generator_based_serializator
-def ser_string_vector(l):
-    return (ser_string(sv) for sv in l)
+def ser_string_vector(v):
+    return (ser_string(sv) for sv in v)
 
 
 def deser_int_vector(f):
@@ -269,8 +268,8 @@ def deser_int_vector(f):
 
 
 @generator_based_serializator
-def ser_int_vector(l):
-    return (struct.pack("<i", i) for i in l)
+def ser_int_vector(v):
+    return (struct.pack("<i", i) for i in v)
 
 
 def deser_varint_vector(f):
@@ -282,10 +281,10 @@ def deser_varint_vector(f):
     return r
 
 
-def ser_varint_vector(l):
-    r = ser_varint(len(l))
-    for v in l:
-        r += ser_varint(v)
+def ser_varint_vector(v):
+    r = ser_varint(len(v))
+    for i in v:
+        r += ser_varint(i)
     return r
 
 
@@ -304,7 +303,7 @@ def ser_byte_array(s):
 
 def deser_optional(typename, f):
     hasVal = struct.unpack("<b", f.read(1))[0]
-    if(hasVal):
+    if hasVal:
         val = typename()
         val.deserialize(f)
         return val
@@ -314,7 +313,7 @@ def deser_optional(typename, f):
 
 def ser_optional(o):
     r = b""
-    if(o):
+    if (o is not None):
         r += struct.pack("<b", 1)
         r += o.serialize()
     else:
@@ -336,7 +335,7 @@ def ToHex(obj):
 # Serialise a UUID association ID as a stream of bytes for sending over the network
 def serialise_uuid_associd(assocId):
     assocIdBytes = bytes()
-    if(assocId):
+    if assocId:
         assocIdPlusType = b"".join((
             struct.pack("<B", 0),
             assocId.bytes
@@ -1020,7 +1019,14 @@ class P2PHeaderAndShortIDs():
         return r
 
     def __repr__(self):
-        return "P2PHeaderAndShortIDs(header=%s, nonce=%d, shortids_length=%d, shortids=%s, prefilled_txn_length=%d, prefilledtxn=%s" % (repr(self.header), self.nonce, self.shortids_length, repr(self.shortids), self.prefilled_txn_length, repr(self.prefilled_txn))
+        return ("P2PHeaderAndShortIDs(header=%s, nonce=%d, shortids_length=%d,"
+                " shortids=%s, prefilled_txn_length=%d, prefilledtxn=%s") \
+            % (repr(self.header),
+               self.nonce,
+               self.shortids_length,
+               repr(self.shortids),
+               self.prefilled_txn_length,
+               repr(self.prefilled_txn))
 
 # Calculate the BIP 152-compact blocks shortid for a given transaction hash
 
@@ -1040,7 +1046,7 @@ class HeaderAndShortIDs():
         self.shortids = []
         self.prefilled_txn = []
 
-        if p2pheaders_and_shortids != None:
+        if p2pheaders_and_shortids is not None:
             self.header = p2pheaders_and_shortids.header
             self.nonce = p2pheaders_and_shortids.nonce
             self.shortids = p2pheaders_and_shortids.shortids
@@ -1144,7 +1150,7 @@ class BlockTransactionsRequest():
 
     def __init__(self, blockhash=0, indexes=None):
         self.blockhash = blockhash
-        self.indexes = indexes if indexes != None else []
+        self.indexes = indexes if indexes is not None else []
 
     def deserialize(self, f):
         self.blockhash = deser_uint256(f)
@@ -1183,7 +1189,7 @@ class BlockTransactions():
 
     def __init__(self, blockhash=0, transactions=None):
         self.blockhash = blockhash
-        self.transactions = transactions if transactions != None else []
+        self.transactions = transactions if transactions is not None else []
 
     def deserialize(self, f):
         self.blockhash = deser_uint256(f)
@@ -1247,9 +1253,9 @@ class msg_version():
                 try:
                     uuidBytes = deser_string(f)
                     self.assocID = deserialise_uuid_associd(uuidBytes)
-                except:
+                except Exception:
                     self.assocID = None
-            except:
+            except Exception:
                 self.nRelay = 0
         else:
             self.nRelay = 0
@@ -1352,7 +1358,7 @@ class msg_revokemid():
         self.sig1 = None
         self.sig2 = None
 
-        if(revocationKey and revocationPubKey and minerIdKey and minerIdPubKey and idToRevoke):
+        if revocationKey and revocationPubKey and minerIdKey and minerIdPubKey and idToRevoke:
             self.revocationPubKey = revocationPubKey
             self.minerIdPubKey = minerIdPubKey
             self.idToRevoke = idToRevoke
@@ -1364,7 +1370,7 @@ class msg_revokemid():
 
     def deserialize(self, f):
         version = struct.unpack("<i", f.read(4))[0]
-        if(version != 0):
+        if version != 0:
             raise ValueError("Bad version {0} in revokemid msg".format(version))
         self.revocationPubKey = f.read(33)
         self.minerIdPubKey = f.read(33)
@@ -1373,8 +1379,7 @@ class msg_revokemid():
         revocationMessage = deser_string(f)
         sig1Len = revocationMessage[0]
         self.sig1 = revocationMessage[1:sig1Len]
-        sig2Len = revocationMessage[1+sig1Len]
-        self.sig2 = revocationMessage[1+sig1Len+1:]
+        self.sig2 = revocationMessage[1 + sig1Len + 1:]
 
     def serialize(self):
         r = b""
@@ -1398,7 +1403,7 @@ class msg_protoconf():
 
     def __init__(self, protoconf=None):
         if protoconf is None:
-            self.protoconf = CProtoconf(2,0,b"")
+            self.protoconf = CProtoconf(2, 0, b"")
         else:
             self.protoconf = protoconf
 
@@ -1443,10 +1448,10 @@ class msg_authresp():
 
     def __init__(self):
         self.nPubKeyLen = 0
-        self.pubKey = None
+        self.pubKey = bytearray()
         self.nClientNonce = 0
         self.nSignLen = 0
-        self.sign = None
+        self.sign = bytearray()
 
     def deserialize(self, f):
         self.nPubKeyLen = struct.unpack("<I", f.read(1))[0]
@@ -1458,10 +1463,10 @@ class msg_authresp():
     def serialize(self):
         return b"".join((
             struct.pack("<I", self.nPubKeyLen),
-            ser_uint8_vector(self.PubKey),
+            ser_string(self.pubKey),
             struct.pack("<Q", self.nClientNonce),
             struct.pack("<I", self.nSignLen),
-            ser_uint8_vector(self.sign),
+            ser_string(self.sign),
         ))
 
     def __repr__(self):
@@ -1524,7 +1529,7 @@ class msg_getdata():
     command = b"getdata"
 
     def __init__(self, inv=None):
-        self.inv = inv if inv != None else []
+        self.inv = inv if inv is not None else []
 
     def deserialize(self, f):
         self.inv = deser_vector(f, CInv)
@@ -1675,17 +1680,38 @@ class msg_pong():
 class msg_mempool():
     command = b"mempool"
 
-    def __init__(self):
-        pass
+    class Age():
+        def __init__(self, age=None):
+            self.age = age
+
+        def deserialize(self, f):
+            self.age = struct.unpack("<q", f.read(8))[0]
+
+        def serialize(self):
+            return struct.pack("<q", self.age)
+
+        def __repr__(self):
+            return "{}".format(self.age)
+
+    def __init__(self, age=None):
+        if age is not None:
+            self.age = self.Age(age)
+        else:
+            self.age = None
 
     def deserialize(self, f):
-        pass
+        age = deser_optional(self.Age, f)
+        if age is not None:
+            self.age = age.age
+        else:
+            self.age = None
 
     def serialize(self):
-        return b""
+        return b"".join((
+            ser_optional(self.age),))
 
     def __repr__(self):
-        return "msg_mempool()"
+        return "msg_mempool(age={})".format(repr(self.age))
 
 
 class msg_sendheaders():
@@ -1963,7 +1989,7 @@ class MerkleProofNode():
     def deserialize(self, f):
         self.nodeType = struct.unpack("<B", f.read(1))[0]
         # Currently only type 0 is supported (it means node is always uint256)
-        assert(self.nodeType == 0)
+        assert (self.nodeType == 0)
         self.node = deser_uint256(f)
 
     def serialize(self):
@@ -2023,7 +2049,7 @@ class DSMerkleProof(MerkleProof):
             self.txIndex = json_notification["index"]
             self.tx = FromHex(CTransaction(), json_notification["txOrId"])
             # Only merkleRoot target type is currently supported
-            assert(json_notification["targetType"] == "merkleRoot")
+            assert (json_notification["targetType"] == "merkleRoot")
             self.merkleRoot = uint256_from_str(hex_str_to_bytes(json_notification["target"])[::-1])
             self.proof = []
             for node in json_notification["nodes"]:
@@ -2032,7 +2058,7 @@ class DSMerkleProof(MerkleProof):
     def deserialize(self, f):
         super().deserialize(f)
         # Flags should always be 5
-        assert(self.flags == 5)
+        assert (self.flags == 5)
 
     def __repr__(self):
         return "DSMerkleProof(txIndex=%i tx=%s merkleRoot=%064x proof=%s)" % (self.txIndex, repr(self.tx), self.merkleRoot, repr(self.proof))
@@ -2173,9 +2199,9 @@ class NodeConnCB():
                 self.last_message[command] = message
                 self.msg_timestamp[command] = time.time()
                 self.msg_index[command] = self.time_index
-                self.time_index +=1
+                self.time_index += 1
                 getattr(self, 'on_' + command)(conn, message)
-            except:
+            except Exception:
                 print("ERROR delivering %s (%s)" % (repr(message),
                                                     sys.exc_info()[0]))
                 raise
@@ -2198,49 +2224,71 @@ class NodeConnCB():
         self.connected = False
         self.connection = None
 
-    def on_addr(self, conn, message): pass
+    def on_addr(self, conn, message):
+        pass
 
-    def on_alert(self, conn, message): pass
+    def on_alert(self, conn, message):
+        pass
 
-    def on_block(self, conn, message): pass
+    def on_block(self, conn, message):
+        pass
 
-    def on_blocktxn(self, conn, message): pass
+    def on_blocktxn(self, conn, message):
+        pass
 
-    def on_cmpctblock(self, conn, message): pass
+    def on_cmpctblock(self, conn, message):
+        pass
 
-    def on_feefilter(self, conn, message): pass
+    def on_feefilter(self, conn, message):
+        pass
 
-    def on_getaddr(self, conn, message): pass
+    def on_getaddr(self, conn, message):
+        pass
 
-    def on_getblocks(self, conn, message): pass
+    def on_getblocks(self, conn, message):
+        pass
 
-    def on_getblocktxn(self, conn, message): pass
+    def on_getblocktxn(self, conn, message):
+        pass
 
-    def on_getdata(self, conn, message): pass
+    def on_getdata(self, conn, message):
+        pass
 
-    def on_getheaders(self, conn, message): pass
+    def on_getheaders(self, conn, message):
+        pass
 
-    def on_headers(self, conn, message): pass
+    def on_headers(self, conn, message):
+        pass
 
-    def on_gethdrsen(self, conn, message): pass
+    def on_gethdrsen(self, conn, message):
+        pass
 
-    def on_hdrsen(self, conn, message): pass
+    def on_hdrsen(self, conn, message):
+        pass
 
-    def on_mempool(self, conn): pass
+    def on_mempool(self, conn, message):
+        pass
 
-    def on_pong(self, conn, message): pass
+    def on_pong(self, conn, message):
+        pass
 
-    def on_reject(self, conn, message): pass
+    def on_reject(self, conn, message):
+        pass
 
-    def on_sendcmpct(self, conn, message): pass
+    def on_sendcmpct(self, conn, message):
+        pass
 
-    def on_sendheaders(self, conn, message): pass
+    def on_sendheaders(self, conn, message):
+        pass
 
-    def on_sendhdrsen(self, conn, message): pass
+    def on_sendhdrsen(self, conn, message):
+        pass
 
-    def on_tx(self, conn, message): pass
+    def on_tx(self, conn, message):
+        pass
 
-    def on_datareftx(self, conn, message): pass
+    def on_datareftx(self, conn, message):
+        pass
 
     def on_inv(self, conn, message):
         want = msg_getdata()
@@ -2258,11 +2306,14 @@ class NodeConnCB():
         conn.ver_recv = conn.ver_send
         self.verack_received = True
 
-    def on_streamack(self, conn, message): pass
+    def on_streamack(self, conn, message):
+        pass
 
-    def on_revokemid(self, conn, message): pass
+    def on_revokemid(self, conn, message):
+        pass
 
-    def on_protoconf(self, conn, message): pass
+    def on_protoconf(self, conn, message):
+        pass
 
     def on_version(self, conn, message):
         if message.nVersion >= 209:
@@ -2273,11 +2324,14 @@ class NodeConnCB():
             conn.ver_recv = conn.ver_send
         conn.nServices = message.nServices
 
-    def on_authch(self, conn, message): pass
+    def on_authch(self, conn, message):
+        pass
 
-    def on_authresp(self, conn, message): pass
+    def on_authresp(self, conn, message):
+        pass
 
-    def on_notfound(self, conn, message): pass
+    def on_notfound(self, conn, message):
+        pass
 
     def send_protoconf(self, conn):
         conn.send_message(msg_protoconf(CProtoconf(2, MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, b"BlockPriority,Default")))
@@ -2288,7 +2342,8 @@ class NodeConnCB():
         self.connection = conn
 
     def wait_for_disconnect(self, timeout=60):
-        def test_function(): return not self.connected
+        def test_function():
+            return not self.connected
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     # Message receiving helper methods
@@ -2298,24 +2353,29 @@ class NodeConnCB():
             self.message_count.clear()
 
     def wait_for_block(self, blockhash, timeout=60):
-        def test_function(): return self.last_message.get(
-            "block") and self.last_message["block"].block.rehash() == blockhash
+        def test_function():
+            return self.last_message.get("block") \
+                and self.last_message["block"].block.rehash() == blockhash
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_getdata(self, timeout=60):
-        def test_function(): return self.last_message.get("getdata")
+        def test_function():
+            return self.last_message.get("getdata")
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_getheaders(self, timeout=60):
-        def test_function(): return self.last_message.get("getheaders")
+        def test_function():
+            return self.last_message.get("getheaders")
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_headers(self, timeout=60):
-        def test_function(): return self.last_message.get("headers")
+        def test_function():
+            return self.last_message.get("headers")
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_hdrsen(self, timeout=60):
-        def test_function(): return self.last_message.get("hdrsen")
+        def test_function():
+            return self.last_message.get("hdrsen")
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_inv(self, expected_inv, timeout=60, check_interval=0.05):
@@ -2324,25 +2384,30 @@ class NodeConnCB():
             raise NotImplementedError(
                 "wait_for_inv() will only verify the first inv object")
 
-        def test_function(): return self.last_message.get("inv") and \
-            self.last_message["inv"].inv[0].type == expected_inv[0].type and \
-            self.last_message["inv"].inv[0].hash == expected_inv[0].hash
+        def test_function():
+            return self.last_message.get("inv") \
+                and self.last_message["inv"].inv[0].type == expected_inv[0].type \
+                and self.last_message["inv"].inv[0].hash == expected_inv[0].hash
         wait_until(test_function, timeout=timeout, lock=mininode_lock, check_interval=check_interval)
 
     def wait_for_verack(self, timeout=60):
-        def test_function(): return self.message_count["verack"]
+        def test_function():
+            return self.message_count["verack"]
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_reject(self, timeout=60):
-        def test_function(): return self.message_count["reject"]
+        def test_function():
+            return self.message_count["reject"]
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_protoconf(self, timeout=60):
-        def test_function(): return self.message_count["protoconf"]
+        def test_function():
+            return self.message_count["protoconf"]
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_streamack(self, timeout=60):
-        def test_function(): return self.message_count["streamack"]
+        def test_function():
+            return self.message_count["streamack"]
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     # Message sending helper functions
@@ -2481,7 +2546,7 @@ class NodeConn(asyncore.dispatcher):
 
     # Extended message command
     EXTMSG_COMMAND = b'extmsg\x00\x00\x00\x00\x00\x00'
-    assert(len(EXTMSG_COMMAND) == 12)
+    assert (len(EXTMSG_COMMAND) == 12)
 
     def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=NODE_NETWORK, send_version=True,
                  versionNum=MY_VERSION, strSubVer=None, assocID=None, nullAssocID=False):
@@ -2512,7 +2577,7 @@ class NodeConn(asyncore.dispatcher):
             self.strSubVer = strSubVer
             self.assocID = assocID
 
-            if(assocID):
+            if assocID:
                 send_version = False
 
             if send_version:
@@ -2523,9 +2588,9 @@ class NodeConn(asyncore.dispatcher):
                 vt.addrTo.port = self.dstport
                 vt.addrFrom.ip = "0.0.0.0"
                 vt.addrFrom.port = 0
-                if(strSubVer):
+                if strSubVer:
                     vt.strSubVer = strSubVer
-                if(nullAssocID):
+                if nullAssocID:
                     vt.assocID = None
                 self.send_message(vt, True)
                 self.assocID = vt.assocID
@@ -2535,7 +2600,7 @@ class NodeConn(asyncore.dispatcher):
 
             try:
                 self.connect((dstaddr, dstport))
-            except:
+            except Exception:
                 self.handle_close()
             self.rpc = rpc
 
@@ -2566,7 +2631,7 @@ class NodeConn(asyncore.dispatcher):
         self.sendbuf = bytearray()
         try:
             self.close()
-        except:
+        except Exception:
             pass
         self.cb.on_close(self)
 
@@ -2585,7 +2650,7 @@ class NodeConn(asyncore.dispatcher):
 
         while True:
             msg = self.got_data()
-            if msg == None:
+            if msg is None:
                 break
             self.got_message(msg)
 
@@ -2617,7 +2682,7 @@ class NodeConn(asyncore.dispatcher):
                     next_chunk = min(next_chunk, len(self.sendbuf))
                     sent = self.send(self.sendbuf[:next_chunk])
                     self.send_data_rate_limiter.update_amount_processed(time_now, sent, 0.1)
-            except:
+            except Exception:
                 self.handle_close()
                 return
             del self.sendbuf[:sent]

@@ -14,6 +14,7 @@
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 #include <univalue.h>
+#include <variant>
 
 std::string FormatScript(const CScript &script) {
     std::string ret;
@@ -86,15 +87,17 @@ const std::map<uint8_t, std::string> mapSigHashTypes = {
  * false, or omit the this argument (defaults to false), for scriptPubKeys.
  */
 std::string ScriptToAsmStr(const CScript& script,
+                           const int32_t txnVersion,
                            const bool fAttemptSighashDecode)
 {
     CStringWriter stringWriter;
-    ScriptToAsmStr(script, stringWriter, fAttemptSighashDecode);
+    ScriptToAsmStr(script, stringWriter, txnVersion, fAttemptSighashDecode);
     return stringWriter.MoveOutString();
 }
 
 void ScriptToAsmStr(const CScript& script,
                     CTextWriter& textWriter,
+                    const int32_t txnVersion,
                     const bool fAttemptSighashDecode)
 {
     opcodetype opcode;
@@ -117,7 +120,9 @@ void ScriptToAsmStr(const CScript& script,
         {
             if (vch.size() <= static_cast<std::vector<uint8_t>::size_type>(4))
             {
-                textWriter.Write(strprintf("%d", CScriptNum(vch, false).getint()));
+                textWriter.Write(
+                    strprintf("%d",
+                              CScriptNum(vch, min_encoding_check::no).getint()));
             }
             else
             {
@@ -140,15 +145,13 @@ void ScriptToAsmStr(const CScript& script,
                         // TODO: Remove after the Hard Fork.
                         flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
                     }
-                    if (CheckSignatureEncoding(vch, flags, nullptr))
+                    
+                    if(CheckSignatureEncoding(vch, flags, txnVersion) == SCRIPT_ERR_OK)
                     {
                         const uint8_t chSigHashType = vch.back();
-                        if (mapSigHashTypes.count(chSigHashType))
+                        if(auto it = mapSigHashTypes.find(chSigHashType); it != mapSigHashTypes.end())
                         {
-                            strSigHashDecode =
-                                "[" +
-                                mapSigHashTypes.find(chSigHashType)->second +
-                                "]";
+                            strSigHashDecode = "[" + it->second + "]";
                             // remove the sighash type byte. it will be replaced
                             // by the decode.
                             vch.pop_back();
@@ -197,13 +200,14 @@ public:
     }
 };
 
-void EncodeHexTx(const CTransaction& tx, CTextWriter& writer, const int serialFlags)
+void EncodeHexTx(const CTransaction& tx, CTextWriter& writer, const int /*serialFlags*/)
 {
     CHexWriter ssTx(writer);
     ssTx << tx;
 }
 
-void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, bool isGenesisEnabled, UniValue &out) {
+void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, ProtocolEra era, UniValue &out)
+{
     txnouttype type;
     std::vector<CTxDestination> addresses;
     int nRequired;
@@ -213,7 +217,7 @@ void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, bool isGe
         out.pushKV("hex", HexStr(scriptPubKey.begin(), scriptPubKey.end()));
     }
 
-    if (!ExtractDestinations(scriptPubKey, isGenesisEnabled, type, addresses, nRequired)) {
+    if (!ExtractDestinations(scriptPubKey, era, type, addresses, nRequired)) {
         out.pushKV("type", GetTxnOutputType(type));
         return;
     }
@@ -230,7 +234,7 @@ void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, bool isGe
 
 void TxToJSON(const CTransaction& tx,
               const uint256& hashBlock,
-              bool utxoAfterGenesis,
+              ProtocolEra era,
               const int serializeFlags,
               CJSONWriter& entry,
               const std::optional<CBlockDetailsData>&  blockData)
@@ -262,7 +266,7 @@ void TxToJSON(const CTransaction& tx,
 
             entry.pushK("asm");
             entry.pushQuote();
-            ScriptToAsmStr(txin.scriptSig, entry.getWriter(), true);
+            ScriptToAsmStr(txin.scriptSig, entry.getWriter(), tx.nVersion, true);
             entry.pushQuote();
 
             entry.pushK("hex");
@@ -288,7 +292,7 @@ void TxToJSON(const CTransaction& tx,
         entry.pushKV("n", static_cast<int64_t>(i));
 
         entry.writeBeginObject("scriptPubKey");
-        ScriptPublicKeyToJSON(txout.scriptPubKey, true, utxoAfterGenesis, entry);
+        ScriptPublicKeyToJSON(txout.scriptPubKey, true, era, entry);
         entry.writeEndObject();
 
         entry.writeEndObject();
@@ -325,7 +329,7 @@ void TxToJSON(const CTransaction& tx,
 
 void ScriptPublicKeyToJSON(const CScript& scriptPubKey,
                            bool fIncludeHex,
-                           bool isGenesisEnabled,
+                           ProtocolEra era,
                            CJSONWriter& entry) {
     txnouttype type;
     std::vector<CTxDestination> addresses;
@@ -343,7 +347,7 @@ void ScriptPublicKeyToJSON(const CScript& scriptPubKey,
         entry.pushQuote();
     }
 
-    if (!ExtractDestinations(scriptPubKey, isGenesisEnabled, type, addresses, nRequired))
+    if (!ExtractDestinations(scriptPubKey, era, type, addresses, nRequired))
     {
         entry.pushKV("type", GetTxnOutputType(type));
         return;

@@ -93,8 +93,10 @@ CTranslationInterface translationInterface;
 
 /** Init OpenSSL library multithreading support */
 static CCriticalSection **ppmutexOpenSSL;
-void locking_callback(int mode, int i, const char *file,
-                      int line) NO_THREAD_SAFETY_ANALYSIS {
+
+void locking_callback(int mode, int i, const char* /*file*/, int /*line*/)
+    NO_THREAD_SAFETY_ANALYSIS
+{
     if (mode & CRYPTO_LOCK) {
         ENTER_CRITICAL_SECTION(*ppmutexOpenSSL[i]);
     } else {
@@ -436,6 +438,41 @@ std::string HelpMessageOpt(const std::string &option,
            std::string("\n") + std::string(msgIndent, ' ') +
            FormatParagraph(message, screenWidth - msgIndent, msgIndent) +
            std::string("\n\n");
+}
+
+void AppendParamsHelpMessages(std::string& strUsage)
+{
+    strUsage += HelpMessageGroup(_("Chain selection options:"));
+    strUsage += HelpMessageOpt("-testnet", _("Use the test chain"));
+    strUsage += HelpMessageOpt(
+        "-regtest", "Enter regression test mode, which uses a special "
+                    "chain in which blocks can be solved instantly. "
+                    "This is intended for regression testing tools and app "
+                    "development.");
+    strUsage += HelpMessageOpt(
+            "-stn", "Use the Scaling Test Network"
+            );
+}
+
+std::string ChainNameFromCommandLine() {
+    bool fRegTest = gArgs.GetBoolArg("-regtest", false);
+    bool fTestNet = gArgs.GetBoolArg("-testnet", false);
+    bool fStn = gArgs.GetBoolArg("-stn", false);
+
+    if ((fTestNet && fRegTest) || (fTestNet && fStn) || (fRegTest && fStn))
+        throw std::runtime_error(
+            "Invalid combination of -regtest, -stn, and -testnet.");
+    if (fRegTest) return CBaseChainParams::REGTEST;
+    if (fTestNet) return CBaseChainParams::TESTNET;
+    if (fStn) return CBaseChainParams::STN;
+    return CBaseChainParams::MAIN;
+}
+
+std::optional<std::string> MagicBytesFromCommandLine() {
+    if (gArgs.IsArgSet("-magicbytes")) {
+        return gArgs.GetArg("-magicbytes", "0f0f0f0f");
+    }
+    return std::nullopt;
 }
 
 static std::string FormatException(const std::exception *pex,

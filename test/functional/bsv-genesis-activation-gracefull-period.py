@@ -24,21 +24,21 @@ import socket
 from test_framework.test_framework import ComparisonTestFramework, wait_until
 from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal
-from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx, mininode_lock
-from test_framework.cdefs import GENESIS_GRACEFULL_ACTIVATION_PERIOD
+from test_framework.cdefs import GENESIS_GRACEFUL_ACTIVATION_PERIOD
 from test_framework.key import CECKey
 from time import sleep
-from test_framework.key import CECKey
-from test_framework.script import (CScript, SignatureHashForkId, OP_0, OP_TRUE, OP_ADD, OP_4, OP_DROP, OP_FALSE, OP_TRUE,
-                                   OP_IF, OP_ELSE, OP_ENDIF, OP_1, OP_CHECKMULTISIG, SIGHASH_ALL, SIGHASH_FORKID, OP_NOP)
+from test_framework.script import (CScript, OP_ADD, OP_4, OP_DROP, OP_FALSE, OP_TRUE,
+                                   OP_IF, OP_ELSE, OP_ENDIF, OP_1, OP_CHECKMULTISIG, OP_NOP)
 
 _lan_ip = None
 
 
 def get_lan_ip():
     global _lan_ip
-    if _lan_ip: return _lan_ip
+    if _lan_ip:
+        return _lan_ip
+
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         # doesn't even have to be reachable
@@ -63,7 +63,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-        self.genesisactivationheight = 154 + int(GENESIS_GRACEFULL_ACTIVATION_PERIOD)
+        self.genesisactivationheight = 154 + int(GENESIS_GRACEFUL_ACTIVATION_PERIOD)
         self.extra_args = [['-genesisactivationheight=%d' % self.genesisactivationheight, '-acceptnonstdtxn', '-banscore=1', '-maxopsperscriptpolicy=1000', '-txnvalidationmaxduration=100000']]
 
     def run_test(self):
@@ -92,7 +92,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         yield test
 
         # Create transaction with OP_ADD in the locking script which should be banned
-        txOpAdd1 = create_transaction(out[0].tx, out[0].n, b'', 100000, CScript([b'\xFF'*4, b'\xFF'*4, OP_ADD, OP_4, OP_ADD, OP_DROP, OP_TRUE]))
+        txOpAdd1 = create_transaction(out[0].tx, out[0].n, b'', 100000, CScript([b'\xFF' * 4, b'\xFF' * 4, OP_ADD, OP_4, OP_ADD, OP_DROP, OP_TRUE]))
         self.test.connections[0].send_message(msg_tx(txOpAdd1))
         # wait for transaction processing
         self.check_mempool(self.test.connections[0].rpc, [txOpAdd1])
@@ -103,7 +103,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         wait_until(lambda: txOpAdd2.sha256 in [msg.data for msg in rejected_txs], timeout=5, lock=mininode_lock)
 
         assert_equal(len(rejected_txs), 1) # rejected
-        assert_equal(rejected_txs[0].reason, b'max-script-num-length-policy-limit-violated (Script number overflow)')
+        assert_equal(rejected_txs[0].reason, b'mandatory-script-verify-flag-failed (Script number overflow)')
         wait_until(lambda: len(self.nodes[0].listbanned()) == 1, timeout=5)  # and banned
         self.nodes[0].clearbanned()
         wait_until(lambda: len(self.nodes[0].listbanned()) == 0, timeout=5)  # and not banned
@@ -169,7 +169,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
 
         # Create transaction with OP_ADD in the locking script and send it to mempool
         # which should not be banned (but should be rejected instead), because we are in Genesis gracefull period now
-        txOpAdd1 = create_transaction(out[5].tx, out[5].n, b'', 100003, CScript([b'\xFF'*4, b'\xFF'*4, OP_ADD, OP_4, OP_ADD, OP_DROP, OP_TRUE]))
+        txOpAdd1 = create_transaction(out[5].tx, out[5].n, b'', 100003, CScript([b'\xFF' * 4, b'\xFF' * 4, OP_ADD, OP_4, OP_ADD, OP_DROP, OP_TRUE]))
         self.test.connections[0].send_message(msg_tx(txOpAdd1))
         # wait for transaction processing
         self.check_mempool(self.test.connections[0].rpc, [txOpAdd1])
@@ -204,7 +204,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         assert len(self.nodes[0].listbanned()) == 0  # not banned
 
         # Create transaction that will check if CheckRegularTransaction method inside TxnValidation method will reject instead ban the node
-        txPubKeys = create_transaction(out[7].tx, out[7].n, b'', 100000, CScript(([OP_1] + makePubKeys(1) + [5000, OP_CHECKMULTISIG])*1001))
+        txPubKeys = create_transaction(out[7].tx, out[7].n, b'', 100000, CScript(([OP_1] + makePubKeys(1) + [5000, OP_CHECKMULTISIG]) * 1001))
         self.test.connections[0].send_message(msg_tx(txPubKeys))
         # wait for transaction processing
         wait_until(lambda: len(rejected_txs) > 0, timeout=5, lock=mininode_lock) #rejected
@@ -241,7 +241,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         # generate an empty block, height is Genesis + 1
         block(6)
         #Create transaction with OP_ADD in the locking script that should be accepted to block
-        txOpAdd1 = create_transaction(out[9].tx, out[9].n, b'', 100003, CScript([b'\xFF'*4, b'\xFF'*4, OP_ADD, OP_4, OP_ADD, OP_DROP, OP_TRUE]))
+        txOpAdd1 = create_transaction(out[9].tx, out[9].n, b'', 100003, CScript([b'\xFF' * 4, b'\xFF' * 4, OP_ADD, OP_4, OP_ADD, OP_DROP, OP_TRUE]))
         self.chain.update_block(6, [txOpAdd1])
         yield self.accepted()
 
@@ -257,7 +257,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
 
         # Create transaction with OP_ADD in the locking script and send it to mempool
         # which should not be banned (but should be rejected instead), because we are in genesis gracefull period now
-        txOpAdd1 = create_transaction(out[10].tx, out[10].n, b'', 100003, CScript([b'\xFF'*4, b'\xFF'*4, OP_ADD, OP_4, OP_ADD, OP_DROP, OP_TRUE]))
+        txOpAdd1 = create_transaction(out[10].tx, out[10].n, b'', 100003, CScript([b'\xFF' * 4, b'\xFF' * 4, OP_ADD, OP_4, OP_ADD, OP_DROP, OP_TRUE]))
         self.test.connections[0].send_message(msg_tx(txOpAdd1))
         # wait for transaction processing
         self.check_mempool(self.test.connections[0].rpc, [txOpAdd1])
@@ -297,7 +297,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         rejected_txs = []
 
         height = self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height']
-        genesisHeightNoGracefullPeriod = self.genesisactivationheight + int(GENESIS_GRACEFULL_ACTIVATION_PERIOD)
+        genesisHeightNoGracefullPeriod = self.genesisactivationheight + int(GENESIS_GRACEFUL_ACTIVATION_PERIOD)
 
         #now we need to raise block count so we are in genesis but before gracefull period is over
         for x in range(height, genesisHeightNoGracefullPeriod):
@@ -305,7 +305,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
             test.blocks_and_transactions.append([self.chain.tip, True])
         yield test
         height = self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height']
-        assert_equal(height, self.genesisactivationheight + int(GENESIS_GRACEFULL_ACTIVATION_PERIOD)) # check if we are in right height
+        assert_equal(height, self.genesisactivationheight + int(GENESIS_GRACEFUL_ACTIVATION_PERIOD)) # check if we are in right height
 
         # generate an empty block, height is Genesis + gracefull period + 1, we moved beyond gracefull period now
         block(9, spend=out[12])
@@ -314,7 +314,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         # generate a block, height is Genesis + gracefull period + 2
         block(10)
         #Create transaction with OP_ADD in the locking script that should be accepted to block
-        txOpAdd1 = create_transaction(out[13].tx, out[13].n, b'', 100003, CScript([b'\xFF'*4, b'\xFF'*4, OP_ADD, OP_4, OP_ADD, OP_DROP, OP_TRUE]))
+        txOpAdd1 = create_transaction(out[13].tx, out[13].n, b'', 100003, CScript([b'\xFF' * 4, b'\xFF' * 4, OP_ADD, OP_4, OP_ADD, OP_DROP, OP_TRUE]))
         self.chain.update_block(10, [txOpAdd1])
         yield self.accepted()
 
@@ -330,7 +330,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
 
         # Create transaction with OP_ADD in the locking script and send it to mempool
         # which should not be banned (but should be rejected instead), because we are in genesis gracefull period now
-        txOpAdd1 = create_transaction(out[14].tx, out[14].n, b'', 100003, CScript([b'\xFF'*4, b'\xFF'*4, OP_ADD, OP_4, OP_ADD, OP_DROP, OP_TRUE]))
+        txOpAdd1 = create_transaction(out[14].tx, out[14].n, b'', 100003, CScript([b'\xFF' * 4, b'\xFF' * 4, OP_ADD, OP_4, OP_ADD, OP_DROP, OP_TRUE]))
         self.test.connections[0].send_message(msg_tx(txOpAdd1))
         # wait for transaction processing
         self.check_mempool(self.test.connections[0].rpc, [txOpAdd1])

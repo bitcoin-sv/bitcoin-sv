@@ -74,12 +74,12 @@ class FrozenTXOSoftConsensusFreeze(SoftConsensusFreezeBase):
                 continue
             if tip["status"] == "headers-only" and tip["hash"] == subsequent_frozen_blocks[-1].hash:
                 continue
-            assert False, "Unexpected tip: "+str(tip)
+            assert False, "Unexpected tip: " + str(tip)
 
         self.log.info(f"Sending block {first_frozen_block.hash} and checking that it is rejected")
         node.send_block(first_frozen_block, last_valid_tip_hash, True)
-        assert(node.check_frozen_tx_log(first_frozen_block.hash))
-        assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*"+first_frozen_block.hash))
+        assert (node.check_frozen_tx_log(first_frozen_block.hash))
+        assert (node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*" + first_frozen_block.hash))
 
         self.log.info(f"Sending descendants of block {first_frozen_block.hash} and checking that they do not become tip")
         for b in subsequent_frozen_blocks:

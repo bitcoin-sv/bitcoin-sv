@@ -23,6 +23,7 @@ public:
     std::pair<size_t, size_t> operator()(std::span<const uint8_t> s);
     [[nodiscard]] size_t read(size_t read_pos, std::span<uint8_t>);
     size_t size() const;
+    [[nodiscard]] size_t readable_size() const;
     void clear();
 };
 

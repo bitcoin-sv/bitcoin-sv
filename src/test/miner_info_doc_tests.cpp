@@ -8,11 +8,9 @@
 #include <boost/test/unit_test.hpp>
 #include <sstream>
 #include <variant>
-#include "boost/algorithm/hex.hpp"
 
 #include "miner_id/miner_info.h"
 #include "miner_id/miner_info_error.h"
-#include "script/instruction_iterator.h"
 #include "script/opcodes.h"
 #include "uint256.h"
 
@@ -39,12 +37,11 @@ namespace
                         make_pair("prevRevocationKeySig",
                                    json_value_type::string)};
     
-    const string version{"0.3"};
+    const string miner_id_version{"0.3"};
     const string height{"1234"};
     constexpr int h{1234};
     const string compressed_key_2{[]{ return string{"02"} + string(64, '0');}()};
     const string compressed_key_3{[]{ return string{"03"} + string(64, '0');}()};
-
     const string miner_id{
         "031ad1328476a7ff79016775b5cc66d028af6d647da5c8627e1266e6a209d3d1ee"};
     const string prev_miner_id{
@@ -62,7 +59,7 @@ namespace
         "a8d30fce5f15a4fe9fb6088f802201df8b523690ee3c3a721"
         "703ef3696a47b836e93f8dcbc3bd2bdca77a0d8a2dff"};
     
-    const vector<string> required_values{version,
+    const vector<string> required_values{miner_id_version,
                                          height,
                                          miner_id,
                                          prev_miner_id,
@@ -129,39 +126,39 @@ namespace
     std::string to_json(T first, T last)
     {
         bool first_pass{true};
-        string doc{R"({ )"};
-        doc = accumulate(first,
-                         last,
-                         doc,
-                         [&first_pass](auto&& doc, const auto& x) {
-                             const auto& [name, type, value] = x;
-                             if(first_pass)
-                                 first_pass = false;
-                             else
-                                 doc += ", ";
-                             doc += R"(")";
-                             doc += name;
-                             doc += R"(" : )";
-                             if(type == json_value_type::string)
-                             {
-                                 doc += R"(")";
-                                 doc += value;
-                                 doc += R"(")";
-                             }
-                             else if(type == json_value_type::number)
-                             {
-                                 doc += value;
-                             }
-                             else if(type == json_value_type::object)
-                             {
-                                 doc += R"({ )";
-                                 doc += value;
-                                 doc += R"( })";
-                             }
-                             return doc;
-                         });
-        doc.append("}");
-        return doc;
+        string s{R"({ )"};
+        s = accumulate(first,
+                       last,
+                       s,
+                       [&first_pass](auto&& doc, const auto& x) {
+                           const auto& [name, type, value] = x;
+                           if(first_pass)
+                               first_pass = false;
+                           else
+                               doc += ", ";
+                           doc += R"(")";
+                           doc += name;
+                           doc += R"(" : )";
+                           if(type == json_value_type::string)
+                           {
+                               doc += R"(")";
+                               doc += value;
+                               doc += R"(")";
+                           }
+                           else if(type == json_value_type::number)
+                           {
+                               doc += value;
+                           }
+                           else if(type == json_value_type::object)
+                           {
+                               doc += R"({ )";
+                               doc += value;
+                               doc += R"( })";
+                           }
+                           return doc;
+                       });
+        s.append("}");
+        return s;
     }
 
     template <typename T, typename U>
@@ -179,16 +176,16 @@ namespace
         else if(src.size() <= 0xffff)
         {
             dst.insert(dst.end(), OP_PUSHDATA2);
-            uint8_t data[2];
-            WriteLE16(data, src.size());
-            dst.insert(dst.end(), data, data + sizeof(data));
+            std::array<uint8_t, 2> data{};
+            WriteLE16(data.data(), src.size());
+            dst.insert(dst.end(), data.begin(), data.end());
         }
         else
         {
             dst.insert(dst.end(), OP_PUSHDATA4);
-            uint8_t data[4];
-            WriteLE32(data, src.size());
-            dst.insert(dst.end(), data, data + sizeof(data));
+            std::array<uint8_t, 4> data{};
+            WriteLE32(data.data(), src.size());
+            dst.insert(dst.end(), data.begin(), data.end());
         }
         dst.insert(dst.end(), src.begin(), src.end());
     }
@@ -215,7 +212,7 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_script_failure_cases)
     // version, sig_len_offset, expected result
     const vector<tuple<uint8_t, uint8_t, miner_info_error>> v{
         make_tuple(1, 0, miner_info_error::script_version_unsupported),
-        make_tuple(0, -2, miner_info_error::invalid_sig_len),
+        make_tuple(0, -7, miner_info_error::invalid_sig_len),
         make_tuple(0, +3, miner_info_error::invalid_sig_len),
     };
     for(const auto& [version, sig_len_offset, expected] : v)
@@ -430,7 +427,7 @@ BOOST_AUTO_TEST_CASE(parse_miner_info_doc_invalid_prev_miner_id_sig)
 }
 
 BOOST_AUTO_TEST_CASE(
-    parse_miner_info_doc__prevMinerIDSig_verification_fail)
+    parse_miner_info_doc_prevMinerIDSig_verification_fail)
 {
     vector<string> values{required_values};
 
@@ -786,7 +783,7 @@ BOOST_AUTO_TEST_CASE(revocation_message_equality)
     const revocation_msg a{cmp_miner_id_1, sig_bad_0, sig_bad_1};
     BOOST_CHECK_EQUAL(a, a);
     
-    const revocation_msg b{a};
+    const revocation_msg b{a}; // NOLINT(performance-unnecessary-copy-initialization)
     BOOST_CHECK_EQUAL(a, b);
     BOOST_CHECK_EQUAL(b, a);
 
@@ -955,7 +952,7 @@ BOOST_AUTO_TEST_CASE(parse_datarefs_happy_case)
     const vector<string> expected_brfcids{"brfcid_1", "brfcid_2"};
     const vector<data_ref> expected{
         data_ref{expected_brfcids, expected_txid, 1, "gzip"}};
-    const auto actual = get<::data_refs>(var_data_refs);
+    const auto actual = get<::data_refs_type>(var_data_refs);
     BOOST_CHECK_EQUAL_COLLECTIONS(expected.cbegin(),
                                   expected.cend(),
                                   actual.cbegin(),

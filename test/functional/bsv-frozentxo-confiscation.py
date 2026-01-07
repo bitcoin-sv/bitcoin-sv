@@ -32,11 +32,9 @@ from test_framework.mininode import (
 from test_framework.script import (
     CScript,
     hash160,
-    OP_1,
     OP_CHECKSIG,
     OP_CHECKMULTISIG,
     OP_DUP,
-    OP_IF,
     OP_EQUAL,
     OP_EQUALVERIFY,
     OP_FALSE,
@@ -116,7 +114,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
                             "-limitfreerelay=999999",
                             "-genesisactivationheight=100",
                             "-maxtxsigopscountspolicy=1MB",
-                            "-permitbaremultisig=0"]]*2
+                            "-permitbaremultisig=0"]] * 2
         self.block_count = 0
 
     def _init(self):
@@ -172,7 +170,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
 
     def make_block_with_tx(self, node, tx, block_time_offset=None):
         block, _ = make_block(node.rpc)
-        if block_time_offset != None:
+        if block_time_offset is not None:
             # Changing the block time can be used to create block with same contents and different hash
             block.nTime += block_time_offset
         block.vtx.append(tx)
@@ -205,7 +203,15 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         return ctx
 
     def _create_and_send_tx(self, node):
-        tx = self._create_tx(self.chain.get_spendable_output(), b'', CScript([OP_DUP, OP_HASH160, hash160(self.pubkey), OP_EQUALVERIFY, OP_CHECKSIG])) # TXO with standard P2PKH script that can normally only be spent if private key is known
+        tx = self._create_tx(self.chain.get_spendable_output(),
+                             b'',
+                             # TXO with standard P2PKH script that can normally
+                             # only be spent if private key is known
+                             CScript([OP_DUP,
+                                      OP_HASH160,
+                                      hash160(self.pubkey),
+                                      OP_EQUALVERIFY,
+                                      OP_CHECKSIG]))
         self.log.info(f"Sending transaction {tx.hash} and generating a new block")
         node.rpc.sendrawtransaction(ToHex(tx))
         assert_equal(node.rpc.getrawmempool(), [tx.hash])
@@ -217,15 +223,15 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         self.log.info(f"Freezing TXO {tx.hash},0 on consensus blacklist at heights [{start_height},{stop_height})")
 
         enforceAtHeight = {"start": start_height}
-        if stop_height != None:
+        if stop_height is not None:
             enforceAtHeight["stop"] = stop_height
 
-        result=node.rpc.addToConsensusBlacklist({
+        result = node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : tx.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": tx.hash,
+                        "vout": 0
                     },
                     "enforceAtHeight": [enforceAtHeight],
                     "policyExpiresWithConsensus": False
@@ -235,7 +241,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
 
     def _whitelistTx(self, node, tx, enforce_at_height):
         self.log.info(f"Whitelisting confiscation transaction {tx.hash} with enforceAtHeight={enforce_at_height}")
-        result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx" : {"enforceAtHeight" : enforce_at_height, "hex": ToHex(tx)}}]})
+        result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx": {"enforceAtHeight": enforce_at_height, "hex": ToHex(tx)}}]})
         assert_equal(result["notProcessed"], [])
 
     def check_log(self, node, line_text):
@@ -252,7 +258,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         def send_over_p2p_and_rpc(tx, err_str, err_code=-26):
             best_hash = node.rpc.getbestblockhash()
             if len(tx.vin) > 0:
-                self._whitelistTx(node, tx, node.rpc.getblockcount()+1)
+                self._whitelistTx(node, tx, node.rpc.getblockcount() + 1)
             node.send_message(msg_tx(tx))
             err_str_tx = 'flexible-' + err_str if err_str == 'bad-txns-vout-p2sh' else err_str
             wait_until(lambda: check_for_log_msg(node.rpc, f"txn= {tx.hash} rejected {err_str_tx}")
@@ -265,7 +271,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
                 err_str = "bad-txns-inputs-missingorspent"
             assert_equal(node.rpc.submitblock(ToHex(block)), err_str)
             node.send_message(msg_block(block))
-            wait_until(lambda: check_for_log_msg(node.rpc, f"received block {block.hash}"
+            wait_until(lambda: check_for_log_msg(node.rpc, f"Received block for {block.hash}"
                                                  or f"ConnectBlock {block.hash} failed"))
             assert_equal(best_hash, node.rpc.getbestblockhash())
 
@@ -333,15 +339,15 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
 
         # non-final tx in block only
         confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
-        confiscate_tx.nLockTime = node.rpc.getblockcount()+1
+        confiscate_tx.nLockTime = node.rpc.getblockcount() + 1
         confiscate_tx.vin[0].nSequence = 0
         confiscate_tx.rehash()
         best_hash = node.rpc.getbestblockhash()
-        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount() + 1)
         block = self.make_block_with_tx(node, confiscate_tx)
         assert_equal(node.rpc.submitblock(ToHex(block)), "bad-txns-nonfinal")
         node.send_message(msg_block(block))
-        wait_until(lambda: check_for_log_msg(node.rpc, f"received block {block.hash}"))
+        wait_until(lambda: check_for_log_msg(node.rpc, f"Received block for {block.hash}"))
         assert_equal(best_hash, node.rpc.getbestblockhash())
 
         # coinbase confiscation tx
@@ -365,7 +371,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         node.send_message(msg_tx(confiscate_tx))
         send_over_p2p_and_rpc(confiscate_tx, "bad-txns-vin-empty")
 
-        node.rpc.clearBlacklists({"removeAllEntries" : True})
+        node.rpc.clearBlacklists({"removeAllEntries": True})
 
     def _check_invalid_confiscation_transaction_policy(self, node):
         frozen_tx = self._create_and_send_tx(node)
@@ -387,14 +393,14 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
         confiscate_tx.vout[1].nValue = COIN
         confiscate_tx.rehash()
-        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount() + 1)
         assert_raises_rpc_error(-26, "absurdly-high-fee", node.rpc.sendrawtransaction, ToHex(confiscate_tx))
         send_block_over_p2p_accept_invalidate(confiscate_tx)
 
         # invalid tx size
         script = CScript([OP_RETURN] * 1048576)
         confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', script)
-        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount() + 1)
         result = node.rpc.sendrawtransactions([{'hex': ToHex(confiscate_tx), 'config': {'maxtxsizepolicy': 1048576, 'acceptnonstdoutputs': False}}])
         assert_result(result, confiscate_tx.hash, 'tx-size')
         send_block_over_p2p_accept_invalidate(confiscate_tx)
@@ -405,13 +411,13 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         result = node.rpc.sendrawtransactions([{'hex': ToHex(confiscate_tx), 'config': {'acceptnonstdoutputs': True}}])
         assert_result(result, confiscate_tx.hash, 'txn-mempool-conflict')
         # it's needed block to be accepted
-        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount() + 1)
         send_block_over_p2p_accept_invalidate(confiscate_tx)
 
         # invalid script not push only
         script = CScript([OP_NOP])
         confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), script, CScript([OP_TRUE]))
-        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount() + 1)
         result = node.rpc.sendrawtransactions([{'hex': ToHex(confiscate_tx), 'config': {'acceptnonstdoutputs': False}}])
         assert_result(result, confiscate_tx.hash, 'scriptsig-not-pushonly')
         send_block_over_p2p_accept_invalidate(confiscate_tx)
@@ -419,7 +425,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         # invalid tx multisig
         script = CScript([b'\x01', self.pubkey, b'\x01', OP_CHECKMULTISIG])
         confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', script)
-        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount() + 1)
         result = node.rpc.sendrawtransactions([{'hex': ToHex(confiscate_tx), 'config': {'acceptnonstdoutputs': False}}])
         assert_result(result, confiscate_tx.hash, 'bare-multisig')
         send_block_over_p2p_accept_invalidate(confiscate_tx)
@@ -428,14 +434,14 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
         confiscate_tx.vout.append(CTxOut(0, CScript([OP_RETURN])))
         confiscate_tx.rehash()
-        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount() + 1)
         result = node.rpc.sendrawtransactions([{'hex': ToHex(confiscate_tx), 'config': {'acceptnonstdoutputs': False}}])
         assert_result(result, confiscate_tx.hash, 'dust')
         send_block_over_p2p_accept_invalidate(confiscate_tx)
 
         # invalid tx scriptpubkey
         confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_RETURN]))
-        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount() + 1)
         result = node.rpc.sendrawtransactions([{'hex': ToHex(confiscate_tx), 'config': {'acceptnonstdoutputs': False}}])
         assert_result(result, confiscate_tx.hash, 'scriptpubkey')
         send_block_over_p2p_accept_invalidate(confiscate_tx)
@@ -444,7 +450,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_RETURN]))
         confiscate_tx.vout[1].nValue = 1
         # no rehash call
-        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount() + 1)
         confiscate_tx.rehash()
         result = node.rpc.sendrawtransactions([{'hex': ToHex(confiscate_tx), 'config': {'acceptnonstdoutputs': False}}])
         assert_result(result, confiscate_tx.hash, 'scriptpubkey')
@@ -454,12 +460,12 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
         confiscate_tx.vout[0].scriptPubKey = CScript(CTX_OP_RETURN + [b'\x01' * 70])
         confiscate_tx.rehash()
-        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount()+1)
+        self._whitelistTx(node, confiscate_tx, node.rpc.getblockcount() + 1)
         result = node.rpc.sendrawtransactions([{'hex': ToHex(confiscate_tx), 'config': {'datacarriersize': 50, 'acceptnonstdoutputs': False}}])
         assert_result(result, confiscate_tx.hash, 'datacarrier-size-exceeded')
         send_block_over_p2p_accept_invalidate(confiscate_tx)
 
-        node.rpc.clearBlacklists({"removeAllEntries" : True})
+        node.rpc.clearBlacklists({"removeAllEntries": True})
 
     def _check_invalid_confiscation_transactios(self, node):
         frozen_tx = self._create_and_send_tx(node)
@@ -471,7 +477,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
             confiscate_tx.rehash()
             assert_raises_rpc_error(-26, "bad-ctx-invalid", node.rpc.sendrawtransaction, ToHex(confiscate_tx))
             # Check that invalid confiscation transaction cannot be whitelisted
-            result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx" : {"enforceAtHeight" : 100, "hex": ToHex(confiscate_tx)}}]})
+            result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx": {"enforceAtHeight": 100, "hex": ToHex(confiscate_tx)}}]})
             assert_equal(result["notProcessed"], [{'confiscationTx': {'txId': confiscate_tx.hash}, 'reason': 'confiscation transaction is not valid'}])
 
         self.log.info(f"Checking detection of invalid confiscation transactions trying to spend frozen TXO {frozen_tx.hash},0")
@@ -482,12 +488,12 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         check_script([CScriptOp(1)])
 
         # script shorter than length specified in PUSHDATA
-        check_script([CScriptOp(21), CScriptOp(1)] + [CScriptOp(0)]*19)
-        check_script([CScriptOp(42), CScriptOp(1)] + [CScriptOp(0)]*40)
+        check_script([CScriptOp(21), CScriptOp(1)] + [CScriptOp(0)] * 19)
+        check_script([CScriptOp(42), CScriptOp(1)] + [CScriptOp(0)] * 40)
 
         # script longer than length specified in PUSHDATA
-        check_script([CScriptOp(21), CScriptOp(1)] + [CScriptOp(0)]*21)
-        check_script([CScriptOp(42), CScriptOp(1)] + [CScriptOp(0)]*42)
+        check_script([CScriptOp(21), CScriptOp(1)] + [CScriptOp(0)] * 21)
+        check_script([CScriptOp(42), CScriptOp(1)] + [CScriptOp(0)] * 42)
 
         # 84 bytes is one byte too long and requires OP_PUSHDATA1
         check_script([b'\x01' + bytes(75)])
@@ -508,19 +514,19 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
 
         # transactions without any input should be detected when whitelisting
         ctx0 = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
-        ctx0.vin=[]
+        ctx0.vin = []
         ctx0.rehash()
-        result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx" : {"enforceAtHeight" : 0, "hex": ToHex(ctx0)}}]})
+        result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx": {"enforceAtHeight": 0, "hex": ToHex(ctx0)}}]})
         assert_equal(result["notProcessed"], [{'confiscationTx': {'txId': ctx0.hash}, 'reason': 'confiscation transaction is not valid'}])
 
         # invalid hex strings should be detected when whitelisting
-        result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx" : {"enforceAtHeight" : 0, "hex": ""}}]})
+        result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx": {"enforceAtHeight": 0, "hex": ""}}]})
         assert_equal(result["notProcessed"], [{'confiscationTx': {'txId': '0000000000000000000000000000000000000000000000000000000000000000'}, 'reason': 'invalid transaction hex string'}])
-        result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx" : {"enforceAtHeight" : 0, "hex": "02"}}]})
+        result = node.rpc.addToConfiscationTxidWhitelist({"confiscationTxs": [{"confiscationTx": {"enforceAtHeight": 0, "hex": "02"}}]})
         assert_equal(result["notProcessed"], [{'confiscationTx': {'txId': '0000000000000000000000000000000000000000000000000000000000000000'}, 'reason': 'invalid transaction hex string'}])
 
         # Cleanup
-        result = node.rpc.clearBlacklists({"removeAllEntries" : True})
+        result = node.rpc.clearBlacklists({"removeAllEntries": True})
         assert_equal(result["numRemovedEntries"], 1) # 1 frozen txo
 
     def _check_confiscation(self, node, node1):
@@ -553,7 +559,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         self._wait_for_block_status(node, block_ctx2.hash, "invalid")
 
         self.log.info("Clearing blacklists with removeAllEntries=true to remove all whitelisted txs and frozen TXOs")
-        result = node.rpc.clearBlacklists({"removeAllEntries" : True})
+        result = node.rpc.clearBlacklists({"removeAllEntries": True})
         assert_equal(result["numRemovedEntries"], 2)
 
         # Make sure both nodes are synchronized
@@ -562,11 +568,11 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
 
         self.log.info("Freezing TXO on both nodes")
         enforce_at_height = current_block_height + 1 # mempool height
-        self._freeze_txo(node,  frozen_tx, enforce_at_height)
+        self._freeze_txo(node, frozen_tx, enforce_at_height)
         self._freeze_txo(node1, frozen_tx, enforce_at_height)
 
         self.log.info("Whitelisting confiscation transaction on one node but not on the other")
-        self._whitelistTx(node,  confiscate_tx, enforce_at_height)
+        self._whitelistTx(node, confiscate_tx, enforce_at_height)
 
         self.log.info(f"Sending confiscation transaction {confiscate_tx.hash} spending frozen TXO {frozen_tx.hash},0 and checking that it is accepted on one node, but not on the other node")
         node.rpc.sendrawtransaction(ToHex(confiscate_tx))
@@ -576,10 +582,14 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
 
         node.rpc.clearConfiscationWhitelist() # remove confiscation transaction from mempool by clearing whitelist
         assert_equal(node.rpc.getrawmempool(), [])
-
-        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE, OP_NOP])) # must use a different confiscation tx so that it is relayed again to node1 (because the first one was rejected)
-        self._whitelistTx(node,  confiscate_tx, enforce_at_height)
-        self._whitelistTx(node1, confiscate_tx, enforce_at_height+1) # whitelisted, but not at current mempool height
+        confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0),
+                                                     b'',
+                                                     # must use a different confiscation tx
+                                                     # so that it is relayed again to node1
+                                                     # (because the first one was rejected)
+                                                     CScript([OP_TRUE, OP_NOP]))
+        self._whitelistTx(node, confiscate_tx, enforce_at_height)
+        self._whitelistTx(node1, confiscate_tx, enforce_at_height + 1) # whitelisted, but not at current mempool height
 
         self.log.info(f"Sending confiscation transaction {confiscate_tx.hash} spending frozen TXO {frozen_tx.hash},0 and checking that it is accepted on one node, but not on the other node")
         node.rpc.sendrawtransaction(ToHex(confiscate_tx))
@@ -593,7 +603,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
 
         confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE, OP_NOP, OP_NOP])) # must use a different confiscation tx
         self.log.info("Whitelisting confiscation transaction on both nodes")
-        self._whitelistTx(node,  confiscate_tx, enforce_at_height)
+        self._whitelistTx(node, confiscate_tx, enforce_at_height)
         self._whitelistTx(node1, confiscate_tx, enforce_at_height)
 
         self.log.info(f"Sending confiscation transaction {confiscate_tx.hash} spending frozen TXO {frozen_tx.hash},0 and checking that it is accepted on both nodes")
@@ -648,7 +658,11 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         self.log.info(f"Sending transaction {spend_tx.hash} spending confiscated TXO {confiscate_tx.hash},1 and checking that it is rejected because output has not matured")
         assert_raises_rpc_error(-26, "bad-txns-premature-spend-of-confiscation", node.rpc.sendrawtransaction, ToHex(spend_tx))
 
-        spend_tx1 = self._create_tx(PreviousSpendableOutput(confiscate_tx, 1), b'', CScript([OP_TRUE, OP_NOP])) # Must use a different tx, otherwise node1 would immediately force relay it to node (because node is whitelisted), which would then not relay it below in test to node1 when it is received again via RPC and is valid.
+        # Must use a different tx, otherwise node1 would immediately force
+        # relay it to node (because node is whitelisted), which would then
+        # not relay it below in test to node1 when it is received again
+        # via RPC and is valid.
+        spend_tx1 = self._create_tx(PreviousSpendableOutput(confiscate_tx, 1), b'', CScript([OP_TRUE, OP_NOP]))
         self.log.info(f"Sending transaction {spend_tx1.hash} spending confiscated TXO {confiscate_tx.hash},1 via P2P to node1 and checking that it is not accepted because output has not matured")
         node1.send_and_ping(msg_tx(spend_tx1))
         time.sleep(1)
@@ -670,10 +684,10 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
 
         self.log.info("Mining 1 block")
         block_hash1 = node.rpc.generate(1)[0]
-        node1.rpc.waitforblockheight(current_block_height+1)
+        node1.rpc.waitforblockheight(current_block_height + 1)
 
         self.log.info("Clearing blacklists+whitelist on node1 to check it is not needed when spending confiscation TXO")
-        result = node1.rpc.clearBlacklists({"removeAllEntries" : True})
+        result = node1.rpc.clearBlacklists({"removeAllEntries": True})
         assert_equal(result["numRemovedEntries"], 2) # 1 whitelisted txs + 1 frozen txo
 
         self.log.info(f"Sending transaction {spend_tx.hash} spending confiscated TXO {confiscate_tx.hash},1 and checking that it is accepted on both nodes")
@@ -684,7 +698,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         self.log.info("Mining 1 block")
         block_hash = node.rpc.generate(1)[0]
         assert_equal(node.rpc.getrawmempool(), [])
-        node1.rpc.waitforblockheight(current_block_height+2)
+        node1.rpc.waitforblockheight(current_block_height + 2)
 
         self.log.info(f"Invalidating tip {block_hash} to check that confiscated TXO is properly added back to UTXODB")
         result = node.rpc.gettxout(txid=confiscate_tx.hash, n=1, include_mempool=False)
@@ -710,7 +724,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         assert_equal(node1.rpc.getbestblockhash(), block_hash)
 
         # Cleanup
-        result = node.rpc.clearBlacklists({"removeAllEntries" : True})
+        result = node.rpc.clearBlacklists({"removeAllEntries": True})
         assert_equal(result["numRemovedEntries"], 3) # 2 whitelisted txs + 1 frozen txo
 
     def _check_mempool_removal(self, node):
@@ -723,33 +737,33 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         root_block_height = node.rpc.getblockcount()
         self.log.info(f"Current block height: {root_block_height}")
 
-        self._freeze_txo(node, frozen_tx, root_block_height, root_block_height+2)
+        self._freeze_txo(node, frozen_tx, root_block_height, root_block_height + 2)
         confiscate_tx = self._create_confiscation_tx(PreviousSpendableOutput(frozen_tx, 0), b'', CScript([OP_TRUE]))
-        self._whitelistTx(node, confiscate_tx, root_block_height+1)
+        self._whitelistTx(node, confiscate_tx, root_block_height + 1)
         self.log.info(f"Sending confiscation transaction {confiscate_tx.hash} spending frozen TXO {frozen_tx.hash},0 and checking that it is accepted")
         node.rpc.sendrawtransaction(ToHex(confiscate_tx))
         assert_equal(node.rpc.getrawmempool(), [confiscate_tx.hash])
 
         self.log.info("Checking that confiscation transaction is removed from mempool if blacklist is cleared")
-        result=node.rpc.clearBlacklists({"removeAllEntries" : True})
+        result = node.rpc.clearBlacklists({"removeAllEntries": True})
         assert_equal(result["numRemovedEntries"], 2)
         assert_equal(node.rpc.getrawmempool(), [])
 
         self.log.info("Restoring status of TXO so that it is frozen at mempool height, whitelisting transaction, sending confiscation transaction again and checking that it is accepted")
-        self._freeze_txo(node, frozen_tx, root_block_height, root_block_height+2)
-        self._whitelistTx(node, confiscate_tx, root_block_height+1)
+        self._freeze_txo(node, frozen_tx, root_block_height, root_block_height + 2)
+        self._whitelistTx(node, confiscate_tx, root_block_height + 1)
         node.rpc.sendrawtransaction(ToHex(confiscate_tx))
         assert_equal(node.rpc.getrawmempool(), [confiscate_tx.hash])
 
         self.log.info("Checking that confiscation transaction is removed from mempool if confiscation whitelist is cleared")
-        result=node.rpc.clearConfiscationWhitelist()
+        result = node.rpc.clearConfiscationWhitelist()
         assert_equal(result["numFrozenBackToConsensus"], 1)
         assert_equal(result["numUnwhitelistedTxs"], 1)
         assert_equal(node.rpc.getrawmempool(), [])
         assert_raises_rpc_error(-26, "bad-ctx-not-whitelisted", node.rpc.sendrawtransaction, ToHex(confiscate_tx))
 
         self.log.info("Whitelisting transaction, sending confiscation transaction again and checking that it is accepted")
-        self._whitelistTx(node, confiscate_tx, root_block_height+1)
+        self._whitelistTx(node, confiscate_tx, root_block_height + 1)
         node.rpc.sendrawtransaction(ToHex(confiscate_tx))
         assert_equal(node.rpc.getrawmempool(), [confiscate_tx.hash])
 
@@ -759,7 +773,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         assert_equal(block.hash, node.rpc.getbestblockhash())
         assert_equal(node.rpc.getrawmempool(), [confiscate_tx.hash])
 
-        self._freeze_txo(node, frozen_tx, root_block_height+2, root_block_height+3)
+        self._freeze_txo(node, frozen_tx, root_block_height + 2, root_block_height + 3)
 
         self.log.info(f"Invalidating block {block.hash} and checking that confiscation transaction {confiscate_tx.hash} stays in mempool even if TXO consensus freeze interval was updated to no longer be frozen at lower height")
         node.rpc.invalidateblock(block.hash)
@@ -776,7 +790,7 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
         # Cleanup
         node.rpc.reconsiderblock(root_block.hash) # this will also reconsider next block which was invalidated above
         assert_equal(block.hash, node.rpc.getbestblockhash())
-        result = node.rpc.clearBlacklists({"removeAllEntries" : True})
+        result = node.rpc.clearBlacklists({"removeAllEntries": True})
         assert_equal(result["numRemovedEntries"], 2) # 1 whitelisted tx + 1 frozen txo
 
     def run_test(self):

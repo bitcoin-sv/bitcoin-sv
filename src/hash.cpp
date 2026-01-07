@@ -6,6 +6,7 @@
 #include "crypto/common.h"
 #include "crypto/hmac_sha512.h"
 #include "pubkey.h"
+#include <cstddef>
 
 inline uint32_t ROTL32(uint32_t x, int8_t r) {
     return (x << r) | (x >> (32 - r));
@@ -20,14 +21,18 @@ unsigned int MurmurHash3(unsigned int nHashSeed,
         const uint32_t c1 = 0xcc9e2d51;
         const uint32_t c2 = 0x1b873593;
 
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         const int nblocks = vDataToHash.size() / 4;
 
         //----------
         // body
-        const uint8_t *blocks = &vDataToHash[0] + nblocks * 4;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        const uint8_t *blocks = &vDataToHash[0] + static_cast<ptrdiff_t>(nblocks * 4);
 
-        for (int i = -nblocks; i; i++) {
-            uint32_t k1 = ReadLE32(blocks + i * 4);
+        for(int i = -nblocks; i; i++)
+        {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            uint32_t k1 = ReadLE32(blocks + static_cast<ptrdiff_t>(i * 4));
 
             k1 *= c1;
             k1 = ROTL32(k1, 15);
@@ -40,11 +45,14 @@ unsigned int MurmurHash3(unsigned int nHashSeed,
 
         //----------
         // tail
-        const uint8_t *tail = (const uint8_t *)(&vDataToHash[0] + nblocks * 4);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        const uint8_t* tail = (const uint8_t*)(&vDataToHash[0] +
+                                               static_cast<ptrdiff_t>(nblocks * 4));
 
         uint32_t k1 = 0;
 
         switch (vDataToHash.size() & 3) {
+            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             case 3:
                 k1 ^= tail[2] << 16;
             // FALLTHROUGH
@@ -57,6 +65,9 @@ unsigned int MurmurHash3(unsigned int nHashSeed,
                 k1 = ROTL32(k1, 15);
                 k1 *= c2;
                 h1 ^= k1;
+            // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            default:
+                break;
         }
     }
 
@@ -72,17 +83,21 @@ unsigned int MurmurHash3(unsigned int nHashSeed,
     return h1;
 }
 
-void BIP32Hash(const ChainCode &chainCode, unsigned int nChild, uint8_t header,
-               const uint8_t data[32], uint8_t output[64]) {
-    uint8_t num[4];
+void BIP32Hash(const ChainCode& chainCode,
+               const unsigned int nChild,
+               const uint8_t header,
+               const std::span<const uint8_t, 32> data,
+               const std::span<uint8_t, 64> output)
+{
+    std::array<uint8_t, 4> num{}; 
     num[0] = (nChild >> 24) & 0xFF;
     num[1] = (nChild >> 16) & 0xFF;
     num[2] = (nChild >> 8) & 0xFF;
     num[3] = (nChild >> 0) & 0xFF;
     CHMAC_SHA512(chainCode.begin(), chainCode.size())
         .Write(&header, 1)
-        .Write(data, 32)
-        .Write(num, 4)
+        .Write(data.data(), data.size())
+        .Write(num.data(), num.size())
         .Finalize(output);
 }
 
@@ -111,8 +126,6 @@ CSipHasher::CSipHasher(uint64_t k0, uint64_t k1) {
     v[1] = 0x646f72616e646f6dULL ^ k1;
     v[2] = 0x6c7967656e657261ULL ^ k0;
     v[3] = 0x7465646279746573ULL ^ k1;
-    count = 0;
-    tmp = 0;
 }
 
 CSipHasher &CSipHasher::Write(uint64_t data) {
@@ -140,6 +153,7 @@ CSipHasher &CSipHasher::Write(const uint8_t *data, size_t size) {
     int c = count;
 
     while (size--) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         t |= uint64_t(*(data++)) << (8 * (c % 8));
         c++;
         if ((c & 7) == 0) {

@@ -42,7 +42,7 @@ The aim of this test is to verify/check behaviour of Prioritised Validation Queu
 
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.key import CECKey
-from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_TRUE, OP_CHECKSIG, OP_DROP, OP_ADD, OP_MUL
+from test_framework.script import CScript, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID, OP_TRUE, OP_CHECKSIG, OP_DROP, OP_ADD, OP_MUL
 from test_framework.blocktools import create_transaction, PreviousSpendableOutput
 from test_framework.util import assert_equal, wait_until, wait_for_ptv_completion
 from test_framework.comptool import TestInstance
@@ -80,8 +80,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
     # Sign a transaction, using the key we know about.
     # This signs input 0 in tx, which is assumed to be spending output n in spend_tx
     def sign_tx(self, tx, spend_tx, n):
-        scriptPubKey = bytearray(spend_tx.vout[n].scriptPubKey)
-        sighash = SignatureHashForkId(
+        sighash = SignatureHash(
             spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
         tx.vin[0].scriptSig = CScript(
             [self.coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
@@ -107,7 +106,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
             # Create a new transaction.
             tx = create_transaction(spend.tx, spend.n, unlocking_script, money_to_spend, locking_script)
             # Extend the number of outputs to the required vout_size size.
-            tx.vout.extend(tx.vout * (vout_size-1))
+            tx.vout.extend(tx.vout * (vout_size - 1))
             # Sign txn.
             self.sign_tx(tx, spend.tx, spend.n)
             tx.rehash()
@@ -135,7 +134,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
         for tx in range(len(txchains)):
             conn.send_message(msg_tx(txchains[tx]))
         # Check if the validation queues are empty.
-        wait_for_ptv_completion(conn, num_of_chains*chain_length, timeout=timeout)
+        wait_for_ptv_completion(conn, num_of_chains * chain_length, timeout=timeout)
 
         return txchains
 
@@ -181,7 +180,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
         # Check if the validation queues are empty.
         conn.rpc.waitforptvcompletion()
 
-        return nonstd_txs+additional_txs, rejected_txs
+        return nonstd_txs + additional_txs, rejected_txs
 
     def get_tests(self):
         # Shorthand for functions
@@ -219,7 +218,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
         # - None txn is rejected with a reason 'too-long-validation-time' (not moved into the non-std queue).
         #
         # The number of txs used in the test case.
-        tc1_txs_num=10
+        tc1_txs_num = 10
         # Select funding transactions to use:
         # - tc1_txs_num funding transactions are needed in this test case.
         spend_txs = out[0:tc1_txs_num]
@@ -246,10 +245,10 @@ class PVQTimeoutTest(ComparisonTestFramework):
         # All txns are then forwarded to the non-standard validation queue where the validation timeout is longer (sufficient).
         #
         # The number of txs used in the test case.
-        tc2_txs_num=10
+        tc2_txs_num = 10
         # Select funding transactions to use:
         # - one funding transaction is needed in this test case.
-        spend_txs = out[tc1_txs_num:tc1_txs_num+1]
+        spend_txs = out[tc1_txs_num:tc1_txs_num + 1]
         args = ['-checkmempool=0', '-persistmempool=0']
         with self.run_node_with_connections('TC2: {} txs with small bignums detected as non-std txs and then finally accepted.'.format(tc2_txs_num),
                                             0,
@@ -274,14 +273,14 @@ class PVQTimeoutTest(ComparisonTestFramework):
         # All txns are then forwarded to the non-standard validation queue where the validation timeout is longer (sufficient).
         #
         # The number of txs used in the test case.
-        tc3_txs_num=10
+        tc3_txs_num = 10
         # Select funding transactions to use:
         # - one funding transaction is needed in this test case.
-        spend_txs = out[tc1_txs_num+1:tc1_txs_num+2]
+        spend_txs = out[tc1_txs_num + 1:tc1_txs_num + 2]
         args = ['-checkmempool=0', '-persistmempool=0',
                 '-maxnonstdtxvalidationduration=100000', # On slow/busy machine txn validation times have to be high
                 '-maxtxnvalidatorasynctasksrunduration=100001', # This needs to mehigher then maxnonstdtxvalidationduration
-                '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=250000']
+                '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=500000']
         with self.run_node_with_connections('TC3: {} txs with large bignums detected as non-std txs and then finally accepted.'.format(tc3_txs_num),
                                             0,
                                             args + self.default_args,
@@ -307,12 +306,12 @@ class PVQTimeoutTest(ComparisonTestFramework):
         # - reject messages are created for each and every txn.
         #
         # The number of txs used in the test case.
-        tc4_txs_num=10
+        tc4_txs_num = 10
         # Select funding transactions to use:
         # - one funding transaction is needed in this test case.
-        spend_txs = out[tc1_txs_num+2:tc1_txs_num+3]
+        spend_txs = out[tc1_txs_num + 2:tc1_txs_num + 3]
         args = ['-checkmempool=0', '-persistmempool=0',
-                '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=250000']
+                '-maxscriptsizepolicy=0', '-maxscriptnumlengthpolicy=500000']
         with self.run_node_with_connections('TC4: {} txs with large bignums detected as non-std txs and then finally rejected.'.format(tc4_txs_num),
                                             0,
                                             args + self.default_args,
@@ -336,14 +335,14 @@ class PVQTimeoutTest(ComparisonTestFramework):
         # - the set of std and non-std txs is shuffled before sending it to the node.
         #
         # The number of txs used in the test case.
-        tc5_1_txs_num=100
-        tc5_2_txs_num=10
+        tc5_1_txs_num = 100
+        tc5_2_txs_num = 10
         # Select funding transactions to use:
         # - tc5_1_txs_num+1 funding transactions are needed in this test case.
-        spend_txs = out[tc1_txs_num+3:tc1_txs_num+3+tc5_1_txs_num]
-        spend_txs2 = out[tc1_txs_num+3+tc5_1_txs_num:tc1_txs_num+4+tc5_1_txs_num]
+        spend_txs = out[tc1_txs_num + 3:tc1_txs_num + 3 + tc5_1_txs_num]
+        spend_txs2 = out[tc1_txs_num + 3 + tc5_1_txs_num:tc1_txs_num + 4 + tc5_1_txs_num]
         args = ['-checkmempool=0', '-persistmempool=0']
-        with self.run_node_with_connections('TC5: The total of {} std and nonstd txs processed and accepted.'.format(tc5_1_txs_num+tc5_2_txs_num),
+        with self.run_node_with_connections('TC5: The total of {} std and nonstd txs processed and accepted.'.format(tc5_1_txs_num + tc5_2_txs_num),
                                             0,
                                             args + self.default_args,
                                             number_of_connections=1) as (conn,):
@@ -353,7 +352,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
             wait_for_ptv_completion(conn, len(std_and_nonstd_txs))
             # Check if required transactions are accepted by the mempool.
             self.check_mempool(conn.rpc, std_and_nonstd_txs, timeout=30)
-            assert_equal(conn.rpc.getmempoolinfo()['size'], tc5_1_txs_num+tc5_2_txs_num)
+            assert_equal(conn.rpc.getmempoolinfo()['size'], tc5_1_txs_num + tc5_2_txs_num)
 
 
 if __name__ == '__main__':

@@ -49,6 +49,7 @@ CTxMemPoolEntry MakeEntry(
     }
     
     auto txSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     auto totalFee = Amount(int64_t( feerate * txSize) / nOutputs * nOutputs);
     auto perOutput = (totalInput - totalFee) / int64_t(nOutputs);
 
@@ -98,7 +99,7 @@ public:
         return iter;
     }
 
-    void AddGroup(std::vector<CTxMemPoolEntry> entries)
+    void AddGroup(const std::vector<CTxMemPoolEntry>& entries)
     {
         SecondaryMempoolEntryData groupData;
         std::vector<CTxMemPoolTestAccess::txiter> iters;
@@ -142,7 +143,7 @@ public:
         {
             for(auto it: entry->GetCPFPGroup()->Transactions())
             {
-                CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).group().reset();
+                CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).group().reset(); // NOLINT(cppcoreguidelines-pro-type-const-cast)
             }
         }
 
@@ -172,7 +173,7 @@ public:
                 links, 
                 [](CTxMemPoolTestAccess::txiter entry)
                 {
-                    int64_t score = entry->GetFee().GetSatoshis() * 100000 / entry->GetTxSize();
+                    auto score = entry->GetFee().GetSatoshis() * 100'000 / entry->GetTxSize();
                     if(!entry->IsInPrimaryMempool())
                     {
                         score += std::numeric_limits<int64_t>::min();
@@ -184,6 +185,7 @@ public:
     
     void RemoveMostWorthless()
     {
+        assert(tracker);
         auto iter = tracker->GetMostWorthless();
         RemoveTx(iter);
     }
@@ -222,6 +224,7 @@ BOOST_AUTO_TEST_CASE(single_long_chain) {
         std::deque<uint256> removedTransactions;
         for(int i = 0; i < 100; i++)
         {
+            assert(mempool.tracker);
             auto txToRemove = mempool.tracker->GetMostWorthless();
             auto txId = txToRemove->GetSharedTx()->GetId();
             removedTransactions.push_front(txId);
@@ -245,8 +248,13 @@ BOOST_AUTO_TEST_CASE(broad_tree) {
     {
         for(size_t i = 0; i < 100; i++)
         {
-            auto feerate = 100 + ((i % 2 == 0) ? (i * 0.1) : (i * -0.1)); 
-            auto newEntry = MakeEntry(feerate, {}, { std::make_tuple<CTransactionRef, int>(entry.GetSharedTx(), std::move(i))}, 1, 0);
+            // NOLINTNEXTLINE(*-narrowing-conversions)
+            auto feerate = 100 + ((i % 2 == 0) ? (i * 0.1) : (i * -0.1));
+            auto newEntry = MakeEntry(feerate,
+                                      {},
+                                      {std::make_tuple(entry.GetSharedTx(), i)},
+                                      1,
+                                      0);
             mempool.AddTx(newEntry);
             if(mempool.tracker)
             {
@@ -262,8 +270,10 @@ BOOST_AUTO_TEST_CASE(broad_tree) {
         double lastRemovedFeeRate = 0;
         for(size_t i = 0; i < 100; i++)
         {
+            assert(mempool.tracker);
             BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == (100-i));
             auto txToRemove = mempool.tracker->GetMostWorthless();
+            // NOLINTNEXTLINE(*-narrowing-conversions)
             double feeRate = double(txToRemove->GetFee().GetSatoshis()) / txToRemove->GetTxSize();
             mempool.RemoveTx(txToRemove);
             BOOST_ASSERT(feeRate >= lastRemovedFeeRate);
@@ -282,7 +292,11 @@ BOOST_AUTO_TEST_CASE(secondary_mempool_first) {
 
     for(int i = 0; i < 100; i++)
     {    
-        auto newEntry = MakeEntry(100 + (i * 0.1), {}, { std::make_tuple<CTransactionRef, int>(entry.GetSharedTx(), std::move(i))}, 1, 0);
+        auto newEntry = MakeEntry(100 + (i * 0.1),
+                                  {},
+                                  {std::make_tuple(entry.GetSharedTx(), i)},
+                                  1,
+                                  0);
         if(i % 2 == 0)
         {
             CTestTxMemPoolEntry(newEntry).groupingData() =
@@ -297,7 +311,9 @@ BOOST_AUTO_TEST_CASE(secondary_mempool_first) {
     bool lastFromSecondary = true;
     for(int i = 0; i < 100; i++)
     {
+        assert(mempool.tracker);
         auto txToRemove = mempool.tracker->GetMostWorthless();
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         double feeRate = double(txToRemove->GetFee().GetSatoshis()) / txToRemove->GetTxSize();
         bool fromSecondary = !txToRemove->IsInPrimaryMempool();
         mempool.RemoveMostWorthless();
@@ -327,7 +343,8 @@ BOOST_AUTO_TEST_CASE(secondary_mempool_first) {
 
 
 
-BOOST_AUTO_TEST_CASE(group) {
+BOOST_AUTO_TEST_CASE(group_test)
+{
     MempoolMockup mempool;
     std::vector<std::tuple<TxId, int, Amount>> confirmedInputs = {
         std::make_tuple<TxId, int, Amount>(TxId(), 0, Amount(10000000)),
@@ -346,6 +363,7 @@ BOOST_AUTO_TEST_CASE(group) {
     group.push_back(MakeEntry(10,{}, inMempoolInputs, 1, 1000));
     mempool.AddGroup(group);
     mempool.InitializeTracker();
+    assert(mempool.tracker);
     BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == 1);
     mempool.AddTx(MakeEntry(1000, {}, {std::make_tuple(group[0].GetSharedTx(), 1)}, 1, 1000));
     BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == 1);

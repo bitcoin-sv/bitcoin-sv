@@ -54,7 +54,7 @@ since in that case the parent (block 1) has not been validated yet - this way
 we certainly get an attempt of trying to validate block 1 by two checker queues
 at the same time.
 """
-from test_framework.blocktools import (create_block, create_coinbase, prepare_init_chain)
+from test_framework.blocktools import prepare_init_chain
 from test_framework.mininode import (
     NetworkThread,
     NodeConn,
@@ -68,9 +68,6 @@ from test_framework.util import (
     wait_until,
     check_for_log_msg)
 from bsv_pbv_common import wait_for_waiting_blocks
-from test_framework.script import *
-from test_framework.blocktools import create_transaction
-from test_framework.key import CECKey
 
 
 class PBVProcessingOrder(BitcoinTestFramework):

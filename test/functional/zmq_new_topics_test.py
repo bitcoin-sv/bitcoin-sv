@@ -20,7 +20,6 @@ Scenario:
 11. N0 should receive 18 notifications: 6 per each new block (2 notifications (hash+raw) for coinbase tx, sent tx and block)
 
 """
-import os
 import struct
 
 from test_framework.test_framework import BitcoinTestFramework, SkipTest
@@ -28,7 +27,7 @@ from test_framework.util import (assert_equal,
                                  bytes_to_hex_str,
                                  hash256,
                                  connect_nodes_bi,
-                                 check_zmq_test_requirements, zmq_port, wait_until)
+                                 check_zmq_test_requirements, zmq_port)
 
 
 class ZMQNewTopicsTest (BitcoinTestFramework):
@@ -218,7 +217,7 @@ class ZMQNewTopicsTest (BitcoinTestFramework):
         # Checking that all three blocks from the longer chain are published along with all the transactions
         # 2 notifications (hash+raw) for coinbase tx, sent tx and block -- 6 per added block +
         # 2 notifications (hash+raw) per tx from the disconnected block
-        for i in range(numberOfBlocks * 6 + 2*len(txhashes_sent0)):
+        for i in range(numberOfBlocks * 6 + 2 * len(txhashes_sent0)):
             msg = self.zmqSubSocket.recv_multipart()
             topic = msg[0]
             body = msg[1]
@@ -239,7 +238,6 @@ class ZMQNewTopicsTest (BitcoinTestFramework):
 
         self.log.info("Generate a new block that will contain transactions from disconnected blocks.")
         blockhash = self.nodes[0].generate(1)[0]
-        txes_added_again = set()
         for i in range(4):
             msg = self.zmqSubSocket.recv_multipart()
             topic = msg[0]

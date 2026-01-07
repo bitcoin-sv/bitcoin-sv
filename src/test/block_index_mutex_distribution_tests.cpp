@@ -39,9 +39,11 @@ CBlockIndex* AddBlockIndex(CBlockIndex& prev, BlockIndexStore& mapBlockIndex)
 
 BOOST_AUTO_TEST_CASE(BlockIndexMutexDistributionTest)
 {
-    uint32_t BLOCK_COUNT = 100000;
+    uint32_t BLOCK_COUNT = 100'000;
     uint32_t MUTEX_COUNT = 8;
+    // NOLINTNEXTLINE(*-narrowing-conversions, bugprone-integer-division)
     uint32_t LOWER_LIMIT = BLOCK_COUNT / MUTEX_COUNT - 0.1 * BLOCK_COUNT;
+    // NOLINTNEXTLINE(*-narrowing-conversions, bugprone-integer-division)
     uint32_t UPPER_LIMIT = BLOCK_COUNT / MUTEX_COUNT + 0.1 * BLOCK_COUNT;
 
     LOCK(cs_main);

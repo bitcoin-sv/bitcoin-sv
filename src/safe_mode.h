@@ -29,11 +29,6 @@ class SafeMode
     SafeModeLevel ShouldForkTriggerSafeMode(const Config& config, const CBlockIndex* pindexForkTip, const CBlockIndex* pindexForkBase) const;
 
     /**
-    * Returns block height for the ro
-    */
-    int64_t GetMinimumRelevantBlockHeight(const Config& config) const;
-
-    /**
      * Creates or updates entry in the safeModeForks for fork which is 
      * determined with pindexNew
      */
@@ -48,13 +43,6 @@ class SafeMode
      * Deletes entries in the safeModeForks which have fork distance larger than configured
      */
     void PruneStaleForkData(const Config& config);
-
-    /**
-     * Returns a new fork tip which is result of ignoring specific blocks for the safe mode,
-     * and set of all blocks that should be ignored.
-     * If the whole fork is marked for ignoring nullptr is returned.
-     */
-    std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>> ExcludeIgnoredBlocks(const Config& config, const CBlockIndex* pindexForkTip) const;
 
     /**
     * Represents single forking of the main chain
@@ -83,11 +71,11 @@ class SafeMode
     */
     struct SafeModeResult
     {
-        const CBlockIndex* activeChainTip;
-        const CBlockIndex* reorgedFrom;
-        int numberOfDisconnectedBlocks;
+        const CBlockIndex* activeChainTip{};
+        const CBlockIndex* reorgedFrom{};
+        int numberOfDisconnectedBlocks{};
         std::map<const CBlockIndex*, SafeModeFork> forks;
-        SafeModeLevel maxLevel;
+        SafeModeLevel maxLevel{SafeModeLevel::NONE};
 
         bool ShouldNotify(const SafeModeResult& oldResult) const;
         void AddFork(const CBlockIndex* forkTip, const CBlockIndex* forkBase, SafeModeLevel level);
@@ -129,6 +117,9 @@ private: // data members
     std::unique_ptr<rpc::client::RPCClientConfig> webhookConfig;
 
 public:
+
+    const auto& forks() const { return safeModeForks; }
+
     /**
     * Updates safe mode status after a change in the blockchain.
     * If the change is related to a single block (connected, invalidated, ...) it is passed as pindexNew. 
@@ -147,6 +138,14 @@ public:
     void GetStatus(CJSONWriter& writer);
     std::string GetStatus();
 };
+    
+int64_t GetMinimumRelevantBlockHeight(const Config&);
+  
+// Returns a new fork tip which is the result of ignoring specific blocks for safe mode,
+// and set of all blocks that should be ignored.
+// If the whole fork is marked for ignoring nullptr is returned.
+std::tuple<const CBlockIndex*, std::vector<const CBlockIndex*>>
+ExcludeIgnoredBlocks(const Config&, const CBlockIndex* tip);
 
 /**
  * Calling SafeMode::Clear()

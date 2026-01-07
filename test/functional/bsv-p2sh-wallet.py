@@ -7,13 +7,13 @@
 This test checks the behaviour of P2SH before and after genesis.
 """
 
-from test_framework.test_framework import ComparisonTestFramework
-from test_framework.comptool import TestManager, TestInstance, RejectResult
-from test_framework.blocktools import *
+from test_framework.blocktools import create_and_sign_transaction
+from test_framework.comptool import TestInstance, RejectResult
 from test_framework.key import CECKey
-from test_framework.script import *
-
-from test_framework.util import assert_raises_message
+from test_framework.mininode import COIN
+from test_framework.script import CScript, hash160, OP_EQUAL, OP_HASH160
+from test_framework.test_framework import ComparisonTestFramework
+from test_framework.util import hex_str_to_bytes
 
 
 # In this test we are checking behavior of the Wallet when trying to spend pre and post genesis P2SH script
@@ -51,7 +51,7 @@ class P2SH(ComparisonTestFramework):
 
         # Now we need that block to mature so we can spend the coinbase.
         test = TestInstance(sync_every_block=False)
-        for i in range(0,100):
+        for i in range(0, 100):
             block(i, coinbase_pubkey=self.coinbase_pubkey)
             test.blocks_and_transactions.append([self.chain.tip, True])
             self.chain.save_spendable_output()
@@ -79,7 +79,7 @@ class P2SH(ComparisonTestFramework):
             redeem_script_hash = hash160(redeem_script)
             p2sh_script = CScript([OP_HASH160, redeem_script_hash, OP_EQUAL])
             return create_and_sign_transaction(spend_tx=output.tx, n=output.n,
-                                               value=output.tx.vout[0].nValue-100,
+                                               value=output.tx.vout[0].nValue - 100,
                                                private_key=self.coinbase_key,
                                                script=p2sh_script)
 
@@ -93,7 +93,7 @@ class P2SH(ComparisonTestFramework):
         current_height = node1.getblockcount()
 
         for i in range(self.genesisactivationheight - current_height):
-            block(101+i, coinbase_pubkey=self.coinbase_pubkey)
+            block(101 + i, coinbase_pubkey=self.coinbase_pubkey)
             test.blocks_and_transactions.append([self.chain.tip, True])
             self.chain.save_spendable_output()
         yield test

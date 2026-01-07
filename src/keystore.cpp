@@ -6,8 +6,11 @@
 #include "keystore.h"
 
 #include "key.h"
+#include "logging.h"
 #include "pubkey.h"
-#include "util.h"
+
+#include <boost/signals2/signal.hpp>
+#include <boost/variant.hpp>
 
 bool CKeyStore::AddKey(const CKey &key) {
     return AddKeyPubKey(key, key.GetPubKey());
@@ -35,11 +38,40 @@ bool CBasicKeyStore::AddKeyPubKey(const CKey &key, const CPubKey &pubkey) {
     return true;
 }
 
+bool CBasicKeyStore::HaveKey(const CKeyID &address) const {
+    bool result; // NOLINT(cppcoreguidelines-init-variables)
+    {
+        LOCK(cs_KeyStore);
+        result = (mapKeys.count(address) > 0);
+    }
+    return result;
+}
+void CBasicKeyStore::GetKeys(std::set<CKeyID> &setAddress) const {
+    setAddress.clear();
+    {
+        LOCK(cs_KeyStore);
+        for (const auto& [key, _] : mapKeys) {
+            setAddress.insert(key);
+        }
+    }
+}
+bool CBasicKeyStore::GetKey(const CKeyID &address, CKey &keyOut) const {
+    {
+        LOCK(cs_KeyStore);
+        KeyMap::const_iterator mi = mapKeys.find(address);
+        if (mi != mapKeys.end()) {
+            keyOut = mi->second;
+            return true;
+        }
+    }
+    return false;
+}
+
 bool CBasicKeyStore::AddCScript(const CScript &redeemScript) {
-    if (redeemScript.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS)
-        return error("CBasicKeyStore::AddCScript(): redeemScripts > %i bytes "
-                     "are invalid",
-                     MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS);
+    if (redeemScript.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS){
+        LogPrintf("CBasicKeyStore::AddCScript(): redeemScripts > %i bytes are invalid\n",MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS);
+        return false;
+    }
 
     LOCK(cs_KeyStore);
     mapScripts[CScriptID(redeemScript)] = redeemScript;

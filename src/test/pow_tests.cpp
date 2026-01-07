@@ -2,18 +2,13 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "chain.h"
-#include "chainparams.h"
-#include "config.h"
-#include "pow.h"
-#include "random.h"
-#include "test/test_bitcoin.h"
-#include "util.h"
 #include "block_index_store.h"
+#include "chain.h"
+#include "pow.h"
+#include "test/dummy_config.h"
+#include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
-
-#include <map>
 
 namespace{ class pow_tests_uid; } // only used as unique identifier
 
@@ -116,10 +111,11 @@ BOOST_AUTO_TEST_CASE(GetBlockProofEquivalentTime_test) {
     }
 
     for (int j = 0; j < 1000; j++) {
+        // NOLINTBEGIN(*-narrowing-conversions)
         CBlockIndex *p1 = blocks[InsecureRandRange(10000)];
         CBlockIndex *p2 = blocks[InsecureRandRange(10000)];
         CBlockIndex *p3 = blocks[InsecureRandRange(10000)];
-
+        // NOLINTEND(*-narrowing-conversions)
         int64_t tdiff = GetBlockProofEquivalentTime(
             *p1, *p2, *p3, config.GetChainParams().GetConsensus());
         BOOST_CHECK_EQUAL(tdiff, p1->GetBlockTime() - p2->GetBlockTime());

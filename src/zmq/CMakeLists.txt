@@ -2,14 +2,13 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-project(zmq)
-
 add_library(zmq
 	zmqabstractnotifier.cpp
 	zmqnotificationinterface.cpp
 	zmqpublishnotifier.cpp
 	zmq_publisher.cpp
 )
+enable_coverage(zmq)
 
 find_package(ZeroMQ REQUIRED)
 target_include_directories(zmq PRIVATE ${ZMQ_INCLUDE_DIR})

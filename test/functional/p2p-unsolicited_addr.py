@@ -6,9 +6,11 @@
 Check that unsolicted ADDR messages don't get accepted and relayed.
 """
 
-from test_framework.mininode import *
+from test_framework.mininode import CAddress, msg_addr, NetworkThread, \
+    NodeConn, NodeConnCB
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import connect_nodes_mesh, p2p_port
+
 import time
 
 
@@ -64,7 +66,7 @@ class UnsolictedAddr(BitcoinTestFramework):
 
         maddr = msg_addr()
         for addr in addrs:
-            ca = CAddress(addr.split(":")[0],int(addr.split(":")[1]))
+            ca = CAddress(addr.split(":")[0], int(addr.split(":")[1]))
             maddr.addrs.append(ca)
         connections[0].send_message(maddr)
 
@@ -74,7 +76,7 @@ class UnsolictedAddr(BitcoinTestFramework):
         time.sleep(60)
 
         for node in test_nodes:
-            assert(node.gotAddr == False)
+            assert (node.gotAddr is False)
 
 
 if __name__ == '__main__':

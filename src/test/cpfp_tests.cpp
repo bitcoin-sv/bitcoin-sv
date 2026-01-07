@@ -31,87 +31,93 @@ std::ostream& operator<<(std::ostream& os, const CTransactionConflictData& confl
 
 namespace std
 {
-    std::ostream& operator<<(
+    std::ostream& operator<<( // NOLINT(cert-dcl58-cpp)
         std::ostream& os,
         const std::tuple<uint256,
                          MemPoolRemovalReason,
                          std::optional<CTransactionConflictData>>& x)
     {
-        os << std::get<0>(x).ToString() << ' ' << std::get<1>(x) << ' '
-           << std::get<2>(x).value();
+        const auto& [txid, reason, conflict] = x;
+        assert(conflict);
+        os << txid.ToString() << ' ' << reason << ' '
+           << *conflict;
         return os;
     }
 }
 
 namespace{
 
-CTxMemPoolEntry MakeEntry(
-    CFeeRate feerate, 
-    std::vector<std::tuple<TxId, size_t, Amount>> inChainInputs, 
-    std::vector<std::tuple<CTransactionRef, int>> inMempoolInputs,
-    size_t nOutputs, size_t additionalSize=0, Amount feeAlreadyPaid=Amount{1},
-    size_t opReturnSize=0)
-{
-    CMutableTransaction tx;
-    Amount totalInput;
-    for(const auto& input: inChainInputs)
+    CTxMemPoolEntry MakeEntry(
+        const CFeeRate& feerate,
+        const std::vector<std::tuple<TxId, size_t, Amount>>& inChainInputs,
+        const std::vector<std::tuple<CTransactionRef, int>>& inMempoolInputs,
+        size_t nOutputs,
+        size_t additionalSize = 0,
+        size_t opReturnSize = 0)
     {
-        auto[id, ndx, amount] = input;
-        tx.vin.push_back(CTxIn(id, ndx, CScript()));
-        totalInput += amount;
-    }
-
-    for(const auto& input: inMempoolInputs)
-    {
-        auto[txInput, ndx] = input;
-        tx.vin.push_back(CTxIn(txInput->GetId(), ndx, CScript()));
-        totalInput += txInput->vout[ndx].nValue;
-    }
-
-    for(size_t i = 0; i < nOutputs; i++)
-    {
-        CScript script;
-        script << OP_TRUE;
-        tx.vout.push_back(CTxOut(Amount{1}, script));
-    }
-    
-    if(opReturnSize != 0)
-    {
-        CScript script;
-        script << OP_FALSE << OP_RETURN;
-        script << std::vector<uint8_t>(opReturnSize);
-        tx.vout.push_back(CTxOut(Amount(), script));
-    }
-
-    auto txSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) + additionalSize;
-    auto totalFee = feerate.GetFee(txSize);
-    auto perOputput = (totalInput - totalFee) / int64_t(nOutputs) + Amount(1);
-
-    for(auto& output: tx.vout)
-    {
-        if(output.scriptPubKey.begin_instructions()->opcode() != OP_FALSE)
+        CMutableTransaction tx;
+        Amount totalInput; // NOLINT(cppcoreguidelines-init-variables)
+        for(const auto& input : inChainInputs)
         {
-            output.nValue = perOputput;
+            auto [id, ndx, amount] = input;
+            tx.vin.push_back(CTxIn(id, ndx, CScript()));
+            totalInput += amount;
         }
-    }
 
-    auto txRef = MakeTransactionRef(tx);
-    CTxMemPoolEntry entry(txRef, totalFee, int64_t(0), false, false, LockPoints());
-    return entry;
-}
+        for(const auto& input : inMempoolInputs)
+        {
+            auto [txInput, ndx] = input;
+            tx.vin.push_back(CTxIn(txInput->GetId(), ndx, CScript()));
+            totalInput += txInput->vout[ndx].nValue;
+        }
+
+        for(size_t i = 0; i < nOutputs; i++)
+        {
+            CScript script;
+            script << OP_TRUE;
+            tx.vout.push_back(CTxOut(Amount{1}, script));
+        }
+
+        if(opReturnSize != 0)
+        {
+            CScript script;
+            script << OP_FALSE << OP_RETURN;
+            script << std::vector<uint8_t>(opReturnSize);
+            tx.vout.push_back(CTxOut(Amount(), script));
+        }
+
+        auto txSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) +
+                      additionalSize;
+        auto totalFee = feerate.GetFee(txSize);
+        auto perOputput = (totalInput - totalFee) / int64_t(nOutputs) + Amount(1);
+
+        for(auto& output : tx.vout)
+        {
+            if(output.scriptPubKey.begin_instructions()->opcode() != OP_FALSE)
+            {
+                output.nValue = perOputput;
+            }
+        }
+
+        auto txRef = MakeTransactionRef(tx);
+        CTxMemPoolEntry entry(txRef, totalFee, int64_t(0), false, false, LockPoints());
+        return entry;
+    }
 
 TxId MakeId(uint16_t n)
 {
     TxId id;
     *id.begin() = n >> 1;
-    *(id.begin() + 1) = n | 0x00ff;
+    *(id.begin() + 1) = n | 0x00ff; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     return id;
 }
 
-std::vector<std::tuple<TxId, size_t, Amount>> MakeConfirmedInputs(size_t count, Amount value)
+std::vector<std::tuple<TxId, size_t, Amount>> MakeConfirmedInputs(size_t count,
+                                                                  const Amount& value)
 {
     static uint16_t nextTxid = 1;
     std::vector<std::tuple<TxId, size_t, Amount>> inputs;
+    inputs.reserve(count);
     for (size_t i = 0; i < count; i++)
     {
         inputs.push_back(std::make_tuple(MakeId(nextTxid++), i, value));
@@ -229,12 +235,20 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     auto entryNotPaying4 = MakeEntry(CFeeRate{}, {}, {std::make_tuple(entryPayForItself.GetSharedTx(), 2), std::make_tuple(entryNotPaying3.GetSharedTx(), 0)}, 1);
     
     auto sizeOfNotPaying3and4 = entryNotPaying3.GetSharedTx()->GetTotalSize() + entryNotPaying4.GetSharedTx()->GetTotalSize();
-    auto feeOfNotPaying3and4 = entryNotPaying3.GetModifiedFee() + entryNotPaying4.GetModifiedFee();
-    auto entryPayingFor3And4 = MakeEntry(DefaultFeeRate(), {}, {std::make_tuple(entryNotPaying4.GetSharedTx(), 0)}, 1, sizeOfNotPaying3and4, feeOfNotPaying3and4);
+    auto entryPayingFor3And4 = MakeEntry(DefaultFeeRate(),
+                                         {},
+                                         {std::make_tuple(entryNotPaying4.GetSharedTx(),
+                                                          0)},
+                                         1,
+                                         sizeOfNotPaying3and4);
 
     auto sizeSoFar = entryNotPaying.GetSharedTx()->GetTotalSize() + entryPayForItself.GetSharedTx()->GetTotalSize();
-    auto feeSoFar = entryNotPaying.GetModifiedFee() + entryPayForItself.GetModifiedFee();
-    auto entryPayForGroup = MakeEntry(DefaultFeeRate(), {}, {std::make_tuple(entryPayForItself.GetSharedTx(), 0)}, 1, sizeSoFar, feeSoFar);
+    auto entryPayForGroup = MakeEntry(DefaultFeeRate(),
+                                      {},
+                                      {std::make_tuple(entryPayForItself.GetSharedTx(),
+                                                       0)},
+                                      1,
+                                      sizeSoFar);
 
     CTxMemPoolTestAccess testAccess(mempool);
     auto journal = testAccess.getJournalBuilder().getCurrentJournal();
@@ -313,14 +327,14 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     changeSet->clear();
 
     // entries which we have removed, they should removed from mempool and also from the journal
-    for(auto entry: {entryNotPaying4, entryPayingFor3And4})
+    for(const auto& entry: {entryNotPaying4, entryPayingFor3And4})
     {
         BOOST_ASSERT(testAccess.mapTx().find(entry.GetTxId()) == testAccess.mapTx().end());
         BOOST_ASSERT(!JournalTester(journal).checkTxnExists(JournalEntry{entry}));
     }
 
     // unaffected entries, they should stay in the mempool and journal
-    for(auto entry: {entryNotPaying, entryPayForItself, entryPayForGroup})
+    for(const auto& entry: {entryNotPaying, entryPayForItself, entryPayForGroup})
     {
         BOOST_ASSERT(testAccess.mapTx().find(entry.GetTxId()) != testAccess.mapTx().end());
         BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{entry}));
@@ -340,7 +354,12 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     BOOST_ASSERT(payFor3And4It->IsInPrimaryMempool());
 
     // things should be as before removal
-    for(auto entry: {entryNotPaying, entryPayForItself, entryPayForGroup, entryNotPaying3, entryNotPaying4, entryPayingFor3And4})
+    for(const auto& entry : {entryNotPaying,
+                             entryPayForItself,
+                             entryPayForGroup,
+                             entryNotPaying3,
+                             entryNotPaying4,
+                             entryPayingFor3And4})
     {
         BOOST_ASSERT(testAccess.mapTx().find(entry.GetTxId()) != testAccess.mapTx().end());
         BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{entry}));
@@ -514,10 +533,25 @@ BOOST_AUTO_TEST_CASE(journal_groups)
 
     auto journal = testAccess.getJournalBuilder().getCurrentJournal();
 
-    auto entry1 = MakeEntry(DefaultFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 1, 0, Amount{0}, 100000);
-    auto entryGroup1Tx1 = MakeEntry(CFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 2, 0, Amount{0}, 100000);
-    auto entryGroup1Tx2 = MakeEntry(DefaultFeeRate(), {}, {std::make_tuple(entryGroup1Tx1.GetSharedTx(), 1)}, 2, entryGroup1Tx1.GetSharedTx()->GetTotalSize(), Amount{0}, 100000);
-    
+    auto entry1 = MakeEntry(DefaultFeeRate(),
+                            MakeConfirmedInputs(1, Amount(1000000)),
+                            {},
+                            1,
+                            0,
+                            100'000);
+    auto entryGroup1Tx1 = MakeEntry(CFeeRate(),
+                                    MakeConfirmedInputs(1, Amount(1'000'000)),
+                                    {},
+                                    2,
+                                    0,
+                                    100'000);
+    auto entryGroup1Tx2 = MakeEntry(DefaultFeeRate(),
+                                    {},
+                                    {std::make_tuple(entryGroup1Tx1.GetSharedTx(), 1)},
+                                    2,
+                                    entryGroup1Tx1.GetSharedTx()->GetTotalSize(),
+                                    100'000);
+
     auto tx1 = AddToMempool(entry1);
     auto tx2 = AddToMempool(entryGroup1Tx1);
     auto tx3 = AddToMempool(entryGroup1Tx2);
@@ -623,8 +657,7 @@ namespace
         return mtx;
     }
 
-    std::unique_ptr<const CTransaction> MakeTx(const std::vector<COutPoint>& inputs,
-                                         const size_t nOutputs=0)
+    std::unique_ptr<const CTransaction> MakeTx(const std::vector<COutPoint>& inputs)
     {
         const CMutableTransaction mtx{MakeMutableTx(inputs)};
         return std::make_unique<const CTransaction>(mtx);
@@ -642,14 +675,16 @@ namespace
                                LockPoints()};
     }
     
-    struct test_validator : CValidationInterface
+    struct test_validator : CValidationInterface // NOLINT(cppcoreguidelines-special-member-functions, cppcoreguidelines-virtual-class-destructor)
     {
         test_validator()
         {
+            // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
             RegisterValidationInterface();
         }
         ~test_validator()
         {
+            // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
             UnregisterValidationInterface();
         }
 

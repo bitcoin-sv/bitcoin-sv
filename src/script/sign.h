@@ -6,8 +6,10 @@
 #ifndef BITCOIN_SCRIPT_SIGN_H
 #define BITCOIN_SCRIPT_SIGN_H
 
+#include "protocol_era.h"
 #include "script/interpreter.h"
 #include "script/sighashtype.h"
+#include <cstdint>
 
 class CKeyID;
 class CKeyStore;
@@ -16,6 +18,7 @@ class CScript;
 class CTransaction;
 
 /** Virtual base class for signature creators. */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class BaseSignatureCreator {
 protected:
     const CKeyStore *keystore;
@@ -37,6 +40,7 @@ class TransactionSignatureCreator : public BaseSignatureCreator {
     unsigned int nIn;
     Amount amount;
     SigHashType sigHashType;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const TransactionSignatureChecker checker;
 
 public:
@@ -53,13 +57,15 @@ class MutableTransactionSignatureCreator : public TransactionSignatureCreator {
     CTransaction tx;
 
 public:
-    MutableTransactionSignatureCreator(const CKeyStore *keystoreIn,
-                                       const CMutableTransaction *txToIn,
-                                       unsigned int nInIn, const Amount amount,
+    MutableTransactionSignatureCreator(const CKeyStore* keystoreIn,
+                                       const CMutableTransaction* txToIn,
+                                       unsigned int nInIn,
+                                       const Amount& amt,
                                        SigHashType sigHashTypeIn)
-        : TransactionSignatureCreator(keystoreIn, &tx, nInIn, amount,
-                                      sigHashTypeIn),
-          tx(*txToIn) {}
+        : TransactionSignatureCreator(keystoreIn, &tx, nInIn, amt, sigHashTypeIn),
+          tx(*txToIn)
+    {
+    }
 };
 
 /** A signature creator that just produces 72-byte empty signatures. */
@@ -80,26 +86,35 @@ struct SignatureData {
 };
 
 /** Produce a script signature using a generic signature creator. */
-bool ProduceSignature(const Config& config, bool consensus, const BaseSignatureCreator& creator, bool genesisEnabled, bool utxoAfterGenesis,
-                      const CScript& scriptPubKey, SignatureData& sigdata);
+bool SignAndVerify(const ConfigScriptPolicy& policySettings,
+                   bool consensus,
+                   const BaseSignatureCreator&,
+                   ProtocolEra era,
+                   ProtocolEra utxoEra,
+                   const CScript& fromPubKey,
+                   SignatureData&);
 
 /** Produce a script signature for a transaction. */
-bool SignSignature(const Config& config, const CKeyStore& keystore, bool genesisEnabled,
-                   bool utxoAfterGenesis, const CScript& fromPubKey,
+bool SignSignature(const ConfigScriptPolicy& policySettings, const CKeyStore& keystore,
+                   ProtocolEra era, ProtocolEra utxoEra,
+                   const CScript& fromPubKey,
                    CMutableTransaction& txTo, unsigned int nIn,
                    const Amount amount, SigHashType sigHashType);
-bool SignSignature(const Config& config, const CKeyStore& keystore, bool genesisEnabled,
-                   bool utxoAfterGenesis, const CTransaction& txFrom,
+bool SignSignature(const ConfigScriptPolicy& policySettings, const CKeyStore& keystore,
+                   ProtocolEra era, ProtocolEra utxoEra,
+                   const CTransaction& txFrom,
                    CMutableTransaction& txTo, unsigned int nIn,
                    SigHashType sigHashType);
 
 /** Combine two script signatures using a generic signature checker,
  * intelligently, possibly with OP_0 placeholders. */
-SignatureData CombineSignatures(const Config& config, bool consensus, const CScript &scriptPubKey,
-                                const BaseSignatureChecker &checker,
-                                const SignatureData &scriptSig1,
-                                const SignatureData &scriptSig2,
-                                bool utxoAfterGenesis);
+SignatureData CombineSignatures(const eval_script_params&,
+                                const CScript& scriptPubKey,
+                                const BaseSignatureChecker&,
+                                const SignatureData& scriptSig1,
+                                const SignatureData& scriptSig2,
+                                ProtocolEra era,
+                                ProtocolEra utxoEra);
 
 /** Extract signature data from a transaction, and insert it. */
 SignatureData DataFromTransaction(const CMutableTransaction &tx,

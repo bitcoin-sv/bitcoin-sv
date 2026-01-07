@@ -14,7 +14,6 @@ Scenario:
 7. Extend main branch by 15 blocks. This should cause that node exits safe mode because alternative branch is
    no longer SAFE_MODE_MIN_POW_DIFFERENCE blocks ahead
 """
-from time import sleep
 
 from test_framework.authproxy import JSONRPCException
 from test_framework.blocktools import make_block, send_by_headers, wait_for_tip, wait_for_tip_status

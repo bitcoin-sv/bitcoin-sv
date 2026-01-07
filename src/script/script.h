@@ -9,15 +9,17 @@
 #include "consensus/consensus.h"
 #include "crypto/common.h"
 #include "prevector.h"
+#include "protocol_era.h"
 #include "serialize.h"
 #include "opcodes.h"
 
 #include <array>
 #include <cassert>
 #include <climits>
+#include <concepts>
 #include <cstdint>
 #include <cstring>
-#include <limits>
+#include <iterator>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -41,6 +43,10 @@ class CScriptNum;
 
 typedef prevector<28, uint8_t> CScriptBase;
 
+template<typename InputIt>
+concept uint8_iterator = std::input_iterator<InputIt> 
+                         && std::same_as<std::iter_value_t<InputIt>, uint8_t>;
+
 namespace bsv
 {
     class instruction_iterator;
@@ -53,13 +59,16 @@ protected:
 
 public:
     CScript() {}
-    CScript(const_iterator pbegin, const_iterator pend)
-        : CScriptBase(pbegin, pend) {}
-    CScript(std::vector<uint8_t>::const_iterator pbegin,
-            std::vector<uint8_t>::const_iterator pend)
-        : CScriptBase(pbegin, pend) {}
-    CScript(const uint8_t *pbegin, const uint8_t *pend)
-        : CScriptBase(pbegin, pend) {}
+
+    template<uint8_iterator InputIt>
+    CScript(InputIt first, InputIt last): CScriptBase{first, last}
+    {}
+
+    CScript(int64_t b) { operator<<(b); }
+
+    explicit CScript(opcodetype b) { operator<<(b); }
+    explicit CScript(const CScriptNum& b) { operator<<(b); }
+    explicit CScript(const std::vector<uint8_t>& b) { operator<<(b); }
 
     ADD_SERIALIZE_METHODS
 
@@ -78,12 +87,6 @@ public:
         ret += b;
         return ret;
     }
-
-    CScript(int64_t b) { operator<<(b); }
-
-    explicit CScript(opcodetype b) { operator<<(b); }
-    explicit CScript(const CScriptNum &b) { operator<<(b); }
-    explicit CScript(const std::vector<uint8_t> &b) { operator<<(b); }
 
     CScript &operator<<(int64_t b) { return push_int64(b); }
 
@@ -106,17 +109,17 @@ public:
             insert(end(), OP_PUSHDATA2);
             // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
             uint8_t data[2];
-            // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
             WriteLE16(data, b.size());
-            // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
             insert(end(), data, data + sizeof(data));
         } else {
             insert(end(), OP_PUSHDATA4);
             // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
             uint8_t data[4];
-            // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
             WriteLE32(data, b.size());
-            // NOLINTNEXTLINE-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
             insert(end(), data, data + sizeof(data));
         }
         insert(end(), b.begin(), b.end());
@@ -190,29 +193,17 @@ public:
         return true;
     }
 
-    /** Encode/decode small integers: */
-    static int DecodeOP_N(opcodetype opcode) {
-        if (opcode == OP_0) return 0;
-        assert(opcode >= OP_1 && opcode <= OP_16);
-        return (int)opcode - (int)(OP_1 - 1);
-    }
-    static opcodetype EncodeOP_N(int n) {
-        assert(n >= 0 && n <= 16);
-        if (n == 0) return OP_0;
-        return (opcodetype)(OP_1 + n - 1);
-    }
-
     int FindAndDelete(const CScript &b) {
         int nFound = 0;
         if (b.empty()) return nFound;
         CScript result;
         iterator pc = begin(), pc2 = begin();
         opcodetype opcode; // NOLINT(cppcoreguidelines-init-variables)
-        do { // NOLINT(cppcoreguidelines-avoid-do-while)
+        do {
             result.insert(result.end(), pc2, pc);
             while (static_cast<size_t>(end() - pc) >= b.size() &&
                    std::equal(b.begin(), b.end(), pc)) {
-                pc = pc + b.size(); // NOLINT(*-narrowing-conversions)
+                pc = pc + std::ssize(b);
                 ++nFound;
             }
             pc2 = pc;
@@ -238,13 +229,13 @@ public:
      * If the size is bigger than that, or if the number of public keys is negative,
      * sigOpCountError is set to true,
      */
-    uint64_t GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sigOpCountError) const;
+    uint64_t GetSigOpCount(bool fAccurate, ProtocolEra era, bool& sigOpCountError) const;
 
     /**
      * Accurately count sigOps, including sigOps in pay-to-script-hash
      * transactions:
      */
-    uint64_t GetSigOpCount(const CScript &scriptSig, bool isGenesisEnabled, bool& sigOpCountError) const;
+    uint64_t GetSigOpCount(const CScript &scriptSig, ProtocolEra era, bool& sigOpCountError) const;
 
     /** Called by IsStandardTx and P2SH/BIP62 VerifyScript (which makes it
      * consensus-critical). */
@@ -255,15 +246,14 @@ public:
      * Returns whether the script is guaranteed to fail at execution, regardless
      * of the initial stack. This allows outputs to be pruned instantly when
      * entering the UTXO set.
-     * nHeight reflects the height of the block that script was mined in
+     * era reflects the height of the block that script was mined in.
      * For Genesis OP_RETURN this can return false negatives. For example if we have:
      *   <some complex script that always return OP_FALSE> OP_RETURN
      * this function will return false even though the ouput is unspendable.
-     * 
      */
-
-    bool IsUnspendable(bool isGenesisEnabled) const {
-        if (isGenesisEnabled)
+    bool IsUnspendable(ProtocolEra era) const
+    {
+        if(IsProtocolActive(era, ProtocolName::Genesis))
         {
             // Genesis restored OP_RETURN functionality. It no longer uncoditionally fails execution
             // The top stack value determines if execution suceeds, and OP_RETURN lock script might be spendable if 
@@ -333,5 +323,24 @@ public:
     CReserveScript() {}
     virtual ~CReserveScript() {}
 };
+    
+constexpr uint8_t DecodeOP_N(opcodetype opcode)
+{
+    assert(opcode >= OP_0 && opcode <= OP_16);
+
+    if(opcode == OP_0)
+        return 0;
+
+    return opcode - OP_1 + 1;
+}
+
+constexpr opcodetype EncodeOP_N(uint8_t n)
+{
+    assert(n <= 16);
+    if(n == 0)
+        return OP_0;
+    
+    return static_cast<opcodetype>(OP_1 + n - 1);
+}
 
 #endif // BITCOIN_SCRIPT_SCRIPT_H

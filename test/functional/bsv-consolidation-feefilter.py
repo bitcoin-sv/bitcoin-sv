@@ -2,12 +2,15 @@
 # Copyright (c) 2020 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.mininode import *
+from test_framework.mininode import COIN, CTransaction, FromHex, \
+    mininode_lock, msg_feefilter, NetworkThread, NodeConn, NodeConnCB
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import hashToHex, p2p_port, satoshi_round, \
+    sync_blocks, sync_mempools, wait_until
+
+from decimal import Decimal
+
 import time
-import decimal
-from test_framework.cdefs import DEFAULT_MAX_STD_TXN_VALIDATION_DURATION
 
 '''
 Test if consolidation transactions pass the feefilter
@@ -25,7 +28,7 @@ def getInputScriptPubKey(node, input, index):
     return tx.vout[index].scriptPubKey
 
 
-def expectedInvsReceived(invsExpected, testnode, timeout = 60):
+def expectedInvsReceived(invsExpected, testnode, timeout=60):
     expectedSet = set(invsExpected)
     for x in range(timeout):
         with mininode_lock:
@@ -64,8 +67,8 @@ class FeeFilterTest(BitcoinTestFramework):
             [
                 "-whitelist=127.0.0.1",
                 "-whitelistforcerelay=1"
-                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
+                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats) / COIN),
                 "-minconsolidationfactor=10",
                 "-acceptnonstdtxn=1",
                 "-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
@@ -74,8 +77,8 @@ class FeeFilterTest(BitcoinTestFramework):
             [
                 "-whitelist=127.0.0.1",
                 "-whitelistforcerelay=1"
-                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
-                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+                "-mindebugrejectionfee={}".format(Decimal(self.minrelaytxfee_sats) / COIN),
+                "-minminingtxfee={}".format(Decimal(self.blockmintxfee_sats) / COIN),
                 "-minconsolidationfactor=10",
                 "-acceptnonstdtxn=1",
                 "-maxstdtxvalidationduration=1",  # enable this setting to more reproducibly fail with old node
@@ -90,7 +93,7 @@ class FeeFilterTest(BitcoinTestFramework):
 
         utxos = []
         addr = node.getnewaddress()
-        for i in range (utxo_count):
+        for i in range(utxo_count):
             txid = node.sendtoaddress(addr, self.utxo_test_bsvs)
             tx = FromHex(CTransaction(), node.getrawtransaction(txid))
             tx.rehash()
@@ -103,7 +106,7 @@ class FeeFilterTest(BitcoinTestFramework):
         return utxos
 
     def create_and_sign_tx(self, node, in_count, min_confirmations):
-        utxos = self.create_utxos_value10000 (node, in_count, min_confirmations)
+        utxos = self.create_utxos_value10000(node, in_count, min_confirmations)
         inputs = []
         sum_values_bsvs = 0
         for u in utxos:
@@ -175,13 +178,13 @@ class FeeFilterTest(BitcoinTestFramework):
         wait_until(lambda: txid2 in node0.getrawmempool(), timeout=5)
 
         # Check that tx1 and tx2 were relayed to test_node
-        assert(expectedInvsReceived([txid1, txid2], test_node, 60))
+        assert (expectedInvsReceived([txid1, txid2], test_node, 60))
 
         # Now the feefilter is set to minminingtxfee+1;
         # tx3 is not relayed as modified fees < feefilter
         # tx4 is relayed, as node1's txfee is set high enough - control tx
 
-        test_node.send_and_ping(msg_feefilter(self.blockmintxfee_sats+1))
+        test_node.send_and_ping(msg_feefilter(self.blockmintxfee_sats + 1))
         test_node.clear_invs()
 
         txid3 = node1.sendrawtransaction(tx_hex3)
@@ -191,8 +194,8 @@ class FeeFilterTest(BitcoinTestFramework):
         wait_until(lambda: txid4 in node0.getrawmempool(), timeout=5)
 
         # Check that tx3 was not relayed to test_node but tx4 was
-        assert(expectedInvsReceived([txid4], test_node, 60))
-        assert(not expectedInvsReceived([txid3], test_node, 5))
+        assert (expectedInvsReceived([txid4], test_node, 60))
+        assert (not expectedInvsReceived([txid3], test_node, 5))
 
 
 if __name__ == '__main__':

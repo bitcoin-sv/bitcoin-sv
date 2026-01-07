@@ -2,8 +2,12 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "merkletree.h"
-#include "task_helpers.h"
+
 #include "blockstreams.h"
+#include "hash.h"
+#include "task_helpers.h"
+
+#include <cstdint>
 
 CMerkleTree::CMerkleTree(const std::vector<CTransactionRef>& transactions, const uint256& blockHashIn, int32_t blockHeightIn, CThreadPool<CQueueAdaptor>* pThreadPool)
     : numberOfLeaves(transactions.size()), blockHash(blockHashIn), blockHeight(blockHeightIn)
@@ -147,7 +151,7 @@ void CMerkleTree::AddNodeAtLevel(const uint256& hash, size_t level)
             CHash256()
                 .Write(leftNode.begin(), 32)
                 .Write(rightNode.begin(), 32)
-                .Finalize(currentNode.begin());
+                .Finalize(CHash256::span{currentNode.begin(), CHash256::OUTPUT_SIZE});
 
             merkleTreeLevelsWithNodeHashes[currentLevel].push_back(rightNode);
         }
@@ -188,6 +192,7 @@ void CMerkleTree::AddNodeAtLevel(const uint256& hash, size_t level)
     4567 after the merge. They become siblings and their parent is calculated and stored
     to Level 3.
 */
+// NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
 bool CMerkleTree::MergeSubTree(CMerkleTree&& subTree)
 {
     size_t currentTreeHeight = merkleTreeLevelsWithNodeHashes.size();
@@ -233,7 +238,7 @@ void CMerkleTree::CalculateMissingParentNode(const size_t currentLevel, uint256&
         CHash256()
             .Write(leftNode.begin(), 32)
             .Write(rightNode.begin(), 32)
-            .Finalize(additionalNodeInOut.begin());
+            .Finalize(CHash256::span{additionalNodeInOut.begin(), CHash256::OUTPUT_SIZE});
     }
     else if (merkleTreeLevelsWithNodeHashes[currentLevel].size() > 1 &&
         merkleTreeLevelsWithNodeHashes[currentLevel].size() & 1)
@@ -242,7 +247,7 @@ void CMerkleTree::CalculateMissingParentNode(const size_t currentLevel, uint256&
         CHash256()
             .Write(merkleTreeLevelsWithNodeHashes[currentLevel].back().begin(), 32)
             .Write(merkleTreeLevelsWithNodeHashes[currentLevel].back().begin(), 32)
-            .Finalize(additionalNodeInOut.begin());
+            .Finalize(CHash256::span{additionalNodeInOut.begin(), CHash256::OUTPUT_SIZE});
     }
 }
 

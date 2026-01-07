@@ -24,8 +24,7 @@ To submit transactions p2p and rpc interfaces are used
 from test_framework.authproxy import JSONRPCException
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.script import CScript, OP_TRUE
-from test_framework.blocktools import create_transaction
-from test_framework.util import assert_equal, p2p_port, wait_until, check_for_log_msg, sync_blocks
+from test_framework.util import p2p_port, wait_until, check_for_log_msg, sync_blocks
 from test_framework.mininode import (NodeConn, NodeConnCB, NetworkThread, msg_tx, CTransaction, COutPoint,
                                      CTxIn, CTxOut, FromHex, ToHex)
 import time
@@ -71,7 +70,7 @@ class NonFinalP2PTest(BitcoinTestFramework):
     def create_funding_txn(self, out_value):
         ftx = CTransaction()
         ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
-        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx),{'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx), {'changePosition': len(ftx.vout)})['hex']
         ftxHex = self.nodes[0].signrawtransaction(ftxHex)['hex']
         ftx = FromHex(CTransaction(), ftxHex)
         ftx.rehash()
@@ -105,8 +104,8 @@ class NonFinalP2PTest(BitcoinTestFramework):
         self.send_txn(rpcsend, conn, tx)
         wait_until(lambda: tx.hash in self.nodes[0].getrawnonfinalmempool(), timeout=5)
         wait_until(lambda: tx.hash in self.nodes[1].getrawnonfinalmempool(), timeout=5)
-        assert(tx.hash not in self.nodes[0].getrawmempool())
-        assert(tx.hash not in self.nodes[1].getrawmempool())
+        assert (tx.hash not in self.nodes[0].getrawmempool())
+        assert (tx.hash not in self.nodes[1].getrawmempool())
 
         # Create finalising txn.
         finaltx = copy.deepcopy(tx)
@@ -117,8 +116,8 @@ class NonFinalP2PTest(BitcoinTestFramework):
         self.send_txn(rpcsend, conn, finaltx)
         wait_until(lambda: finaltx.hash in self.nodes[0].getrawmempool(), timeout=5)
         wait_until(lambda: finaltx.hash in self.nodes[1].getrawmempool(), timeout=5)
-        assert(tx.hash not in self.nodes[0].getrawnonfinalmempool())
-        assert(tx.hash not in self.nodes[1].getrawnonfinalmempool())
+        assert (tx.hash not in self.nodes[0].getrawnonfinalmempool())
+        assert (tx.hash not in self.nodes[1].getrawnonfinalmempool())
 
         # Create and send another non-final txn
         tx = self.create_non_final_txn(ftxs[1], out_value - 500)
@@ -140,10 +139,10 @@ class NonFinalP2PTest(BitcoinTestFramework):
         self.send_txn(rpcsend, conn, tx)
         wait_until(lambda: self.err == "69: non-final-txn-replacement-rate", timeout=5)
         wait_until(lambda: check_for_log_msg(self, "txn= {} rejected non-final-txn-replacement-rate".format(tx.hash), "/node0"))
-        assert(not check_for_log_msg(self, "Non-final txn that exceeds replacement rate made it to validation", "/node0"))
+        assert (not check_for_log_msg(self, "Non-final txn that exceeds replacement rate made it to validation", "/node0"))
         # Can't prove a negative, but just wait a while and check node1 hasn't also seen and rejected the txn
         time.sleep(6)
-        assert(not check_for_log_msg(self, "txn= {} rejected non-final-txn-replacement-rate".format(tx.hash), "/node1"))
+        assert (not check_for_log_msg(self, "txn= {} rejected non-final-txn-replacement-rate".format(tx.hash), "/node1"))
 
         # Time has moved on enough for another update to be accepted
         tx.vin[0].nSequence += 1

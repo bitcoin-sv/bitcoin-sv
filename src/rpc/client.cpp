@@ -11,6 +11,8 @@
 
 #include <event2/buffer.h>
 
+static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
+
 namespace
 {
     // Callback for HTTP error
@@ -41,7 +43,7 @@ namespace
         if(buf)
         {   
             size_t size { evbuffer_get_length(buf) };
-            // NOLINTNEXTLINE (cppcoreguidelines-narrowing-conversions)
+            // NOLINTNEXTLINE(*-narrowing-conversions)
             response->SetBody(evbuffer_pullup(buf, size), size);
             evbuffer_drain(buf, size);
         }

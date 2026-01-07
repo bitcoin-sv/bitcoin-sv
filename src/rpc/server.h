@@ -15,6 +15,7 @@
 #include <functional>
 #include <list>
 #include <map>
+#include <memory>
 #include <string>
 
 #include <univalue.h>
@@ -29,32 +30,27 @@ void OnPostCommand(std::function<void(const CRPCCommand &)> slot);
 } // namespace RPCServer
 
 class CBlockIndex;
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CNetAddr;
 
 /** Wrapper for UniValue::VType, which includes typeAny:
  * Used to denote don't care type. Only used by RPCTypeCheckObj */
 struct UniValueType {
     UniValueType(UniValue::VType _type) : typeAny(false), type(_type) {}
-    UniValueType() : typeAny(true) {}
-    bool typeAny;
-    UniValue::VType type;
+    UniValueType() = default;
+
+    bool typeAny{true};
+    UniValue::VType type{UniValue::VNULL};
 };
 
 class JSONRPCRequest {
 public:
-    UniValue id;
+    UniValue id{NullUniValue};
     std::string strMethod;
-    UniValue params;
-    bool fHelp;
+    UniValue params{NullUniValue};
+    bool fHelp{};
     std::string URI;
     std::string authUser;
-
-    JSONRPCRequest() {
-        id = NullUniValue;
-        params = NullUniValue;
-        fHelp = false;
-    }
 
     void parse(const UniValue &valRequest);
 };
@@ -98,7 +94,7 @@ void RPCTypeCheckObj(const UniValue &o,
  * This provides no methods at the moment, but makes sure that delete cleans up
  * the whole state.
  */
-class RPCTimerBase {
+class RPCTimerBase { // NOLINT(cppcoreguidelines-special-member-functions)
 public:
     virtual ~RPCTimerBase() {}
 };
@@ -106,7 +102,7 @@ public:
 /**
  * RPC timer "driver".
  */
-class RPCTimerInterface {
+class RPCTimerInterface { // NOLINT(cppcoreguidelines-special-member-functions)
 public:
     virtual ~RPCTimerInterface() {}
     /** Implementation name */
@@ -120,8 +116,8 @@ public:
      * but only GUI RPC console, and to break the dependency of pcserver on
      * httprpc.
      */
-    virtual RPCTimerBase *NewTimer(std::function<void(void)> &func,
-                                   int64_t millis) = 0;
+    virtual std::unique_ptr<RPCTimerBase> NewTimer(std::function<void(void)>& func,
+                                                   int64_t millis) = 0;
 };
 
 /** Set the factory function for timers */
@@ -168,64 +164,64 @@ public:
      * Config is const or not, so we can call the command through the proper pointer.
      * Casting constness on parameters of function is undefined behavior.
      */
-    CRPCCommand(std::string category,
-                std::string name,
-                bool okSafeMode,
-                bool useConstConfig,
-                bool useHTTPRequest,
-                std::vector<std::string> argNames)
-        : category{std::move(category)},
-          name{std::move(name)},
-          okSafeMode{okSafeMode},
-          useConstConfig{useConstConfig},
-          useHTTPRequest{useHTTPRequest},
-          argNames{std::move(argNames)}
+    CRPCCommand(std::string cat, // NOLINT(cppcoreguidelines-pro-type-member-init)
+                std::string n,
+                bool ok_safe_mode,
+                bool use_const_config,
+                bool use_http_request,
+                std::vector<std::string> arg_names)
+        : category{std::move(cat)},
+          name{std::move(n)},
+          okSafeMode{ok_safe_mode},
+          useConstConfig{use_const_config},
+          useHTTPRequest{use_http_request},
+          argNames{std::move(arg_names)}
     {
     }
 
-    CRPCCommand(std::string category,
-                std::string name,
+    CRPCCommand(std::string cat,
+                std::string n,
                 rpcfn_type fn,
-                bool okSafeMode,
-                std::vector<std::string> argNames)
-        : CRPCCommand{std::move(category),
-                      std::move(name),
-                      okSafeMode,
+                bool ok_safe_mode,
+                std::vector<std::string> arg_names)
+        : CRPCCommand{std::move(cat),
+                      std::move(n),
+                      ok_safe_mode,
                       false,
                       false,
-                      std::move(argNames)}
+                      std::move(arg_names)}
     {
-        actor.fn = fn;
+        actor.fn = fn; // NOLINT(cppcoreguidelines-pro-type-union-access)
     }
 
-    CRPCCommand(std::string category,
-                std::string name,
+    CRPCCommand(std::string cat,
+                std::string n,
                 const_rpcfn_type fn,
-                bool okSafeMode,
-                std::vector<std::string> argNames)
-        : CRPCCommand{std::move(category),
-                      std::move(name),
-                      okSafeMode,
+                bool ok_safe_mode,
+                std::vector<std::string> arg_names)
+        : CRPCCommand{std::move(cat),
+                      std::move(n),
+                      ok_safe_mode,
                       true,
                       false,
-                      std::move(argNames)}
+                      std::move(arg_names)}
     {
-        actor.cfn = fn;
+        actor.cfn = fn; // NOLINT(cppcoreguidelines-pro-type-union-access)
     }
 
-    CRPCCommand(std::string category,
-                std::string name,
+    CRPCCommand(std::string cat,
+                std::string n,
                 rpcfn_http_type fn,
-                bool okSafeMode,
-                std::vector<std::string> argNames)
-        : CRPCCommand{std::move(category),
-                      std::move(name),
-                      okSafeMode,
+                bool ok_safe_mode,
+                std::vector<std::string> arg_names)
+        : CRPCCommand{std::move(cat),
+                      std::move(n),
+                      ok_safe_mode,
                       true,
                       true,
-                      std::move(argNames)}
+                      std::move(arg_names)}
     {
-        actor.http_fn = fn;
+        actor.http_fn = fn; // NOLINT(cppcoreguidelines-pro-type-union-access)
     }
 
     UniValue call(Config&,
@@ -275,7 +271,7 @@ public:
     bool appendCommand(const std::string &name, const CRPCCommand *pcmd);
 };
 
-extern CRPCTable tableRPC;
+extern CRPCTable tableRPC; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 /**
  * Utilities: convert hex-encoded Values

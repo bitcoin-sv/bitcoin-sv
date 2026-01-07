@@ -5,7 +5,7 @@
 
 from test_framework.miner_id import MinerIdKeys, make_miner_id_block
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import wait_until, assert_equal, bytes_to_hex_str, hex_str_to_bytes, disconnect_nodes_bi, connect_nodes_bi, rpc_port, p2p_port
+from test_framework.util import wait_until, assert_equal, bytes_to_hex_str, disconnect_nodes_bi, connect_nodes_bi, rpc_port, p2p_port
 from test_framework.script import CScript, OP_DUP, OP_HASH160, hash160, OP_EQUALVERIFY, OP_CHECKSIG
 from test_framework.mininode import CTransaction, ToHex, CTxIn, CTxOut, COutPoint, FromHex, sha256
 from test_framework.blocktools import create_block, create_coinbase
@@ -60,7 +60,7 @@ class AuthConnTestReputation(BitcoinTestFramework):
         rpcport0 = "rpcport=" + str(rpc_port(0))
         rpcport1 = "rpcport=" + str(rpc_port(1))
 
-        def make_datadir (n):
+        def make_datadir(n):
             datadir = os.path.join(self.options.tmpdir, "node" + str(n))
             if not os.path.isdir(datadir):
                 os.makedirs(datadir)
@@ -120,7 +120,7 @@ class AuthConnTestReputation(BitcoinTestFramework):
         fundingSeed = {}
         fundingKey['fundingKey'] = {'privateBIP32': keys.privateKey()}
         fundingSeed['fundingDestination'] = {'addressBase58': destination, }
-        fundingSeed['firstFundingOutpoint'] = {'txid':txId, 'n': index}
+        fundingSeed['firstFundingOutpoint'] = {'txid': txId, 'n': index}
 
         fundingKeyJson = json.dumps(fundingKey, indent=3)
         fundingSeedJson = json.dumps(fundingSeed, indent=3)
@@ -155,35 +155,35 @@ class AuthConnTestReputation(BitcoinTestFramework):
             'publicIP': '127.0.0.1',
             'publicPort': str(rpc_port(nodenum)),
             'minerKeys': signWithService,
-            'revocationKeys':  None,
+            'revocationKeys': None,
             'prev_minerKeys': None,
             'prev_revocationKeys': None,
             'pubCompromisedMinerKeyHex': None
         }
 
-        http_conns[nodenum].request('GET', "/opreturn/{}/{}/".format(aliases[nodenum],  height))
+        http_conns[nodenum].request('GET', "/opreturn/{}/{}/".format(aliases[nodenum], height))
         response = http_conns[nodenum].getresponse()
         scriptPubKey = response.read()
         scriptPubKey = scriptPubKey.decode('ascii')
 
         txid = node.createminerinfotx(scriptPubKey)
-        wait_until (lambda: txid in node.getrawmempool())
+        wait_until(lambda: txid in node.getrawmempool())
 
         # create a minerinfo block with coinbase referencing the minerinfo transaction
         minerInfoTx = FromHex(CTransaction(), node.getrawtransaction(txid))
         block = make_miner_id_block(node, minerinfotx_parameters, minerInfoTx=minerInfoTx)
         block_count = node.getblockcount()
         node.submitblock(ToHex(block))
-        wait_until (lambda: block_count + 1 == node.getblockcount())
+        wait_until(lambda: block_count + 1 == node.getblockcount())
 
         # check if the minerinfo-txn
         # was moved from the mempool into the new block
-        assert(txid not in node.getrawmempool())
+        assert (txid not in node.getrawmempool())
         bhash = node.getbestblockhash()
         block = node.getblock(bhash)
-        assert(txid in block['tx'])
+        assert (txid in block['tx'])
 
-    def isAuthenticated (self, nodenum):
+    def isAuthenticated(self, nodenum):
         peerinfo = self.nodes[nodenum].getpeerinfo()
         if len(peerinfo) > 1:
             if (peerinfo[1]["authconn"]):

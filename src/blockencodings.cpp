@@ -4,10 +4,9 @@
 
 #include "blockencodings.h"
 #include "blockstreams.h"
-#include "clientversion.h"
 #include "config.h"
-#include "consensus/consensus.h"
 #include "consensus/validation.h"
+#include "crypto/sha256.h"
 #include "hash.h"
 #include "random.h"
 #include "streams.h"
@@ -16,9 +15,12 @@
 
 #include <unordered_map>
 
-CBlockHeaderAndShortTxIDs::CBlockHeaderAndShortTxIDs(const CBlock &block)
+CBlockHeaderAndShortTxIDs::CBlockHeaderAndShortTxIDs(const CBlock& block)
     : nonce(GetRand(std::numeric_limits<uint64_t>::max())),
-      shorttxids(block.vtx.size() - 1), prefilledtxn(1), header(block) {
+      shorttxids(block.vtx.size() - 1),
+      prefilledtxn(1),
+      header(block) // NOLINT(cppcoreguidelines-slicing)
+{
     FillShortTxIDSelector();
     // TODO: Use our mempool prior to block acceptance to predictively fill more
     // than just the coinbase.
@@ -64,9 +66,11 @@ void CBlockHeaderAndShortTxIDs::FillShortTxIDSelector() const {
     CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
     stream << header << nonce;
     CSHA256 hasher;
-    hasher.Write((uint8_t *)&(*stream.begin()), stream.end() - stream.begin());
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    hasher.Write(reinterpret_cast<uint8_t*>(&(*stream.begin())),
+                 stream.end() - stream.begin());
     uint256 shorttxidhash;
-    hasher.Finalize(shorttxidhash.begin());
+    hasher.Finalize(CSHA256::span{shorttxidhash.begin(), CSHA256::OUTPUT_SIZE});
     shorttxidk0 = shorttxidhash.GetUint64(0);
     shorttxidk1 = shorttxidhash.GetUint64(1);
 }
@@ -301,8 +305,8 @@ size_t ser_size(const BlockTransactions& txns)
     return std::accumulate(txns.txn.cbegin(),
                            txns.txn.cend(),
                            total,
-                           [](auto total, const auto& sp_tx) {
-                               total += ser_size(*sp_tx);
-                               return total;
+                           [](auto acc, const auto& sp_tx) {
+                               acc += ser_size(*sp_tx);
+                               return acc;
                            });
 }

@@ -4,7 +4,9 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_equal, assert_raises_rpc_error
+
+from decimal import Decimal
 
 
 class ImportPrunedFundsTest(BitcoinTestFramework):
@@ -23,7 +25,7 @@ class ImportPrunedFundsTest(BitcoinTestFramework):
         # pubkey
         address2 = self.nodes[0].getnewaddress()
         # Using pubkey
-        address2_pubkey = self.nodes[0].validateaddress(address2)['pubkey']
+        self.nodes[0].validateaddress(address2)['pubkey']
         # privkey
         address3 = self.nodes[0].getnewaddress()
         # Using privkey
@@ -78,13 +80,13 @@ class ImportPrunedFundsTest(BitcoinTestFramework):
 
         # Import with affiliated address with no rescan
         self.nodes[1].importaddress(address2, "add2", False)
-        result2 = self.nodes[1].importprunedfunds(rawtxn2, proof2)
+        self.nodes[1].importprunedfunds(rawtxn2, proof2)
         balance2 = self.nodes[1].getbalance("add2", 0, True)
         assert_equal(balance2, Decimal('0.05'))
 
         # Import with private key with no rescan
         self.nodes[1].importprivkey(address3_privkey, "add3", False)
-        result3 = self.nodes[1].importprunedfunds(rawtxn3, proof3)
+        self.nodes[1].importprunedfunds(rawtxn3, proof3)
         balance3 = self.nodes[1].getbalance("add3", 0, False)
         assert_equal(balance3, Decimal('0.025'))
         balance3 = self.nodes[1].getbalance("*", 0, True)

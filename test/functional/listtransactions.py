@@ -5,9 +5,11 @@
 
 # Exercise the listtransactions API
 
+from test_framework.mininode import CTransaction
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
-from test_framework.mininode import CTransaction, COIN
+from test_framework.util import assert_array_result, hex_str_to_bytes
+
+from decimal import Decimal
 from io import BytesIO
 
 
@@ -90,7 +92,7 @@ class ListTransactionsTest(BitcoinTestFramework):
         txid = self.nodes[1].sendtoaddress(multisig["address"], 0.1)
         self.nodes[1].generate(1)
         self.sync_all()
-        assert(
+        assert (
             len(self.nodes[0].listtransactions("watchonly", 100, 0, False)) == 0)
         assert_array_result(
             self.nodes[0].listtransactions("watchonly", 100, 0, True),

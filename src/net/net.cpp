@@ -17,8 +17,10 @@
 #include "crypto/common.h"
 #include "crypto/sha256.h"
 #include "hash.h"
+#include "mempool_msg.h"
 #include "miner_id/miner_info_tracker.h"
 #include "net/netbase.h"
+#include "netmessagemaker.h"
 #include "primitives/transaction.h"
 #include "scheduler.h"
 #include "taskcancellation.h"
@@ -368,7 +370,7 @@ CNodePtr CConnman::ConnectNode(NodeConnectInfo& connect)
     SOCKET hSocket;
     bool proxyConnectionFailed = false;
     if (connect.pszDest ? ConnectSocketByName(connect.addrConnect, hSocket, connect.pszDest,
-                                      config->GetChainParams().GetDefaultPort(),
+                                      config_->GetChainParams().GetDefaultPort(),
                                       nConnectTimeout, &proxyConnectionFailed)
                 : ConnectSocket(connect.addrConnect, hSocket, nConnectTimeout,
                                 &proxyConnectionFailed)) {
@@ -417,6 +419,7 @@ CNodePtr CConnman::ConnectNode(NodeConnectInfo& connect)
                 connect.pszDest ? connect.pszDest : "",
                 false);
         pnode->nServicesExpected = ServiceFlags(connect.addrConnect.nServices & nRelevantServices);
+        pnode->fMempoolSync = IsMempoolSyncPeer(connect.addrConnect);
 
         return pnode;
     } else if (!proxyConnectionFailed) {
@@ -438,7 +441,7 @@ void CConnman::DumpBanlist() {
 
     int64_t nStart = GetTimeMillis();
 
-    CBanDB bandb(config->GetChainParams());
+    CBanDB bandb(config_->GetChainParams());
     banmap_t banmap;
     GetBanned(banmap);
     if (bandb.Write(banmap)) {
@@ -624,9 +627,28 @@ bool CConnman::IsWhitelistedRange(const CNetAddr &addr) {
     return false;
 }
 
+bool CConnman::IsMempoolSyncPeer(const CNetAddr& addr) const
+{
+    LOCK(cs_vMempoolSyncPeers);
+    for(const CSubNet &subnet : vMempoolSyncPeers)
+    {
+        if(subnet.Match(addr))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 void CConnman::AddWhitelistedRange(const CSubNet &subnet) {
     LOCK(cs_vWhitelistedRange);
     vWhitelistedRange.push_back(subnet);
+}
+
+void CConnman::AddMempoolSyncPeer(const CSubNet& subnet)
+{
+    LOCK(cs_vMempoolSyncPeers);
+    vMempoolSyncPeers.push_back(subnet);
 }
 
 CConnman::CAsyncTaskPool::CAsyncTaskPool(const Config& config)
@@ -730,6 +752,7 @@ void CNode::copyStats(NodeStats &stats)
     stats.fPauseSend = GetPausedForSending();
     stats.fUnpauseSend = stats.fPauseSend && !GetPausedForSending(true);
     stats.fAuthConnEstablished = fAuthConnEstablished;
+    stats.fMempoolSync = fMempoolSync;
     stats.nTimeConnected = nTimeConnected;
     stats.nTimeOffset = nTimeOffset;
     stats.addrName = GetAddrName();
@@ -874,7 +897,8 @@ void CNode::SetSupportedStreamPolicies(const std::string& policies)
 
     LOCK(cs_supportedStreamPolicies);
     mSupportedStreamPolicies.clear();
-    boost::split(mSupportedStreamPolicies, policies, boost::is_any_of(","));
+    boost::split(mSupportedStreamPolicies, policies,
+                 [](const char c) { return c == ','; });
 
     // Filter common stream policies
     mCommonStreamPolicies.clear();
@@ -932,26 +956,13 @@ bool CNode::GetPausedForSending(bool checkPauseRecv)
     if(g_connman)
     {
         unsigned maxBuffSize { g_connman->GetSendBufferSize() };
-        bool pausedForReceiving {false};
-        if(checkPauseRecv && mAssociation.GetPausedForReceiving(Association::PausedFor::ANY))
-        {
-            pausedForReceiving = true;
-            // If we're paused for both sending and receiving, allow a temporary
-            // increase in send buffer size to get things moving
-            size_t multiplier { static_cast<size_t>(gArgs.GetArg("-maxsendbuffermult", DEFAULT_MAXSENDBUFFER_MULTIPLIER)) };
-            if(multiplier > 0)
-            {
-                maxBuffSize *= multiplier;
-            }
-        }
-
-        bool pausedForSending { mAssociation.GetTotalSendQueueSize() > maxBuffSize };
+        bool pausedForSending { mAssociation.GetTotalSendQueueMemoryUsage() > maxBuffSize };
 
         // This complex if/else is just to try and limit logging so that we only log
         // as we enter or leave the pause send & recv state.
         if(checkPauseRecv)
         {
-            if(pausedForSending && pausedForReceiving)
+            if(pausedForSending && GetPausedForReceiving())
             {
                 if(!mEnteredPauseSendRecv)
                 {
@@ -975,6 +986,11 @@ bool CNode::GetPausedForSending(bool checkPauseRecv)
     }
 
     return false;
+}
+
+bool CNode::GetPausedForReceiving() const
+{
+    return mAssociation.GetPausedForReceiving(Association::PausedFor::ANY);
 }
 
 void CNode::SetSendVersion(int nVersionIn) {
@@ -1356,6 +1372,7 @@ void CConnman::AcceptConnection(const ListenSocket &hListenSocket) {
             "",
             true);
     pnode->fWhitelisted = whitelisted;
+    pnode->fMempoolSync = IsMempoolSyncPeer(addr);
 
     GetNodeSignals().InitializeNode(pnode, *this, nullptr);
 
@@ -1514,7 +1531,7 @@ void CConnman::ThreadSocketHandler() {
 
             uint64_t bytesRecv {0};
             uint64_t bytesSent {0};
-            pnode->ServiceSockets(fdsetRecv, fdsetSend, fdsetError, *this, *config, bytesRecv, bytesSent);
+            pnode->ServiceSockets(fdsetRecv, fdsetSend, fdsetError, *this, *config_, bytesRecv, bytesSent);
 
             if(bytesRecv > 0) {
                 RecordBytesRecv(bytesRecv);
@@ -1559,7 +1576,11 @@ void ThreadMapPort() {
     struct IGDdatas data;
     int r;
 
+#if (MINIUPNPC_API_VERSION >= 18)
+    r = UPNP_GetValidIGD(devlist, &urls, &data, lanaddr, sizeof(lanaddr), nullptr, 0);
+#else
     r = UPNP_GetValidIGD(devlist, &urls, &data, lanaddr, sizeof(lanaddr));
+#endif
     if (r == 1) {
         if (fDiscover) {
             char externalIPAddress[40];
@@ -1692,7 +1713,7 @@ void CConnman::ThreadDNSAddressSeed() {
     }
 
     const std::vector<CDNSSeedData> &vSeeds =
-        config->GetChainParams().DNSSeeds();
+        config_->GetChainParams().DNSSeeds();
     int found = 0;
 
     LogPrintf("Loading addresses from DNS seeds (could take a while)\n");
@@ -1709,7 +1730,7 @@ void CConnman::ThreadDNSAddressSeed() {
                 for (const CNetAddr &ip : vIPs) {
                     int nOneDay = 24 * 3600;
                     CAddress addr = CAddress(
-                        CService(ip, config->GetChainParams().GetDefaultPort()),
+                        CService(ip, config_->GetChainParams().GetDefaultPort()),
                         requiredServiceBits);
                     // Use a random age between 3 and 7 days old.
                     addr.nTime = GetTime() - 3 * nOneDay - GetRand(4 * nOneDay);
@@ -1736,7 +1757,7 @@ void CConnman::ThreadDNSAddressSeed() {
 void CConnman::DumpAddresses() {
     int64_t nStart = GetTimeMillis();
 
-    CAddrDB adb(config->GetChainParams());
+    CAddrDB adb(config_->GetChainParams());
     adb.Write(addrman);
 
     LogPrint(BCLog::NETCONN, "Flushed %d addresses to peers.dat  %dms\n",
@@ -1816,7 +1837,7 @@ void CConnman::ThreadOpenConnections() {
                           "available.\n");
                 CNetAddr local;
                 LookupHost("127.0.0.1", local, false);
-                addrman.Add(convertSeed6(config->GetChainParams().FixedSeeds()),
+                addrman.Add(convertSeed6(config_->GetChainParams().FixedSeeds()),
                             local);
                 done = true;
             }
@@ -1917,7 +1938,7 @@ void CConnman::ThreadOpenConnections() {
 
             // do not allow non-default ports, unless after 50 invalid addresses
             // selected already.
-            if (addr.GetPort() != config->GetChainParams().GetDefaultPort() &&
+            if (addr.GetPort() != config_->GetChainParams().GetDefaultPort() &&
                 nTries < 50) {
                 continue;
             }
@@ -1980,7 +2001,7 @@ std::vector<AddedNodeInfo> CConnman::GetAddedNodeInfo() {
 
     for (const std::string &strAddNode : lAddresses) {
         CService service(LookupNumeric(
-            strAddNode.c_str(), config->GetChainParams().GetDefaultPort()));
+            strAddNode.c_str(), config_->GetChainParams().GetDefaultPort()));
         if (service.IsValid()) {
             // strAddNode is an IP:port
             auto it = mapConnected.find(service);
@@ -2035,7 +2056,7 @@ void CConnman::ThreadOpenAddedConnections() {
                 tried = true;
                 CService service(
                     LookupNumeric(info.strAddedNode.c_str(),
-                                  config->GetChainParams().GetDefaultPort()));
+                                  config_->GetChainParams().GetDefaultPort()));
                 NodeConnectInfo connectInfo { CAddress(service, NODE_NONE), info.strAddedNode.c_str() };
                 OpenNetworkConnection(connectInfo, &grant, false, false, true);
                 if (!interruptNet.sleep_for(std::chrono::milliseconds(500))) {
@@ -2177,7 +2198,7 @@ void CConnman::ThreadMessageHandler()
 
             // Receive messages
             bool fMoreNodeWork = GetNodeSignals().ProcessMessages(
-                *config, pnode, *this, flagInterruptMsgProc,
+                *config_, pnode, *this, flagInterruptMsgProc,
                 mDebugP2PTheadStallsThreshold);
             fMoreWork |= (fMoreNodeWork && !pnode->GetPausedForSending());
 
@@ -2188,7 +2209,7 @@ void CConnman::ThreadMessageHandler()
             // Send messages
             {
                 LOCK(pnode->cs_sendProcessing);
-                GetNodeSignals().SendMessages(*config, pnode, *this,
+                GetNodeSignals().SendMessages(*config_, pnode, *this,
                                               flagInterruptMsgProc);
             }
 
@@ -2325,7 +2346,8 @@ bool CConnman::BindListenPort(const CService &addrBind, std::string &strError,
     return true;
 }
 
-void Discover(boost::thread_group &threadGroup) {
+void Discover()
+{
     if (!fDiscover) {
         return;
     }
@@ -2400,7 +2422,7 @@ CConnman::CConnman(
     uint64_t nSeed0In,
     uint64_t nSeed1In,
     std::chrono::milliseconds debugP2PTheadStallsThreshold)
-    : config(&configIn)
+    : config_(&configIn)
     , nSeed0(nSeed0In)
     , nSeed1(nSeed1In)
     , mValidatorThreadPool{true, "TxnValidatorPool",
@@ -2465,15 +2487,17 @@ CConnman::CConnman(
             std::make_shared<CTxnDoubleSpendDetector>(),
             mTxIdTracker);
 
-    mRawTxnValidator = std::make_shared<RawTxValidator>(*config);
+    mRawTxnValidator = std::make_shared<RawTxValidator>(*config_);
 }
 
 NodeId CConnman::GetNewNodeId() {
     return nLastNodeId.fetch_add(1, std::memory_order_relaxed);
 }
 
-bool CConnman::Start(CScheduler &scheduler, std::string &strNodeError,
-                     Options connOptions) {
+bool CConnman::Start(CScheduler& scheduler,
+                     std::string& /*strNodeError*/,
+                     Options connOptions)
+{
     nTotalBytesRecv = 0;
     nTotalBytesSent = 0;
     nMaxOutboundTotalBytesSentInCycle = 0;
@@ -2502,7 +2526,7 @@ bool CConnman::Start(CScheduler &scheduler, std::string &strNodeError,
     // Load addresses from peers.dat
     int64_t nStart = GetTimeMillis();
     {
-        CAddrDB adb(config->GetChainParams());
+        CAddrDB adb(config_->GetChainParams());
         if (adb.Read(addrman)) {
             LogPrintf("Loaded %i addresses from peers.dat  %dms\n",
                       addrman.size(), GetTimeMillis() - nStart);
@@ -2518,7 +2542,7 @@ bool CConnman::Start(CScheduler &scheduler, std::string &strNodeError,
     }
     // Load addresses from banlist.dat
     nStart = GetTimeMillis();
-    CBanDB bandb(config->GetChainParams());
+    CBanDB bandb(config_->GetChainParams());
     banmap_t banmap;
     if (bandb.Read(banmap)) {
         // thread save setter
@@ -2616,6 +2640,16 @@ bool CConnman::Start(CScheduler &scheduler, std::string &strNodeError,
     // Schedule average bandwidth measurements
     scheduler.scheduleEvery(std::bind(&CConnman::PeerAvgBandwithCalc, this),
                             PEER_AVG_BANDWIDTH_CALC_FREQUENCY_SECS * 1000);
+
+    // Schedule mempool syncing
+    {
+        LOCK(cs_vMempoolSyncPeers);
+        if(! vMempoolSyncPeers.empty())
+        {
+            scheduler.scheduleEvery([this]{ SyncMempool(); },
+                config_->GetMempoolSyncPeriod() * 1000);
+        }
+    }
 
     return true;
 }
@@ -2952,9 +2986,26 @@ void CConnman::PeerAvgBandwithCalc()
     }
 }
 
+// Send message to all whitelisted peers to sync our mempools
+void CConnman::SyncMempool()
+{
+    const int64_t age { config_->GetMempoolSyncAge() };
+
+    ForEachNode(
+        [this, age](const CNodePtr& node)
+        {
+            if(node->fMempoolSync && NodeFullyConnected(node))
+            {
+                LogPrint(BCLog::NETMSG, "Sending mempool sync request age %ld to peer=%d\n", age, node->id);
+                PushMessage(node, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::MEMPOOL,
+                    MempoolMsg(age)));
+            }
+        }
+    );
+}
 
 CNode::MonitoredPendingResponses::PendingResponses::PendingResponses(unsigned int max_allowed)
-: max_allowed(max_allowed)
+: max_allowed_{max_allowed}
 {}
 
 CNode::MonitoredPendingResponses::MonitoredPendingResponses()
@@ -3061,6 +3112,15 @@ bool CConnman::NodeFullyConnected(const CNodePtr& pnode) {
 
 void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg&& msg, StreamType stream)
 {
+    // If the peer is paused for both sending and receiving, discard messages until
+    // they have cleared the backlog.
+    if(pnode->GetPausedForSending() && pnode->GetPausedForReceiving())
+    {
+        LogPrint(BCLog::NETMSG, "Dropping %s message because we're paused for send and receive to peer=%d\n",
+            SanitizeString(msg.Command().c_str()), pnode->id);
+        return;
+    }
+
     // Ensure we don't send extended messages to a peer that won't understand them
     uint64_t nPayloadLength { msg.Size() };
     int sendVersion { pnode->SendVersionIsSet()? pnode->GetSendVersion() : INIT_PROTO_VERSION };
@@ -3074,7 +3134,7 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg&& msg, Strea
     LogPrint(BCLog::NETMSGVERB, "sending %s (%d bytes) peer=%d\n",
              SanitizeString(msg.Command().c_str()), nPayloadLength, pnode->id);
 
-    CMessageHeader hdr { *config, msg };
+    CMessageHeader hdr { *config_, msg };
     std::vector<uint8_t> serializedHeader {};
     serializedHeader.reserve(hdr.GetLength());
     CVectorWriter { SER_NETWORK, INIT_PROTO_VERSION, serializedHeader, 0, hdr };

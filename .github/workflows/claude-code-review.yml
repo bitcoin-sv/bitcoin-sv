@@ -1,0 +1,169 @@
+name: Claude Code Review
+
+# This workflow performs automated code review using Claude Code when a PR is ready for review.
+#
+# How it works:
+# 1. Triggers when a PR is marked "Ready for review" (or opened/updated)
+# 2. Claude analyzes the code and posts inline comments for specific issues
+# 3. Claude posts a summary comment with overall feedback (updates in-place on re-reviews)
+# 4. Enforcement script programmatically sets commit status check:
+#    - FAILURE (❌) if any unresolved issues found → blocks merge
+#    - SUCCESS (✅) if all issues resolved or dismissed by CODEOWNERS → allows merge
+# 5. When new commits are pushed, Claude automatically re-reviews:
+#    - Checks if previous issues were properly fixed
+#    - Auto-resolves comment threads where issues are verified as fixed
+#    - Un-resolves threads that were prematurely marked resolved (prevents bypass)
+#    - Posts new comments for any new issues found
+#    - Updates commit status check based on current state
+#
+# Required Branch Protection Setup (configure in GitHub repository settings):
+# 1. Go to Settings → Branches → Add branch protection rule for your main branch
+# 2. Enable "Require status checks to pass before merging"
+#    - Add "Claude Code Review" to the list of required status checks
+#    - This blocks merge if Claude finds any unresolved issues
+# 3. Enable "Require conversation resolution before merging"
+#    - This ensures all Claude's comments are either fixed (and auto-resolved)
+#      or dismissed by CODEOWNERS
+# 4. Enable "Require approvals" (set to 1 or more for human review)
+# 5. Optional: Add a CODEOWNERS file to specify required human reviewers
+#
+# This ensures:
+# - Claude reviews first and blocks merge if issues found (via status check)
+# - Developers address Claude's feedback and push updates
+# - Claude verifies fixes and auto-resolves verified issues
+# - Human reviewers can see which issues were fixed and verified by Claude
+# - PR can only merge when: status check passes + all conversations resolved + human approves
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, synchronize, reopened]
+    paths-ignore:
+      - '.github/workflows/**'
+      - 'doc/**'
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    if: '!github.event.pull_request.draft'
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+      actions: read  # Required for github_ci MCP server to read CI results
+      statuses: write
+    
+    timeout-minutes: 20 
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Load code review guidelines
+        id: code-review-guidelines
+        run: |
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          cat .claude/prompts/code-review-guidelines.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Load subagent instructions
+        id: subagent-instructions
+        run: |
+          echo "cpp<<EOF" >> $GITHUB_OUTPUT
+          cat .claude/prompts/claude-code-review-cpp-instructions.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "python<<EOF" >> $GITHUB_OUTPUT
+          cat .claude/prompts/claude-code-review-python-instructions.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Detect Review Mode
+        id: detect-mode
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: .github/workflows/claude-code-review-detect-mode.sh
+
+      - name: Filter Threads for Verification
+        id: filter-threads
+        if: steps.detect-mode.outputs.mode == 'rereview'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: .github/workflows/claude-code-review-verify-threads.sh
+
+      - name: Load initial review prompt
+        id: initial-prompt
+        if: steps.detect-mode.outputs.mode == 'initial'
+        run: |
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          cat .claude/prompts/claude-code-review-initial-prompt.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Load re-review prompt
+        id: rereview-prompt
+        if: steps.detect-mode.outputs.mode == 'rereview'
+        run: |
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          cat .claude/prompts/claude-code-review-rereview-prompt.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Run Claude Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          use_sticky_comment: true
+          prompt: |
+            ${{ steps.code-review-guidelines.outputs.content }}
+
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            **ZERO-TOLERANCE ENFORCEMENT:**
+            - Post ALL issues as inline comments (except formatting: clang-format/flake8)
+            - All issues block merge equally
+            - Only CODEOWNER dismissal or fixes unblock
+
+            You are coordinating a comprehensive multi-language code review for this PR.
+
+            ═══════════════════════════════════════════════════════════════════════
+            MODE: ${{ steps.detect-mode.outputs.mode }}
+            ═══════════════════════════════════════════════════════════════════════
+
+            ${{ steps.detect-mode.outputs.mode == 'initial' && steps.initial-prompt.outputs.content || steps.rereview-prompt.outputs.content }}
+
+            ═══════════════════════════════════════════════════════════════════════
+
+            Use repository CLAUDE.md for guidance.
+
+          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          # For available options see:
+          # https://docs.claude.com/en/docs/claude-code/cli-reference
+          claude_args: >-
+            --allowed-tools
+            "Task,mcp__github_inline_comment__create_inline_comment,
+            Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),
+            Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),
+            Bash(gh api /repos/*/pulls/*/comments:*),
+            Bash(gh api POST /repos/*/pulls/*/comments/*:*),
+            Bash(gh api POST /repos/*/pulls/*/comments/*/replies:*),
+            Bash(gh api graphql:*)"
+
+      - name: Enforce Zero-Tolerance Policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: .github/workflows/claude-code-review-enforcement.sh
+

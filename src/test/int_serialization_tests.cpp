@@ -25,7 +25,7 @@ namespace
     using int64_t_test_data_type =
         std::vector<std::pair<int64_t, std::vector<uint8_t>>>;
     // clang-format off
-    int64_t_test_data_type int64_t_test_data = 
+    int64_t_test_data_type int64_t_test_data =
     {
         {1, {1}},
         {std::numeric_limits<int8_t>::max()-1, {0x7e}}, // 126
@@ -69,7 +69,7 @@ namespace
     const bint bn_min64{int64_min};
     const bint bn_max64{int64_max};
     using bint_test_data_type = std::vector<std::pair<bint, std::vector<uint8_t>>>;
-    bint_test_data_type bint_test_data = 
+    bint_test_data_type bint_test_data = // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
     {
         {bn_max64, {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f}},
         {bn_max64 + 1, {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x80, 0x0}},
@@ -94,7 +94,7 @@ BOOST_AUTO_TEST_CASE(serialize_int64_t)
         serialize(n, back_inserter(op));
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(s), end(s), begin(op), end(op));
 
-        const auto ip{deserialize<int64_t>(op.begin(), op.end())};
+        const auto ip{bsv::deserialize<int64_t>(op.begin(), op.end())};
         BOOST_CHECK_EQUAL(n, ip);
     }
 }

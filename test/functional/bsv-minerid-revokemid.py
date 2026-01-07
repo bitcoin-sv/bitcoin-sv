@@ -8,7 +8,6 @@ from test_framework.util import create_confirmed_utxos, wait_until
 from test_framework.miner_id import MinerIdKeys, make_miner_id_block
 from decimal import Decimal
 
-import os
 import time
 
 '''
@@ -46,7 +45,7 @@ class RevokeMid(BitcoinTestFramework):
 
     def run_test(self):
 
-        with self.run_all_nodes_connected(title="RevokeMid", args=self.extra_args, p2pConnections=[0,1,2], cb_class=TestNode) as (p2p_0,p2p_1,p2p_2):
+        with self.run_all_nodes_connected(title="RevokeMid", args=self.extra_args, p2pConnections=[0, 1, 2], cb_class=TestNode) as (p2p_0, p2p_1, p2p_2):
 
             # Get out of IBD and make some spendable outputs
             utxos = create_confirmed_utxos(Decimal("250") / 100000000, self.nodes[0], 5, nodes=self.nodes)
@@ -88,22 +87,22 @@ class RevokeMid(BitcoinTestFramework):
             minerids0 = self.nodes[0].dumpminerids()
             minerids1 = self.nodes[1].dumpminerids()
             minerids2 = self.nodes[2].dumpminerids()
-            assert(len(minerids0['miners']) == 1)
-            assert(len(minerids1['miners']) == 1)
-            assert(len(minerids2['miners']) == 1)
-            assert(len(minerids0['miners'][0]['minerids']) == 3)
-            assert(len(minerids1['miners'][0]['minerids']) == 3)
-            assert(len(minerids2['miners'][0]['minerids']) == 3)
-            assert(minerids0['miners'][0]['reputation']['void'] == False)
-            assert(minerids1['miners'][0]['reputation']['void'] == False)
-            assert(minerids2['miners'][0]['reputation']['void'] == False)
+            assert (len(minerids0['miners']) == 1)
+            assert (len(minerids1['miners']) == 1)
+            assert (len(minerids2['miners']) == 1)
+            assert (len(minerids0['miners'][0]['minerids']) == 3)
+            assert (len(minerids1['miners'][0]['minerids']) == 3)
+            assert (len(minerids2['miners'][0]['minerids']) == 3)
+            assert (minerids0['miners'][0]['reputation']['void'] is False)
+            assert (minerids1['miners'][0]['reputation']['void'] is False)
+            assert (minerids2['miners'][0]['reputation']['void'] is False)
 
             # Bad node steals honest nodes miner ID key and spoils their reputation
             minerIdParams['height'] = self.nodes[1].getblockcount() + 1
             badblock = make_miner_id_block(p2p_0, minerIdParams, utxo=utxos.pop(), makeValid=False)
             p2p_0.send_message(msg_block(badblock))
 
-            wait_until(lambda: self.nodes[0].dumpminerids()['miners'][0]['reputation']['void'] == True)
+            wait_until(lambda: self.nodes[0].dumpminerids()['miners'][0]['reputation']['void'] is True)
 
             # Honest node sends revokemid message to revoke their stolen key
             revokemid = msg_revokemid(self.minerIdRevocationKey.signingKey(), self.minerIdRevocationKey.publicKeyBytes(),
@@ -118,7 +117,7 @@ class RevokeMid(BitcoinTestFramework):
             # Check we get the revokmid msg forwarded to us from the 2 peers we didn't initially send it to
             wait_until(lambda: p2p_0.cb.revokemid_count == 2)
             time.sleep(1)
-            assert(p2p_0.cb.revokemid_count == 2)
+            assert (p2p_0.cb.revokemid_count == 2)
 
             # Honest node revokes and rotates their stolen key in the next block
             minerIdParams = {
@@ -137,18 +136,18 @@ class RevokeMid(BitcoinTestFramework):
             minerids0 = self.nodes[0].dumpminerids()
             minerids1 = self.nodes[1].dumpminerids()
             minerids2 = self.nodes[2].dumpminerids()
-            assert(len(minerids0['miners']) == 1)
-            assert(len(minerids1['miners']) == 1)
-            assert(len(minerids2['miners']) == 1)
-            assert(len(minerids0['miners'][0]['minerids']) == 4)
-            assert(len(minerids1['miners'][0]['minerids']) == 4)
-            assert(len(minerids2['miners'][0]['minerids']) == 4)
-            assert(minerids0['miners'][0]['reputation']['void'] == False)
-            assert(minerids1['miners'][0]['reputation']['void'] == False)
-            assert(minerids2['miners'][0]['reputation']['void'] == False)
-            assert(minerids0['miners'][0]['minerids'][0]['state'] == 'CURRENT')
-            assert(minerids1['miners'][0]['minerids'][0]['state'] == 'CURRENT')
-            assert(minerids2['miners'][0]['minerids'][0]['state'] == 'CURRENT')
+            assert (len(minerids0['miners']) == 1)
+            assert (len(minerids1['miners']) == 1)
+            assert (len(minerids2['miners']) == 1)
+            assert (len(minerids0['miners'][0]['minerids']) == 4)
+            assert (len(minerids1['miners'][0]['minerids']) == 4)
+            assert (len(minerids2['miners'][0]['minerids']) == 4)
+            assert (minerids0['miners'][0]['reputation']['void'] is False)
+            assert (minerids1['miners'][0]['reputation']['void'] is False)
+            assert (minerids2['miners'][0]['reputation']['void'] is False)
+            assert (minerids0['miners'][0]['minerids'][0]['state'] == 'CURRENT')
+            assert (minerids1['miners'][0]['minerids'][0]['state'] == 'CURRENT')
+            assert (minerids2['miners'][0]['minerids'][0]['state'] == 'CURRENT')
 
 
 if __name__ == '__main__':

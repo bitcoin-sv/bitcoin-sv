@@ -4,8 +4,13 @@
 
 #include "chainparams.h"
 #include "config.h"
+
 #include "consensus/consensus.h"
+#include "double_spend/dsdetected_defaults.h"
+#include "miner_id/miner_id_db_defaults.h"
+#include "rpc/webhook_client_defaults.h"
 #include "test/test_bitcoin.h"
+#include "txdb_defaults.h"
 
 #include <boost/test/unit_test.hpp>
 #include <string>
@@ -153,16 +158,16 @@ BOOST_AUTO_TEST_CASE(max_tx_size) {
 
 
     // default pre genesis policy tx size
-    BOOST_CHECK(config.GetMaxTxSize(false, false) == MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
+    BOOST_CHECK(config.GetMaxTxSize(ProtocolEra::PreGenesis, false) == MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
 
     // default post genesis policy tx size
-    BOOST_CHECK(config.GetMaxTxSize(true, false) == DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS);
+    BOOST_CHECK(config.GetMaxTxSize(ProtocolEra::PostGenesis, false) == DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS);
 
     // default pre genesis consensus tx size
-    BOOST_CHECK(config.GetMaxTxSize(false, true) == MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS);
+    BOOST_CHECK(config.GetMaxTxSize(ProtocolEra::PreGenesis, true) == MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS);
 
     // default post genesis consensus tx size
-    BOOST_CHECK(config.GetMaxTxSize(true, true) == MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS);
+    BOOST_CHECK(config.GetMaxTxSize(ProtocolEra::PostGenesis, true) == MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS);
 
 
     // can not set policy tx size < pre genesis policy tx size
@@ -179,63 +184,64 @@ BOOST_AUTO_TEST_CASE(max_tx_size) {
     BOOST_CHECK(config.SetMaxTxSizePolicy(newMaxTxSizePolicy, &reason));
 
     // pre genesis policy tx size
-    BOOST_CHECK(config.GetMaxTxSize(false, false) == MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
+    BOOST_CHECK(config.GetMaxTxSize(ProtocolEra::PreGenesis, false) == MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
 
     // post genesis policy tx size
-    BOOST_CHECK(config.GetMaxTxSize(true, false) == static_cast<uint64_t>(newMaxTxSizePolicy));
+    BOOST_CHECK(config.GetMaxTxSize(ProtocolEra::PostGenesis, false) == static_cast<uint64_t>(newMaxTxSizePolicy));
 
 
     // set unlimited policy tx size
     BOOST_CHECK(config.SetMaxTxSizePolicy(0, &reason));
 
     // pre genesis policy tx size
-    BOOST_CHECK(config.GetMaxTxSize(false, false) == MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
+    BOOST_CHECK(config.GetMaxTxSize(ProtocolEra::PreGenesis, false) == MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
 
     // post genesis policy tx size
-    BOOST_CHECK(config.GetMaxTxSize(true, false) == MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS);
+    BOOST_CHECK(config.GetMaxTxSize(ProtocolEra::PostGenesis, false) == MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS);
 }
 
 BOOST_AUTO_TEST_CASE(max_bignum_length_policy) {
 
     GlobalConfig config;
     std::string reason;
-    int64_t newMaxScriptNumLengthPolicy{ MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS + 1 };
 
     // default pre genesis policy max length
-    BOOST_CHECK(config.GetMaxScriptNumLength(false, false) == MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
+    BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PreGenesis, false) == MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
 
     // default post genesis policy max length
-    BOOST_CHECK(config.GetMaxScriptNumLength(true, false) == DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS);
+    BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PostGenesis, false) == DEFAULT_SCRIPT_NUM_LENGTH_POLICY);
+
+    // default post chronicle policy max length
+    BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PostChronicle, false) == DEFAULT_SCRIPT_NUM_LENGTH_POLICY);
 
     // default pre genesis consensus max length
-    BOOST_CHECK(config.GetMaxScriptNumLength(false, true) == MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
+    BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PreGenesis, true) == MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
 
     // default post genesis consensus max length
-    BOOST_CHECK(config.GetMaxScriptNumLength(true, true) == MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS);
+    BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PostGenesis, true) == MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS);
 
-    // can not set script number length policy > post genesis consensus script number length
-    BOOST_CHECK(!config.SetMaxScriptNumLengthPolicy(MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS + 1, &reason));
+    // default post chronicle consensus max length
+    BOOST_CHECK(config.GetMaxScriptNumLength(ProtocolEra::PostChronicle, true) == MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE);
+
+
+    // can not set script number length policy < pre genesis consensus script number length
+    BOOST_CHECK(!config.SetMaxScriptNumLengthPolicy(MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS - 1, &reason));
 
     // can not set policy script number length < 0
     BOOST_CHECK(!config.SetMaxScriptNumLengthPolicy(-1, &reason));
 
-    // set new max policy script number length
+    // set and fetch a new policy script number length
+    uint64_t newMaxScriptNumLengthPolicy { MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS + 1 };
     BOOST_CHECK(config.SetMaxScriptNumLengthPolicy(newMaxScriptNumLengthPolicy, &reason));
+    BOOST_CHECK_EQUAL(config.GetMaxScriptNumLength(ProtocolEra::PreGenesis, false), MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
+    BOOST_CHECK_EQUAL(config.GetMaxScriptNumLength(ProtocolEra::PostGenesis, false), newMaxScriptNumLengthPolicy);
+    BOOST_CHECK_EQUAL(config.GetMaxScriptNumLength(ProtocolEra::PostChronicle, false), newMaxScriptNumLengthPolicy);
 
-    // pre genesis policy script number length
-    BOOST_CHECK(config.GetMaxScriptNumLength(false, false) == MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
-
-    // post genesis policy script number length
-    BOOST_CHECK(config.GetMaxScriptNumLength(true, false) == static_cast<uint64_t>(newMaxScriptNumLengthPolicy));
-
-    // set unlimited policy script number length
+    // set and fetch an unlimited policy script number length
     BOOST_CHECK(config.SetMaxScriptNumLengthPolicy(0, &reason));
-
-    // pre genesis policy script number length
-    BOOST_CHECK(config.GetMaxScriptNumLength(false, false) == MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
-
-    // post genesis policy script number length
-    BOOST_CHECK(config.GetMaxScriptNumLength(true, false) == MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS);
+    BOOST_CHECK_EQUAL(config.GetMaxScriptNumLength(ProtocolEra::PreGenesis, false), MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS);
+    BOOST_CHECK_EQUAL(config.GetMaxScriptNumLength(ProtocolEra::PostGenesis, false), MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS);
+    BOOST_CHECK_EQUAL(config.GetMaxScriptNumLength(ProtocolEra::PostChronicle, false), MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE);
 }
 
 
@@ -296,7 +302,7 @@ BOOST_AUTO_TEST_CASE(max_send_queues_size) {
 
     std::string reason;
 
-    uint64_t testBlockSize = LEGACY_MAX_BLOCK_SIZE + 1;
+    int64_t testBlockSize = LEGACY_MAX_BLOCK_SIZE + 1;
     gArgs.ForceSetArg("-excessiveblocksize", to_string(testBlockSize));
     BOOST_CHECK(testConfig.SetMaxBlockSize(testBlockSize, &reason));
     BOOST_CHECK_EQUAL(testConfig.GetMaxSendQueuesBytes(), testBlockSize * DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES);
@@ -414,10 +420,10 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK(! config.DoDropMessageTest());
     BOOST_CHECK(config.SetDropMessageTest(1));
     BOOST_CHECK(config.DoDropMessageTest());
-    BOOST_CHECK_EQUAL(config.GetDropMessageTest(), 1);
+    BOOST_CHECK_EQUAL(config.GetDropMessageTest(), 1U);
     BOOST_CHECK(config.SetDropMessageTest(0));
     BOOST_CHECK(config.DoDropMessageTest());
-    BOOST_CHECK_EQUAL(config.GetDropMessageTest(), 0);
+    BOOST_CHECK_EQUAL(config.GetDropMessageTest(), 0U);
     BOOST_CHECK(! config.SetDropMessageTest(-1));
     BOOST_CHECK(! config.DoDropMessageTest());
 
@@ -754,7 +760,6 @@ BOOST_AUTO_TEST_CASE(banned_clientua_test)
 BOOST_AUTO_TEST_CASE(prune_config_test)
 {
     GlobalConfig config {};
-    std::string err {};
 
     BOOST_CHECK_EQUAL(config.GetMinBlocksToKeep(), DEFAULT_MIN_BLOCKS_TO_KEEP);
     BOOST_CHECK(config.SetMinBlocksToKeep(MIN_MIN_BLOCKS_TO_KEEP));
@@ -782,6 +787,55 @@ BOOST_AUTO_TEST_CASE(tx_validation)
     BOOST_CHECK_EQUAL(config.GetPerBlockScriptValidatorThreadsCount(), std::clamp(GetNumCores(), 0, 8));
     BOOST_CHECK_EQUAL(config.GetPerBlockTxnValidatorThreadsCount(), 2);
     BOOST_CHECK(! config.SetBlockScriptValidatorsParams(1, -1, -1, 1, &err));
+}
+
+BOOST_AUTO_TEST_CASE(chronicle)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetChronicleGracefulPeriod(), DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD);
+    BOOST_CHECK(config.SetChronicleGracefulPeriod(DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD+1, &err));
+    BOOST_CHECK_EQUAL(config.GetChronicleGracefulPeriod(), DEFAULT_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD+1);
+    BOOST_CHECK(config.SetChronicleGracefulPeriod(0, &err));
+    BOOST_CHECK(config.SetChronicleGracefulPeriod(MAX_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD, &err));
+    BOOST_CHECK(! config.SetChronicleGracefulPeriod(-1, &err));
+    BOOST_CHECK(! config.SetChronicleGracefulPeriod(MAX_CHRONICLE_GRACEFUL_ACTIVATION_PERIOD + 1, &err));
+
+    BOOST_CHECK_EQUAL(config.GetChronicleActivationHeight(), 0);
+    BOOST_CHECK(config.SetChronicleActivationHeight(1, &err));
+    BOOST_CHECK_EQUAL(config.GetChronicleActivationHeight(), 1);
+    BOOST_CHECK(! config.SetChronicleActivationHeight(0, &err));
+    BOOST_CHECK(! config.SetChronicleActivationHeight(-1, &err));
+}
+
+BOOST_AUTO_TEST_CASE(leveldb)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetCoinsDBMaxFileSize(), CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE);
+    BOOST_CHECK(config.SetCoinsDBMaxFileSize(CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE * 2, &err));
+    BOOST_CHECK_EQUAL(config.GetCoinsDBMaxFileSize(), CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE * 2);
+    BOOST_CHECK(config.SetCoinsDBMaxFileSize(CoinsDBDefaults::MIN_LEVELDB_FILE_SIZE, &err));
+    BOOST_CHECK(! config.SetCoinsDBMaxFileSize(CoinsDBDefaults::MIN_LEVELDB_FILE_SIZE - 1, &err));
+}
+
+BOOST_AUTO_TEST_CASE(mempool_sync_config)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetMempoolSyncAge(), MempoolMsg::DEFAULT_AGE);
+    BOOST_CHECK(config.SetMempoolSyncAge(1, &err));
+    BOOST_CHECK_EQUAL(config.GetMempoolSyncAge(), 1);
+    BOOST_CHECK(!config.SetMempoolSyncAge(0, &err));
+
+    BOOST_CHECK_EQUAL(config.GetMempoolSyncPeriod(), MempoolMsg::DEFAULT_PERIOD);
+    BOOST_CHECK(config.SetMempoolSyncPeriod(MempoolMsg::DEFAULT_PERIOD * 2, &err));
+    BOOST_CHECK_EQUAL(config.GetMempoolSyncPeriod(), MempoolMsg::DEFAULT_PERIOD * 2);
+    BOOST_CHECK(!config.SetMempoolSyncPeriod(0, &err));
+    BOOST_CHECK(!config.SetMempoolSyncPeriod(-1, &err));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -44,22 +44,25 @@ static std::string urlDecode(const std::string &urlEncoded) {
     return res;
 }
 
-CWallet *GetWalletForJSONRPCRequest(const JSONRPCRequest &request) {
-    if (request.URI.substr(0, WALLET_ENDPOINT_BASE.size()) ==
-        WALLET_ENDPOINT_BASE) {
+CWallet* GetWalletForJSONRPCRequest(const JSONRPCRequest& request)
+{
+    if(request.URI.substr(0, WALLET_ENDPOINT_BASE.size()) == WALLET_ENDPOINT_BASE)
+    {
         // wallet endpoint was used
-        std::string requestedWallet =
-            urlDecode(request.URI.substr(WALLET_ENDPOINT_BASE.size()));
-        for (CWalletRef pwallet : ::vpwallets) {
-            if (pwallet->GetName() == requestedWallet) {
-                return pwallet;
+        std::string requestedWallet = urlDecode(
+            request.URI.substr(WALLET_ENDPOINT_BASE.size()));
+        for(const auto& pwallet : ::vpwallets)
+        {
+            if(pwallet->GetName() == requestedWallet)
+            {
+                return pwallet.get();
             }
         }
         throw JSONRPCError(RPC_WALLET_NOT_FOUND,
                            "Requested wallet does not exist or is not loaded");
     }
     return ::vpwallets.size() == 1 || (request.fHelp && ::vpwallets.size() > 0)
-               ? ::vpwallets[0]
+               ? ::vpwallets[0].get()
                : nullptr;
 }
 
@@ -141,8 +144,8 @@ std::string AccountFromValue(const UniValue &value) {
     return strAccount;
 }
 
-static UniValue getnewaddress(const Config &config,
-                              const JSONRPCRequest &request) {
+static UniValue getnewaddress(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -208,8 +211,8 @@ CTxDestination GetAccountAddress(CWallet *const pwallet, std::string strAccount,
     return pubKey.GetID();
 }
 
-static UniValue getaccountaddress(const Config &config,
-                                  const JSONRPCRequest &request) {
+static UniValue getaccountaddress(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -246,8 +249,8 @@ static UniValue getaccountaddress(const Config &config,
     return ret;
 }
 
-static UniValue getrawchangeaddress(const Config &config,
-                                    const JSONRPCRequest &request) {
+static UniValue getrawchangeaddress(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -389,8 +392,8 @@ static UniValue getaccount(const Config &config,
     return strAccount;
 }
 
-static UniValue getaddressesbyaccount(const Config &config,
-                                      const JSONRPCRequest &request) {
+static UniValue getaddressesbyaccount(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -569,8 +572,8 @@ static UniValue sendtoaddress(const Config &config,
     return wtx.GetId().GetHex();
 }
 
-static UniValue listaddressgroupings(const Config &config,
-                                     const JSONRPCRequest &request) {
+static UniValue listaddressgroupings(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -861,8 +864,8 @@ static UniValue getreceivedbyaccount(const Config &config,
     return ValueFromAmount(nAmount);
 }
 
-static UniValue getbalance(const Config &config,
-                           const JSONRPCRequest &request) {
+static UniValue getbalance(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -941,8 +944,8 @@ static UniValue getbalance(const Config &config,
         pwallet->GetLegacyBalance(filter, nMinDepth, account));
 }
 
-static UniValue getunconfirmedbalance(const Config &config,
-                                      const JSONRPCRequest &request) {
+static UniValue getunconfirmedbalance(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -959,7 +962,8 @@ static UniValue getunconfirmedbalance(const Config &config,
     return ValueFromAmount(pwallet->GetUnconfirmedBalance());
 }
 
-static UniValue movecmd(const Config &config, const JSONRPCRequest &request) {
+static UniValue movecmd(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -1310,8 +1314,8 @@ static UniValue sendmany(const Config &config, const JSONRPCRequest &request) {
     return wtx.GetId().GetHex();
 }
 
-static UniValue addmultisigaddress(const Config &config,
-                                   const JSONRPCRequest &request) {
+static UniValue addmultisigaddress(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -1738,8 +1742,8 @@ void AcentryToJSON(const CAccountingEntry &acentry,
     }
 }
 
-static UniValue listtransactions(const Config &config,
-                                 const JSONRPCRequest &request) {
+static UniValue listtransactions(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -1852,13 +1856,19 @@ static UniValue listtransactions(const Config &config,
         strAccount = request.params[0].get_str();
     }
 
-    int nCount = 10;
+    uint32_t nCount = 10;
     if (request.params.size() > 1) {
+        if (request.params[1].get_int() < 0) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative count");
+        }
         nCount = request.params[1].get_int();
     }
 
-    int nFrom = 0;
+    uint32_t nFrom = 0;
     if (request.params.size() > 2) {
+        if (request.params[2].get_int() < 0) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative skip");
+        }
         nFrom = request.params[2].get_int();
     }
 
@@ -1867,12 +1877,6 @@ static UniValue listtransactions(const Config &config,
         filter = filter | ISMINE_WATCH_ONLY;
     }
 
-    if (nCount < 0) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative count");
-    }
-    if (nFrom < 0) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative from");
-    }
     UniValue ret(UniValue::VARR);
 
     const CWallet::TxItems &txOrdered = pwallet->wtxOrdered;
@@ -1889,17 +1893,17 @@ static UniValue listtransactions(const Config &config,
             AcentryToJSON(*pacentry, strAccount, ret);
         }
 
-        if ((int)ret.size() >= (nCount + nFrom)) {
+        if (ret.size() >= (nCount + nFrom)) {
             break;
         }
     }
 
     // ret is newest to oldest
 
-    if (nFrom > (int)ret.size()) {
+    if (nFrom > ret.size()) {
         nFrom = ret.size();
     }
-    if ((nFrom + nCount) > (int)ret.size()) {
+    if ((nFrom + nCount) > ret.size()) {
         nCount = ret.size() - nFrom;
     }
 
@@ -1927,8 +1931,8 @@ static UniValue listtransactions(const Config &config,
     return ret;
 }
 
-static UniValue listaccounts(const Config &config,
-                             const JSONRPCRequest &request) {
+static UniValue listaccounts(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2022,8 +2026,8 @@ static UniValue listaccounts(const Config &config,
     return ret;
 }
 
-static UniValue listsinceblock(const Config &config,
-                               const JSONRPCRequest &request) {
+static UniValue listsinceblock(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2166,8 +2170,8 @@ static UniValue listsinceblock(const Config &config,
     return ret;
 }
 
-static UniValue gettransaction(const Config &config,
-                               const JSONRPCRequest &request) {
+static UniValue gettransaction(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2294,8 +2298,8 @@ static UniValue gettransaction(const Config &config,
     return entry;
 }
 
-static UniValue abandontransaction(const Config &config,
-                                   const JSONRPCRequest &request) {
+static UniValue abandontransaction(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2343,8 +2347,8 @@ static UniValue abandontransaction(const Config &config,
     return NullUniValue;
 }
 
-static UniValue backupwallet(const Config &config,
-                             const JSONRPCRequest &request) {
+static UniValue backupwallet(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2372,8 +2376,8 @@ static UniValue backupwallet(const Config &config,
     return NullUniValue;
 }
 
-static UniValue keypoolrefill(const Config &config,
-                              const JSONRPCRequest &request) {
+static UniValue keypoolrefill(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2422,8 +2426,8 @@ static void LockWallet(CWallet *pWallet) {
     pWallet->Lock();
 }
 
-static UniValue walletpassphrase(const Config &config,
-                                 const JSONRPCRequest &request) {
+static UniValue walletpassphrase(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2503,8 +2507,9 @@ static UniValue walletpassphrase(const Config &config,
     return NullUniValue;
 }
 
-static UniValue walletpassphrasechange(const Config &config,
-                                       const JSONRPCRequest &request) {
+static UniValue walletpassphrasechange(const Config&,
+                                       const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2564,8 +2569,8 @@ static UniValue walletpassphrasechange(const Config &config,
     return NullUniValue;
 }
 
-static UniValue walletlock(const Config &config,
-                           const JSONRPCRequest &request) {
+static UniValue walletlock(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2609,8 +2614,8 @@ static UniValue walletlock(const Config &config,
     return NullUniValue;
 }
 
-static UniValue encryptwallet(const Config &config,
-                              const JSONRPCRequest &request) {
+static UniValue encryptwallet(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2687,8 +2692,8 @@ static UniValue encryptwallet(const Config &config,
            "backup.";
 }
 
-static UniValue lockunspent(const Config &config,
-                            const JSONRPCRequest &request) {
+static UniValue lockunspent(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2808,8 +2813,8 @@ static UniValue lockunspent(const Config &config,
     return true;
 }
 
-static UniValue listlockunspent(const Config &config,
-                                const JSONRPCRequest &request) {
+static UniValue listlockunspent(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2868,7 +2873,8 @@ static UniValue listlockunspent(const Config &config,
     return ret;
 }
 
-static UniValue settxfee(const Config &config, const JSONRPCRequest &request) {
+static UniValue settxfee(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2901,8 +2907,8 @@ static UniValue settxfee(const Config &config, const JSONRPCRequest &request) {
     return true;
 }
 
-static UniValue getwalletinfo(const Config &config,
-                              const JSONRPCRequest &request) {
+static UniValue getwalletinfo(const Config&, const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -2983,8 +2989,8 @@ static UniValue getwalletinfo(const Config &config,
     return obj;
 }
 
-static UniValue listwallets(const Config &config,
-                            const JSONRPCRequest &request) {
+static UniValue listwallets(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp || request.params.size() != 0) {
         throw std::runtime_error(
             "listwallets\n"
@@ -3002,8 +3008,9 @@ static UniValue listwallets(const Config &config,
 
     UniValue obj(UniValue::VARR);
 
-    for (CWalletRef pwallet : vpwallets) {
-        if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+    for(const auto& pwallet : vpwallets)
+    {
+        if(!EnsureWalletIsAvailable(pwallet.get(), request.fHelp)) {
             return NullUniValue;
         }
 
@@ -3014,8 +3021,9 @@ static UniValue listwallets(const Config &config,
     return obj;
 }
 
-static UniValue resendwallettransactions(const Config &config,
-                                         const JSONRPCRequest &request) {
+static UniValue resendwallettransactions(const Config&,
+                                         const JSONRPCRequest& request)
+{
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
         return NullUniValue;
@@ -3499,57 +3507,57 @@ static UniValue generate(const Config &config, const JSONRPCRequest &request) {
                           true);
 }
 
-// clang-format off
-static const CRPCCommand commands[] = {
-    //  category            name                        actor (function)          okSafeMode
-    //  ------------------- ------------------------    ----------------------    ----------
-    { "rawtransactions",    "fundrawtransaction",       fundrawtransaction,       false,  {"hexstring","options"} },
-    { "hidden",             "resendwallettransactions", resendwallettransactions, true,   {} },
-    { "wallet",             "abandontransaction",       abandontransaction,       false,  {"txid"} },
-    { "wallet",             "addmultisigaddress",       addmultisigaddress,       true,   {"nrequired","keys","account"} },
-    { "wallet",             "backupwallet",             backupwallet,             true,   {"destination"} },
-    { "wallet",             "encryptwallet",            encryptwallet,            true,   {"passphrase"} },
-    { "wallet",             "getaccountaddress",        getaccountaddress,        true,   {"account"} },
-    { "wallet",             "getaccount",               getaccount,               true,   {"address"} },
-    { "wallet",             "getaddressesbyaccount",    getaddressesbyaccount,    true,   {"account"} },
-    { "wallet",             "getbalance",               getbalance,               false,  {"account","minconf","include_watchonly"} },
-    { "wallet",             "getnewaddress",            getnewaddress,            true,   {"account"} },
-    { "wallet",             "getrawchangeaddress",      getrawchangeaddress,      true,   {} },
-    { "wallet",             "getreceivedbyaccount",     getreceivedbyaccount,     false,  {"account","minconf"} },
-    { "wallet",             "getreceivedbyaddress",     getreceivedbyaddress,     false,  {"address","minconf"} },
-    { "wallet",             "gettransaction",           gettransaction,           false,  {"txid","include_watchonly"} },
-    { "wallet",             "getunconfirmedbalance",    getunconfirmedbalance,    false,  {} },
-    { "wallet",             "getwalletinfo",            getwalletinfo,            false,  {} },
-    { "wallet",             "keypoolrefill",            keypoolrefill,            true,   {"newsize"} },
-    { "wallet",             "listaccounts",             listaccounts,             false,  {"minconf","include_watchonly"} },
-    { "wallet",             "listaddressgroupings",     listaddressgroupings,     false,  {} },
-    { "wallet",             "listlockunspent",          listlockunspent,          false,  {} },
-    { "wallet",             "listreceivedbyaccount",    listreceivedbyaccount,    false,  {"minconf","include_empty","include_watchonly"} },
-    { "wallet",             "listreceivedbyaddress",    listreceivedbyaddress,    false,  {"minconf","include_empty","include_watchonly"} },
-    { "wallet",             "listsinceblock",           listsinceblock,           false,  {"blockhash","target_confirmations","include_watchonly"} },
-    { "wallet",             "listtransactions",         listtransactions,         false,  {"account","count","skip","include_watchonly"} },
-    { "wallet",             "listunspent",              listunspent,              false,  {"minconf","maxconf","addresses","include_unsafe"} },
-    { "wallet",             "listwallets",              listwallets,              true,   {} },
-    { "wallet",             "lockunspent",              lockunspent,              true,   {"unlock","transactions"} },
-    { "wallet",             "move",                     movecmd,                  false,  {"fromaccount","toaccount","amount","minconf","comment"} },
-    { "wallet",             "sendfrom",                 sendfrom,                 false,  {"fromaccount","toaddress","amount","minconf","comment","comment_to"} },
-    { "wallet",             "sendmany",                 sendmany,                 false,  {"fromaccount","amounts","minconf","comment","subtractfeefrom"} },
-    { "wallet",             "sendtoaddress",            sendtoaddress,            false,  {"address","amount","comment","comment_to","subtractfeefromamount"} },
-    { "wallet",             "setaccount",               setaccount,               true,   {"address","account"} },
-    { "wallet",             "settxfee",                 settxfee,                 true,   {"amount"} },
-    { "wallet",             "signmessage",              signmessage,              true,   {"address","message"} },
-    { "wallet",             "walletlock",               walletlock,               true,   {} },
-    { "wallet",             "walletpassphrasechange",   walletpassphrasechange,   true,   {"oldpassphrase","newpassphrase"} },
-    { "wallet",             "walletpassphrase",         walletpassphrase,         true,   {"passphrase","timeout"} },
-
-    { "generating",         "generate",                 generate,                 true,   {"nblocks","maxtries"} },
-};
-// clang-format on
-
-void RegisterWalletRPCCommands(CRPCTable &t) {
-    if (gArgs.GetBoolArg("-disablewallet", false)) {
+void RegisterWalletRPCCommands(CRPCTable& t)
+{
+    if(gArgs.GetBoolArg("-disablewallet", false))
         return;
-    }
+
+    // clang-format off
+    static const CRPCCommand commands[] = {
+        //  category            name                        actor (function)          okSafeMode
+        //  ------------------- ------------------------    ----------------------    ----------
+        { "rawtransactions",    "fundrawtransaction",       fundrawtransaction,       false,  {"hexstring","options"} },
+        { "hidden",             "resendwallettransactions", resendwallettransactions, true,   {} },
+        { "wallet",             "abandontransaction",       abandontransaction,       false,  {"txid"} },
+        { "wallet",             "addmultisigaddress",       addmultisigaddress,       true,   {"nrequired","keys","account"} },
+        { "wallet",             "backupwallet",             backupwallet,             true,   {"destination"} },
+        { "wallet",             "encryptwallet",            encryptwallet,            true,   {"passphrase"} },
+        { "wallet",             "getaccountaddress",        getaccountaddress,        true,   {"account"} },
+        { "wallet",             "getaccount",               getaccount,               true,   {"address"} },
+        { "wallet",             "getaddressesbyaccount",    getaddressesbyaccount,    true,   {"account"} },
+        { "wallet",             "getbalance",               getbalance,               false,  {"account","minconf","include_watchonly"} },
+        { "wallet",             "getnewaddress",            getnewaddress,            true,   {"account"} },
+        { "wallet",             "getrawchangeaddress",      getrawchangeaddress,      true,   {} },
+        { "wallet",             "getreceivedbyaccount",     getreceivedbyaccount,     false,  {"account","minconf"} },
+        { "wallet",             "getreceivedbyaddress",     getreceivedbyaddress,     false,  {"address","minconf"} },
+        { "wallet",             "gettransaction",           gettransaction,           false,  {"txid","include_watchonly"} },
+        { "wallet",             "getunconfirmedbalance",    getunconfirmedbalance,    false,  {} },
+        { "wallet",             "getwalletinfo",            getwalletinfo,            false,  {} },
+        { "wallet",             "keypoolrefill",            keypoolrefill,            true,   {"newsize"} },
+        { "wallet",             "listaccounts",             listaccounts,             false,  {"minconf","include_watchonly"} },
+        { "wallet",             "listaddressgroupings",     listaddressgroupings,     false,  {} },
+        { "wallet",             "listlockunspent",          listlockunspent,          false,  {} },
+        { "wallet",             "listreceivedbyaccount",    listreceivedbyaccount,    false,  {"minconf","include_empty","include_watchonly"} },
+        { "wallet",             "listreceivedbyaddress",    listreceivedbyaddress,    false,  {"minconf","include_empty","include_watchonly"} },
+        { "wallet",             "listsinceblock",           listsinceblock,           false,  {"blockhash","target_confirmations","include_watchonly"} },
+        { "wallet",             "listtransactions",         listtransactions,         false,  {"account","count","skip","include_watchonly"} },
+        { "wallet",             "listunspent",              listunspent,              false,  {"minconf","maxconf","addresses","include_unsafe"} },
+        { "wallet",             "listwallets",              listwallets,              true,   {} },
+        { "wallet",             "lockunspent",              lockunspent,              true,   {"unlock","transactions"} },
+        { "wallet",             "move",                     movecmd,                  false,  {"fromaccount","toaccount","amount","minconf","comment"} },
+        { "wallet",             "sendfrom",                 sendfrom,                 false,  {"fromaccount","toaddress","amount","minconf","comment","comment_to"} },
+        { "wallet",             "sendmany",                 sendmany,                 false,  {"fromaccount","amounts","minconf","comment","subtractfeefrom"} },
+        { "wallet",             "sendtoaddress",            sendtoaddress,            false,  {"address","amount","comment","comment_to","subtractfeefromamount"} },
+        { "wallet",             "setaccount",               setaccount,               true,   {"address","account"} },
+        { "wallet",             "settxfee",                 settxfee,                 true,   {"amount"} },
+        { "wallet",             "signmessage",              signmessage,              true,   {"address","message"} },
+        { "wallet",             "walletlock",               walletlock,               true,   {} },
+        { "wallet",             "walletpassphrasechange",   walletpassphrasechange,   true,   {"oldpassphrase","newpassphrase"} },
+        { "wallet",             "walletpassphrase",         walletpassphrase,         true,   {"passphrase","timeout"} },
+
+        { "generating",         "generate",                 generate,                 true,   {"nblocks","maxtries"} },
+    };
+    // clang-format on
 
     for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++) {
         t.appendCommand(commands[vcidx].name, &commands[vcidx]);

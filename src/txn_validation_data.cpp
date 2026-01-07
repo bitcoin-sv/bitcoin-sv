@@ -2,6 +2,9 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "txn_validation_data.h"
+
+#include <utility>
+
 #include "config.h"
 #include "transaction_specific_config.h"
 #include "logging.h"
@@ -48,17 +51,17 @@ CTxInputData::CTxInputData(
     Amount nAbsurdFee,
     std::weak_ptr<CNode> pNode,
     bool fOrphan,
-    const std::shared_ptr<const TransactionSpecificConfig> tsc)
-: mpTx(ptx),
-  mpNode(pNode),
-  mpTxIdTracker(pTxIdTracker),
+    std::shared_ptr<const TransactionSpecificConfig> tsc)
+: mpTx{std::move(ptx)},
+  mpNode{std::move(pNode)},
+  mpTxIdTracker{std::move(pTxIdTracker)},
   mTxStorage(txStorage),
   mnAbsurdFee(nAbsurdFee),
   mnAcceptTime(nAcceptTime),
   mTxSource(txSource),
   mTxValidationPriority(txValidationPriority),
   mfOrphan(fOrphan),
-  mConfig(tsc)
+  mConfig{std::move(tsc)}
 {
     // A check on the tracker for nullness and availability
     if(mpTxIdTracker.expired()) {

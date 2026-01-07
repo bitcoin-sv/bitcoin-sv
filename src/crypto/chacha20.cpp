@@ -8,6 +8,7 @@
 #include "crypto/chacha20.h"
 #include "crypto/common.h"
 
+#include <array>
 #include <cstring>
 
 constexpr static inline uint32_t rotl32(uint32_t v, int c) {
@@ -15,53 +16,67 @@ constexpr static inline uint32_t rotl32(uint32_t v, int c) {
 }
 
 #define QUARTERROUND(a, b, c, d)                                               \
-    a += b;                                                                    \
-    d = rotl32(d ^ a, 16);                                                     \
-    c += d;                                                                    \
-    b = rotl32(b ^ c, 12);                                                     \
-    a += b;                                                                    \
-    d = rotl32(d ^ a, 8);                                                      \
-    c += d;                                                                    \
-    b = rotl32(b ^ c, 7);
+    a += (b);                                                                  \
+    (d) = rotl32((d) ^ (a), 16);                                               \
+    (c) += (d);                                                                \
+    (b) = rotl32((b) ^ (c), 12);                                               \
+    (a) += (b);                                                                \
+    (d) = rotl32((d) ^ (a), 8);                                                \
+    (c) += (d);                                                                \
+    (b) = rotl32((b) ^ (c), 7);
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays)
 static const uint8_t sigma[] = "expand 32-byte k";
 static const uint8_t tau[] = "expand 16-byte k";
+// NOLINTEND(cppcoreguidelines-avoid-c-arrays)
 
-void ChaCha20::SetKey(const uint8_t *k, size_t keylen) {
-    const uint8_t *constants;
+void ChaCha20::SetKey(std::span<const uint8_t> k)
+{
+    const uint8_t* constants{};
 
-    input[4] = ReadLE32(k + 0);
-    input[5] = ReadLE32(k + 4);
-    input[6] = ReadLE32(k + 8);
-    input[7] = ReadLE32(k + 12);
-    if (keylen == 32) {
+    input[4] = ReadLE32(k.data() + 0);
+    input[5] = ReadLE32(k.data() + 4);
+    input[6] = ReadLE32(k.data()  + 8);
+    input[7] = ReadLE32(k.data()  + 12);
+    if(k.size() == 32)
+    {
         // recommended
-        k += 16;
+        k = k.subspan(16);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         constants = sigma;
-    } else {
+    }
+    else
+    {
         // keylen == 16
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         constants = tau;
     }
-    input[8] = ReadLE32(k + 0);
-    input[9] = ReadLE32(k + 4);
-    input[10] = ReadLE32(k + 8);
-    input[11] = ReadLE32(k + 12);
+    input[8] = ReadLE32(k.data()  + 0);
+    input[9] = ReadLE32(k.data()  + 4);
+    input[10] = ReadLE32(k.data()  + 8);
+    input[11] = ReadLE32(k.data()  + 12);
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     input[0] = ReadLE32(constants + 0);
     input[1] = ReadLE32(constants + 4);
     input[2] = ReadLE32(constants + 8);
     input[3] = ReadLE32(constants + 12);
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     input[12] = 0;
     input[13] = 0;
     input[14] = 0;
     input[15] = 0;
 }
 
-ChaCha20::ChaCha20() {
-    memset(input, 0, sizeof(input));
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+ChaCha20::ChaCha20()
+{
+    memset(input.data(), 0, input.size());
 }
 
-ChaCha20::ChaCha20(const uint8_t *k, size_t keylen) {
-    SetKey(k, keylen);
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+ChaCha20::ChaCha20(const std::span<const uint8_t> k)
+{
+    SetKey(k);
 }
 
 void ChaCha20::SetIV(uint64_t iv) {
@@ -74,14 +89,18 @@ void ChaCha20::Seek(uint64_t pos) {
     input[13] = pos >> 32;
 }
 
-void ChaCha20::Output(uint8_t *c, size_t bytes) {
+void ChaCha20::Output(uint8_t *c, size_t bytes)
+{
+    // NOLINTBEGIN(cppcoreguidelines-init-variables)
     uint32_t x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14,
         x15;
     uint32_t j0, j1, j2, j3, j4, j5, j6, j7, j8, j9, j10, j11, j12, j13, j14,
         j15;
+    // NOLINTEND(cppcoreguidelines-init-variables)
     uint8_t *ctarget = nullptr;
-    uint8_t tmp[64];
-    unsigned int i;
+
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, 64> tmp;
 
     if (!bytes) {
         return;
@@ -107,7 +126,7 @@ void ChaCha20::Output(uint8_t *c, size_t bytes) {
     for (;;) {
         if (bytes < 64) {
             ctarget = c;
-            c = tmp;
+            c = tmp.data();
         }
         x0 = j0;
         x1 = j1;
@@ -125,7 +144,7 @@ void ChaCha20::Output(uint8_t *c, size_t bytes) {
         x13 = j13;
         x14 = j14;
         x15 = j15;
-        for (i = 20; i > 0; i -= 2) {
+        for(unsigned int i = 20; i > 0; i -= 2) {
             QUARTERROUND(x0, x4, x8, x12)
             QUARTERROUND(x1, x5, x9, x13)
             QUARTERROUND(x2, x6, x10, x14)
@@ -157,6 +176,7 @@ void ChaCha20::Output(uint8_t *c, size_t bytes) {
             ++j13;
         }
 
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         WriteLE32(c + 0, x0);
         WriteLE32(c + 4, x1);
         WriteLE32(c + 8, x2);
@@ -173,10 +193,12 @@ void ChaCha20::Output(uint8_t *c, size_t bytes) {
         WriteLE32(c + 52, x13);
         WriteLE32(c + 56, x14);
         WriteLE32(c + 60, x15);
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         if (bytes <= 64) {
             if (bytes < 64) {
-                for (i = 0; i < bytes; ++i) {
+                for (unsigned int i = 0; i < bytes; ++i) {
+                    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                     ctarget[i] = c[i];
                 }
             }
@@ -185,6 +207,7 @@ void ChaCha20::Output(uint8_t *c, size_t bytes) {
             return;
         }
         bytes -= 64;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         c += 64;
     }
 }

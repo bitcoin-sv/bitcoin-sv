@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
-"""
+r"""
 Testing that we correctly reorg to longer chain even if we are still validating blocks
 on lower chains
 
@@ -76,7 +76,7 @@ class PBVReorg(BitcoinTestFramework):
         self.log.info("waiting for block height 101 via rpc")
         self.nodes[0].waitforblockheight(101)
 
-        tip_block_num = block_count-1
+        tip_block_num = block_count - 1
 
         # left branch
         block2 = self.chain.next_block(block_count, spend=out[0], extra_txns=8)

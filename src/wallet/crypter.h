@@ -9,6 +9,8 @@
 #include "serialize.h"
 #include "support/allocators/secure.h"
 
+#include <boost/signals2/signal.hpp>
+
 class uint256;
 
 const unsigned int WALLET_CRYPTO_KEY_SIZE = 32;
@@ -36,8 +38,10 @@ public:
     std::vector<uint8_t> vchSalt;
     //! 0 = EVP_sha512()
     //! 1 = scrypt()
-    unsigned int nDerivationMethod;
-    unsigned int nDeriveIterations;
+    unsigned int nDerivationMethod{0};
+    // 25,000 rounds is just under 0.1 seconds on a 1.86 GHz Pentium M
+    // ie slightly lower than the lowest hardware we need bother supporting
+    unsigned int nDeriveIterations{25'000};
     //! Use this for more parameters to key derivation, such as the various
     //! parameters to scrypt
     std::vector<uint8_t> vchOtherDerivationParameters;
@@ -52,14 +56,6 @@ public:
         READWRITE(nDeriveIterations);
         READWRITE(vchOtherDerivationParameters);
     }
-
-    CMasterKey() {
-        // 25000 rounds is just under 0.1 seconds on a 1.86 GHz Pentium M
-        // ie slightly lower than the lowest hardware we need bother supporting
-        nDeriveIterations = 25000;
-        nDerivationMethod = 0;
-        vchOtherDerivationParameters = std::vector<uint8_t>(0);
-    }
 };
 
 typedef std::vector<uint8_t, secure_allocator<uint8_t>> CKeyingMaterial;
@@ -69,6 +65,7 @@ class TestCrypter;
 }
 
 /** Encryption/decryption context with key information */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CCrypter {
     // for test access to chKey/chIV
     friend class wallet_crypto::TestCrypter;
@@ -76,7 +73,7 @@ class CCrypter {
 private:
     std::vector<uint8_t, secure_allocator<uint8_t>> vchKey;
     std::vector<uint8_t, secure_allocator<uint8_t>> vchIV;
-    bool fKeySet;
+    bool fKeySet{};
 
     int BytesToKeySHA512AES(const std::vector<uint8_t> &chSalt,
                             const SecureString &strKeyData, int count,
@@ -101,7 +98,6 @@ public:
     }
 
     CCrypter() {
-        fKeySet = false;
         vchKey.resize(WALLET_CRYPTO_KEY_SIZE);
         vchIV.resize(WALLET_CRYPTO_IV_SIZE);
     }
@@ -120,10 +116,10 @@ private:
 
     //! if fUseCrypto is true, mapKeys must be empty
     //! if fUseCrypto is false, vMasterKey must be empty
-    bool fUseCrypto;
+    bool fUseCrypto{};
 
     //! keeps track of whether Unlock has run a thorough check before
-    bool fDecryptionThoroughlyChecked;
+    bool fDecryptionThoroughlyChecked{};
 
 protected:
     bool SetCrypted();
@@ -135,14 +131,12 @@ protected:
     CryptedKeyMap mapCryptedKeys;
 
 public:
-    CCryptoKeyStore()
-        : fUseCrypto(false), fDecryptionThoroughlyChecked(false) {}
 
     bool IsCrypted() const { return fUseCrypto; }
 
     bool IsLocked() const {
         if (!IsCrypted()) return false;
-        bool result;
+        bool result; // NOLINT(cppcoreguidelines-init-variables)
         {
             LOCK(cs_KeyStore);
             result = vMasterKey.empty();

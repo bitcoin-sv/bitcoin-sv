@@ -5,7 +5,6 @@
 Base functions that are used by bsv-frozentxo-soft-consensus-freeze* tests.
 """
 
-import threading
 import glob
 import re
 
@@ -54,16 +53,16 @@ class Send_node():
         self.p2p.wait_for_verack()
         self._register_on_reject()
 
-    def send_block(self, block, expect_tip, expect_reject = False):
+    def send_block(self, block, expect_tip, expect_reject=False):
         self.p2p.send_and_ping(msg_block(block))
 
         if expect_reject:
             assert_equal(expect_tip, self.rpc.getbestblockhash())
             self.reject_check(block)
-            assert(self.check_frozen_tx_log(block.hash))
+            assert (self.check_frozen_tx_log(block.hash))
         else:
             assert_equal(expect_tip, self.rpc.getbestblockhash())
-            assert(self.check_frozen_tx_log(block.hash) == False)
+            assert (self.check_frozen_tx_log(block.hash) is False)
 
     def reject_check(self, block):
         self.p2p.wait_for_reject()
@@ -149,10 +148,10 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
 
         return block
 
-    def _mine_and_send_block(self, tx, node, expect_reject = False, expect_tip = None):
+    def _mine_and_send_block(self, tx, node, expect_reject=False, expect_tip=None):
         block = self._mine_block(tx)
 
-        expect_tip = expect_tip if expect_tip != None else block.hash
+        expect_tip = expect_tip if expect_tip is not None else block.hash
 
         node.send_block(block, expect_tip, expect_reject)
 
@@ -171,28 +170,28 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
         old_tip = self.chain.tip
         block = self._mine_and_send_block(tx, node, True, node.rpc.getbestblockhash())
         assert_equal(node.rpc.getbestblockhash(), old_tip.hash)
-        assert(node.check_frozen_tx_log(self.chain.tip.hash))
-        assert(node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*"+self.chain.tip.hash))
+        assert (node.check_frozen_tx_log(self.chain.tip.hash))
+        assert (node.check_log("Block was rejected because it included a transaction, which tried to spend a frozen transaction output.*" + self.chain.tip.hash))
 
         return block
 
-    def _create_tx_mine_block_and_freeze_tx(self, node, spendable_out, stop = None):
+    def _create_tx_mine_block_and_freeze_tx(self, node, spendable_out, stop=None):
         freeze_tx = self._create_tx(spendable_out, b'', CScript([OP_TRUE]))
         self.log.info(f"Mining block with transaction {freeze_tx.hash} whose output will be frozen later")
         self._mine_and_send_block(freeze_tx, node)
 
-        if stop != None:
+        if stop is not None:
             enforce_at_height = [{"start": 0, "stop": stop}]
         else:
             enforce_at_height = [{"start": 0}]
 
         self.log.info(f"Freezing TXO {freeze_tx.hash},0 on consensus blacklist {stop}")
-        result=node.rpc.addToConsensusBlacklist({
+        result = node.rpc.addToConsensusBlacklist({
             "funds": [
                 {
-                    "txOut" : {
-                        "txId" : freeze_tx.hash,
-                        "vout" : 0
+                    "txOut": {
+                        "txId": freeze_tx.hash,
+                        "vout": 0
                     },
                     "enforceAtHeight": enforce_at_height,
                     "policyExpiresWithConsensus": False
@@ -204,7 +203,7 @@ class SoftConsensusFreezeBase(BitcoinTestFramework):
 
     def submit_block_and_check_tip(self, node, block, expect_tip):
         node.rpc.submitblock(block.serialize().hex())
-        if expect_tip == None:
+        if expect_tip is None:
             expect_tip = block.hash
         assert_equal(expect_tip, node.rpc.getbestblockhash())
 

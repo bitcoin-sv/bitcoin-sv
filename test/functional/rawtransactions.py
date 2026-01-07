@@ -13,13 +13,14 @@
 #    - decoderawtransaction
 #    - getrawtransaction
 """
-from decimal import Decimal
-
 from test_framework.cdefs import ONE_KILOBYTE
+from test_framework.mininode import CTransaction, COIN, hex_str_to_bytes
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import CTransaction, COIN
-from test_framework.util import *
+from test_framework.util import assert_equal, assert_raises_rpc_error, \
+    bytes_to_hex_str, connect_nodes_bi, create_confirmed_utxos, \
+    satoshi_round, wait_until
 
+from decimal import Decimal
 from io import BytesIO
 
 # Create one-input, one-output, no-fee transaction:
@@ -30,7 +31,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.num_nodes = 4
         self.relayfee = Decimal(1) * ONE_KILOBYTE / COIN
-        self.extra_args = [['-persistmempool=0'],['-persistmempool=0'],['-persistmempool=0'],
+        self.extra_args = [['-persistmempool=0'], ['-persistmempool=0'], ['-persistmempool=0'],
                            ['-persistmempool=0',
                             '-maxmempool=300',
                             '-maxmempoolsizedisk=0',
@@ -49,7 +50,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         addr = conn.getnewaddress()
         outputs[addr] = satoshi_round(send_value)
         outputs["data"] = bytes_to_hex_str(bytearray(999000))
-        raw= conn.createrawtransaction(inputs, outputs)
+        raw = conn.createrawtransaction(inputs, outputs)
         return conn.signrawtransaction(raw)["hex"]
 
     # Get vout id for specific value from given transaction
@@ -101,7 +102,7 @@ class RawTransactionsTest(BitcoinTestFramework):
 
         mSigObj = self.nodes[2].addmultisigaddress(
             2, [addr1Obj['pubkey'], addr2Obj['pubkey']])
-        mSigObjValid = self.nodes[2].validateaddress(mSigObj)
+        self.nodes[2].validateaddress(mSigObj)
 
         # use balance deltas instead of absolute values
         bal = self.nodes[2].getbalance()
@@ -127,12 +128,11 @@ class RawTransactionsTest(BitcoinTestFramework):
 
         mSigObj = self.nodes[2].addmultisigaddress(
             2, [addr1Obj['pubkey'], addr2Obj['pubkey'], addr3Obj['pubkey']])
-        mSigObjValid = self.nodes[2].validateaddress(mSigObj)
+        self.nodes[2].validateaddress(mSigObj)
 
         txId = self.nodes[0].sendtoaddress(mSigObj, 2.2)
         decTx = self.nodes[0].gettransaction(txId)
         rawTx = self.nodes[0].decoderawtransaction(decTx['hex'])
-        sPK = rawTx['vout'][0]['scriptPubKey']['hex']
         self.sync_all()
         self.nodes[0].generate(1)
         self.sync_all()
@@ -303,7 +303,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         )
         txid2 = self.nodes[3].sendrawtransaction(tx_hex2, False, True)
         mempool = self.nodes[3].getrawmempool(False)
-        assert(txid2 in mempool)
+        assert (txid2 in mempool)
 
         self.nodes[3].generate(1)
         self.sync_all()
@@ -340,7 +340,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         txid_new = self.nodes[3].sendrawtransaction(signedTxn, False, True)
         mempoolsize_new = self.nodes[3].getmempoolinfo()['size']
         # with 'dontcheckfee' other txn should be evicted
-        assert(txid_new in self.nodes[3].getrawmempool())
+        assert (txid_new in self.nodes[3].getrawmempool())
         assert_equal(mempoolsize_new, mempoolsize)
 
         #
@@ -358,14 +358,14 @@ class RawTransactionsTest(BitcoinTestFramework):
         assert_equal(rejectedTxns['invalid'][0]['reject_code'], 66)
         assert_equal(rejectedTxns['invalid'][0]['reject_reason'], "mempool min fee not met")
         mempool = self.nodes[3].getrawmempool()
-        assert(txid1 not in mempool)
-        assert(txid2 not in mempool)
+        assert (txid1 not in mempool)
+        assert (txid2 not in mempool)
         # Don't check fee.
         rejectedTxns = self.nodes[3].sendrawtransactions([{'hex': txnhex1, 'dontcheckfee': True}, {'hex': txnhex2, 'dontcheckfee': True}])
         assert_equal(len(rejectedTxns), 0)
         mempool = self.nodes[3].getrawmempool()
-        assert(txid1 in mempool)
-        assert(txid2 in mempool)
+        assert (txid1 in mempool)
+        assert (txid2 in mempool)
         # Test listunconfirmedancestors option
         # Create two parents and send one child
         parent_tx_1 = self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), Decimal("0.1"))
@@ -395,8 +395,8 @@ class RawTransactionsTest(BitcoinTestFramework):
             vin = self.nodes[0].getrawtransaction(ancestor["txid"], 1)["vin"]
             assert_equal(vin[0]["txid"], ancestor["vin"][0]["txid"])
             assert_equal(vin[0]["vout"], ancestor["vin"][0]["vout"])
-        assert(parent_tx_1 in ancestors_txids)
-        assert(parent_tx_2 in ancestors_txids)
+        assert (parent_tx_1 in ancestors_txids)
+        assert (parent_tx_2 in ancestors_txids)
 
 
 if __name__ == '__main__':

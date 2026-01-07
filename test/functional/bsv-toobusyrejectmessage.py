@@ -3,12 +3,13 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-from test_framework.mininode import *
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import p2p_port
 from test_framework.blocktools import create_block, create_coinbase, assert_equal
+from test_framework.mininode import CBlockHeader, mininode_lock, msg_headers, msg_reject
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import wait_until
 
 import datetime
+import time
 
 # This test checks TOOBUSY reject message and behaviour that it triggers.
 # Scenario 1:
@@ -92,7 +93,7 @@ class TooBusyRejectMsgTest(BitcoinTestFramework):
             wait_until(lambda: self.getDataLambda(connection.cb, block.sha256), lock=mininode_lock)
 
             end_test = datetime.datetime.now()
-            assert(end_test - begin_test > datetime.timedelta(seconds = 5))
+            assert (end_test - begin_test > datetime.timedelta(seconds=5))
 
             assert_equal(next(iter(askedFor.values())), 2)
             assert_equal(len(askedFor), 1)

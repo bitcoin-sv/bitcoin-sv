@@ -16,27 +16,22 @@
 #include "chain.h"
 #include "coins.h"
 #include "consensus/consensus.h"
-#include "fs.h"
 #include "mining/journal_change_set.h"
 #include "protocol.h" // For CMessageHeader::MessageMagic
+#include "protocol_era.h"
+#include "script/interpreter.h"
 #include "script/script_error.h"
 #include "sync.h"
-#include "streams.h"
 #include "task.h"
 #include "txn_double_spend_detector.h"
 #include "txn_validation_result.h"
-#include "versionbits.h"
 
-#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
-#include <exception>
 #include <functional>
-#include <map>
 #include <set>
 #include <string>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -81,15 +76,12 @@ static const bool DEFAULT_REJECTMEMPOOLREQUEST = true;
 /** Default for -minrelaytxfee, minimum relay fee for transactions */
 static constexpr Amount DEFAULT_MIN_RELAY_TX_FEE(250);
 //! -maxtxfee default
-// NOLINTNEXTLINE(cert-err58-cpp)
-static const Amount DEFAULT_TRANSACTION_MAXFEE(COIN / 10);
+static const Amount DEFAULT_TRANSACTION_MAXFEE{COIN / 10};
 //! Discourage users to set fees higher than this amount (in satoshis) per kB
-// NOLINTNEXTLINE(cert-err58-cpp)
-static const Amount HIGH_TX_FEE_PER_KB(COIN / 100);
+static const Amount HIGH_TX_FEE_PER_KB{COIN / 100};
 /** -maxtxfee will warn if called with a higher fee than this amount (in
  * satoshis */
-// NOLINTNEXTLINE(cert-err58-cpp)
-static const Amount HIGH_MAX_TX_FEE(100 * HIGH_TX_FEE_PER_KB);
+static const Amount HIGH_MAX_TX_FEE{100 * HIGH_TX_FEE_PER_KB};
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
 static const uint64_t DEFAULT_ANCESTOR_LIMIT = 10000;
 /** Default for -limitancestorcount, max number of secondary mempool ancestors */
@@ -179,7 +171,7 @@ static const unsigned int INVENTORY_BROADCAST_MAX_PER_MB = 7 * INVENTORY_BROADCA
 /** Average delay between feefilter broadcasts in seconds. */
 static const unsigned int AVG_FEEFILTER_BROADCAST_INTERVAL = 10 * 60;
 /** Maximum feefilter broadcast delay after significant change. */
-static const unsigned int MAX_FEEFILTER_CHANGE_DELAY = 5 * 60;
+static const unsigned int MAX_FEEFILTER_CHANGE_DELAY = 1 * 60;
 /** Block download timeout base, expressed as percentage of the block interval
  * (i.e. 10 min) */
 static const int64_t DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE = 100;  // percent
@@ -192,7 +184,6 @@ static const int64_t DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_BASE_IBD = 600;  // percent
 *   (i.e. 5 min)*/
 static const int64_t DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 50; // percent
 
-// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
 
 /** Default for -permitbaremultisig */
@@ -232,8 +223,9 @@ constexpr std::int32_t DEFAULT_SOFT_CONSENSUS_FREEZE_DURATION = 3;
 /** Default for -detectselfishmining. */
 static const bool DEFAULT_DETECT_SELFISH_MINING = false;
 
+extern const CScript COINBASE_FLAGS;
+
 // NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
-extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
 extern const std::string strMessageMagic;
@@ -243,7 +235,6 @@ extern std::atomic_bool fImporting;
 extern std::atomic_bool fReindex;
 extern bool fTxIndex;
 extern bool fIsBareMultisigStd;
-extern bool fRequireStandard;
 extern bool fCheckBlockIndex;
 extern bool fCheckpointsEnabled;
 extern size_t nCoinCacheUsage;
@@ -308,7 +299,6 @@ enum FlushStateMode {
  * the prune to be one 128MB block file + added 15% undo data = 147MB greater
  * for a total of 545MB.
  */
-// NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
 static const uint64_t MIN_DISK_SPACE_FOR_BLOCK_FILES = 550 * 1024 * 1024;
 
 /** get number of blocks that are currently being processed */
@@ -364,18 +354,15 @@ bool CheckBlockTTOROrder(const CBlock& block);
 
 class BlockValidationOptions {
 private:
-    bool checkPoW : 1; // NOLINT(cppcoreguidelines-use-default-member-init)
-    bool checkMerkleRoot : 1; // NOLINT(cppcoreguidelines-use-default-member-init)
+    bool checkPoW : 1{true};
+    bool checkMerkleRoot : 1{true};
 
     // If true; force block to be flagged as checked
-    bool markChecked : 1; // NOLINT(cppcoreguidelines-use-default-member-init)
+    bool markChecked : 1{};
     // If false, check for max block size is skipped in CheckBlock().
-    bool checkMaxBlockSize : 1; // NOLINT(cppcoreguidelines-use-default-member-init)
+    bool checkMaxBlockSize : 1{true};
 
 public:
-    BlockValidationOptions() : checkPoW{true}, checkMerkleRoot{true}, markChecked{false}, checkMaxBlockSize{true}
-    {}
-
     bool shouldValidatePoW() const { return checkPoW; }
     bool shouldValidateMerkleRoot() const { return checkMerkleRoot; }
     bool shouldMarkChecked() const { return markChecked; }
@@ -425,11 +412,10 @@ extern CBlockValidationStatus blockValidationStatus;
  * its BlockChecked method called whenever *any* block completes validation.
  *
  * @param[in]   config  The global config.
- * @param[in]   pblock  The block we want to verify.
+ * @param[in]   block  The block we want to verify.
  * @return True if the block is valid.
  */
-bool VerifyNewBlock(const Config &config,
-                     const std::shared_ptr<const CBlock> pblock);
+bool VerifyNewBlock(const Config& config, const CBlock& block);
 
 /**
  * Process an incoming block. This only returns after the best known valid
@@ -469,7 +455,7 @@ bool ProcessNewBlock(const Config &config,
  * seen it.
  */
 std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
-    task::CCancellationToken&& token,
+    const task::CCancellationToken& token,
     const Config& config,
     const std::shared_ptr<const CBlock>& pblock,
     bool fForceProcessing,
@@ -522,7 +508,7 @@ bool InitBlockIndex(const Config &config);
 /**
  * Load the block tree and coins database from disk.
  */
-bool LoadBlockIndex(const CChainParams &chainparams);
+bool LoadBlockIndex();
 
 /**
  * Update the chain tip based on database information.
@@ -563,7 +549,7 @@ std::string GetWarnings(const std::string &strFor);
  * Retrieve a transaction (from memory pool, or from disk, if possible).
  */
 bool GetTransaction(const Config &config, const TxId &txid, CTransactionRef &tx,
-    bool fAllowSlow, uint256 &hashBlock, bool& isGenesisEnabled);
+    bool fAllowSlow, uint256 &hashBlock, ProtocolEra& era);
 
 /**
  * Find the best known block, and make it the active tip of the block chain.
@@ -623,6 +609,7 @@ void UnlinkPrunedFiles(const std::set<int> &setFilesToPrune);
 
 /** Create a new block index entry for a given block hash */
 CBlockIndex *InsertBlockIndex(uint256 hash);
+
 /**
  * Update the on-disk chain state.
  * The caches and indexes are flushed depending on the mode we're called with if
@@ -641,24 +628,6 @@ void PruneAndFlush();
 /** Prune block files up to a given height */
 void PruneBlockFilesManual(int32_t nPruneUpToHeight);
 
-/** Check if DAA HF has activated. */
-bool IsDAAEnabled(const Config &config, int32_t nHeight);
-
-/** Check if Genesis has activated. */
-bool IsGenesisEnabled(const Config &config, const CBlockIndex *pindexPrev);
-/** Check if Genesis has activated.
- * Do not call this overload with height of coin. If the coin was created in mempool, 
- * this function will throw exception.
- */
-bool IsGenesisEnabled(const Config& config, int32_t nHeight);
-/**  Check if Genesis has activated.
- * When a coins is present in mempool, it will have height MEMPOOL_HEIGHT. 
- * In this case, you should call this overload and specify the mempool height (chainActive.Height()+1) 
- *as parameter to correctly determine if genesis is enabled for this coin.
- */
-bool IsGenesisEnabled(const Config& config, const CoinWithScript& coin, int32_t mempoolHeight);
-int GetGenesisActivationHeight(const Config& config);
-
 /**
  * Helper to return the script flags which should be checked for a block with given parent
  */
@@ -666,7 +635,7 @@ uint32_t GetBlockScriptFlags(const Config& config, const CBlockIndex* pChainTip)
 /**
  * Get script verification flags to use.
  */
-uint32_t GetScriptVerifyFlags(const Config &config, bool genesisEnabled);
+uint32_t GetScriptVerifyFlags(const Config &config, ProtocolEra era);
 
 /**
  * A function used to produce a default value for a number of Low priority threads
@@ -853,7 +822,7 @@ std::string FormatStateMessage(const CValidationState &state);
  * @return number of sigops this transaction's outputs will produce when spent
  * @see CTransaction::FetchInputs
  */
-uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx, bool isGenesisEnabled, bool& sigOpCountError);
+uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx, ProtocolEra era, bool& sigOpCountError);
 
 /**
  * Count ECDSA signature operations in pay-to-script-hash inputs.
@@ -881,7 +850,7 @@ uint64_t GetTransactionSigOpCount(const Config& config,
                                   const CTransaction& tx,
                                   const ICoinsViewCache& inputs,
                                   bool checkP2SH, 
-                                  bool isGenesisEnabled, 
+                                  ProtocolEra era,
                                   bool& sigOpCountError);
 
 /**
@@ -946,8 +915,12 @@ void UpdateCoins(const CTransaction& tx, ICoinsViewCache& inputs,
 /** Transaction validation functions */
 
 /** Context-independent validity checks for coinbase and non-coinbase transactions */
-bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled);
-bool CheckCoinbase(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled, int32_t blockHeight = -1);
+bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state,
+                             uint64_t maxTxSigOpsCountConsensusBeforeGenesis,
+                             uint64_t maxTxSizeConsensus, ProtocolEra era);
+bool CheckCoinbase(const CTransaction &tx, CValidationState &state,
+                   uint64_t maxTxSigOpsCountConsensusBeforeGenesis,
+                   uint64_t maxTxSizeConsensus, ProtocolEra era);
 
 namespace Consensus {
 
@@ -1004,8 +977,8 @@ bool CheckSequenceLocks(
  * Closure representing one script verification.
  * Note that this stores references to the spending transaction.
  */
-class CScriptCheck {
-private:
+class CScriptCheck
+{
     CScript scriptPubKey;
     Amount amount;
     const CTransaction *ptxTo = 0;
@@ -1014,19 +987,17 @@ private:
     bool cacheStore = false;
     ScriptError error = SCRIPT_ERR_UNKNOWN_ERROR;
     PrecomputedTransactionData txdata;
-    std::reference_wrapper<const Config> config;
-    bool consensus = false;
+    verify_script_params params_;
 
 public:
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
-    CScriptCheck(const Config &configIn, bool consensusIn, const CScript &scriptPubKeyIn, const Amount amountIn,
-                 const CTransaction &txToIn, unsigned int nInIn,
-                 uint32_t nFlagsIn, bool cacheIn,
-                 const PrecomputedTransactionData& txdataIn)
-        : scriptPubKey(scriptPubKeyIn), amount(amountIn), ptxTo(&txToIn),
-          nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn),
-          // NOLINTNEXTLINE(cppcoreguidelines-use-default-member-init)
-          error(SCRIPT_ERR_UNKNOWN_ERROR), txdata(txdataIn), config(configIn), consensus(consensusIn) {}
+    CScriptCheck(const verify_script_params&,
+                 const CScript& scriptPubKey,
+                 const Amount&,
+                 const CTransaction& txTo,
+                 unsigned int nIn,
+                 uint32_t flags,
+                 bool cache,
+                 const PrecomputedTransactionData&);
 
     std::optional<bool> operator()(const task::CCancellationToken& token);
 
@@ -1162,7 +1133,7 @@ extern std::unique_ptr<CoinsDB> pcoinsTip;
 
 /** Global variable that points to the active block tree (protected by cs_main)
  */
-extern CBlockTreeDB *pblocktree;
+extern std::unique_ptr<CBlockTreeDB> pblocktree;
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 /**

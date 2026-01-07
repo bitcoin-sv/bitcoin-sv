@@ -3,19 +3,24 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "txn_validator.h"
+
+#include "protocol_era.h"
 #include "txn_validation_config.h"
 #include "config.h"
 #include "net/net_processing.h"
 
+#include <utility>
+
 /** Constructor */
-CTxnValidator::CTxnValidator(
-    const Config& config,
-    CTxMemPool& mpool,
-    TxnDoubleSpendDetectorSPtr dsDetector,
-    TxIdTrackerWPtr pTxIdTracker)
-    : mConfig(config),
-      mMempool(mpool),
-      mpTxnDoubleSpendDetector(dsDetector) {
+CTxnValidator::CTxnValidator(const Config& config,
+                             CTxMemPool& mpool,
+                             TxnDoubleSpendDetectorSPtr dsDetector,
+                             // NOLINTNEXTLINE(performance-unnecessary-value-param)
+                             TxIdTrackerWPtr /*pTxIdTracker*/)
+    : mConfig{config},
+      mMempool{mpool},
+      mpTxnDoubleSpendDetector{std::move(dsDetector)}
+{
     // Configure our running frequency
     auto runFreq { gArgs.GetArg("-txnvalidationasynchrunfreq", DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS) };
     mAsynchRunFrequency = std::chrono::milliseconds {runFreq};
@@ -30,7 +35,7 @@ CTxnValidator::CTxnValidator(
    
     mpOrphanTxnsP2PQ = std::make_shared<COrphanTxns>(
         maxExtraTxnsForCompactBlock,
-        config.GetMaxTxSize(true, false), /*orphan tx before genesis might not get accepted by mempool */
+        config.GetMaxTxSize(ProtocolEra::PostGenesis, false), /*orphan tx before genesis might not get accepted by mempool */
         config.GetMaxOrphansInBatchPercentage(),
         config.GetMaxInputsForSecondLayerOrphan());
     
@@ -104,6 +109,7 @@ size_t CTxnValidator::GetTransactionsInQueueCount() const {
 }
 
 /** Handle a new transaction */
+// NOLINTNEXTLINE(performance-unnecessary-value-param)
 void CTxnValidator::newTransaction(TxInputDataSPtr pTxInputData) {
     const TxValidationPriority& txpriority = pTxInputData->GetTxValidationPriority();
     // Add transaction to the right queue based on priority.
@@ -308,7 +314,7 @@ CTxnValidator::RejectedTxns CTxnValidator::processValidation(
     for (auto&& txid: vOrphanTxIds) {
         CValidationState state;
         state.SetMissingInputs();
-        mInvalidTxns.try_emplace(std::move(txid), std::move(state));
+        mInvalidTxns.try_emplace(txid, std::move(state));
     }
     return {mInvalidTxns, vRemovedTxIds};
 }
@@ -321,10 +327,12 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
         // Get a number of High and Low priority threads.
         size_t nNumStdTxValidationThreads {
             static_cast<size_t>(
+                    // NOLINTNEXTLINE(*-narrowing-conversions)
                     gArgs.GetArg("-numstdtxvalidationthreads", GetNumHighPriorityValidationThrs()))
         };
         size_t nNumNonStdTxValidationThreads {
             static_cast<size_t>(
+                    // NOLINTNEXTLINE(*-narrowing-conversions)
                     gArgs.GetArg("-numnonstdtxvalidationthreads", GetNumLowPriorityValidationThrs()))
         };
         // Get a ratio for std and nonstd txns to be scheduled for validation in a single iteration.
@@ -450,7 +458,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                 "Txnval-asynch: Validation timeout occurred for %d txn(s) received from the Standard queue "
                                 "(forwarding them to the Non-standard queue)\n",
                                  nDetectedLowPriorityTxnsNum);
-                        std::unique_lock lock { mNonStdTxnsMtx };
+                        std::unique_lock lock_non_std{ mNonStdTxnsMtx };
                         enqueueTxnsNL(imdResult.mDetectedLowPriorityTxns.begin(), imdResult.mDetectedLowPriorityTxns.end(),
                             [this](const TxInputDataSPtr& txn){ enqueueNonStdTxnNL(txn); }
                         );
@@ -556,31 +564,29 @@ CTxnValidator::CIntermediateResult CTxnValidator::processNewTransactionsNL(
     std::chrono::milliseconds maxasynctasksrunduration) {
 
     // Trigger parallel validation
-    auto results {
-        g_connman->
-            ParallelTxnValidation(
-                [](const TxInputDataSPtrRefVec& vTxInputData,
-                    const Config* config,
-                    CTxMemPool *pool,
-                    CTxnHandlers& handlers,
-                    bool fUseLimits,
-                    std::chrono::steady_clock::time_point end_time_point) {
-                    return TxnValidationProcessingTask(
-                                vTxInputData,
-                               *config,
-                               *pool,
-                                handlers,
-                                fUseLimits,
-                                end_time_point);
-                },
-                &mConfig,
-                &mMempool,
-                txns,
-                handlers,
-                fUseLimits,
-                maxasynctasksrunduration,
-                mConfig.GetPTVTaskScheduleStrategy())
-    };
+    auto results{g_connman->ParallelTxnValidation(
+        [](const TxInputDataSPtrRefVec& vTxInputData,
+           const Config* config,
+           CTxMemPool* pool,
+           CTxnHandlers& tx_handlers,
+           bool useLimits,
+           std::chrono::steady_clock::time_point end_time_point)
+        {
+            return TxnValidationProcessingTask(vTxInputData,
+                                               *config,
+                                               *pool,
+                                               tx_handlers,
+                                               useLimits,
+                                               end_time_point);
+        },
+        &mConfig,
+        &mMempool,
+        txns,
+        handlers,
+        fUseLimits,
+        maxasynctasksrunduration,
+        mConfig.GetPTVTaskScheduleStrategy())};
+
     CIntermediateResult imdResult {};
     // Process validation results
     for(auto& task_result : results) {
@@ -717,7 +723,7 @@ bool CTxnValidator::enqueueStdTxnNL(const TxInputDataSPtr& txn) {
     }
     if(isSpaceForTxnNL(txn, mStdTxnsMemSize)) {
         // Add the given txn to the list of new standard transactions.
-        mStdTxns.emplace_back(std::move(txn));
+        mStdTxns.emplace_back(txn);
         // Increase memory tracking
         incMemUsedNL(mStdTxnsMemSize, txn);
         return true;
@@ -735,7 +741,7 @@ bool CTxnValidator::enqueueNonStdTxnNL(const TxInputDataSPtr& txn) {
     }
     if(isSpaceForTxnNL(txn, mNonStdTxnsMemSize)) {
         // Add the given txn to the list of new non-standard transactions.
-        mNonStdTxns.emplace_back(std::move(txn));
+        mNonStdTxns.emplace_back(txn);
         // Increase memory tracking
         incMemUsedNL(mNonStdTxnsMemSize, txn);
         return true;
@@ -766,7 +772,9 @@ bool CTxnValidator::isTxnKnown(const uint256& txid) const {
 
 /** Wait for the Validator until the predicate returns true.
  * An interface to facilitate Unit Tests.*/
-void CTxnValidator::waitUntil(std::function<bool(const QueueCounts&)> predicate, bool fCheckOrphanQueueEmpty) {
+void CTxnValidator::waitUntil(const std::function<bool(const QueueCounts&)>& predicate,
+                              bool fCheckOrphanQueueEmpty)
+{
     do {
        std::shared_lock lock { mProcessingQueueMtx };
        // Block the calling thread until notification is received and the predicate is not satisfied

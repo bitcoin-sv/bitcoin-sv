@@ -3,15 +3,13 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "bench.h"
-#include "chainparams.h"
 #include "coins.h"
 #include "config.h"
-#include "consensus/validation.h"
 #include "primitives/transaction.h"
 #include "test/test_bitcoin.h"
-#include "wallet/crypter.h"
+#include "txdb_defaults.h"
 #include "uint256.h"
-#include "validation.h"
+#include "wallet/crypter.h"
 
 #include <cstdint>
 #include <limits>
@@ -31,10 +29,12 @@ SetupDummyInputs(CBasicKeyStore &keystoreRet, CCoinsViewCache &coinsRet) {
     dummyTransactions.resize(2);
 
     // Add some keys to the keystore:
-    CKey key[4];
+    CKey key[4]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
     for (int i = 0; i < 4; i++) {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
         key[i].MakeNewKey(i % 2);
         keystoreRet.AddKey(key[i]);
+        // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 
     // Create some dummy input transactions
@@ -89,13 +89,12 @@ static void CCoinsCaching(benchmark::State &state) {
     // Benchmark.
     while (state.KeepRunning()) {
         CTransaction t(t1);
-        bool success =
-            AreInputsStandard(
-                task::CCancellationSource::Make()->GetToken(),
-                GlobalConfig::GetConfig(),
-                t,
-                coins,
-                0).value();
+        const auto o = AreInputsStandard(task::CCancellationSource::Make()->GetToken(),
+                                         GlobalConfig::GetConfig(),
+                                         t,
+                                         coins,
+                                         0);
+        bool success = o ? o.value() : false;
         assert(success);
         Amount value = coins.GetValueIn(t);
         assert(value == (50 + 21 + 22) * CENT);
@@ -139,8 +138,8 @@ template <>
 struct CoinsDB::UnitTestAccess<coins_tests_uid> : public CoinsDB
 {
 public:
-    UnitTestAccess( std::size_t cacheSize )
-        : CoinsDB{ cacheSize, 0, CoinsDB::MaxFiles::Default(), false, false }
+    UnitTestAccess(std::size_t cacheSize)
+        : CoinsDB{ cacheSize, 0, CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE, CoinsDB::MaxFiles::Default(), false, false }
     {}
 
     const std::optional<CoinImpl>& GetLatestCoin() const { return mLatestGetCoin; }
@@ -231,13 +230,16 @@ protected:
         mLatestRequestedScriptSize = (mOverrideSize.has_value() ? mOverrideSize.value() : maxScriptSize);
         mLatestGetCoin = CoinsDB::GetCoin(outpoint, mLatestRequestedScriptSize);
 
-        return mLatestGetCoin->MakeNonOwning();
+        if(mLatestGetCoin)
+            return mLatestGetCoin->MakeNonOwning();
+        else
+            return {};
     }
 
     using CoinsDB::ReadLock;
 
 private:
-    mutable uint64_t mLatestRequestedScriptSize;
+    mutable uint64_t mLatestRequestedScriptSize{};
     mutable std::optional<CoinImpl> mLatestGetCoin;
     std::optional<uint64_t> mOverrideSize;
 
@@ -272,10 +274,10 @@ static void CCoinsInsertion(benchmark::State &state, bool V1) {
 
         auto shardedTarget = [](uint16_t shardIndex,
                                 CCoinsViewCache::Shard& shard,
-                                const std::vector<CTransactionRef>& txns)
+                                const std::vector<CTransactionRef>& txs)
         {
             CoinWithScript coin;
-            auto& tx = txns[shardIndex];
+            auto& tx = txs[shardIndex];
             for (auto& vin : tx->vin) {
                 shard.SpendCoin(vin.prevout, &coin);
             }
@@ -284,6 +286,7 @@ static void CCoinsInsertion(benchmark::State &state, bool V1) {
 
         std::thread spawner([&]() {
             std::vector<std::thread> threads;
+            threads.reserve(NumTxns);
             for(int i = 0; i < NumTxns; ++i) {
                 threads.emplace_back([&]() {
                     // Cache them all (Except the first in the list, which the function expects to be coinbase)

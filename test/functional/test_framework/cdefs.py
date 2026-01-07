@@ -31,7 +31,7 @@ _consensus_h_contents = _consensus_h_fh.read()
 _consensus_h_fh.close()
 
 # Slurp in script.h contents
-_script_h_fh = open(os.path.join(get_srcdir(), 'src', 'script', 'script.h'),'rt')
+_script_h_fh = open(os.path.join(get_srcdir(), 'src', 'script', 'script.h'), 'rt')
 _script_h_contents = _script_h_fh.read()
 _script_h_fh.close()
 
@@ -72,8 +72,8 @@ def _extractConsensusValue(name):
     return int(eval(re.search(name + ' = (.+);', _consensus_h_contents).group(1)))
 
 
-INT64_MAX = 2**63-1
-UINT32_MAX = 2**32-1
+INT64_MAX = 2 ** 63 - 1
+UINT32_MAX = 2 ** 32 - 1
 # This constant is currently needed to evaluate some that are formulas
 ONE_KILOBYTE = 1000
 ONE_MEGABYTE = 1000000
@@ -105,11 +105,11 @@ def _extractTextWriterValue(name):
 
 
 def _extractTxnValidationConfigValue(name):
-    return int(eval(re.search(name + " =\n\t.*\{(\d+)\};", _txnvalidationconfig_h_contents).group(1)))
+    return int(eval(re.search(name + r" =\n\t.*\{(\d+)\};", _txnvalidationconfig_h_contents).group(1)))
 
 
 def _extractTxnValidatorValue(name):
-    return int(eval(re.search(name + " \{\n.*\((\d+)\)", _txnvalidator_h_contents).group(1)))
+    return int(eval(re.search(name + r" \{\n.*\((\d+)\)", _txnvalidator_h_contents).group(1)))
 
 
 # Extract relevant default values parameters
@@ -164,8 +164,8 @@ COINBASE_MATURITY = 100
 MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS = _extractConsensusValue('MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS')
 MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS = _extractConsensusValue('MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS')
 
-#Gracefull period for genesis activation where nodes will not be banned for certain ops
-GENESIS_GRACEFULL_ACTIVATION_PERIOD = _extractPolicyValue('GENESIS_GRACEFULL_ACTIVATION_PERIOD')
+#Graceful period for genesis activation where nodes will not be banned for certain ops
+GENESIS_GRACEFUL_ACTIVATION_PERIOD = _extractPolicyValue('GENESIS_GRACEFUL_ACTIVATION_PERIOD')
 
 # Maximum number of non-push operations per script before GENESIS
 MAX_OPS_PER_SCRIPT_BEFORE_GENESIS = _extractConsensusValue('MAX_OPS_PER_SCRIPT_BEFORE_GENESIS')
@@ -181,7 +181,8 @@ MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS = _extractConsensusValue('MAX_SCRIPT_NUM_LE
 
 # Maximum length of numbers used in scripts after genesis
 MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS = _extractConsensusValue('MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS')
-DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS = _extractPolicyValue('DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS')
+MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE = _extractConsensusValue('MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE')
+DEFAULT_SCRIPT_NUM_LENGTH_POLICY = _extractPolicyValue('DEFAULT_SCRIPT_NUM_LENGTH_POLICY')
 
 MIN_TTOR_VALIDATION_DISTANCE = _extractValidationValue('MIN_TTOR_VALIDATION_DISTANCE')
 
@@ -217,7 +218,6 @@ if __name__ == "__main__":
 
     print("MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS = %d" % MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS)
     print("MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS = %d" % MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
-    print("DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS = %d" % DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS)
     print("MIN_TTOR_VALIDATION_DISTANCE = %d" % MIN_TTOR_VALIDATION_DISTANCE)
 
     print("SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE = %d" % SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE)

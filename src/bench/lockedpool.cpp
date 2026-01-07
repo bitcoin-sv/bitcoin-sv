@@ -6,25 +6,23 @@
 
 #include "support/lockedpool.h"
 
-#include <iostream>
 #include <vector>
 
 #define ASIZE 2048
 #define BITER 5000
 #define MSIZE 2048
 
-static void LockedPool(benchmark::State &state) {
+static void locked_pool(benchmark::State &state) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     void *synth_base = reinterpret_cast<void *>(0x08000000);
     const size_t synth_size = 1024 * 1024;
     Arena b(synth_base, synth_size, 16);
 
-    std::vector<void *> addr;
-    for (int x = 0; x < ASIZE; ++x)
-        addr.push_back(0);
+    std::vector<void *> addr(ASIZE, 0);
     uint32_t s = 0x12345678;
     while (state.KeepRunning()) {
         for (int x = 0; x < BITER; ++x) {
-            int idx = s & (addr.size() - 1);
+            const auto idx = s & (addr.size() - 1);
             if (s & 0x80000000) {
                 b.free(addr[idx]);
                 addr[idx] = 0;
@@ -41,4 +39,4 @@ static void LockedPool(benchmark::State &state) {
     addr.clear();
 }
 
-BENCHMARK(LockedPool)
+BENCHMARK(locked_pool)

@@ -72,8 +72,7 @@ class CoinImpl // NOLINT(cppcoreguidelines-special-member-functions)
 public:
     CoinImpl() : storage{CTxOut{}}, out{&storage.value()} {}
 
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
-    CoinImpl(Amount amount, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase, bool IsConfiscation)
+    CoinImpl(const Amount& amount, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase, bool IsConfiscation)
         : storage{CTxOut{amount, {}}}
         , out{&storage.value()}
         , nHeightAndIsCoinBase{(static_cast<uint32_t>(nHeightIn) << 1) | (IsCoinbase ? 1u : 0u)}
@@ -310,6 +309,20 @@ public:
 
     const Amount& GetAmount() const { return GetTxOut().nValue; }
 
+    // Get protocol activation status for the given coin at a particular "mining height".
+    // When a coin is present in mempool it will have height MEMPOOL_HEIGHT. 
+    // In this case you should call this overload and specify the expected height at which
+    // it will be mined (chainActive.Height()+1) to correctly determine which release
+    // is enabled for this coin.
+    ProtocolEra GetProtocolEra(const ConfigScriptPolicy& config, int32_t miningHeight) const {
+        const auto height { GetHeight() };
+        if(height == MEMPOOL_HEIGHT)
+        {
+            return ::GetProtocolEra(config, miningHeight);
+        }
+        return ::GetProtocolEra(config, height);
+    }
+
 private:
     //! Constructor from a CTxOut and height/coinbase information.
     CoinWithScript(CTxOut&& outIn, int32_t nHeightIn, bool IsCoinbase, bool IsConfiscation)
@@ -417,8 +430,12 @@ protected:
 class CCoinsViewEmpty : public ICoinsView
 {
 protected:
-    void CacheAllCoins(const std::vector<CTransactionRef>& txns) const override {}
-    std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const override { return {}; }
+    void CacheAllCoins(const std::vector<CTransactionRef>&) const override {}
+    std::optional<CoinImpl> GetCoin(const COutPoint&,
+                                    uint64_t /*maxScriptSize*/) const override
+    {
+        return {};
+    }
     uint256 GetBestBlock() const override { return {}; }
 
     void ReleaseLock() override {}
@@ -451,11 +468,9 @@ public:
     }
 
     const CoinImpl& AddCoin(const COutPoint& outpoint, CoinImpl&& coin);
-    void AddCoin(
-        const COutPoint& outpoint,
-        CoinWithScript&& coin,
-        bool possible_overwrite,
-        uint64_t genesisActivationHeight);
+    void AddCoin(const COutPoint& outpoint,
+                 CoinWithScript&& coin,
+                 bool possible_overwrite);
     bool SpendCoin(const COutPoint& outpoint);
     void Uncache(const std::vector<COutPoint>& vOutpoints);
     void BatchWrite(CCoinsMap& mapCoins);

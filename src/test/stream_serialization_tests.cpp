@@ -53,7 +53,7 @@ BOOST_AUTO_TEST_CASE(exception)
 {
     struct CTestExceptionReader
     {
-        size_t Read(char* pch, size_t maxSize)
+        size_t Read(char* /*pch*/, size_t /*maxSize*/)
         {
             throw std::exception{};
         }
@@ -141,7 +141,7 @@ BOOST_AUTO_TEST_CASE(known_size_input_async_reader)
         }
 
         std::chrono::time_point<std::chrono::steady_clock> mStart = std::chrono::steady_clock::now();
-        size_t& mSkipCount;
+        size_t& mSkipCount; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     };
 
     std::vector<uint8_t> expectedSerializedData{

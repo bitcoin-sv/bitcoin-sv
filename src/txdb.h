@@ -28,7 +28,7 @@ class uint256;
 //! No need to periodic flush if at least this much space still available.
 static constexpr int MAX_BLOCK_COINSDB_USAGE = 10;
 //! -dbcache default (MiB)
-static const int64_t nDefaultDbCache = 450;
+static const int64_t nDefaultDbCache = 2048;
 //! -dbbatchsize default (bytes)
 static const int64_t nDefaultDbBatchSize = 16 << 20;
 //! max. -dbcache (MiB)
@@ -43,9 +43,10 @@ static const int64_t nMaxBlockDBCache = 2;
 // https://github.com/bitcoin/bitcoin/pull/8273#issuecomment-229601991
 static const int64_t nMaxBlockDBAndTxIndexCache = 1024;
 //! Max memory allocated to coin DB specific cache (MiB)
-static const int64_t nMaxCoinsDBCache = 8;
+static const int64_t nMaxCoinsDBCache = 256;
 
 /** Iterate over coins in DB */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CCoinsViewDBCursor {
 public:
     ~CCoinsViewDBCursor() {}
@@ -84,16 +85,17 @@ private:
  * full only coins without script are stored in it while coins with script are
  * re-requested from base on every call to GetCoin() that requires a script.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CoinsDB {
 private:
-    friend class CoinsDBView;
+    friend class CoinsDBView; // NOLINT(cppcoreguidelines-virtual-class-destructor)
     friend class CoinsDBSpan;
 
     /**
      * Make mutable so that we can "fill the cache" even from Get-methods
      * declared as "const".
      */
-    mutable uint256 hashBlock;
+    mutable uint256 hashBlock_;
     mutable CoinsStore mCache;
 
 public:
@@ -114,6 +116,7 @@ public:
     CoinsDB(
         uint64_t cacheSizeThreshold,
         size_t nCacheSize,
+        size_t nMaxFileSize,
         MaxFiles maxFiles,
         bool fMemory = false,
         bool fWipe = false);
@@ -294,11 +297,12 @@ private:
  * Class automatically obtains CoinsDB read lock on construction and
  * releases it on destruction.
  */
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
 class CoinsDBView : public ICoinsView
 {
 public:
     friend class CoinsViewLockedMemPoolNL;
-    friend class CCoinsViewMemPool;
+    friend class CCoinsViewMemPool; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 
     CoinsDBView(const CoinsDB& db)
         : mDB{db}
@@ -355,7 +359,7 @@ private:
         return mDB.GetCoin(outpoint, maxScriptSize);
     }
 
-    const CoinsDB& mDB;
+    const CoinsDB& mDB; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 
     // This variable enforces read only access to mDB
     WPUSMutex::Lock mLock;
@@ -431,6 +435,7 @@ private:
 };
 
 /** Access to the block database (blocks/index/) */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CBlockTreeDB : public CDBWrapper {
 public:
     CBlockTreeDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);

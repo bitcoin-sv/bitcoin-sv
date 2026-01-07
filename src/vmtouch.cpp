@@ -67,59 +67,76 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <boost/thread/thread.hpp> // boost::thread::interrupt
 
 // Takes ownership of result of opendir() and closes it in destructor.
-class CAutoCloseDir : public boost::noncopyable {
-  DIR * dir;
-  std::function<void(const std::string& message)> warning;
-public:
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
+class CAutoCloseDir : public boost::noncopyable
+{
+    DIR* dir_;
+    std::function<void(const std::string& message)> warning_;
 
-  CAutoCloseDir(DIR* dir, std::function<void(const std::string& message)> warning) : dir(dir), warning(warning)
-  {
-  }
+public:
+    CAutoCloseDir(DIR* dir, std::function<void(const std::string& message)> warning)
+        : dir_{dir},
+          warning_{std::move(warning)}
+    {}
 
   ~CAutoCloseDir()
   {
-    if (closedir(dir))
-    {
-      char* msg = strerror(errno);
-      warning(std::string("unable to closedir. ") +  std::string(msg));
-    }
+      if(closedir(dir_))
+      {
+          const char* msg = strerror(errno);
+          warning_(std::string("unable to closedir. ") + std::string(msg));
+      }
   }
 };
 
 // Takes ownership of memory mapped region and unmaps it in destructor unless Release() is called
-class CAutoMunmap : public boost::noncopyable {
-  void* mem = nullptr;
-  uint64_t len_of_range = 0;
-  std::function<void(const std::string& message)> warning;
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
+class CAutoMunmap : public boost::noncopyable
+{
+    void* mem_ = nullptr;
+    uint64_t len_of_range_ = 0;
+    std::function<void(const std::string& message)> warning_;
+
 public:
-  CAutoMunmap(void *mem,uint64_t len_of_range, std::function<void(const std::string& message)> warning)
-   :  mem(mem), len_of_range(len_of_range), warning(warning)
-  {  }
+    CAutoMunmap(void* mem,
+                uint64_t len_of_range,
+                std::function<void(const std::string& message)> warning)
+        : mem_{mem},
+          len_of_range_{len_of_range},
+          warning_{std::move(warning)}
+    {}
 
-  void Release()
-  {
-    mem = nullptr;
-  }
+    void Release() { mem_ = nullptr; }
 
-  ~CAutoMunmap()
-  {
-    if (mem && munmap(mem, len_of_range) != 0) {
-      char* msg = strerror(errno);
-      warning(std::string("unable to munmap file. ") +  std::string(msg));
+    ~CAutoMunmap()
+    {
+        if(mem_ && munmap(mem_, len_of_range_) != 0)
+        {
+            char* msg = strerror(errno);
+            warning_(std::string("unable to munmap file. ") + std::string(msg));
+        }
     }
-  }
-
 };
-
 
 VMTouch::VMTouch() : pagesize(sysconf(_SC_PAGESIZE))
 {
-    curr_crawl_depth = 0;
 }
 
 VMTouch::~VMTouch()
 {   }
 
+// NOLINTBEGIN(*-narrowing-conversions)
+// NOLINTBEGIN(cert-err33-c)
+// NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays)
+// NOLINTBEGIN(cppcoreguidelines-avoid-goto)
+// NOLINTBEGIN(cppcoreguidelines-init-variables)
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+// NOLINTBEGIN(cppcoreguidelines-pro-type-cstyle-cast)
+// NOLINTBEGIN(cppcoreguidelines-pro-type-vararg)
+
+// NOLINTNEXTLINE(cert-dcl50-cpp)
 static void fatal(const char *fmt, ...) {
     va_list ap;
     char buf[4096];
@@ -130,6 +147,8 @@ static void fatal(const char *fmt, ...) {
 
     throw std::runtime_error(buf);
 }
+
+// NOLINTNEXTLINE(cert-dcl50-cpp)
 void VMTouch::warning(const char *fmt, ...) {
     va_list ap;
     char buf[4096];
@@ -158,7 +177,7 @@ int VMTouch::is_mincore_page_resident(char p)
 
 void VMTouch::increment_nofile_rlimit()
 {
-    struct rlimit r;
+    struct rlimit r{};
 
     if (getrlimit(RLIMIT_NOFILE, &r))
       fatal("increment_nofile_rlimit: getrlimit (%s)", strerror(errno));
@@ -177,11 +196,12 @@ void VMTouch::increment_nofile_rlimit()
 
     }
 }
+
 void VMTouch::vmtouch_file(const std::string& strPath)
 {
     int fd = -1;
     void* mem = nullptr;
-    struct stat sb;
+    struct stat sb{};
     int64_t len_of_file=0;
     uint64_t len_of_range=0;
     int64_t pages_in_range;
@@ -410,7 +430,7 @@ bool VMTouch::find_object(const struct stat& st)
 
 void VMTouch::vmtouch_crawl(std::string strPath)
 {
-    struct stat sb;
+    struct stat sb{};
     DIR *dirp;
     struct dirent *de;
     std::string npath;
@@ -555,6 +575,17 @@ double VMTouch::getPagesInCorePercent()
 
   return 100.0*total_pages_in_core/total_pages;
 }
+
+// NOLINTEND(cppcoreguidelines-pro-type-vararg)
+// NOLINTEND(cppcoreguidelines-pro-type-cstyle-cast)
+// NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+// NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
+// NOLINTEND(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+// NOLINTEND(cppcoreguidelines-init-variables)
+// NOLINTEND(cppcoreguidelines-avoid-goto)
+// NOLINTEND(cppcoreguidelines-avoid-c-arrays)
+// NOLINTEND(cert-err33-c)
+// NOLINTEND(*-narrowing-conversions)
 
 #endif
 

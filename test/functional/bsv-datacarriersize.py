@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
-from time import sleep
 
-from test_framework.cdefs import MAX_TX_SIZE_POLICY_BEFORE_GENESIS
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal
-from test_framework.mininode import *
-from test_framework.script import CScript, OP_RETURN, OP_FALSE
 from test_framework.blocktools import calc_needed_data_size
+from test_framework.cdefs import MAX_TX_SIZE_POLICY_BEFORE_GENESIS
+from test_framework.mininode import CTransaction, CTxOut, FromHex, msg_tx, ToHex
+from test_framework.script import CScript, OP_RETURN, OP_FALSE
+from test_framework.util import assert_equal
+from test_framework.test_framework import BitcoinTestFramework
 
 # Test the functionality -datacarriersize works as expected. It should accept both OP_RETURN and OP_FALSE, OP_RETURN
 # 1. Set -datacarriersize to 500B.
@@ -31,7 +30,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
     def _split_int(n, n_parts):
         rest = n
         step = n // n_parts
-        for _ in range(n_parts-1):
+        for _ in range(n_parts - 1):
             yield step
             rest -= step
         yield rest
@@ -72,7 +71,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
 
             desired_scripts_size = total_bytes - 3000 + missing_bytes
 
-            del(tx.vout[1:])
+            del tx.vout[1:]
 
             self.fill_outputs(tx, n_outputs, script_op_codes, fund, desired_scripts_size)
 
@@ -122,7 +121,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
 
         with self.run_node_with_connections(description,
                                             0,
-                                            ['-datacarriersize=%d' % (MAX_TX_SIZE_POLICY_BEFORE_GENESIS * 2),  '-genesisactivationheight=%d' % self.genesisHeight, '-acceptnonstdtxn=false'],
+                                            ['-datacarriersize=%d' % (MAX_TX_SIZE_POLICY_BEFORE_GENESIS * 2), '-genesisactivationheight=%d' % self.genesisHeight, '-acceptnonstdtxn=false'],
                                             self.num_peers) as connections:
 
             connection = connections[0]
@@ -157,13 +156,13 @@ class DataCarrierSizeTest(BitcoinTestFramework):
         self.stop_node(0)
 
         dataCarrierSize = 500
-        self.check_datacarriersize([OP_RETURN]          , 1, dataCarrierSize, "script with one OP_RETURN op code")
+        self.check_datacarriersize([OP_RETURN], 1, dataCarrierSize, "script with one OP_RETURN op code")
         self.check_datacarriersize([OP_FALSE, OP_RETURN], 1, dataCarrierSize, "script with one OP_FALSE, OP_RETURN op code")
-        self.check_datacarriersize([OP_RETURN]          , 3, dataCarrierSize, "script with three OP_RETURN op codes")
+        self.check_datacarriersize([OP_RETURN], 3, dataCarrierSize, "script with three OP_RETURN op codes")
         self.check_datacarriersize([OP_FALSE, OP_RETURN], 3, dataCarrierSize, "script with three OP_FALSE, OP_RETURN op codes")
 
         self.stop_node(0)
-        self.check_max_tx_size_policy([OP_RETURN]          , 1, "script with one OP_RETURN op code")
+        self.check_max_tx_size_policy([OP_RETURN], 1, "script with one OP_RETURN op code")
         self.check_max_tx_size_policy([OP_FALSE, OP_RETURN], 3, "script with three OP_FALSE, OP_RETURN op codes")
 
 

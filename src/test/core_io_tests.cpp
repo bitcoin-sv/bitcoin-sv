@@ -27,14 +27,14 @@ BOOST_AUTO_TEST_CASE(mt_parse_script_of_opcodes)
     array<future<CScript>, n> futures;
     for(size_t i{}; i < n; ++i)
     {
-        futures[i] = async(
+        futures[i] = async( // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
             std::launch::async,
             [&sf](auto* ready) {
                 ready->set_value();
                 sf.wait();
                 return ParseScript("OP_ADD");
             },
-            &promises[i]);
+            &promises[i]); // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 
     // wait until all tasks are ready

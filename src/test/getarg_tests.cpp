@@ -24,10 +24,12 @@ static void ResetArgs(const std::string &strArg) {
 
     // Convert to char*:
     std::vector<const char *> vecChar;
+    vecChar.reserve(vecArg.size());
     for (std::string &s : vecArg) {
         vecChar.push_back(s.c_str());
     }
 
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     gArgs.ParseParameters(vecChar.size(), &vecChar[0]);
 }
 

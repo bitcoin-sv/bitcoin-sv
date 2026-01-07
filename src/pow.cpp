@@ -6,12 +6,14 @@
 
 #include "pow.h"
 #include "arith_uint256.h"
-#include "chain.h"
 #include "config.h"
 #include "consensus/params.h"
 #include "primitives/block.h"
+#include "verify_script_flags.h"
 #include "uint256.h"
 #include "validation.h"
+
+#include <array>
 
 /**
  * Compute the next required proof of work using the legacy Bitcoin difficulty
@@ -27,6 +29,7 @@ static uint32_t GetNextEDAWorkRequired(const CBlockIndex *pindexPrev,
     if (nHeight % params.DifficultyAdjustmentInterval() == 0) {
         // Go back by what we want to be 14 days worth of blocks
         assert(nHeight >= params.DifficultyAdjustmentInterval());
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int32_t nHeightFirst = nHeight - params.DifficultyAdjustmentInterval();
         const CBlockIndex *pindexFirst = pindexPrev->GetAncestor(nHeightFirst);
         assert(pindexFirst);
@@ -89,9 +92,11 @@ static uint32_t GetNextEDAWorkRequired(const CBlockIndex *pindexPrev,
     return nPow.GetCompact();
 }
 
-uint32_t GetNextWorkRequired(const CBlockIndex *pindexPrev,
-                             const CBlockHeader *pblock, const Config &config) {
-    const Consensus::Params &params = config.GetChainParams().GetConsensus();
+uint32_t GetNextWorkRequired(const CBlockIndex* pindexPrev,
+                             const CBlockHeader* pblock,
+                             const Config& config)
+{
+    const Consensus::Params& params = config.GetChainParams().GetConsensus();
 
     // Genesis block
     if (pindexPrev == nullptr) {
@@ -103,7 +108,8 @@ uint32_t GetNextWorkRequired(const CBlockIndex *pindexPrev,
         return pindexPrev->GetBits();
     }
 
-    if (IsDAAEnabled(config, pindexPrev->GetHeight())) {
+    if(pindexPrev->GetHeight() >= params.daaHeight)
+    {
         return GetNextCashWorkRequired(pindexPrev, pblock, config);
     }
 
@@ -141,9 +147,10 @@ uint32_t CalculateNextWorkRequired(const CBlockIndex *pindexPrev,
     return bnNew.GetCompact();
 }
 
-bool CheckProofOfWork(uint256 hash, uint32_t nBits, const Config &config) {
-    bool fNegative;
-    bool fOverflow;
+bool CheckProofOfWork(uint256 hash, uint32_t nBits, const Config &config)
+{
+    bool fNegative{};
+    bool fOverflow{};
     arith_uint256 bnTarget;
 
     bnTarget.SetCompact(nBits, &fNegative, &fOverflow);
@@ -212,7 +219,7 @@ static const CBlockIndex *GetSuitableBlock(const CBlockIndex *pindex) {
      * influence, we select the median of the 3 top most blocks as a starting
      * point.
      */
-    const CBlockIndex *blocks[3];
+    std::array<const CBlockIndex*, 3> blocks{};
     blocks[2] = pindex;
     blocks[1] = pindex->GetPrev();
     blocks[0] = blocks[1]->GetPrev();

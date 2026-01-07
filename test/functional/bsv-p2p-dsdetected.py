@@ -39,7 +39,7 @@ class WebHookService(BaseHTTPRequestHandler):
     def do_GET(self):
         # This dummy service receives from this path only
         assert_equal(self.path, "/dsdetected/webhook/query")
-        if (WebHookService.lastReceivedJSON == None):
+        if (WebHookService.lastReceivedJSON is None):
             self.send_response(400, "No JSON received")
             self.end_headers()
             return
@@ -73,7 +73,9 @@ class DSDetectedTests(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.num_nodes = 1
         # Set webhook url with IP, port and endpoint
-        self.extra_args = [["-dsdetectedwebhookurl=http://127.0.0.1:8888/dsdetected/webhook", "-banscore=100000","-safemodemaxforkdistance=288"]]
+        self.extra_args = [["-dsdetectedwebhookurl=http://127.0.0.1:8888/dsdetected/webhook",
+                            "-banscore=100000",
+                            "-safemodemaxforkdistance=288"]]
 
     def start_webhook_server(self):
         self.server = HTTPServer(('localhost', 8888), partial(WebHookService))
@@ -132,7 +134,7 @@ class DSDetectedTests(BitcoinTestFramework):
         nBranches = random.randint(2, maxNumberOfBranches)
         branches = []
         # Each branch will spend the same output, but for diversity each will spend a different amount (fraction of an output value)
-        valueFraction = 1.0/(nBranches+1.0)
+        valueFraction = 1.0 / (nBranches + 1.0)
         valueFactor = 1.0
         last_block_time = commonBlock.nTime
         for _ in range(nBranches):
@@ -151,13 +153,17 @@ class DSDetectedTests(BitcoinTestFramework):
                     # dsdetected message requires a list of block headers from double-spending block up to the common block
                     branch = randomBranch[:random.randrange(1, len(randomBranch))]
                     previousBlock = branch[-1]
-            for _ in range(random.randint(1, maxNumberOfBlocksPerBranch)):
+
+            # Ensure we can never end up with just 2 branches each of length 1 - if that happens bitcoind will not
+            # process our dsdetected message because the maximum fork distance will be greater than the permitted maximum.
+            maxBranchLen = max([len(b) for b in branches]) if len(branches) >= 1 else 0
+            for _ in range(random.randint(1 if maxBranchLen > 1 else 2, maxNumberOfBlocksPerBranch)):
                 # To make unique blocks we need to set the last_block_time
                 previousBlock, last_block_time = make_block(None, parent_block=previousBlock, last_block_time=last_block_time)
                 branch.append(previousBlock)
             # Last block should contain a double-spend transaction but we intentionally spend a different amount for each to make transactions unique
             valueFactor = valueFactor - valueFraction
-            dsTx = create_tx(spendTransaction, spendOutput, int(valueFactor*spendTransaction.vout[spendOutput].nValue))
+            dsTx = create_tx(spendTransaction, spendOutput, int(valueFactor * spendTransaction.vout[spendOutput].nValue))
             branch[-1].vtx.append(dsTx)
             branch[-1].hashMerkleRoot = branch[-1].calc_merkle_root()
             branch[-1].solve()
@@ -204,11 +210,11 @@ class DSDetectedTests(BitcoinTestFramework):
 
         # Create a block with a transaction spending coinbaseTx of a previous block and making multiple outputs for future transactions to spend
         utxoBlock, _ = make_block(connection, parent_block=block101)
-        utxoTx = create_tx(coinbaseTx, 0, 1*COIN)
+        utxoTx = create_tx(coinbaseTx, 0, 1 * COIN)
 
         # Create additional 48 outputs (we let 1 COIN as fee)
         for _ in range(48):
-            utxoTx.vout.append(CTxOut(1*COIN, CScript([OP_TRUE])))
+            utxoTx.vout.append(CTxOut(1 * COIN, CScript([OP_TRUE])))
         # Add to block
         utxoTx.rehash()
 
@@ -236,9 +242,9 @@ class DSDetectedTests(BitcoinTestFramework):
         blockA, _ = make_block(connection, parent_block=utxoBlock)
         blockB, _ = make_block(connection, parent_block=utxoBlock)
         blockF, _ = make_block(connection, parent_block=utxoBlock)
-        txA = create_tx(utxoBlock.vtx[1], 0, int(0.8*COIN))
-        txB = create_tx(utxoBlock.vtx[1], 0, int(0.9*COIN))
-        txF = create_tx(utxoBlock.vtx[1], 0, int(0.7*COIN))
+        txA = create_tx(utxoBlock.vtx[1], 0, int(0.8 * COIN))
+        txB = create_tx(utxoBlock.vtx[1], 0, int(0.9 * COIN))
+        txF = create_tx(utxoBlock.vtx[1], 0, int(0.7 * COIN))
         txA.rehash()
         txB.rehash()
         txF.rehash()
@@ -328,15 +334,22 @@ class DSDetectedTests(BitcoinTestFramework):
 
         # Webhook should not receive the notification if we send dsdetected message with the valid proof, but transaction is a coinbase transaction
         dsdMessage = msg_dsdetected(blocksDetails=[
-            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA,           blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
+            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
             BlockDetails([CBlockHeader(blockB)], DSMerkleProof(0, blockB.vtx[0], blockB.hashMerkleRoot, [MerkleProofNode(blockB.vtx[1].sha256)]))])
+        peer.send_and_ping(dsdMessage)
+        assert_equal(self.get_JSON_notification(), None)
+
+        # Webhook should not receive the notification if we send dsdetected message with merkle proof for different block than the one in block details
+        dsdMessage = msg_dsdetected(blocksDetails=[
+            BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
+            BlockDetails([CBlockHeader(blockB)], DSMerkleProof(1, txF, blockF.hashMerkleRoot, [MerkleProofNode(blockF.vtx[0].sha256)]))])
         peer.send_and_ping(dsdMessage)
         assert_equal(self.get_JSON_notification(), None)
 
         # Webhook should not receive the notification if we send dsdetected message with transactions that are not double spending
         # Create a block similar as before, but with a transaction spending a different utxo
         blockC, _ = make_block(connection, parent_block=utxoBlock)
-        txC = create_tx(utxoBlock.vtx[1], 1, int(0.7*COIN))
+        txC = create_tx(utxoBlock.vtx[1], 1, int(0.7 * COIN))
         blockC.vtx.append(txC)
         blockC.hashMerkleRoot = blockC.calc_merkle_root()
         blockC.solve()
@@ -379,7 +392,7 @@ class DSDetectedTests(BitcoinTestFramework):
         assert_equal(self.get_JSON_notification(), None)
 
         end_banscore = node.getpeerinfo()[0]['banscore']
-        assert ((end_banscore - start_banscore) / 10 == 13)  # because we have 13 negative tests so far
+        assert ((end_banscore - start_banscore) / 10 == 14)  # because we have 14 negative tests so far
 
         # Finally, webhook should receive the notification if we send a proper dsdetected message
         dsdMessage = msg_dsdetected(blocksDetails=[
@@ -388,7 +401,7 @@ class DSDetectedTests(BitcoinTestFramework):
         peer.send_and_ping(dsdMessage)
         json_notification = self.get_JSON_notification()
         # remove diverentBlockHash so we can compare with the ds-message
-        assert(json_notification != None)
+        assert (json_notification is not None)
         for e in json_notification['blocks']:
             del e['divergentBlockHash']
         assert_equal(str(dsdMessage), str(msg_dsdetected(json_notification=json_notification)))
@@ -403,7 +416,7 @@ class DSDetectedTests(BitcoinTestFramework):
         # repeat previous test but generate many blocks in the node to age the notificatoin message.
         # very old notification messages shall be ignored. We use the same thresholds as safe mode.
         # We will hardcode this threshold for now until branch we depend on is merged
-        node.generate (289)
+        node.generate(289)
         dsdMessage = msg_dsdetected(blocksDetails=[
             BlockDetails([CBlockHeader(blockA)], DSMerkleProof(1, txA, blockA.hashMerkleRoot, [MerkleProofNode(blockA.vtx[0].sha256)])),
             BlockDetails([CBlockHeader(blockF)], DSMerkleProof(1, txF, blockF.hashMerkleRoot, [MerkleProofNode(blockF.vtx[0].sha256)]))])
@@ -420,7 +433,7 @@ class DSDetectedTests(BitcoinTestFramework):
             # Notification should be received as generated dsdetected message is valid
             json_notification = self.get_JSON_notification()
             # remove diverentBlockHash so we can compare with the ds-message
-            assert (json_notification != None)
+            assert (json_notification is not None)
             for e in json_notification['blocks']:
                 del e['divergentBlockHash']
             assert_equal(str(dsdMessage), str(msg_dsdetected(json_notification=json_notification)))

@@ -32,10 +32,12 @@ Test is as follows:
 """
 import time
 
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
 from test_framework.mininode import CTransaction, CTxOut, CTxIn, COutPoint, ToHex, FromHex
 from test_framework.script import CScript, OP_TRUE
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import assert_equal, wait_until
+
+from decimal import Decimal
 
 
 class MempoolPersistTest(BitcoinTestFramework):
@@ -58,7 +60,7 @@ class MempoolPersistTest(BitcoinTestFramework):
         ftx = CTransaction()
         ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
         ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
-        ftxHex = self.nodes[2].fundrawtransaction(ToHex(ftx),{'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = self.nodes[2].fundrawtransaction(ToHex(ftx), {'changePosition': len(ftx.vout)})['hex']
         ftxHex = self.nodes[2].signrawtransaction(ftxHex)['hex']
         self.nodes[2].sendrawtransaction(ftxHex)
         ftx = FromHex(CTransaction(), ftxHex)

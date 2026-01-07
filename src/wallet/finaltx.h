@@ -5,6 +5,8 @@
 #ifndef BITCOIN_DEPRECATED_FINALTX_H
 #define BITCOIN_DEPRECATED_FINALTX_H
 
+#include <cstdint>
+
 class CTransaction;
 
 /**

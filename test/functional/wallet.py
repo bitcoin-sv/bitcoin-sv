@@ -3,8 +3,14 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test the wallet."""
+
+from decimal import Decimal
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_array_result, assert_equal, \
+    assert_fee_amount, assert_raises_rpc_error, connect_nodes_bi, \
+    count_bytes, sync_blocks, sync_mempools
+
+import time
 
 
 class WalletTest(BitcoinTestFramework):
@@ -77,7 +83,7 @@ class WalletTest(BitcoinTestFramework):
         mempool_txid = self.nodes[0].sendtoaddress(
             self.nodes[2].getnewaddress(), 10)
         memory_after = self.nodes[0].getmemoryinfo()
-        assert(memory_before['locked']['used'] +
+        assert (memory_before['locked']['used'] +
                64 <= memory_after['locked']['used'])
 
         self.log.info("test gettxout (second part)")
@@ -206,7 +212,7 @@ class WalletTest(BitcoinTestFramework):
         assert_equal(set(relayed), {txid1, txid2})
         sync_mempools(self.nodes)
 
-        assert(txid1 in self.nodes[3].getrawmempool())
+        assert (txid1 in self.nodes[3].getrawmempool())
 
         # Exercise balance rpcs
         assert_equal(self.nodes[0].getwalletinfo()["unconfirmed_balance"], 1)
@@ -218,7 +224,7 @@ class WalletTest(BitcoinTestFramework):
         # 3. sign and send
         # 4. check if recipient (node0) can list the zero value tx
         usp = self.nodes[1].listunspent()
-        inputs = [{"txid": usp[0]['txid'], "vout":usp[0]['vout']}]
+        inputs = [{"txid": usp[0]['txid'], "vout": usp[0]['vout']}]
         outputs = {self.nodes[1].getnewaddress(): 49.998,
                    self.nodes[0].getnewaddress(): 11.11}
 
@@ -228,7 +234,7 @@ class WalletTest(BitcoinTestFramework):
         signedRawTx = self.nodes[1].signrawtransaction(rawTx)
         decRawTx = self.nodes[1].decoderawtransaction(signedRawTx['hex'])
         zeroValueTxid = decRawTx['txid']
-        sendResp = self.nodes[1].sendrawtransaction(signedRawTx['hex'])
+        self.nodes[1].sendrawtransaction(signedRawTx['hex'])
 
         self.sync_all()
         self.nodes[1].generate(1)  # mine a block
@@ -241,7 +247,7 @@ class WalletTest(BitcoinTestFramework):
             if uTx['txid'] == zeroValueTxid:
                 found = True
                 assert_equal(uTx['amount'], Decimal('0'))
-        assert(found)
+        assert (found)
 
         # do some -walletbroadcast tests
         self.stop_nodes()
@@ -325,7 +331,7 @@ class WalletTest(BitcoinTestFramework):
         self.nodes[1].importaddress(address_to_import)
 
         # 3. Validate that the imported address is watch-only on node1
-        assert(self.nodes[1].validateaddress(address_to_import)["iswatchonly"])
+        assert (self.nodes[1].validateaddress(address_to_import)["iswatchonly"])
 
         # 4. Check that the unspents after import are not spendable
         assert_array_result(self.nodes[1].listunspent(),
@@ -367,7 +373,7 @@ class WalletTest(BitcoinTestFramework):
                 addr = self.nodes[0].getaccountaddress(s)
                 label = self.nodes[0].getaccount(addr)
                 assert_equal(label, s)
-                assert(s in self.nodes[0].listaccounts().keys())
+                assert (s in self.nodes[0].listaccounts().keys())
         self.nodes[0].ensure_ascii = True  # restore to default
 
         # maintenance tests
@@ -433,9 +439,14 @@ class WalletTest(BitcoinTestFramework):
         # The tx will be stored in the wallet but not accepted to the mempool
         extra_txid = self.nodes[0].sendtoaddress(
             sending_addr, Decimal('0.0001'))
-        assert(extra_txid not in self.nodes[0].getrawmempool())
-        assert(extra_txid in [tx["txid"]
-                              for tx in self.nodes[0].listtransactions()])
+        assert (extra_txid not in self.nodes[0].getrawmempool())
+        assert (extra_txid in [tx["txid"]
+                for tx in self.nodes[0].listtransactions()])
+
+        # Check parameter overflow handling
+        assert_equal(len(self.nodes[0].listtransactions()), 10)
+        assert_equal(len(self.nodes[0].listtransactions("*", 0x7fffffff, 0x7fffffff)), 0)
+        assert_raises_rpc_error(-1, "JSON integer out of range", self.nodes[0].listtransactions, "*", 0x80000000, 0x80000000)
 
 
 if __name__ == '__main__':

@@ -8,7 +8,7 @@
 #include <variant>
 
 #include "consensus/merkle.h"
-#include "hash.h"
+#include "crypto/sha256.h"
 #include "miner_id/miner_info_error.h"
 #include "miner_id/miner_info_ref.h"
 #include "primitives/block.h"
@@ -79,8 +79,8 @@ uint256 modify_merkle_root(const CBlock& block)
     coinbase_tx.vin[0].prevout = op;
     const auto it = find_if(coinbase_tx.vout.begin(),
                             coinbase_tx.vout.end(),
-                            [](const CTxOut& op) {
-                                return IsMinerInfo(op.scriptPubKey);
+                            [](const CTxOut& tx_out) {
+                                return IsMinerInfo(tx_out.scriptPubKey);
                             });
     if(it != coinbase_tx.vout.cend())
     {
@@ -109,7 +109,7 @@ std::optional<miner_info_error> verify(const CBlock& block,
 
     uint256 expected_mmr_pbh_hash; 
     CSHA256().Write(buffer.data(), buffer.size())
-             .Finalize(expected_mmr_pbh_hash.begin());
+             .Finalize(CSHA256::span{expected_mmr_pbh_hash.begin(), CSHA256::OUTPUT_SIZE});
 
     const auto& mmr_pbh_hash = bb.mmr_pbh_hash();
     if(mmr_pbh_hash != expected_mmr_pbh_hash)
@@ -184,7 +184,7 @@ bool is_der_signature(const std::string& s)
 
 bool is_der_signature(const std::span<const uint8_t> script)
 {
-    return script.size() >= 69 && script.size() <= 72;
+    return script.size() >= 64 && script.size() <= 72;
 }
 
 namespace
@@ -207,8 +207,8 @@ namespace
             return mie::brfcid_invalid_content;
 
         const auto& values{uv.getValues()};
-        if(!all_of(values.cbegin(), values.cend(), [](const auto& uv) {
-               return uv.isObject();
+        if(!all_of(values.cbegin(), values.cend(), [](const auto& v) {
+               return v.isObject();
            }))
             return mie::brfcid_invalid_value_type;
 

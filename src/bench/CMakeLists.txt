@@ -19,15 +19,20 @@ add_executable(bench_bitcoin
         checkqueue.cpp
         $<$<BOOL:${BUILD_BITCOIN_WALLET}>:coin_selection.cpp>
         crypto_hash.cpp
+        cscript.cpp
         interpreter.cpp
         lockedpool.cpp
         mempool_eviction.cpp
         mempooltxdb.cpp
+        op_codes.cpp
         perf.cpp
         rollingbloom.cpp
+        safe_mode.cpp
         serialisation.cpp
         thread_safe_queue.cpp
         data/block413567.raw.h)
+
+enable_coverage(bench_bitcoin)
 
 target_link_libraries(bench_bitcoin
         server
@@ -39,3 +44,7 @@ target_link_libraries(bench_bitcoin
         leveldb
         univalue
         $<$<PLATFORM_ID:Linux>:rt>) # use librt.so for aio on Linux
+
+if(ENABLE_CLANG_TIDY)
+    AddClangTidy(bench_bitcoin)
+endif()

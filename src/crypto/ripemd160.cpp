@@ -7,6 +7,7 @@
 #include "crypto/common.h"
 
 #include <cassert>
+#include <cstdint>
 #include <cstring>
 
 // Internal implementation code.
@@ -29,18 +30,20 @@ namespace ripemd160 {
 
     /** Initialize RIPEMD-160 state. */
     inline void Initialize(uint32_t *s) {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         s[0] = 0x67452301ul;
         s[1] = 0xEFCDAB89ul;
         s[2] = 0x98BADCFEul;
         s[3] = 0x10325476ul;
         s[4] = 0xC3D2E1F0ul;
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     inline uint32_t rol(uint32_t x, int i) {
         return (x << i) | (x >> (32 - i));
     }
 
-    inline void Round(uint32_t &a, uint32_t b, uint32_t &c, uint32_t d,
+    inline void Round(uint32_t& a, uint32_t /*b*/, uint32_t& c, uint32_t /*d*/,
                       uint32_t e, uint32_t f, uint32_t x, uint32_t k, int r) {
         a = rol(a + f + x + k, r) + e;
         c = rol(c, 10);
@@ -89,7 +92,9 @@ namespace ripemd160 {
     }
 
     /** Perform a RIPEMD-160 transformation, processing a 64-byte chunk. */
-    void Transform(uint32_t *s, const uint8_t *chunk) {
+    void Transform(uint32_t *s, const uint8_t *chunk)
+    {
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         uint32_t a1 = s[0], b1 = s[1], c1 = s[2], d1 = s[3], e1 = s[4];
         uint32_t a2 = a1, b2 = b1, c2 = c1, d2 = d1, e2 = e1;
         uint32_t w0 = ReadLE32(chunk + 0), w1 = ReadLE32(chunk + 4),
@@ -100,6 +105,7 @@ namespace ripemd160 {
                  w10 = ReadLE32(chunk + 40), w11 = ReadLE32(chunk + 44);
         uint32_t w12 = ReadLE32(chunk + 48), w13 = ReadLE32(chunk + 52),
                  w14 = ReadLE32(chunk + 56), w15 = ReadLE32(chunk + 60);
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         R11(a1, b1, c1, d1, e1, w0, 11);
         R12(a2, b2, c2, d2, e2, w5, 8);
@@ -266,12 +272,14 @@ namespace ripemd160 {
         R51(b1, c1, d1, e1, a1, w13, 6);
         R52(b2, c2, d2, e2, a2, w11, 11);
 
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         uint32_t t = s[0];
         s[0] = s[1] + c1 + d2;
         s[1] = s[2] + d1 + e2;
         s[2] = s[3] + e1 + a2;
         s[3] = s[4] + a1 + b2;
         s[4] = t + b1 + c2;
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
 } // namespace ripemd160
@@ -280,54 +288,67 @@ namespace ripemd160 {
 
 ////// RIPEMD160
 
-CRIPEMD160::CRIPEMD160() : bytes(0) {
-    ripemd160::Initialize(s);
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+CRIPEMD160::CRIPEMD160()
+{
+    ripemd160::Initialize(s.data());
 }
 
-CRIPEMD160 &CRIPEMD160::Write(const uint8_t *data, size_t len) {
-    if (len == 0) {
-        return *this;    
-    }
+CRIPEMD160& CRIPEMD160::Write(const uint8_t* data, size_t len)
+{
+    if(len == 0)
+        return *this;
+
     assert(data);
-    const uint8_t *end = data + len;
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    const uint8_t* end = data + len;
     size_t bufsize = bytes % 64;
-    if (bufsize && bufsize + len >= 64) {
+    if(bufsize && bufsize + len >= 64)
+    {
         // Fill the buffer, and process it.
-        memcpy(buf + bufsize, data, 64 - bufsize);
+        memcpy(buf.data() + bufsize, data, 64 - bufsize);
         bytes += 64 - bufsize;
         data += 64 - bufsize;
-        ripemd160::Transform(s, buf);
+        ripemd160::Transform(s.data(), buf.data());
         bufsize = 0;
     }
-    while (end >= data + 64) {
+
+    while(end >= data + 64)
+    {
         // Process full chunks directly from the source.
-        ripemd160::Transform(s, data);
+        ripemd160::Transform(s.data(), data);
         bytes += 64;
         data += 64;
     }
-    if (end > data) {
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
+    if(end > data)
+    {
         // Fill the buffer with what remains.
-        memcpy(buf + bufsize, data, end - data);
+        memcpy(buf.data() + bufsize, data, end - data);
         bytes += end - data;
     }
     return *this;
 }
 
-void CRIPEMD160::Finalize(uint8_t hash[OUTPUT_SIZE]) {
-    static const uint8_t pad[64] = {0x80};
-    uint8_t sizedesc[8];
-    WriteLE64(sizedesc, bytes << 3);
-    Write(pad, 1 + ((119 - (bytes % 64)) % 64));
-    Write(sizedesc, 8);
-    WriteLE32(hash, s[0]);
-    WriteLE32(hash + 4, s[1]);
-    WriteLE32(hash + 8, s[2]);
-    WriteLE32(hash + 12, s[3]);
-    WriteLE32(hash + 16, s[4]);
+void CRIPEMD160::Finalize(const span hash)
+{
+    static const std::array<uint8_t, 64> pad = {0x80};
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, 8> sizedesc;
+    WriteLE64(sizedesc.data(), bytes << 3);
+    Write(pad.data(), 1 + ((119 - (bytes % 64)) % 64));
+    Write(sizedesc.data(), 8);
+    WriteLE32(hash.data(), s[0]);
+    WriteLE32(hash.data() + 4, s[1]);
+    WriteLE32(hash.data() + 8, s[2]);
+    WriteLE32(hash.data() + 12, s[3]);
+    WriteLE32(hash.data() + 16, s[4]);
 }
 
-CRIPEMD160 &CRIPEMD160::Reset() {
+CRIPEMD160& CRIPEMD160::Reset()
+{
     bytes = 0;
-    ripemd160::Initialize(s);
+    ripemd160::Initialize(s.data());
     return *this;
 }

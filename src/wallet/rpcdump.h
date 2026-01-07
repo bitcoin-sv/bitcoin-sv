@@ -7,7 +7,7 @@
 
 #include <univalue.h>
 
-class Config;
+class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CRPCTable;
 class JSONRPCRequest;
 

@@ -4,12 +4,12 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 from test_framework import mininode
+from test_framework.comptool import logger
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
-import time
-import struct
+from test_framework.util import assert_equal, p2p_port
+
 import contextlib
-from test_framework.blocktools import create_block, create_coinbase
+import struct
 
 
 # New class that represents an invalid Protoconf msg with 0 fields.
@@ -103,7 +103,6 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
             logger.debug("finished %s", title)
 
         ELEMENTS_PER_1MiB = 29126
-        ELEMENTS_PER_2MiB = 58254
 
         # 1. test
         # Send protoconf with 0 fields. Bitcoind should disconnect the node, since minimum number of fields is 1
@@ -116,7 +115,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
         with run_connection(test_node, "0 fields"):
             test_node.wait_for_verack()
             test_node.wait_for_disconnect()
-            assert(self.nodes[0].closed)
+            assert (self.nodes[0].closed)
             assert_equal(len(self.nodes[0].listbanned()), 0)
 
         # 2. test
@@ -130,7 +129,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
         with run_connection(test_node, "too small protoconf"):
             test_node.wait_for_verack()
             test_node.wait_for_disconnect()
-            assert(self.nodes[0].closed)
+            assert (self.nodes[0].closed)
             assert_equal(len(self.nodes[0].listbanned()), 0)
 
         # 3. test
@@ -199,13 +198,13 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
 
         def send_oversized_protoconf(conn):
             # send protoconf of size LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH + 1
-            conn.send_message(msg_protoconf_largest(mininode.LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH+1))
+            conn.send_message(msg_protoconf_largest(mininode.LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH + 1))
         test_node.send_protoconf = send_oversized_protoconf
 
         with run_connection(test_node, "oversized protoconf"):
             test_node.wait_for_verack()
             test_node.wait_for_disconnect()
-            assert(self.nodes[0].closed)
+            assert (self.nodes[0].closed)
             assert_equal(len(self.nodes[0].listbanned()), 1)
 
 

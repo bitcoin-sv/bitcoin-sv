@@ -2,6 +2,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "test/test_bitcoin.h"
+#include "protocol_era.h"
 #include "rpc/jsonwriter.h"
 #include "core_io.h"
 #include <boost/test/unit_test.hpp>
@@ -9,7 +10,7 @@
 
 BOOST_FIXTURE_TEST_SUITE(json_tests, BasicTestingSetup)
 
-CStringWriter strWriter;
+CStringWriter strWriter; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 BOOST_AUTO_TEST_CASE(CJWriter_write_array)
 {
@@ -276,7 +277,7 @@ BOOST_AUTO_TEST_CASE(json_decode_tx_from_mainnet)
     CTransaction tx(mtx);
 
     CJSONWriter jWriter(strWriter, true, 2);
-    TxToJSON(tx, uint256(), false, 0, jWriter);
+    TxToJSON(tx, uint256(), ProtocolEra::PreGenesis, 0, jWriter);
     
     UniValue uv(UniValue::VOBJ);
     // Read the JSON string into UniValue object to check if JSON is well formed. 
@@ -310,7 +311,7 @@ BOOST_AUTO_TEST_CASE(json_decode_tx_with_2_same_inputs_outputs_addresses)
     CTransaction tx(mtx);
 
     CJSONWriter jWriter(strWriter, true, 2);
-    TxToJSON(tx, uint256(), false, 0, jWriter);
+    TxToJSON(tx, uint256(), ProtocolEra::PreGenesis, 0, jWriter);
 
     UniValue uv(UniValue::VOBJ);
     // Read the JSON string into UniValue object to check if JSON is well formed. 
@@ -347,8 +348,8 @@ BOOST_AUTO_TEST_CASE(json_decode_block_with_2tx_with_same_inputs_outputs_address
     jWriter.writeBeginObject();
     jWriter.writeBeginArray("tx");
 
-    TxToJSON(tx, uint256(), false, 0, jWriter);
-    TxToJSON(tx, uint256(), false, 0, jWriter);
+    TxToJSON(tx, uint256(), ProtocolEra::PreGenesis, 0, jWriter);
+    TxToJSON(tx, uint256(), ProtocolEra::PreGenesis, 0, jWriter);
 
     jWriter.writeEndArray();
     jWriter.writeEndObject();

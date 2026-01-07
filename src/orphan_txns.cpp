@@ -23,6 +23,7 @@ COrphanTxns::COrphanTxns(
 
     size_t nNumStdTxValidationThreads {
         static_cast<size_t>(
+                // NOLINTNEXTLINE(*-narrowing-conversions)
                 gArgs.GetArg("-numstdtxvalidationthreads", GetNumHighPriorityValidationThrs()))
     };
 

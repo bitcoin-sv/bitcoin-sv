@@ -7,8 +7,7 @@ Test applying limit to the non-final pool size.
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import CScript, OP_TRUE
 from test_framework.blocktools import create_transaction, prepare_init_chain
-from test_framework.util import assert_equal, wait_until
-from test_framework.comptool import TestInstance, RejectResult, DiscardResult
+from test_framework.comptool import TestInstance, DiscardResult
 import time
 
 
@@ -67,7 +66,7 @@ class BSVGenesis_NonFinalPoolLimit(ComparisonTestFramework):
         tx1 = self.create_locked_transaction(spend_tx1, 0, CScript(), 1000, CScript([OP_TRUE]), nLockTime, 0x00000003)
         # The transactions should be (silently) rejected because the pool is full.
         yield TestInstance([[tx1, DiscardResult()]])
-        assert(tx1.hash not in self.nodes[0].getrawnonfinalmempool())
+        assert (tx1.hash not in self.nodes[0].getrawnonfinalmempool())
 
 
 if __name__ == '__main__':

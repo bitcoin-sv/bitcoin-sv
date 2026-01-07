@@ -55,9 +55,10 @@ const std::vector<uint8_t> &GetObfuscateKey(const CDBWrapper &w);
 // NOTE: Class is based on CDataStream and provides only read functionality
 class CDataStreamInput
 {
-    std::string_view buf;
-    const std::vector<std::uint8_t>& obfuscate_key;
-    unsigned int nReadPos;
+    std::string_view buf_;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
+    const std::vector<std::uint8_t>& obfuscate_key_;
+    unsigned int nReadPos_{};
 
 public:
     typedef std::string_view::size_type size_type;
@@ -74,14 +75,13 @@ public:
      * @note Both buf and obfuscate_key must outlive constructed CDataStreamInput object.
      */
     CDataStreamInput(std::string_view buf, const std::vector<uint8_t>& obfuscate_key)
-        : buf(buf)
-        , obfuscate_key(obfuscate_key)
-        , nReadPos(0)
+        : buf_{buf}
+        , obfuscate_key_{obfuscate_key}
     {}
 
     // Access to serialized data
-    const value_type* data() const { return buf.data() + nReadPos; }
-    size_type size() const { return buf.size() - nReadPos; }
+    const value_type* data() const { return buf_.data() + nReadPos_; }
+    size_type size() const { return buf_.size() - nReadPos_; }
 
     //
     // Stream subset
@@ -100,23 +100,23 @@ public:
         }
 
         // Read from buffer at current position
-        unsigned int nReadPosNext = nReadPos + nSize;
-        if (nReadPosNext >= buf.size())
+        unsigned int nReadPosNext = nReadPos_ + nSize;
+        if (nReadPosNext >= buf_.size())
         {
-            if (nReadPosNext > buf.size())
+            if (nReadPosNext > buf_.size())
             {
                 throw std::ios_base::failure("CDataStreamInput::read(): end of data");
             }
 
-            memcpy(pch, &buf[nReadPos], nSize);
-            XorBuf(pch, nSize, nReadPos);
-            nReadPos = 0;
-            buf = {};
+            memcpy(pch, &buf_[nReadPos_], nSize);
+            XorBuf(pch, nSize, nReadPos_);
+            nReadPos_ = 0;
+            buf_ = {};
             return;
         }
-        memcpy(pch, &buf[nReadPos], nSize);
-        XorBuf(pch, nSize, nReadPos);
-        nReadPos = nReadPosNext;
+        memcpy(pch, &buf_[nReadPos_], nSize);
+        XorBuf(pch, nSize, nReadPos_);
+        nReadPos_ = nReadPosNext;
     }
 
     void ignore(int nSize)
@@ -127,19 +127,19 @@ public:
             throw std::ios_base::failure("CDataStreamInput::ignore(): nSize negative");
         }
 
-        unsigned int nReadPosNext = nReadPos + nSize;
-        if (nReadPosNext >= buf.size())
+        unsigned int nReadPosNext = nReadPos_ + nSize;
+        if (nReadPosNext >= buf_.size())
         {
-            if (nReadPosNext > buf.size())
+            if (nReadPosNext > buf_.size())
             {
                 throw std::ios_base::failure("CDataStreamInput::ignore(): end of data");
             }
 
-            nReadPos = 0;
-            buf = {};
+            nReadPos_ = 0;
+            buf_ = {};
             return;
         }
-        nReadPos = nReadPosNext;
+        nReadPos_ = nReadPosNext;
     }
 
     template<typename T>
@@ -162,20 +162,21 @@ private:
      */
     void XorBuf(char* buf, std::size_t bufSize, unsigned int readPos)
     {
-        if (obfuscate_key.size() == 0)
+        if(obfuscate_key_.size() == 0)
         {
             return;
         }
 
-        for (size_type i = 0, j = readPos % obfuscate_key.size(); i != bufSize; i++)
+        for (size_type i = 0, j = readPos % obfuscate_key_.size(); i != bufSize; i++)
         {
-            buf[i] ^= obfuscate_key[j++];
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            buf[i] ^= obfuscate_key_[j++];
 
             // This potentially acts on very many bytes of data, so it's
             // important that we calculate `j`, i.e. the `key` index in this way
             // instead of doing a %, which would effectively be a division for
             // each byte Xor'd -- much slower than need be.
-            if (j == obfuscate_key.size()) j = 0;
+            if (j == obfuscate_key_.size()) j = 0;
         }
     }
 };
@@ -187,21 +188,24 @@ class CDBBatch {
     friend class CDBWrapper;
 
 private:
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const CDBWrapper &parent;
     leveldb::WriteBatch batch;
 
     CDataStream ssKey;
     CDataStream ssValue;
 
-    size_t size_estimate;
+    size_t size_estimate{};
 
 public:
     /**
      * @param[in] _parent   CDBWrapper that this batch is to be submitted to
      */
-    CDBBatch(const CDBWrapper &_parent)
-        : parent(_parent), ssKey(SER_DISK, CLIENT_VERSION),
-          ssValue(SER_DISK, CLIENT_VERSION), size_estimate(0){};
+    CDBBatch(const CDBWrapper& _parent)
+        : parent(_parent),
+          ssKey(SER_DISK, CLIENT_VERSION),
+          ssValue(SER_DISK, CLIENT_VERSION)
+    {};
 
     void Clear() {
         batch.Clear();
@@ -285,6 +289,7 @@ public:
     template <typename K> bool GetKey(K &key) {
         leveldb::Slice slKey = piter->key();
         try {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             CDataStream ssKey(slKey.data(), slKey.data() + slKey.size(),
                               SER_DISK, CLIENT_VERSION);
             ssKey >> key;
@@ -329,7 +334,7 @@ class CDBWrapper {
 private:
     //! custom environment this database is using (may be nullptr in case of
     //! default environment)
-    leveldb::Env *penv;
+    leveldb::Env* penv{nullptr};
 
     //! database options used
     leveldb::Options options;
@@ -347,43 +352,40 @@ private:
     leveldb::WriteOptions syncoptions;
 
     //! the database itself
-    leveldb::DB *pdb;
+    leveldb::DB* pdb{nullptr};
 
     //! a key used for optional XOR-obfuscation of the database
     std::vector<uint8_t> obfuscate_key;
 
-    //! the key under which the obfuscation key is stored
-    static const std::string OBFUSCATE_KEY_KEY;
-
-    //! the length of the obfuscate key in number of bytes
-    static const unsigned int OBFUSCATE_KEY_NUM_BYTES;
-
-    std::vector<uint8_t> CreateObfuscateKey() const;
-
 public:
     struct MaxFiles {
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
         const size_t maxFiles;
         explicit MaxFiles(size_t maxFiles_) : maxFiles{maxFiles_} {}
         static MaxFiles Default() { return MaxFiles{64}; }
     };
 
+    // Default levelDB maximum file size (2MB)
+    static constexpr size_t MaxFileSize { 2 * ONE_MEBIBYTE };
+
     /**
      * @param[in] path        Location in the filesystem where leveldb data will
      * be stored.
      * @param[in] nCacheSize  Configures various leveldb cache settings.
+     * @param[in] nFileSize   Max size for levelDB .ldb files.
      * @param[in] fMemory     If true, use leveldb's memory environment.
      * @param[in] fWipe       If true, remove all existing data.
      * @param[in] obfuscate   If true, store data obfuscated via simple XOR. If
-     * false, XOR
-     *                        with a zero'd byte array.
+     *                        false, XOR with a zero'd byte array.
      */
     CDBWrapper(const CDBWrapper&) = delete;
     CDBWrapper& operator=(const CDBWrapper&) = delete;
     CDBWrapper(CDBWrapper&&) = delete;
     CDBWrapper& operator=(CDBWrapper&&) = delete;
-    CDBWrapper(const fs::path &path, size_t nCacheSize, bool fMemory = false,
-               bool fWipe = false, bool obfuscate = false,
-               MaxFiles nMaxFiles = MaxFiles::Default());
+    CDBWrapper(const fs::path &path, size_t nCacheSize,
+               bool fMemory = false, bool fWipe = false, bool obfuscate = false,
+               MaxFiles nMaxFiles = MaxFiles::Default(),
+               size_t nMaxFileSize = MaxFileSize);
     ~CDBWrapper();
 
 public:
@@ -469,7 +471,9 @@ public:
         return WriteBatch(batch, true);
     }
 
-    CDBIterator *NewIterator() {
+    CDBIterator* NewIterator() const
+    {
+        // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
         return new CDBIterator(*this, pdb->NewIterator(iteroptions));
     }
 

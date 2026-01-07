@@ -15,15 +15,17 @@
 #include "miner_id/dataref_index.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
+#include "protocol_era.h"
 #include "timedata.h"
 #include "txdb.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utiltime.h"
-#include "validation.h"
 #include "validationinterface.h"
 #include "txn_validator.h"
+
 #include <boost/range/adaptor/reversed.hpp>
+#include <boost/uuid/nil_generator.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <exception>
 #include <mutex>
@@ -34,6 +36,7 @@ using namespace mining;
      * Special mempool coins provider for internal CTxMemPool use where smtx
      * mutex is expected to be locked.
      */
+    // NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
     class CoinsViewLockedMemPoolNL : public ICoinsView
     {
     public:
@@ -78,15 +81,17 @@ using namespace mining;
     private:
         uint256 GetBestBlock() const override { assert(!"Should not be used!"); return {}; }
 
+        // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
         const CTxMemPool& mempool;
         const CoinsDBView& mDBView;
+        // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
     };
 
 /**
  * class CTxPrioritizer
  */
-CTxPrioritizer::CTxPrioritizer(CTxMemPool& mempool, const TxId& txnToPrioritise)
-    : mMempool(mempool)
+CTxPrioritizer::CTxPrioritizer(CTxMemPool& mem_pool, const TxId& txnToPrioritise)
+    : mMempool(mem_pool)
 {
     // A nulness detection.
     if (!txnToPrioritise.IsNull()) {
@@ -95,8 +100,8 @@ CTxPrioritizer::CTxPrioritizer(CTxMemPool& mempool, const TxId& txnToPrioritise)
     }
 }
 
-CTxPrioritizer::CTxPrioritizer(CTxMemPool& mempool, std::vector<TxId> txnsToPrioritise)
-    : mMempool(mempool), mTxnsToPrioritise(std::move(txnsToPrioritise))
+CTxPrioritizer::CTxPrioritizer(CTxMemPool& mem_pool, std::vector<TxId> txnsToPrioritise)
+    : mMempool(mem_pool), mTxnsToPrioritise(std::move(txnsToPrioritise))
 {
     // An early emptiness check.
     if (!mTxnsToPrioritise.empty()) {
@@ -161,7 +166,9 @@ namespace {
 class CEnsureNonNullChangeSet
 {
     CJournalChangeSetPtr replacement;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const CJournalChangeSetPtr& cs;
+
 public:
     CEnsureNonNullChangeSet(CTxMemPool& theMempool,  const CJournalChangeSetPtr& changeSet)
         : replacement(changeSet ? nullptr : theMempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::UNKNOWN))
@@ -213,7 +220,9 @@ bool CTxMemPool::CheckAncestorLimitsNL(
 
             if(!(*it)->IsInPrimaryMempool())
             {
-                secondaryMempoolAncestorsCount += (*it)->groupingData.value().ancestorsCount + 1;
+                const auto& opt{(*it)->groupingData};
+                assert(opt);
+                secondaryMempoolAncestorsCount += opt->ancestorsCount + 1;
             }
             
             if(ancestorsCount >= limitAncestorCount)
@@ -385,9 +394,9 @@ void CTxMemPool::AcceptSingleGroupNL(const CTxMemPool::setEntriesTopoSorted& gro
     for(auto entry: groupMembers)
     {
         // moving from secondary mempool to the primary
-        mapTx.modify(entry, [&group](CTxMemPoolEntry& entry) {
-                                entry.group = group;
-                                entry.groupingData = std::nullopt;
+        mapTx.modify(entry, [&group](CTxMemPoolEntry& e) {
+                                e.group = group;
+                                e.groupingData = std::nullopt;
                             });
         secondaryMempoolStats.Remove(entry);
         TrackEntryModified(entry);
@@ -410,12 +419,16 @@ SecondaryMempoolEntryData CTxMemPool::CalculateSecondaryMempoolData(txiter entry
     SecondaryMempoolEntryData groupingData({
             entryIt->GetFee(), entryIt->GetFeeDelta(), entryIt->GetTxSize()});
 
-    for (txiter parent : GetMemPoolParentsNL(entryIt)) {
-        if (!parent->IsInPrimaryMempool()) {
-            groupingData.fee += parent->groupingData->fee;
-            groupingData.feeDelta += parent->groupingData->feeDelta;
-            groupingData.size += parent->groupingData->size;
-            groupingData.ancestorsCount += parent->groupingData->ancestorsCount + 1;
+    for(txiter parent : GetMemPoolParentsNL(entryIt))
+    {
+        if(!parent->IsInPrimaryMempool())
+        {
+            const auto& parentGroupingData{parent->groupingData};
+            assert(parentGroupingData);
+            groupingData.fee += parentGroupingData->fee;
+            groupingData.feeDelta += parentGroupingData->feeDelta;
+            groupingData.size += parentGroupingData->size;
+            groupingData.ancestorsCount += parentGroupingData->ancestorsCount + 1;
         }
     }
 
@@ -443,7 +456,9 @@ CTxMemPool::ResultOfUpdateEntryGroupingDataNL CTxMemPool::UpdateEntryGroupingDat
 
     if(!IsPayingEnough(groupingData))
     {
-        if(entryIt->groupingData.value() == groupingData)
+        const auto& entryGroup{entryIt->groupingData};
+        assert(entryGroup);
+        if(*entryGroup == groupingData)
         {
             return ResultOfUpdateEntryGroupingDataNL::NOTHING;
         }
@@ -514,6 +529,7 @@ void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted to
                         }
                     }
                 }
+                // NOLINTNEXTLINE(*-narrowing-conversions)
                 countOfVisitedTxs += groupMembers.size();
                 TrackEntryModified(entry);
                 break;
@@ -619,7 +635,7 @@ CTxMemPool::setEntriesTopoSorted CTxMemPool::RemoveFromPrimaryMempoolNL(CTxMemPo
                 if(entriesToIgnore == nullptr || entriesToIgnore->find(groupMember) == entriesToIgnore->end())
                 {
                     mapTx.modify(groupMember, 
-                        [](CTxMemPoolEntry& entry) {entry.group.reset();});
+                        [](CTxMemPoolEntry& e) {e.group.reset();});
                     // we have removed group object so it will look like it is accepted as standalone in next round
                     toRemove.insert(groupMember);
                 }
@@ -674,8 +690,8 @@ void CTxMemPool::UpdateAncestorsCountNL(CTxMemPool::setEntriesTopoSorted entries
         {
             ancestorsCount = std::max(ancestorsCount, parent->ancestorsCount + 1);
         }
-        mapTx.modify(entry, [ancestorsCount](CTxMemPoolEntry& entry) {
-                                entry.ancestorsCount = ancestorsCount;
+        mapTx.modify(entry, [ancestorsCount](CTxMemPoolEntry& e) {
+                                e.ancestorsCount = ancestorsCount;
                              });
     }
 }
@@ -772,8 +788,8 @@ void CTxMemPool::AddUncheckedNL(
             updateParentNL(newit, pit, true);
         }
     }
-    mapTx.modify(newit, [ancestorsCount](CTxMemPoolEntry& entry) {
-        entry.ancestorsCount = ancestorsCount;
+    mapTx.modify(newit, [ancestorsCount](CTxMemPoolEntry& e) {
+        e.ancestorsCount = ancestorsCount;
     });
 
     updateAncestorsOfNL(true, newit);
@@ -929,14 +945,14 @@ void CTxMemPool::removeRecursiveNL(
     removeStagedNL(setAllRemoves, nonNullChangeSet.Get(), conflictedWith, reason);
 }
 
-void CTxMemPool::RemoveForReorgNL(
-    const Config &config,
-    const CoinsDB& coinsTip,
-    const CJournalChangeSetPtr& changeSet,
-    const CBlockIndex& tip,
-    int flags) {
+void CTxMemPool::RemoveForReorgNL(const Config& config,
+                                  const CJournalChangeSetPtr& changeSet,
+                                  const CBlockIndex& tip,
+                                  int flags)
+{
 
     const int32_t nMemPoolHeight = tip.GetHeight() + 1;
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     const int nMedianTimePast = tip.GetMedianTimePast();
     // Remove transactions spending a coinbase which are now immature and
     // no-longer-final transactions.
@@ -1059,12 +1075,12 @@ void CTxMemPool::RemoveForBlock(
                     // let's see if it need to be updated later on
                     // it needs to be updated in two cases: 
                     //     1. parent and child are part of the same group (group needs to be disbanded)
-                    //     2. child is in secondary mempool, as well as it's parent (grouping data needs to be updated)
+                    //     2. child is in secondary mempool (grouping data needs to be updated)
                     if(found->IsCPFPGroupMember() && child->IsCPFPGroupMember() && (found->GetCPFPGroup() == child->GetCPFPGroup()))
                     {
                         childrenOfToRemoveGroupMembers.insert(child);
                     }
-                    else if(!found->IsInPrimaryMempool() && !child->IsInPrimaryMempool())
+                    else if(!child->IsInPrimaryMempool())
                     {
                         childrenOfToRemoveSecondaryMempool.insert(child);
                     }
@@ -1248,7 +1264,7 @@ void CTxMemPool::RemoveFrozenNL(const mining::CJournalChangeSetPtr& changeSet)
     setEntries spendingFrozenTXOs;
     for(const auto& spentTXO: mapNextTx.get<by_prevout>())
     {
-        std::uint8_t effectiveBlacklist;
+        std::uint8_t effectiveBlacklist{};
         if(!frozenTXOCheck.Check(spentTXO.outpoint, effectiveBlacklist))
         {
             // Is this input spent by confiscation transaction?
@@ -1349,16 +1365,19 @@ void CTxMemPool::clearNL(bool skipTransactionDatabase/* = false*/) {
 
 void CTxMemPool::trackPackageRemovedNL(const CFeeRate &rate, bool haveSecondaryMempoolTxs) 
 {
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     if (rate.GetFeePerK().GetSatoshis() > rollingMinimumFeeRate) 
     {
         // if we still have secondary mempool transactions we should not bump the rolling fee
         // above blockMinTxfee
         if (haveSecondaryMempoolTxs && rate > blockMinTxfee)
         {
+            // NOLINTNEXTLINE(*-narrowing-conversions)
             rollingMinimumFeeRate = blockMinTxfee.GetFeePerK().GetSatoshis();
         }
         else
         {
+            // NOLINTNEXTLINE(*-narrowing-conversions)
             rollingMinimumFeeRate = rate.GetFeePerK().GetSatoshis();
         }
         blockSinceLastRollingFeeBump = false;
@@ -1471,7 +1490,10 @@ void CTxMemPool::CheckMempoolImplNL(
                     if(!it2->IsInPrimaryMempool())
                     {
                         secondaryMempoolAncestorsCount += 1;
-                        secondaryMempoolAncestorsCount += it2->groupingData.value().ancestorsCount;
+
+                        const auto groupingData{it2->groupingData};
+                        assert(groupingData);
+                        secondaryMempoolAncestorsCount += groupingData->ancestorsCount;
                     }
                 }
             } else {
@@ -1488,7 +1510,9 @@ void CTxMemPool::CheckMempoolImplNL(
         if(secondaryMempoolAncestorsCount)
         {
             assert(!it->IsInPrimaryMempool());
-            assert(secondaryMempoolAncestorsCount == it->groupingData.value().ancestorsCount);
+            const auto& groupingData{it->groupingData};
+            assert(groupingData);
+            assert(secondaryMempoolAncestorsCount == groupingData->ancestorsCount);
         }
         else
         {
@@ -1741,6 +1765,7 @@ mining::CJournalChangeSetPtr CTxMemPool::RebuildMempool()
 }
 
 void CTxMemPool::SetSanityCheck(double dFrequency) {
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     nCheckFrequency = dFrequency * 4294967295.0;
 }
 
@@ -2096,9 +2121,11 @@ size_t CTxMemPool::SecondaryMempoolUsageNL() const {
     // worst case is secondary mempool entries consume more index which will slightly
     // increase memory pressure for primary mempool writeout instead of triggering
     // eviction from the secondary mempool
+    // NOLINTBEGIN(*-narrowing-conversions)
     double secondaryMempoolRatio = static_cast<double>(secondaryMempoolStats.Size()) / (mapTx.size() + 1);
     size_t indexSize = DynamicMemoryIndexUsageNL();
     return indexSize * secondaryMempoolRatio + secondaryMempoolStats.InnerUsage();
+    // NOLINTEND(*-narrowing-conversions)
 }
 
 void CTxMemPool::removeStagedNL(
@@ -2176,7 +2203,7 @@ int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeS
 
     CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
     removeStagedNL(stage, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::EXPIRY);
-    return stage.size();
+    return stage.size(); // NOLINT(*-narrowing-conversions)
 }
 
 int CTxMemPool::RemoveTxAndDescendants(const TxId & txid, const mining::CJournalChangeSetPtr& changeSet)
@@ -2189,7 +2216,7 @@ int CTxMemPool::RemoveTxAndDescendants(const TxId & txid, const mining::CJournal
         GetDescendantsNL(it, stage);
         CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
         removeStagedNL(stage, nonNullChangeSet.Get(), noConflict, MemPoolRemovalReason::EXPIRY);
-        return stage.size();
+        return stage.size(); // NOLINT(*-narrowing-conversions)
     }
     return 0;
 }
@@ -2365,10 +2392,10 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
         const CBlockIndex& tip = *chainActive.Tip();
         RemoveForReorgNL(
                 config,
-                *pcoinsTip,
                 changeSet,
                 tip,
-                StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.GetHeight())));
+                // NOLINTNEXTLINE(*-narrowing-conversions)
+                StandardNonFinalVerifyFlags(GetProtocolEra(config.GetConfigScriptPolicy(), tip.GetHeight())));
 
         if(tip.GetHeight() + 1 < CFrozenTXOCheck::Get_max_FrozenTXOData_enforceAtHeight_stop())
         {
@@ -2431,10 +2458,10 @@ void CTxMemPool::RemoveFromMempoolForReorg(const Config &config,
         const CBlockIndex& tip = *chainActive.Tip();
         RemoveForReorgNL(
             config,
-            *pcoinsTip,
             changeSet,
             tip,
-            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.GetHeight())));
+            // NOLINTNEXTLINE(*-narrowing-conversions)
+            StandardNonFinalVerifyFlags(GetProtocolEra(config.GetConfigScriptPolicy(), tip.GetHeight())));
     }
 
     // Check mempool & journal
@@ -2466,10 +2493,14 @@ void CTxMemPool::AddToDisconnectPoolUpToLimit(
         if(minerID->GetCoinbaseDocument().GetDataRefs())
         {
             // Build set of dataref txids for speedy lookup
-            for(const auto& dataref : minerID->GetCoinbaseDocument().GetDataRefs().value())
+            const auto& dataRefs{minerID->GetCoinbaseDocument().GetDataRefs()};
+            if(dataRefs)
             {
-                dataRefIds.insert(dataref.txid);
-                index.DeleteDatarefTxn(dataref.txid);
+                for(const auto& dataref : *dataRefs)
+                {
+                    dataRefIds.insert(dataref.txid);
+                    index.DeleteDatarefTxn(dataref.txid);
+                }
             }
         }
     }
@@ -2575,7 +2606,7 @@ CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const
     if (blockSinceLastRollingFeeBump && rollingMinimumFeeRate != 0) {
         int64_t time = GetTime();
         if (time > lastRollingFeeUpdate + 10) {
-            double halflife = halflife_;
+            double halflife = halflife_; // NOLINT(*-narrowing-conversions)
             if (DynamicMemoryUsageNL() < sizelimit / 4) {
                 halflife /= 4;
             } else if (DynamicMemoryUsageNL() < sizelimit / 2) {
@@ -2584,6 +2615,7 @@ CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const
 
             rollingMinimumFeeRate =
                 rollingMinimumFeeRate /
+                // NOLINTNEXTLINE(*-narrowing-conversions)
                 pow(2.0, (time - lastRollingFeeUpdate) / halflife);
             lastRollingFeeUpdate = time;
         }
@@ -2599,9 +2631,11 @@ int64_t CTxMemPool::evaluateEvictionCandidateNL(txiter entry)
     if(entry->IsCPFPGroupMember())
     {
         const auto& evalParams = entry->GetCPFPGroup()->EvaluationParams();
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         return (evalParams.fee + evalParams.feeDelta).GetSatoshis() * 1000 / evalParams.size;
     }
-    
+   
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     int64_t score = entry->GetModifiedFee().GetSatoshis() * 1000 / entry->GetTxSize();
     if(!entry->IsInPrimaryMempool())
     {
@@ -2758,8 +2792,10 @@ bool CTxMemPool::TransactionWithinChainLimit(const uint256 &txid, int64_t maxAnc
         return static_cast<int64_t>(it->ancestorsCount) < maxAncestorCount; 
     }
 
+    const auto& groupingData{it->groupingData};
+    assert(groupingData);
     return (static_cast<int64_t>(it->ancestorsCount) < maxAncestorCount) &&
-           (static_cast<int64_t>(it->groupingData->ancestorsCount) < maxSecondaryMempoolAncestorCount);
+           (static_cast<int64_t>(groupingData->ancestorsCount) < maxSecondaryMempoolAncestorCount);
 }
 
 unsigned long CTxMemPool::Size() {
@@ -2983,7 +3019,7 @@ void CTxMemPool::DoInitMempoolTxDB()
     OpenMempoolTxDB();
     try
     {
-        uint64_t version;
+        uint64_t version{};
         DumpFileID instanceId;
         CAutoFile file{OpenDumpFile(version, instanceId), SER_DISK, CLIENT_VERSION};
 
@@ -3059,8 +3095,8 @@ UniqueCFile CTxMemPool::OpenDumpFile(uint64_t& version_, DumpFileID& instanceId_
         throw std::runtime_error("Failed to open mempool file from disk");
     }
 
-    uint64_t version;
-    DumpFileID instanceId {0};
+    uint64_t version{};
+    DumpFileID instanceId { boost::uuids::nil_uuid() };
 
     file >> version;
     if (version > MEMPOOL_DUMP_VERSION || version < MEMPOOL_DUMP_COMPAT_VERSION)
@@ -3102,9 +3138,10 @@ bool CTxMemPool::LoadMempool(const Config &config,
                                  bool limitMempoolSize)>& processValidation)
 {
     try {
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int64_t nExpiryTimeout = config.GetMemPoolExpiry();
 
-        uint64_t version;
+        uint64_t version{};
         DumpFileID instanceId;
         CAutoFile file{OpenDumpFile(version, instanceId), SER_DISK, CLIENT_VERSION};
 
@@ -3113,7 +3150,7 @@ bool CTxMemPool::LoadMempool(const Config &config,
         int64_t failed = 0;
         int64_t nNow = GetTime();
 
-        uint64_t num;
+        uint64_t num{};
         file >> num;
         // A pointer to the TxIdTracker.
         const auto& pTxIdTracker = g_connman->GetTxIdTracker();
@@ -3121,8 +3158,6 @@ bool CTxMemPool::LoadMempool(const Config &config,
         while (num--) {
             bool txFromMemory = true;
             CTransactionRef tx;
-            int64_t nTime;
-            int64_t nFeeDelta;
 
             if (version >= MEMPOOL_DUMP_HAS_ON_DISK_TXS) {
                 file >> txFromMemory;
@@ -3140,7 +3175,11 @@ bool CTxMemPool::LoadMempool(const Config &config,
             else {
                 file >> tx;
             }
+
+            int64_t nTime{};
             file >> nTime;
+            
+            int64_t nFeeDelta{};
             file >> nFeeDelta;
             if (nFeeDelta != 0) {
                 const auto& txid = tx->GetId();
@@ -3183,10 +3222,10 @@ bool CTxMemPool::LoadMempool(const Config &config,
             }
         }
 
-        std::map<uint256, Amount> mapDeltas;
-        file >> mapDeltas;
+        std::map<uint256, Amount> deltas;
+        file >> deltas;
 
-        for (const auto &i : mapDeltas) {
+        for (const auto &i : deltas) {
             PrioritiseTransaction(i.first, i.first.ToString(), i.second);
         }
 
@@ -3219,9 +3258,9 @@ void CTxMemPool::DumpMempool() {
 void CTxMemPool::DumpMempool(uint64_t version) {
     int64_t start = GetTimeMicros();
 
-    std::map<uint256, Amount> mapDeltas;
+    std::map<uint256, Amount> deltas;
     std::vector<TxMempoolInfo> vinfo;
-    GetDeltasAndInfo(mapDeltas, vinfo);
+    GetDeltasAndInfo(deltas, vinfo);
 
     int64_t mid = GetTimeMicros();
 
@@ -3261,11 +3300,11 @@ void CTxMemPool::DumpMempool(uint64_t version) {
             }
             file << static_cast<int64_t>(i.nTime);
             file << static_cast<int64_t>(i.nFeeDelta.GetSatoshis());
-            mapDeltas.erase(i.GetTxId());
+            deltas.erase(i.GetTxId());
             ++count;
         }
 
-        file << mapDeltas;
+        file << deltas;
         FileCommit(file.Get());
         file.reset();
         RenameOver(GetDataDir() / "mempool.dat.new",

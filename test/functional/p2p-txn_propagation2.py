@@ -3,12 +3,10 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.comptool import TestManager, TestInstance, RejectResult
-from test_framework.blocktools import *
-from test_framework.util import *
+from test_framework.comptool import TestInstance
+from test_framework.blocktools import prepare_init_chain
+from test_framework.util import assert_equal, bytes_to_hex_str, wait_until
 from test_framework.key import CECKey
-from test_framework.script import *
-import time
 
 '''
 Test the behaviour of the txn propagation after a new block.

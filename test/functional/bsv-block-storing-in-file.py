@@ -6,14 +6,11 @@ This test checks whether block files are created as expected in different cases.
 """
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.comptool import TestInstance
 from test_framework.cdefs import (ONE_MEGABYTE)
 from test_framework.blocktools import ChainManager, prepare_init_chain
 from test_framework.mininode import (NetworkThread, NodeConn, NodeConnCB, msg_block)
-from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (p2p_port, assert_equal)
 import glob
-import time
 
 """
 RunnerNode represents local node with its own block chain
@@ -28,7 +25,7 @@ During initialization it:
 
 class RunnerNode(NodeConnCB):
     def __init__(self, remote_node, node_number):
-        super(RunnerNode,self).__init__()
+        super(RunnerNode, self).__init__()
         self.chain = ChainManager()
         self.next_block = 0
         self.remote_node = remote_node
@@ -56,7 +53,7 @@ class RunnerNode(NodeConnCB):
         # Create a new block - half of max block file size. Together with above blocks
         # this leaves less than 1MB of free space in the first block file
         self.create_and_send_block(ONE_MEGABYTE)
-        assert(
+        assert (
             len(glob.glob(tmp_dir + "/node" + str(self.node_number) + "/regtest/blocks/blk0000*.dat"))
             == 1) # sanity check that there is still only one file
 

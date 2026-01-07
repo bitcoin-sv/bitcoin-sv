@@ -6,7 +6,9 @@
 # Exercise the listreceivedbyaddress API
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_array_result
+
+from decimal import Decimal
 
 
 def get_sub_array_from_array(object_array, to_match):
@@ -49,11 +51,11 @@ class ReceivedByTest(BitcoinTestFramework):
         self.sync_all()
         assert_array_result(self.nodes[1].listreceivedbyaddress(),
                             {"address": addr},
-                            {"address": addr, "account": "", "amount": Decimal("0.1"), "confirmations": 10, "txids": [txid,]})
+                            {"address": addr, "account": "", "amount": Decimal("0.1"), "confirmations": 10, "txids": [txid, ]})
         # With min confidence < 10
         assert_array_result(self.nodes[1].listreceivedbyaddress(5),
                             {"address": addr},
-                            {"address": addr, "account": "", "amount": Decimal("0.1"), "confirmations": 10, "txids": [txid,]})
+                            {"address": addr, "account": "", "amount": Decimal("0.1"), "confirmations": 10, "txids": [txid, ]})
         # With min confidence > 10, should not find Tx
         assert_array_result(
             self.nodes[1].listreceivedbyaddress(11), {"address": addr}, {}, True)

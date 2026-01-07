@@ -120,7 +120,6 @@ public:
         std::lock_guard lockGuard{mMutexCurrentlyValidatingBlocks};
 
         int count =
-            // NOLINTNEXTLINE(*-narrowing-conversions)
             std::count_if(
                 mCurrentlyValidatingBlocks.begin(),
                 mCurrentlyValidatingBlocks.end(),
@@ -180,7 +179,7 @@ public:
 
         // if blockHash is not in mWaitAfterValidation
         // then we break while loop
-        do // NOLINT(cppcoreguidelines-avoid-do-while) 
+        do
         {
             {
                 std::scoped_lock lockGuard(mMutexWaitAfterValidation);

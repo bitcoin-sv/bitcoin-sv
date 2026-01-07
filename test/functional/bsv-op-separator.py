@@ -6,9 +6,9 @@ from time import sleep
 
 from test_framework.blocktools import create_block, create_coinbase
 from test_framework.key import CECKey
-from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block, NetworkThread, CInv
-from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG, \
-    OP_CODESEPARATOR, OP_TRUE, OP_VERIFY, OP_CHECKSIGVERIFY
+from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block
+from test_framework.script import CScript, SignatureHash, SIGHASH_ALL, \
+    SIGHASH_FORKID, OP_CHECKSIG, OP_CODESEPARATOR, OP_CHECKSIGVERIFY
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until
 
@@ -42,7 +42,7 @@ def make_separator_tx(tx_to_spend, key_for_tx_to_spend, n_sgnings):
     script_list = []
     for i in range(n_sgnings - 1):
         k = CECKey()
-        k.set_secretbytes(b"x" * (i+1))
+        k.set_secretbytes(b"x" * (i + 1))
         keys.append(k)
         script_list.extend([k.get_pubkey(), OP_CHECKSIGVERIFY, OP_CODESEPARATOR])
 
@@ -54,7 +54,7 @@ def make_separator_tx(tx_to_spend, key_for_tx_to_spend, n_sgnings):
     amount = tx_to_spend.vout[0].nValue - 2000
     tx.vout.append(CTxOut(amount, CScript(script_list)))
 
-    sighash = SignatureHashForkId(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
+    sighash = SignatureHash(tx_to_spend.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_to_spend.vout[0].nValue)
     tx.vin[0].scriptSig = CScript([key_for_tx_to_spend.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
     tx.rehash()
@@ -78,8 +78,8 @@ def spend_separator_tx(tx_sep_tx, keys_for_sep_tx):
     script_lists = [[]]
 
     for item in list(tx_sep_tx.vout[0].scriptPubKey):
-        for l in script_lists:
-            l.append(item)
+        for script in script_lists:
+            script.append(item)
         if item == OP_CODESEPARATOR:
             script_lists.append([])
 
@@ -89,7 +89,7 @@ def spend_separator_tx(tx_sep_tx, keys_for_sep_tx):
 
     sign_list = []
     for sc, key in zip(script_lists, keys_for_sep_tx):
-        sighash = SignatureHashForkId(CScript(sc), tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_sep_tx.vout[0].nValue)
+        sighash = SignatureHash(CScript(sc), tx, 0, SIGHASH_ALL | SIGHASH_FORKID, tx_sep_tx.vout[0].nValue)
         sign_list.append(key.sign(sighash) + flags)
 
     tx.vin[0].scriptSig = CScript(reversed(sign_list))

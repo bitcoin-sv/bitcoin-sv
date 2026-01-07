@@ -25,18 +25,18 @@
          - restart until recovery succeeds
          - check that utxo matches node3 using gettxoutsetinfo"""
 
+from test_framework.mininode import COIN, COutPoint, CTransaction, CTxIn, \
+    CTxOut, hex_str_to_bytes, ToHex
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import assert_equal, create_confirmed_utxos
+
+from decimal import Decimal
 import errno
 import http.client
 import random
 import sys
 import time
 import math
-from decimal import Decimal
-
-from test_framework.mininode import *
-from test_framework.script import *
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
 
 HTTP_DISCONNECT_ERRORS = [http.client.CannotSendRequest]
 try:
@@ -86,14 +86,14 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
                 if time.time() - time_start > 20:
                     # We had many unsuccessful restart attempts, disable -dbcrashratio for some time
                     print("Restarting with -dbcrashnotbefore, node %s" % node_index)
-                    self.start_node(node_index, extra_args=self.extra_args[node_index] + ["-dbcrashnotbefore="+str(math.ceil(time.time()+20))])
+                    self.start_node(node_index, extra_args=self.extra_args[node_index] + ["-dbcrashnotbefore=" + str(math.ceil(time.time() + 20))])
                 else:
                     self.start_node(node_index, extra_args=self.extra_args[node_index])
                 self.nodes[node_index].waitforblockheight(expected_tip)
                 utxo_hash = self.nodes[node_index].gettxoutsetinfo()[
                     'hash_serialized']
                 return utxo_hash
-            except:
+            except Exception:
                 # An exception here should mean the node is about to crash.
                 # If bitcoind exits, then try again.  wait_for_node_exit()
                 # should raise an exception if bitcoind doesn't exit.
@@ -200,7 +200,7 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
                 # probably a crash on db flushing
                 self.wait_for_node_exit(i, 30)
                 nodei_utxo_hash = self.restart_node(
-                    i, self.nodes[3].getblock(self.nodes[3].getbestblockhash(),1)['height'])
+                    i, self.nodes[3].getblock(self.nodes[3].getbestblockhash(), 1)['height'])
             assert_equal(nodei_utxo_hash, node3_utxo_hash)
 
     def generate_small_transactions(self, node, count, utxo_list):
@@ -311,7 +311,7 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
         for i in range(len(self.nodes)):
             try:
                 self.stop_node(i)
-            except:
+            except Exception:
                 print("Node %s already stopped or crashed" % i)
                 self.wait_for_node_exit(i, 30)
 

@@ -5,6 +5,7 @@
 #include "consensus/validation.h"
 #include "data/sighash.json.h"
 #include "hash.h"
+#include "protocol_era.h"
 #include "script/interpreter.h"
 #include "script/script.h"
 #include "serialize.h"
@@ -16,6 +17,7 @@
 #include "validation.h" // For CheckRegularTransaction
 #include "version.h"
 
+#include <cstdint>
 #include <iostream>
 
 #include <boost/test/unit_test.hpp>
@@ -23,12 +25,12 @@
 #include <univalue.h>
 
 // Old script.cpp SignatureHash function
-static uint256 SignatureHashOld(CScript scriptCode, const CTransaction &txTo,
-                                unsigned int nIn, uint32_t nHashType) {
+static uint256 Local_OriginalSignatureHash(CScript scriptCode, const CTransaction &txTo,
+                                     unsigned int nIn, uint32_t nHashType) {
     static const uint256 one(uint256S(
         "0000000000000000000000000000000000000000000000000000000000000001"));
     if (nIn >= txTo.vin.size()) {
-        printf("ERROR: SignatureHash(): nIn=%d out of range\n", nIn);
+        printf("ERROR: SignatureHash(): nIn=%d out of range\n", nIn); // NOLINT(cppcoreguidelines-pro-type-vararg)
         return one;
     }
     CMutableTransaction txTmp(txTo);
@@ -58,7 +60,7 @@ static uint256 SignatureHashOld(CScript scriptCode, const CTransaction &txTo,
         // Only lock-in the txout payee at same index as txin
         unsigned int nOut = nIn;
         if (nOut >= txTmp.vout.size()) {
-            printf("ERROR: SignatureHash(): nOut=%d out of range\n", nOut);
+            printf("ERROR: SignatureHash(): nOut=%d out of range\n", nOut); // NOLINT(cppcoreguidelines-pro-type-vararg)
             return one;
         }
         txTmp.vout.resize(nOut + 1);
@@ -87,25 +89,26 @@ static uint256 SignatureHashOld(CScript scriptCode, const CTransaction &txTo,
 }
 
 static void RandomScript(CScript &script) {
-    static const opcodetype oplist[] = {
+    static const std::array oplist{
         OP_FALSE, OP_1,        OP_2,
         OP_3,     OP_CHECKSIG, OP_IF,
         OP_VERIF, OP_RETURN,   OP_CODESEPARATOR};
     script = CScript();
-    int ops = (InsecureRandRange(10));
-    for (int i = 0; i < ops; i++) {
-        script << oplist[InsecureRandRange(sizeof(oplist) / sizeof(oplist[0]))];
+    const auto ops = (InsecureRandRange(10));
+    for (uint64_t i = 0; i < ops; i++) {
+        script << oplist[InsecureRandRange(sizeof(oplist) / sizeof(oplist[0]))]; // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     }
 }
 
 static void RandomTransaction(CMutableTransaction &tx, bool fSingle) {
-    tx.nVersion = insecure_rand();
+    tx.nVersion = insecure_rand(); // NOLINT(*-narrowing-conversions)
     tx.vin.clear();
     tx.vout.clear();
     tx.nLockTime = (InsecureRandBool()) ? insecure_rand() : 0;
-    int ins = (InsecureRandBits(2)) + 1;
-    int outs = fSingle ? ins : (InsecureRandBits(2)) + 1;
-    for (int in = 0; in < ins; in++) {
+    const auto ins = InsecureRandBits(2) + 1;
+    const auto outs = fSingle ? ins : (InsecureRandBits(2)) + 1;
+    for(uint64_t in = 0; in < ins; in++)
+    {
         tx.vin.push_back(CTxIn());
         CTxIn &txin = tx.vin.back();
         txin.prevout = COutPoint(InsecureRand256(), InsecureRandBits(2));
@@ -113,7 +116,9 @@ static void RandomTransaction(CMutableTransaction &tx, bool fSingle) {
         txin.nSequence =
             (InsecureRandBool()) ? insecure_rand() : (unsigned int)-1;
     }
-    for (int out = 0; out < outs; out++) {
+
+    for(uint64_t out = 0; out < outs; out++)
+    {
         tx.vout.push_back(CTxOut());
         CTxOut &txout = tx.vout.back();
         txout.nValue = Amount(int64_t(insecure_rand()) % 100000000);
@@ -140,22 +145,19 @@ BOOST_AUTO_TEST_CASE(sighash_test) {
         RandomTransaction(txTo, (nHashType & 0x1f) == SIGHASH_SINGLE);
         CScript scriptCode;
         RandomScript(scriptCode);
-        int nIn = InsecureRandRange(txTo.vin.size());
+        int nIn = InsecureRandRange(txTo.vin.size()); // NOLINT(*-narrowing-conversions)
 
-        uint256 shref =
-            SignatureHashOld(scriptCode, CTransaction(txTo), nIn, nHashType);
-        uint256 shold = SignatureHash(scriptCode, CTransaction(txTo), nIn,
-                                      sigHashType, Amount(0), nullptr, 0);
+        uint256 shref = Local_OriginalSignatureHash(scriptCode, CTransaction(txTo), nIn, nHashType);
+        uint256 shold = SignatureHashOriginal(scriptCode, CTransaction(txTo), nIn, sigHashType);
         BOOST_CHECK(shold == shref);
 
-        // Check the impact of the forkid flag.
-        uint256 shreg = SignatureHash(scriptCode, CTransaction(txTo), nIn,
-                                      sigHashType, Amount(0));
-        if (sigHashType.hasForkId()) {
-            BOOST_CHECK(nHashType & SIGHASH_FORKID);
+        // Check the impact of the forkid & chronicle flags
+        uint256 shreg = SignatureHash(scriptCode, CTransaction(txTo), nIn, sigHashType, Amount(0));
+        if (sigHashType.hasForkId() && !sigHashType.hasChronicle()) {
+            BOOST_CHECK((nHashType & SIGHASH_FORKID) && !(nHashType & SIGHASH_CHRONICLE));
             BOOST_CHECK(shreg != shref);
         } else {
-            BOOST_CHECK((nHashType & SIGHASH_FORKID) == 0);
+            BOOST_CHECK(! ((nHashType & SIGHASH_FORKID) && !(nHashType & SIGHASH_CHRONICLE)));
             BOOST_CHECK(shreg == shref);
         }
 
@@ -184,11 +186,11 @@ BOOST_AUTO_TEST_CASE(sighash_test) {
 // Goal: check that SignatureHash generates correct hash
 BOOST_AUTO_TEST_CASE(sighash_from_data) {
     UniValue tests = read_json(
-        std::string(json_tests::sighash,
-                    json_tests::sighash + sizeof(json_tests::sighash)));
+        std::string(json_tests::sighash, // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+                    json_tests::sighash + sizeof(json_tests::sighash))); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay, cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
     for (size_t idx = 0; idx < tests.size(); idx++) {
-        UniValue test = tests[idx];
+        const UniValue& test = tests[idx];
         std::string strTest = test.write();
         // Allow for extra stuff (useful for comments)
         if (test.size() < 1) {
@@ -201,7 +203,7 @@ BOOST_AUTO_TEST_CASE(sighash_from_data) {
         }
 
         std::string sigHashRegHex, sigHashOldHex;
-        int nIn;
+        int nIn; // NOLINT(cppcoreguidelines-init-variables)
         SigHashType sigHashType;
         CTransactionRef tx;
         CScript scriptCode = CScript();
@@ -219,7 +221,9 @@ BOOST_AUTO_TEST_CASE(sighash_from_data) {
             stream >> tx;
 
             CValidationState state;
-            BOOST_CHECK_MESSAGE(CheckRegularTransaction(*tx, state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, false), strTest);
+            BOOST_CHECK_MESSAGE(CheckRegularTransaction(*tx, state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS,
+                                                        MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS,
+                                                        ProtocolEra::PreGenesis), strTest);
             BOOST_CHECK(state.IsValid());
 
             std::vector<uint8_t> raw = ParseHex(raw_script);
@@ -232,7 +236,7 @@ BOOST_AUTO_TEST_CASE(sighash_from_data) {
         uint256 shreg = SignatureHash(scriptCode, *tx, nIn, sigHashType, Amount(0));
         BOOST_CHECK_MESSAGE(shreg.GetHex() == sigHashRegHex, strTest);
 
-        uint256 shold = SignatureHash(scriptCode, *tx, nIn, sigHashType, Amount(0), nullptr, 0);
+        uint256 shold = SignatureHashOriginal(scriptCode, *tx, nIn, sigHashType);
         BOOST_CHECK_MESSAGE(shold.GetHex() == sigHashOldHex, strTest);
     }
 }

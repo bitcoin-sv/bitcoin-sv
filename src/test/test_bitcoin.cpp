@@ -4,12 +4,13 @@
 
 #include "test_bitcoin.h"
 
+#include "block_read_cache.h"
 #include "chainparams.h"
 #include "config.h"
 #include "consensus/consensus.h"
+#include "consensus/consensus.h"
 #include "consensus/validation.h"
 #include "crypto/sha256.h"
-#include "fs.h"
 #include "key.h"
 #include "logging.h"
 #include "miner_id/miner_info_tracker.h"
@@ -17,7 +18,6 @@
 #include "mining/journal_builder.h"
 #include "net/net_processing.h"
 #include "pow.h"
-#include "pubkey.h"
 #include "random.h"
 #include "rpc/mining.h"
 #include "rpc/register.h"
@@ -26,6 +26,7 @@
 #include "script/sigcache.h"
 #include "taskcancellation.h"
 #include "txdb.h"
+#include "txdb_defaults.h"
 #include "txmempool.h"
 #include "ui_interface.h"
 
@@ -50,13 +51,13 @@ const uint256 insecure_rand_seed = []() {
     auto env = std::getenv(env_var_name);
     auto hash = env ? uint256S(env) : GetRandHash();
     if (env) {
-        printf("Global random seed is set by environment: %s\n", hash.GetHex().c_str());
+        printf("Global random seed is set by environment: %s\n", hash.GetHex().c_str()); // NOLINT(cppcoreguidelines-pro-type-vararg)
     } else {
-        printf("To re-run tests using the same seed, set the following environment variable:\n export %s=%s\n", env_var_name, hash.GetHex().c_str());
+        printf("To re-run tests using the same seed, set the following environment variable:\n export %s=%s\n", env_var_name, hash.GetHex().c_str()); // NOLINT(cppcoreguidelines-pro-type-vararg)
     }
     return hash;
 }();
-FastRandomContext insecure_rand_ctx(insecure_rand_seed);
+FastRandomContext insecure_rand_ctx(insecure_rand_seed); // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 extern void noui_connect();
 
@@ -74,7 +75,7 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(
     ResetGlobalRandomContext();
 
     // Don't want to write to bitcoind.log file.
-    GetLogger().fPrintToDebugLog = false;
+    GetLogger().SetPrintToDebugLog(false);
 
     fCheckBlockIndex = true;
     SelectParams(chainName);
@@ -115,16 +116,18 @@ TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory:
     : BasicTestingSetup(chainName) {
     
     testConfig.SetMiningCandidateBuilder(assemblerType);
+    g_blockReadCache = std::make_unique<BlockReadCache>();
     // Ideally we'd move all the RPC tests to the functional testing framework
     // instead of unit tests, but for now we need these here.
     RegisterAllRPCCommands(tableRPC);
     mempool.SetSanityCheck(1.0);
     InitFrozenTXO(DEFAULT_FROZEN_TXO_DB_CACHE);
-    pblocktree = new CBlockTreeDB(1 << 20, true);
+    pblocktree = std::make_unique<CBlockTreeDB>(1 << 20, true);
     pcoinsTip =
         std::make_unique<CoinsDB>(
             std::numeric_limits<size_t>::max(),
             1 << 23,
+            CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE,
             CoinsDB::MaxFiles::Default(),
             true);
     if (!InitBlockIndex(testConfig)) {
@@ -152,7 +155,7 @@ TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory:
     mining::g_miningFactory = std::make_unique<mining::CMiningFactory>(testConfig);
 }
 
-TestingSetup::~TestingSetup() {
+TestingSetup::~TestingSetup() { // NOLINT(bugprone-exception-escape)
     mining::g_miningFactory.reset();
     threadGroup.interrupt_all();
     threadGroup.join_all();
@@ -172,9 +175,9 @@ TestingSetup::~TestingSetup() {
 
     ShutdownScriptCheckQueues();
     UnregisterNodeSignals(GetNodeSignals());
-    delete pblocktree;
-    pblocktree = nullptr;
+    pblocktree.reset();
     ShutdownFrozenTXO();
+    g_blockReadCache.reset();
 }
 
 TestChain100Setup::TestChain100Setup()
@@ -233,23 +236,27 @@ CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CMutableTransaction &tx,
     return FromTx(txn, pool);
 }
 
-CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransaction &txn,
-                                               CTxMemPool *pool) {
-    return CTxMemPoolEntry(MakeTransactionRef(txn), nFee, nTime, 
-                           nHeight, spendsCoinbase, lp);
+CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransaction& txn, CTxMemPool* /*pool*/)
+{
+    return CTxMemPoolEntry(MakeTransactionRef(txn),
+                           nFee,
+                           nTime,
+                           nHeight,
+                           spendsCoinbase,
+                           lp);
 }
 
 namespace {
 // A place to put misc. setup code eg "the travis workaround" that needs to run
 // at program startup and exit
-struct Init {
+struct Init { // NOLINT(cppcoreguidelines-special-member-functions)
     Init();
     ~Init();
 
     std::list<std::function<void(void)>> cleanup;
 };
 
-Init init;
+Init init; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 Init::Init() {
     if (getenv("TRAVIS_NOHANG_WORKAROUND")) {
@@ -259,7 +266,7 @@ Init::Init() {
         // The strategy here is to let the jobs finish however long they take
         // on Travis, by feeding Travis output.  We start a parallel thread
         // that just prints out '.' once per second.
-        struct Private {
+        struct Private { // NOLINT(cppcoreguidelines-owning-memory)
             Private() : stop(false) {}
             std::atomic_bool stop;
             std::thread thr;
@@ -278,7 +285,7 @@ Init::Init() {
                 }
                 if (!(++ctr % 79)) {
                     // newline once in a while to keep travis happy
-                    std::cerr << std::endl;
+                    std::cerr << '\n'; 
                 }
                 p->cond.wait_for(lock, std::chrono::milliseconds(1000));
             }
@@ -293,7 +300,7 @@ Init::Init() {
             if (p->thr.joinable()) {
                 p->thr.join();
             }
-            delete p;
+            delete p; // NOLINT(cppcoreguidelines-owning-memory)
         });
     }
 }

@@ -15,16 +15,17 @@
 #include "wallet/test/wallet_test_fixture.h"
 #include "blockfileinfostore.h"
 
-#include <boost/test/unit_test.hpp>
-
 #include <univalue.h>
 
 #include <cstdint>
+#include <memory>
 #include <set>
 #include <utility>
 #include <vector>
 
-extern CWallet *pwalletMain;
+#include <boost/test/unit_test.hpp>
+
+extern CWallet *pwalletMain; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 // how many times to run all the tests to have a chance to catch errors that
 // only show up with particular random shuffles
@@ -34,7 +35,7 @@ extern CWallet *pwalletMain;
 // many times and only complain if all iterations of the test fail.
 #define RANDOM_REPEATS 5
 
-std::vector<std::unique_ptr<CWalletTx>> wtxn;
+std::vector<std::unique_ptr<CWalletTx>> wtxn; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 typedef std::set<std::pair<const CWalletTx *, unsigned int>> CoinSet;
 
@@ -42,13 +43,16 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
 
 // Critical section is used to prevent concurrent execution of
 // tests in this fixture
-static CCriticalSection walletCriticalSection;
+static CCriticalSection walletCriticalSection; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
-static std::vector<COutput> vCoins;
+static std::vector<COutput> vCoins; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
-static void add_coin(const CWallet &wallet, const Amount nValue,
-                     int nAge = 6 * 24, bool fIsFromMe = false,
-                     int nInput = 0) {
+static void add_coin(const CWallet& wallet,
+                     const Amount& nValue,
+                     int nAge = 6 * 24,
+                     bool fIsFromMe = false,
+                     int nInput = 0)
+{
     static int nextLockTime = 0;
     CMutableTransaction tx;
     tx.nLockTime = nextLockTime++; // so all transactions get different hashes
@@ -77,7 +81,8 @@ static void empty_wallet(void) {
     wtxn.clear();
 }
 
-static bool equal_sets(CoinSet a, CoinSet b) {
+static bool equal_sets(const CoinSet& a, const CoinSet& b) 
+{
     std::pair<CoinSet::iterator, CoinSet::iterator> ret =
         mismatch(a.begin(), a.end(), b.begin());
     return ret.first == a.end() && ret.second == b.end();
@@ -363,7 +368,7 @@ BOOST_AUTO_TEST_CASE(coin_selection_tests) {
             if (amt - Amount(2000) < MIN_CHANGE) {
                 // needs more than one input:
                 uint16_t returnSize = std::ceil(
-                    (2000.0 + MIN_CHANGE.GetSatoshis()) / amt.GetSatoshis());
+                    (2000.0 + MIN_CHANGE.GetSatoshis()) / amt.GetSatoshis()); // NOLINT(*-narrowing-conversions)
                 Amount returnValue = returnSize * amt;
                 BOOST_CHECK_EQUAL(nValueRet, returnValue);
                 BOOST_CHECK_EQUAL(setCoinsRet.size(), returnSize);
@@ -489,8 +494,8 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChain100Setup) {
     // before the missing block, and success for a key whose creation time is
     // after.
     {
-        CWallet wallet(Params());
-        vpwallets.insert(vpwallets.begin(), &wallet);
+        vpwallets.emplace(vpwallets.begin(),
+                          std::make_unique<CWallet>(Params()));
         UniValue keys;
         keys.setArray();
         UniValue key;
@@ -566,34 +571,35 @@ BOOST_FIXTURE_TEST_CASE(importwallet_rescan, TestChain100Setup) {
 
     // Import key into wallet and call dumpwallet to create backup file.
     {
-        CWallet wallet(Params());
-        LOCK(wallet.cs_wallet);
-        wallet.mapKeyMetadata[coinbaseKey.GetPubKey().GetID()].nCreateTime =
+        auto wallet = std::make_unique<CWallet>(Params());
+        LOCK(wallet->cs_wallet);
+        wallet->mapKeyMetadata[coinbaseKey.GetPubKey().GetID()].nCreateTime =
             KEY_TIME;
-        wallet.AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey());
+        wallet->AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey());
 
         JSONRPCRequest request;
         request.params.setArray();
         request.params.push_back((pathTemp / "wallet.backup").string());
-        vpwallets.insert(vpwallets.begin(), &wallet);
+        vpwallets.insert(vpwallets.begin(), std::move(wallet));
         ::dumpwallet(GlobalConfig::GetConfig(), request);
     }
 
     // Call importwallet RPC and verify all blocks with timestamps >= BLOCK_TIME
     // were scanned, and no prior blocks were scanned.
     {
-        CWallet wallet(Params());
+        auto wallet = std::make_unique<CWallet>(Params());
 
         JSONRPCRequest request;
         request.params.setArray();
         request.params.push_back((pathTemp / "wallet.backup").string());
-        vpwallets[0] = &wallet;
+        vpwallets[0] = std::move(wallet);
         ::importwallet(GlobalConfig::GetConfig(), request);
 
-        BOOST_CHECK_EQUAL(wallet.mapWallet.size(), 3U);
+        BOOST_CHECK_EQUAL(vpwallets[0]->mapWallet.size(), 3U);
         BOOST_CHECK_EQUAL(coinbaseTxns.size(), 103U);
-        for (size_t i = 0; i < coinbaseTxns.size(); ++i) {
-            bool found = wallet.GetWalletTx(coinbaseTxns[i].GetHash());
+        for(size_t i = 0; i < coinbaseTxns.size(); ++i)
+        {
+            bool found = vpwallets[0]->GetWalletTx(coinbaseTxns[i].GetHash());
             bool expected = i >= 100;
             BOOST_CHECK_EQUAL(found, expected);
         }

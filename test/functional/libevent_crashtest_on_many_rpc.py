@@ -6,7 +6,7 @@
 # crash regression introduced by libevent-2.1.7
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import str_to_b64str
 
 import http.client
 import urllib.parse
@@ -34,14 +34,14 @@ class RpcFloddingTest (BitcoinTestFramework):
         conn.connect()
         conn.request('POST', '/', '{"method": "getbestblockhash"}', headers)
         out1 = conn.getresponse().read()
-        assert(b'"error":null' in out1)
-        assert(conn.sock != None)
+        assert (b'"error":null' in out1)
+        assert (conn.sock is not None)
         # according to http/1.1 connection must still be open!
 
         # communication will crash in following while loop if libevent-2.1.7 is used. 2.1.11 will not crash
         # looping with 100 will sometimes succeed and sometimes fail with libevent-2.1.7 hence using 2000
         for _ in range(2000):
-            r = requests.get("http://" + url.hostname + ":" + str(url.port), auth=(url.username, url.password), data=json.dumps({}))
+            requests.get("http://" + url.hostname + ":" + str(url.port), auth=(url.username, url.password), data=json.dumps({}))
 
 
 if __name__ == '__main__':

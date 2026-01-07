@@ -9,34 +9,35 @@
 #include "chain.h"
 #include "coins.h"
 #include "config.h"
-#include "transaction_specific_config.h"
+#include "consensus/merkle.h"
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "dstencode.h"
 #include "keystore.h"
 #include "merkleblock.h"
+#include "merkletreestore.h"
 #include "net/net.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
+#include "protocol_era.h"
+#include "rawtxvalidator.h"
+#include "rpc/blockchain.h"
 #include "rpc/http_protocol.h"
+#include "rpc/misc.h"
 #include "rpc/server.h"
 #include "rpc/tojson.h"
+#include "script/interpreter.h"
 #include "script/script_error.h"
+#include "script/script_flags.h"
 #include "script/sign.h"
 #include "script/standard.h"
 #include "taskcancellation.h"
+#include "transaction_specific_config.h"
 #include "txdb.h"
 #include "txmempool.h"
-#include "txn_validator.h"
 #include "uint256.h"
 #include "utilstrencodings.h"
-#include "validation.h"
-#include "merkletreestore.h"
-#include "rpc/blockchain.h"
-#include "rpc/misc.h"
-#include "consensus/merkle.h"
-#include "util.h"
-#include "rawtxvalidator.h"
+
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
 #include "wallet/wallet.h"
@@ -191,8 +192,8 @@ void getrawtransaction(const Config& config,
 
     CTransactionRef tx;
     uint256 hashBlock;
-    bool isGenesisEnabled;
-    if (!GetTransaction(config, txid, tx, true, hashBlock, isGenesisEnabled)) 
+    ProtocolEra era {};
+    if (!GetTransaction(config, txid, tx, true, hashBlock, era)) 
     {
         throw JSONRPCError(
             RPC_INVALID_ADDRESS_OR_KEY,
@@ -244,11 +245,11 @@ void getrawtransaction(const Config& config,
                 blockData.confirmations = 0;
             }
         }
-        TxToJSON(*tx, hashBlock, isGenesisEnabled, RPCSerializationFlags(), jWriter, blockData);
+        TxToJSON(*tx, hashBlock, era, RPCSerializationFlags(), jWriter, blockData);
     } 
     else 
     {
-        TxToJSON(*tx, uint256(), isGenesisEnabled, RPCSerializationFlags(), jWriter);
+        TxToJSON(*tx, uint256(), era, RPCSerializationFlags(), jWriter);
     }
 
     textWriter.Write(", \"error\": " + NullUniValue.write() + ", \"id\": " + request.id.write() + "}");
@@ -326,8 +327,7 @@ static CBlockIndex* GetBlockIndex(const Config& config,
     {
         CTransactionRef tx;
         uint256 foundBlockHash;
-        bool isGenesisEnabledDummy; // not used
-        if (!GetTransaction(config, *setTxIds.cbegin(), tx, false, foundBlockHash, isGenesisEnabledDummy) ||
+        if (ProtocolEra era; !GetTransaction(config, *setTxIds.cbegin(), tx, false, foundBlockHash, era) ||
             foundBlockHash.IsNull())
         {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
@@ -434,8 +434,8 @@ static UniValue gettxoutproof(const Config &config,
     return strHex;
 }
 
-static UniValue verifytxoutproof(const Config &config,
-                                 const JSONRPCRequest &request) {
+static UniValue verifytxoutproof(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp || request.params.size() != 1) {
         throw std::runtime_error(
             "verifytxoutproof \"proof\"\n"
@@ -570,7 +570,7 @@ static UniValue createrawtransaction(const Config &config,
 
         uint256 txid = ParseHashO(o, "txid");
 
-        const UniValue &vout_v = find_value(o, "vout");
+        const UniValue vout_v = find_value(o, "vout");
         if (!vout_v.isNum()) {
             throw JSONRPCError(RPC_INVALID_PARAMETER,
                                "Invalid parameter, missing vout key");
@@ -587,7 +587,7 @@ static UniValue createrawtransaction(const Config &config,
                              : std::numeric_limits<uint32_t>::max());
 
         // Set the sequence number if passed in the parameters object.
-        const UniValue &sequenceObj = find_value(o, "sequence");
+        const UniValue sequenceObj = find_value(o, "sequence");
         if (sequenceObj.isNum()) {
             int64_t seqNr64 = sequenceObj.get_int64();
             if (seqNr64 < 0 || seqNr64 > std::numeric_limits<uint32_t>::max()) {
@@ -719,7 +719,7 @@ void decoderawtransaction(const Config& config,
     }
 }
 
-void decoderawtransaction(const Config& config,
+void decoderawtransaction(const Config&,
                           const JSONRPCRequest& request,
                           CTextWriter& textWriter, 
                           bool processedInBatch,
@@ -746,14 +746,15 @@ void decoderawtransaction(const Config& config,
         std::none_of(tx.vout.begin(), tx.vout.end(), [](const CTxOut& out) {
             return IsP2SH(out.scriptPubKey);
         });
+    ProtocolEra era { genesisEnabled? ProtocolEra::PostGenesis : ProtocolEra::PreGenesis };
     CJSONWriter jWriter(textWriter, false);
-    TxToJSON(tx, uint256(), genesisEnabled, 0, jWriter);
+    TxToJSON(tx, uint256(), era, 0, jWriter);
     
     textWriter.Write(", \"error\": " + NullUniValue.write() + ", \"id\": " + request.id.write() + "}");
 }
 
-static UniValue decodescript(const Config &config,
-                             const JSONRPCRequest &request) {
+static UniValue decodescript(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp || request.params.size() != 1) {
         throw std::runtime_error(
             "decodescript \"hexstring\"\n"
@@ -791,10 +792,9 @@ static UniValue decodescript(const Config &config,
         // Empty scripts are valid.
     }
 
-    ScriptPubKeyToUniv(
-        script, true,
-        !IsP2SH(script), // treat all transactions as post-Genesis, except P2SH
-        r);
+    // Treat all transactions as post-Genesis, except P2SH
+    ProtocolEra era { IsP2SH(script)? ProtocolEra::PreGenesis : ProtocolEra::PostGenesis };
+    ScriptPubKeyToUniv(script, true, era, r);
 
     UniValue type;
     type = find_value(r, "type");
@@ -1065,7 +1065,7 @@ static UniValue signrawtransaction(const Config &config,
                     coinHeight = genesisActivationHeight - 1;
                 }
 
-                view.AddCoin(out, CoinWithScript::MakeOwning(std::move(txout), coinHeight, false, false), true, genesisActivationHeight);
+                view.AddCoin(out, CoinWithScript::MakeOwning(std::move(txout), coinHeight, false, false), true, config.GetGenesisActivationHeight());
             }
 
             // If redeemScript given and not using the local wallet (private
@@ -1135,7 +1135,7 @@ static UniValue signrawtransaction(const Config &config,
     // rehashing.
     const CTransaction txConst(mergedTx);
 
-    bool genesisEnabled = IsGenesisEnabled(config, activeChainHeight + 1);
+    ProtocolEra era { GetProtocolEra(config.GetConfigScriptPolicy(), activeChainHeight + 1) };
 
     // Sign what we can:
     for (size_t i = 0; i < mergedTx.vin.size(); i++) {
@@ -1150,47 +1150,67 @@ static UniValue signrawtransaction(const Config &config,
         const CScript &prevPubKey = coin->GetTxOut().scriptPubKey;
         const Amount amount = coin->GetTxOut().nValue;
 
-        bool utxoAfterGenesis = IsGenesisEnabled(config, coin.value(), activeChainHeight + 1);
+        ProtocolEra utxoEra { coin.value().GetProtocolEra(config.GetConfigScriptPolicy(), activeChainHeight + 1) };
 
         SignatureData sigdata;
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
-        if ((sigHashType.getBaseType() != BaseSigHashType::SINGLE) ||
-            (i < mergedTx.vout.size())) {
-            ProduceSignature(config, true, MutableTransactionSignatureCreator(
-                                 &keystore, &mergedTx, i, amount, sigHashType),
-                             genesisEnabled, utxoAfterGenesis, prevPubKey, sigdata);
+        if((sigHashType.getBaseType() != BaseSigHashType::SINGLE) ||
+           (i < mergedTx.vout.size()))
+        {
+            SignAndVerify(config.GetConfigScriptPolicy(),
+                          true,
+                          MutableTransactionSignatureCreator(&keystore,
+                                                             &mergedTx,
+                                                             i,
+                                                             amount,
+                                                             sigHashType),
+                          era,
+                          utxoEra,
+                          prevPubKey,
+                          sigdata);
         }
 
+        constexpr bool consensus{true};
+        const auto flags{MandatoryScriptVerifyFlags(era)};
+        const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, consensus)};
+
         // ... and merge in other signatures:
-        for (const CMutableTransaction &txv : txVariants) {
-            if (txv.vin.size() > i) {
-                sigdata = CombineSignatures(
-                    config, 
-                    true,
-                    prevPubKey,
-                    TransactionSignatureChecker(&txConst, i, amount), sigdata,
-                    DataFromTransaction(txv, i),
-                    utxoAfterGenesis);
+        for(const CMutableTransaction& txv : txVariants)
+        {
+            if(txv.vin.size() > i)
+            {
+               sigdata = CombineSignatures(params,
+                                           prevPubKey,
+                                           TransactionSignatureChecker(&txConst,
+                                                                       i,
+                                                                       amount),
+                                           sigdata,
+                                           DataFromTransaction(txv, i),
+                                           era,
+                                           utxoEra);
             }
         }
 
         UpdateTransaction(mergedTx, i, sigdata);
 
-        ScriptError serror = SCRIPT_ERR_OK;
         auto source = task::CCancellationSource::Make();
-        auto res =
-            VerifyScript(
-                config,
-                true,
-                source->GetToken(),
-                txin.scriptSig,
-                prevPubKey,
-                StandardScriptVerifyFlags(genesisEnabled, utxoAfterGenesis),
-                TransactionSignatureChecker(&txConst, i, amount),
-                &serror);
-        if (!res.value())
+        const auto std_input_flags{StandardScriptVerifyFlags(era) | InputScriptVerifyFlags(era, utxoEra)};
+        const auto std_input_params{make_verify_script_params(config.GetConfigScriptPolicy(), std_input_flags, consensus)};
+        const auto res = VerifyScript(std_input_params,
+                                      source->GetToken(),
+                                      txin.scriptSig,
+                                      prevPubKey,
+                                      std_input_flags,
+                                      TransactionSignatureChecker(&txConst, i, amount));
+        if(!res.has_value())
         {
-            TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
+            TxInErrorToJSON(txin, vErrors, "Validation timeout");
+        }
+        else if(res.value() != SCRIPT_ERR_OK)
+        {
+            TxInErrorToJSON(txin,
+                            vErrors,
+                            ScriptErrorString(res.value()));
         }
     }
 
@@ -1260,7 +1280,11 @@ namespace
 
 
     // Parse UniValue and set TransactionSpecificConfig
-    bool setTransactionSpecificConfig(TransactionSpecificConfig& tsc, const UniValue& jsonConfig, uint32_t skipScriptFlags, std::string& rejectReason)
+    bool setTransactionSpecificConfig(TransactionSpecificConfig& tsc,
+                                      const UniValue& jsonConfig,
+                                      uint32_t skipScriptFlags,
+                                      ProtocolEra era,
+                                      std::string& rejectReason)
     {
         const std::set<std::string> allPolicySettings = {"maxtxsizepolicy","datacarriersize","maxscriptsizepolicy","maxscriptnumlengthpolicy",
                                                          "maxstackmemoryusagepolicy","maxscriptnumlengthpolicy","limitancestorcount", "limitcpfpgroupmemberscount",
@@ -1312,7 +1336,7 @@ namespace
         }
 
         if (UniValue maxscriptnumlengthpolicy_uv; !getNumOrRejectReason(jsonConfig, "maxscriptnumlengthpolicy", maxscriptnumlengthpolicy_uv, rejectReason) ||
-            (!maxscriptnumlengthpolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptNumLengthPolicy(maxscriptnumlengthpolicy_uv.get_int64(), &rejectReason)))
+            (!maxscriptnumlengthpolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptNumLengthPolicy(era, maxscriptnumlengthpolicy_uv.get_int64(), &rejectReason)))
         {
             return false;
         }
@@ -1324,7 +1348,7 @@ namespace
        }
 
         if (UniValue maxscriptnumlengthpolicy_uv; !getNumOrRejectReason(jsonConfig, "maxscriptnumlengthpolicy", maxscriptnumlengthpolicy_uv, rejectReason) || 
-            (!maxscriptnumlengthpolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptNumLengthPolicy(maxscriptnumlengthpolicy_uv.get_int64(), &rejectReason)))
+            (!maxscriptnumlengthpolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptNumLengthPolicy(era, maxscriptnumlengthpolicy_uv.get_int64(), &rejectReason)))
         {
             return false;
         }
@@ -1469,8 +1493,8 @@ namespace
     }
 }
 
-static UniValue sendrawtransaction(const Config &config,
-                                   const JSONRPCRequest &request) {
+static UniValue sendrawtransaction(const Config&, const JSONRPCRequest& request)
+{
     if (request.fHelp || request.params.size() < 1 ||
         request.params.size() > 3) {
         throw std::runtime_error(
@@ -1888,6 +1912,9 @@ void sendrawtransactions(const Config& config,
     std::shared_ptr<TransactionSpecificConfig> global_tsc;
     uint32_t skipScriptFlagsGlobal = 0;
 
+    // Get active protocol
+    ProtocolEra era { GetProtocolEra(config.GetConfigScriptPolicy(), chainActive.Height()) };
+
     // Check if we have a second parameter that provides config for all inputs
     if (!request.params[1].empty() && request.params[1].isObject())
     {
@@ -1897,7 +1924,7 @@ void sendrawtransactions(const Config& config,
         }
 
         global_tsc = std::make_shared<TransactionSpecificConfig>(*globalConfig);
-        if(std::string rejectReason; !setTransactionSpecificConfig(*global_tsc, request.params[1], skipScriptFlagsGlobal, rejectReason))
+        if(std::string rejectReason; !setTransactionSpecificConfig(*global_tsc, request.params[1], skipScriptFlagsGlobal, era, rejectReason))
         {
              throw JSONRPCError(RPC_INVALID_PARAMETER, rejectReason);
         }
@@ -1937,7 +1964,7 @@ void sendrawtransactions(const Config& config,
                     std::string("Invalid parameter: An empty json object"));
         }
         // Read and decode transaction's data.
-        const UniValue &txn_data = find_value(o, "hex");
+        const UniValue txn_data = find_value(o, "hex");
         if (txn_data.isNull() || !txn_data.isStr()) {
             throw JSONRPCError(RPC_INVALID_PARAMETER,
                     std::string("Invalid parameter: Missing the hex string of the raw transaction"));
@@ -1951,7 +1978,7 @@ void sendrawtransactions(const Config& config,
         const TxId& txid = tx->GetId();
         // Read allowhighfees.
         Amount nMaxRawTxFee = maxTxFee;
-        const UniValue &allowhighfees = find_value(o, "allowhighfees");
+        const UniValue allowhighfees = find_value(o, "allowhighfees");
         if (!allowhighfees.isNull()) {
             if (!allowhighfees.isBool()) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER,
@@ -1964,7 +1991,7 @@ void sendrawtransactions(const Config& config,
         bool listUnconfirmedAncestors = false;
         bool fTxInMempools = mempool.Exists(txid) || mempool.getNonFinalPool().exists(txid);
         // Read dontcheckfee.
-        const UniValue &dontcheckfee = find_value(o, "dontcheckfee");
+        const UniValue dontcheckfee = find_value(o, "dontcheckfee");
         if (!dontcheckfee.isNull()) {
             if (!dontcheckfee.isBool()) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER,
@@ -1977,12 +2004,12 @@ void sendrawtransactions(const Config& config,
         //Check for config per input
         std::shared_ptr<TransactionSpecificConfig> tsc;
         uint32_t skipFlagsValue = 0;
-        const UniValue& configPolicies = find_value(o, "config");
+        const UniValue configPolicies = find_value(o, "config");
         if(!configPolicies.isNull())
         {
             tsc = std::make_shared<TransactionSpecificConfig>(*globalConfig);
             // set transaction specific config and skipScriptFlags. Put transaction to invalid array with appropriate reject_reason if anything fails.
-            if(std::string rejectReason; !parseSkipScriptFlags(configPolicies, skipFlagsValue, rejectReason) || !setTransactionSpecificConfig(*tsc, configPolicies, skipFlagsValue, rejectReason))
+            if(std::string rejectReason; !parseSkipScriptFlags(configPolicies, skipFlagsValue, rejectReason) || !setTransactionSpecificConfig(*tsc, configPolicies, skipFlagsValue, era, rejectReason))
             {
                 RawTxValidator::RawTxValidatorResult result{ txid, CValidationState(), false };
                 result.state.value().Error(rejectReason);
@@ -2004,7 +2031,7 @@ void sendrawtransactions(const Config& config,
         else
         {
             // Read listunconfirmedancestors.
-            const UniValue& listunconfirmedancestors = find_value(o, "listunconfirmedancestors");
+            const UniValue listunconfirmedancestors = find_value(o, "listunconfirmedancestors");
             if (!listunconfirmedancestors.isNull())
             {
                 if (!listunconfirmedancestors.isBool())
@@ -2414,8 +2441,7 @@ static UniValue getmerkleproof2(const Config& config, const JSONRPCRequest& requ
         {
             CTransactionRef tx;
             uint256 hashBlock;
-            bool isGenesisEnabled;
-            if (!GetTransaction(config, txid, tx, true, hashBlock, isGenesisEnabled))
+            if (ProtocolEra era; !GetTransaction(config, txid, tx, true, hashBlock, era))
             {
                 if (fTxIndex)
                     hints << "No such mempool or blockchain transaction";
@@ -2462,8 +2488,7 @@ static UniValue getmerkleproof2(const Config& config, const JSONRPCRequest& requ
     return callbackDataObject;
 }
 
-static UniValue verifymerkleproof(const Config& config,
-    const JSONRPCRequest& request)
+static UniValue verifymerkleproof(const Config&, const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 1)
     {
@@ -2550,27 +2575,28 @@ static UniValue verifymerkleproof(const Config& config,
     return(calculatedMerkleRoot == headerMerkleRoot);
 }
 
-// clang-format off
-static const CRPCCommand commands[] = {
-    //  category            name                      actor (function)        okSafeMode
-    //  ------------------- ------------------------  ----------------------  ----------
-    { "rawtransactions",    "getrawtransaction",      getrawtransaction,      true,  {"txid","verbose"} },
-    { "rawtransactions",    "createrawtransaction",   createrawtransaction,   true,  {"inputs","outputs","locktime"} },
-    { "rawtransactions",    "decoderawtransaction",   decoderawtransaction,   true,  {"hexstring"} },
-    { "rawtransactions",    "decodescript",           decodescript,           true,  {"hexstring"} },
-    { "rawtransactions",    "sendrawtransaction",     sendrawtransaction,     false, {"hexstring","allowhighfees","dontcheckfee"} },
-    { "rawtransactions",    "sendrawtransactions",    sendrawtransactions,    false, {"inputs"} },
-    { "rawtransactions",    "signrawtransaction",     signrawtransaction,     false, {"hexstring","prevtxs","privkeys","sighashtype"} }, /* uses wallet if enabled */
+void RegisterRawTransactionRPCCommands(CRPCTable& t)
+{
+    // clang-format off
+    static const CRPCCommand commands[] = {
+        //  category            name                      actor (function)        okSafeMode
+        //  ------------------- ------------------------  ----------------------  ----------
+        { "rawtransactions",    "getrawtransaction",      getrawtransaction,      true,  {"txid","verbose"} },
+        { "rawtransactions",    "createrawtransaction",   createrawtransaction,   true,  {"inputs","outputs","locktime"} },
+        { "rawtransactions",    "decoderawtransaction",   decoderawtransaction,   true,  {"hexstring"} },
+        { "rawtransactions",    "decodescript",           decodescript,           true,  {"hexstring"} },
+        { "rawtransactions",    "sendrawtransaction",     sendrawtransaction,     false, {"hexstring","allowhighfees","dontcheckfee"} },
+        { "rawtransactions",    "sendrawtransactions",    sendrawtransactions,    false, {"inputs"} },
+        { "rawtransactions",    "signrawtransaction",     signrawtransaction,     false, {"hexstring","prevtxs","privkeys","sighashtype"} }, /* uses wallet if enabled */
 
-    { "blockchain",         "gettxoutproof",          gettxoutproof,          true,  {"txids", "blockhash"} },
-    { "blockchain",         "verifytxoutproof",       verifytxoutproof,       true,  {"proof"} },
-    { "blockchain",         "getmerkleproof",         getmerkleproof,         true,  {"txid", "blockhash"} },
-    { "blockchain",         "getmerkleproof2",        getmerkleproof2,        true,  {"txid", "blockhash","includeFullTx","targetType","format"} },
-    { "blockchain",         "verifymerkleproof",      verifymerkleproof,      true,  {"proof", "txid"} },
-};
-// clang-format on
+        { "blockchain",         "gettxoutproof",          gettxoutproof,          true,  {"txids", "blockhash"} },
+        { "blockchain",         "verifytxoutproof",       verifytxoutproof,       true,  {"proof"} },
+        { "blockchain",         "getmerkleproof",         getmerkleproof,         true,  {"txid", "blockhash"} },
+        { "blockchain",         "getmerkleproof2",        getmerkleproof2,        true,  {"txid", "blockhash","includeFullTx","targetType","format"} },
+        { "blockchain",         "verifymerkleproof",      verifymerkleproof,      true,  {"proof", "txid"} },
+    };
+    // clang-format on
 
-void RegisterRawTransactionRPCCommands(CRPCTable &t) {
     for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++) {
         t.appendCommand(commands[vcidx].name, &commands[vcidx]);
     }

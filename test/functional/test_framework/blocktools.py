@@ -3,17 +3,30 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """Utilities for manipulating blocks and transactions."""
-from test_framework.script import SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.comptool import TestInstance
-from .cdefs import (MAX_BLOCK_SIGOPS_PER_MB, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, ONE_MEGABYTE,
-                    MAX_TX_SIZE_POLICY_BEFORE_GENESIS, DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS)
+
+from .cdefs import (MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS,
+                    DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS,
+                    MAX_TX_SIZE_POLICY_BEFORE_GENESIS)
+
 from .key import CECKey
-from .mininode import *
-from .script import CScript, hash160, OP_FALSE, OP_TRUE, OP_CHECKSIG, OP_DUP, OP_RETURN, OP_EQUAL, OP_EQUALVERIFY, OP_HASH160, OP_0
-from .util import assert_equal, assert_raises_rpc_error, hash256, satoshi_round, hex_str_to_bytes
+
+from .mininode import CBlock, CBlockHeader, COIN, CTransaction, CTxIn, \
+    CTxOut, COutPoint, FromHex, ToHex, \
+    msg_block, msg_headers, \
+    ser_compact_size, ser_string, ser_uint256, \
+    uint256_from_str, uint256_from_compact
+
+from .script import CScript, hash160, OP_FALSE, OP_TRUE, OP_CHECKSIG, \
+    OP_DUP, OP_RETURN, OP_EQUAL, OP_EQUALVERIFY, OP_HASH160
+from test_framework.script import SignatureHash, SIGHASH_ALL, SIGHASH_FORKID
+
+from .util import assert_equal, hash256, satoshi_round, hex_str_to_bytes, wait_until
 
 from collections import deque
 from decimal import Decimal
+from io import BytesIO
+from time import time
 
 
 # Create a block (with regtest difficulty)
@@ -52,7 +65,7 @@ def mine_block_of_size(node, size, utxos=None, fee=Decimal("0.00001"), genesisAc
         largetx = CTransaction()
         largetx.deserialize(BytesIO(hex_str_to_bytes(rawtx)))
 
-        maxtxnsize = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS if genesisActivated else DEFAULT_MAX_TX_SIZE_POLICY_BEFORE_GENESIS
+        maxtxnsize = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS if genesisActivated else MAX_TX_SIZE_POLICY_BEFORE_GENESIS
         maxtxnsize -= 180 # Existing txn size
         txnsize = maxtxnsize if size >= maxtxnsize else size
         largetx.vout.append(CTxOut(0, CScript([OP_FALSE, OP_RETURN, bytearray([0] * txnsize)])))
@@ -125,7 +138,7 @@ def create_block_from_candidate(candidate, get_coinbase):
     block.nBits = int(candidate["nBits"], 16)
     block.nNonce = 0
 
-    if(get_coinbase):
+    if get_coinbase:
         coinbase_tx = FromHex(CTransaction(), candidate["coinbase"])
     else:
         coinbase_tx = create_coinbase(height=int(candidate["height"]) + 1)
@@ -151,7 +164,7 @@ def create_coinbase(height, pubkey=None, outputValue=50):
     coinbaseoutput.nValue = outputValue * COIN
     halvings = int(height / 150)  # regtest
     coinbaseoutput.nValue >>= halvings
-    if (pubkey != None):
+    if (pubkey is not None):
         coinbaseoutput.scriptPubKey = CScript([pubkey, OP_CHECKSIG])
     else:
         coinbaseoutput.scriptPubKey = CScript([OP_TRUE])
@@ -179,7 +192,7 @@ def create_coinbase_P2SH(height, scriptHash, outputValue=50):
 # If the scriptPubKey is not specified, make it anyone-can-spend.
 def create_transaction(prevtx, n, sig, value, scriptPubKey=CScript()):
     tx = CTransaction()
-    assert(n < len(prevtx.vout))
+    assert (n < len(prevtx.vout))
     tx.vin.append(CTxIn(COutPoint(prevtx.sha256, n), sig, 0xffffffff))
     tx.vout.append(CTxOut(value, scriptPubKey))
     tx.calc_sha256()
@@ -250,9 +263,12 @@ def make_block(connection, parent_block=None, makeValid=True, last_block_time=0)
 
 
 def send_by_headers(conn, blocks, do_send_blocks):
-    hash_block_map = {b.sha256: b for b in blocks}
+    if do_send_blocks:
+        hash_block_map = {b.sha256: b for b in blocks}
 
     def on_getdata(c, msg):
+        if not do_send_blocks:
+            return
         for i in msg.inv:
             bl = hash_block_map.get(i.hash, None)
             if not bl:
@@ -265,7 +281,7 @@ def send_by_headers(conn, blocks, do_send_blocks):
         headers_message.headers = [CBlockHeader(b) for b in blocks]
         conn.send_message(headers_message)
         if do_send_blocks:
-            wait_until(lambda: len(hash_block_map)==0, label="wait until all blocks are sent")
+            wait_until(lambda: len(hash_block_map) == 0, label="wait until all blocks are sent")
 
 
 def chain_tip_status_equals(conn, hash, status):
@@ -294,7 +310,7 @@ def sign_tx(tx, spend_tx, n, private_key):
     if (scriptPubKey[0] == OP_TRUE):  # an anyone-can-spend
         tx.vin[0].scriptSig = CScript()
         return
-    sighash = SignatureHashForkId(
+    sighash = SignatureHash(
         spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
     tx.vin[0].scriptSig = CScript(
         [private_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
@@ -364,7 +380,7 @@ class TxCreator:
 
         sighash_flags |= SIGHASH_FORKID
 
-        sighash = SignatureHashForkId(spend_txout.scriptPubKey, tx, n, sighash_flags, spend_txout.nValue)
+        sighash = SignatureHash(spend_txout.scriptPubKey, tx, n, sighash_flags, spend_txout.nValue)
 
         tx.vin[n].scriptSig = CScript([
             private_key.sign(sighash) + bytes(bytearray([sighash_flags])),
@@ -374,7 +390,19 @@ class TxCreator:
         if not no_rehash:
             tx.rehash()
 
-    def create_signed_transaction(self, inputs, *, num_outputs=1, value=None, pubkey=None, scriptPubKey=None, tx_customize_func=None, fee=None, fee_rate=None, pubkey_change=None, scriptPubKey_change=None, sighash_flags=SIGHASH_ALL) -> CTransaction:
+    def create_signed_transaction(self,
+                                  inputs,
+                                  *,
+                                  num_outputs=1,
+                                  value=None,
+                                  pubkey=None,
+                                  scriptPubKey=None,
+                                  tx_customize_func=None,
+                                  fee=None,
+                                  fee_rate=None,
+                                  pubkey_change=None,
+                                  scriptPubKey_change=None,
+                                  sighash_flags=SIGHASH_ALL) -> CTransaction:
         """
         Create a new signed transaction with specified number of outputs and spending outputs provided in inputs argument.
 
@@ -491,8 +519,8 @@ class TxCreator:
             sighash_flags = SIGHASH_ALL
 
             if type(input) is tuple:
-                l = len(input)
-                assert l>=2 and l<=4
+                ip_len = len(input)
+                assert ip_len >= 2 and ip_len <= 4
 
                 spend_tx = input[0]
 
@@ -502,16 +530,16 @@ class TxCreator:
                 if n < 0:
                     n += len(spend_tx.vout)
 
-                if l>=3:
+                if ip_len >= 3:
                     private_key = input[2]
 
-                if l>=4:
+                if ip_len >= 4:
                     sighash_flags = input[3]
             else:
                 spend_tx = input
                 # Find the first output that is not provably non-spendable
-                while n<len(spend_tx.vout) and len(spend_tx.vout[n].scriptPubKey)>=2 and spend_tx.vout[n].scriptPubKey[0]==OP_FALSE and spend_tx.vout[n].scriptPubKey[1]==OP_RETURN:
-                    n+=1
+                while n < len(spend_tx.vout) and len(spend_tx.vout[n].scriptPubKey) >= 2 and spend_tx.vout[n].scriptPubKey[0] == OP_FALSE and spend_tx.vout[n].scriptPubKey[1] == OP_RETURN:
+                    n += 1
                 assert n < len(spend_tx.vout)
 
             spent_outputs.append(SpentOutput(spend_tx, n, private_key, sighash_flags))
@@ -599,13 +627,13 @@ def create_simple_chain(conn, num_blocks=120, scriptPubKey=None):
     conn.rpc.log.info(f"Creating {num_blocks} blocks after current tip (height={tip_height}, hash={tip_hash})")
     blocks = []
     for i in range(num_blocks):
-        txcb = create_coinbase(tip_height+1)
-        if scriptPubKey != None:
+        txcb = create_coinbase(tip_height + 1)
+        if scriptPubKey is not None:
             txcb.vout[0].scriptPubKey = scriptPubKey
         else:
             txcb.vout[0].scriptPubKey = CScript([OP_TRUE])
         txcb.rehash()
-        block = create_block(int(tip_hash, 16), txcb, tip_time+1)
+        block = create_block(int(tip_hash, 16), txcb, tip_time + 1)
         block.nNonce = 0
         block.solve()
         conn.cb.send_message(msg_block(block))
@@ -635,8 +663,8 @@ def create_simple_chain(conn, num_blocks=120, scriptPubKey=None):
 def prepare_init_chain(chain, no_blocks, no_outputs, block_0=True, start_block=5000, node=None):
     # Create a new block
     block = chain.next_block
-    save_spendable_output=chain.save_spendable_output
-    get_spendable_output=chain.get_spendable_output
+    save_spendable_output = chain.save_spendable_output
+    get_spendable_output = chain.get_spendable_output
     if block_0:
         save_spendable_output()
     # Now we need that block to mature so we can spend the coinbase.
@@ -658,7 +686,7 @@ def prepare_init_chain(chain, no_blocks, no_outputs, block_0=True, start_block=5
     for i in range(no_outputs):
         out.append(get_spendable_output())
 
-    return test, out, start_block+no_blocks
+    return test, out, start_block + no_blocks
 
 ### Helper to build chain
 
@@ -716,10 +744,22 @@ class ChainManager():
         self._script_number += 1
         return CScript([self._script_number, OP_RETURN])
 
-    def next_block(self, number, spend=None, script=CScript([OP_TRUE]), block_size=0, extra_sigops=0, extra_txns=0, additional_coinbase_value=0, do_solve_block=True, coinbase_pubkey=None, coinbase_key=None, simple_output=False, version=None):
-        if self.tip == None:
+    def next_block(self,
+                   number,
+                   spend=None,
+                   script=CScript([OP_TRUE]),
+                   block_size=0,
+                   extra_sigops=0,
+                   extra_txns=0,
+                   additional_coinbase_value=0,
+                   do_solve_block=True,
+                   coinbase_pubkey=None,
+                   coinbase_key=None,
+                   simple_output=False,
+                   version=None):
+        if self.tip is None:
             base_block_hash = self._genesis_hash
-            block_time = int(time.time()) + 1
+            block_time = int(time()) + 1
         else:
             base_block_hash = self.tip.sha256
             block_time = self.tip.nTime + 1
@@ -732,12 +772,12 @@ class ChainManager():
         coinbase = create_coinbase(height=height, pubkey=coinbase_pubkey)
         coinbase.vout[0].nValue += additional_coinbase_value
         coinbase.rehash()
-        if spend == None:
+        if spend is None:
             # We need to have something to spend to fill the block.
             assert_equal(block_size, 0)
             block = create_block(base_block_hash, coinbase, block_time)
         else:
-            if type(spend) == list:
+            if isinstance(spend, list):
                 for s in spend:
                     coinbase.vout[0].nValue += s.tx.vout[s.n].nValue - 1
                     coinbase.rehash()
@@ -798,7 +838,7 @@ class ChainManager():
                     base_tx_size = len(tx.serialize())
 
                     # If a specific script is required, add it.
-                    if script != None:
+                    if script is not None:
                         extraCash, txout = CreateCTxOut(1, extraCash, script)
                         tx.vout.append(txout)
 
@@ -870,7 +910,7 @@ class ChainManager():
         if extra_sigops > 0:
             raise AssertionError("Can not fit %s extra_sigops in a block size of %s" % (extra_sigops_orig, block_size))
 
-        if version != None:
+        if version is not None:
             block.nVersion = version
 
         # Do PoW, which is cheap on regnet

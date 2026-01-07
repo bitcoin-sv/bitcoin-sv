@@ -5,16 +5,25 @@
 // LICENSE.
 
 #include "script.h"
+
 #include "consensus/consensus.h"
 #include "instruction_iterator.h"
 #include "int_serialization.h"
 #include "script_num.h"
-#include "utilstrencodings.h"
 
 #include <algorithm>
 #include <sstream>
+#include <utility>
 
-uint64_t CScript::GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sigOpCountError) const
+static_assert(EncodeOP_N(0) == OP_0);
+static_assert(EncodeOP_N(1) == OP_1);
+static_assert(EncodeOP_N(16) == OP_16);
+
+static_assert(DecodeOP_N(OP_0) == 0);
+static_assert(DecodeOP_N(OP_1) == 1);
+static_assert(DecodeOP_N(OP_16) == 16);
+
+uint64_t CScript::GetSigOpCount(bool fAccurate, ProtocolEra era, bool& sigOpCountError) const
 {
     sigOpCountError = false;
     uint64_t n = 0;
@@ -31,14 +40,14 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sig
         if(it->opcode() == OP_INVALIDOPCODE)
             break;
 
-        if(fAccurate || isGenesisEnabled)
+        if(fAccurate || ::IsProtocolActive(era, ProtocolName::Genesis))
         {
             if(opcode == OP_RETURN && scopeLevel == 0)
             {
                 // Everything after OP_RETURN at top level scope is unexecutable
                 break;
             }
-            else if(opcode == OP_IF || opcode == OP_NOTIF)
+            else if(opcode == OP_IF || opcode == OP_NOTIF || opcode == OP_VERIF || opcode == OP_VERNOTIF)
             {
                 // Entering a new scope at a new level
                 ++scopeLevel;
@@ -62,12 +71,12 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sig
         else if(opcode == OP_CHECKMULTISIG || 
             opcode == OP_CHECKMULTISIGVERIFY)
         {
-            if ((fAccurate || isGenesisEnabled) && lastOpcode >= OP_1 && lastOpcode <= OP_16)
+            if ((fAccurate || ::IsProtocolActive(era, ProtocolName::Genesis)) && lastOpcode >= OP_1 && lastOpcode <= OP_16)
             {
                 n += DecodeOP_N(lastOpcode);
             }
             // post Genesis we always count accurate ops because it's not significantly costlier
-            else if (isGenesisEnabled)
+            else if (::IsProtocolActive(era, ProtocolName::Genesis))
             {
                 if (lastOpcode == OP_0) 
                 {
@@ -94,8 +103,7 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sig
                         return 0;
                     }
 
-                    int numSigs =
-                        CScriptNum(last_instruction.operand(), true).getint();
+                    const int numSigs = CScriptNum(last_instruction.operand(), min_encoding_check::yes).getint();
                     if(numSigs < 0)
                     {
                         sigOpCountError = true;
@@ -115,12 +123,12 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sig
     return n;
 }
 
-uint64_t CScript::GetSigOpCount(const CScript &scriptSig, bool isGenesisEnabled, bool& sigOpCountError) const 
+uint64_t CScript::GetSigOpCount(const CScript &scriptSig, ProtocolEra era, bool& sigOpCountError) const 
 {
     sigOpCountError = false;
     if(!IsP2SH(*this))
     {
-        return GetSigOpCount(true, isGenesisEnabled, sigOpCountError);
+        return GetSigOpCount(true, era, sigOpCountError);
     }
 
     // This is a pay-to-script-hash scriptPubKey;
@@ -139,7 +147,7 @@ uint64_t CScript::GetSigOpCount(const CScript &scriptSig, bool isGenesisEnabled,
     if(!valid_script)
         return 0;
 
-    if (isGenesisEnabled)
+    if (IsProtocolActive(era, ProtocolName::Genesis))
     {
         // After Genesis P2SH is not supported and redeem script is not executed, so we return 0
         return 0;
@@ -148,7 +156,7 @@ uint64_t CScript::GetSigOpCount(const CScript &scriptSig, bool isGenesisEnabled,
     {
         // ... and return its opcount:
         CScript subscript(data.data(), data.data() + data.size());
-        return subscript.GetSigOpCount(true, isGenesisEnabled, sigOpCountError);
+        return subscript.GetSigOpCount(true, era, sigOpCountError);
     }
 }
 
@@ -231,7 +239,9 @@ CScript &CScript::operator<<(const CScriptNum &b) {
 
 bsv::instruction_iterator CScript::begin_instructions() const
 {
-    return bsv::instruction_iterator{span<const uint8_t>{data(), size()}};
+    const auto s = size();
+    assert(std::in_range<size_t>(s) && "Script size exceeds size_t range");
+    return bsv::instruction_iterator{span<const uint8_t>{data(), static_cast<size_t>(s)}};
 }
 
 bsv::instruction_iterator CScript::end_instructions() const

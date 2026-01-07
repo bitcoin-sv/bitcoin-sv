@@ -1,6 +1,7 @@
 // Copyright (c) 2017 The Bitcoin developers
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
+#include "finaltx.h"
 
 #include "config.h"
 #include "consensus/validation.h"
@@ -8,11 +9,11 @@
 #include "validation.h"
 
 bool CheckFinalTx(
-    const CTransaction &tx,
+    const CTransaction& tx,
     int32_t nChainActiveHeight,
     int nMedianTimePast,
-    int flags = -1) {
-
+    int flags)
+{
     auto &config = GlobalConfig::GetConfig();
     CValidationState state;
     return ContextualCheckTransactionForCurrentBlock(

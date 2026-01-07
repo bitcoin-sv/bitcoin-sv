@@ -7,7 +7,7 @@
 
 BOOST_FIXTURE_TEST_SUITE(string_writer_tests, BasicTestingSetup)
 
-CStringWriter strWriter;
+CStringWriter strWriter; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 BOOST_AUTO_TEST_CASE(CStringWriter_writechar)
 {

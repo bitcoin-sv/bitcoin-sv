@@ -81,7 +81,8 @@ class NetTest(BitcoinTestFramework):
 
     def _test_getnetworkinginfo(self):
         assert_equal(self.nodes[0].getnetworkinfo()['networkactive'], True)
-        assert_equal(self.nodes[0].getnetworkinfo()['connections'], 2)
+        # wait multistream connections to be closed
+        wait_until(lambda: self.nodes[0].getnetworkinfo()['connections'] == 2)
 
         self.nodes[0].setnetworkactive(False)
         assert_equal(self.nodes[0].getnetworkinfo()['networkactive'], False)
@@ -95,7 +96,8 @@ class NetTest(BitcoinTestFramework):
         self.nodes[0].setnetworkactive(True)
         connect_nodes_bi(self.nodes, 0, 1)
         assert_equal(self.nodes[0].getnetworkinfo()['networkactive'], True)
-        assert_equal(self.nodes[0].getnetworkinfo()['connections'], 2)
+        # wait multistream connections to be closed
+        wait_until(lambda: self.nodes[0].getnetworkinfo()['connections'] == 2)
 
     def _test_getaddednodeinfo(self):
         assert_equal(self.nodes[0].getaddednodeinfo(), [])

@@ -28,6 +28,7 @@
 #include <boost/signals2/signal.hpp>
 #include <boost/uuid/uuid.hpp>
 
+#include <concepts>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -46,27 +47,19 @@ class CBlockIndex;
 class CEvictionCandidateTracker;
 class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CoinsDB;
-class CoinsDBView;
+class CoinsDBView; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 class CAsyncMempoolTxDB;
-
-/**
- * Fake height value used in Coins to signify they are only in the memory
- * pool(since 0.8)
- */
-static const int32_t MEMPOOL_HEIGHT = 0x7FFFFFFF;
 
 struct LockPoints {
     // Will be set to the blockchain height and median time past values that
     // would be necessary to satisfy all relative locktime constraints (BIP68)
     // of this tx given our view of block chain history
-    int32_t height; // NOLINT(cppcoreguidelines-use-default-member-init)
-    int64_t time; // NOLINT(cppcoreguidelines-use-default-member-init)
+    int32_t height{};
+    int64_t time{};
     // As long as the current chain descends from the highest height block
     // containing one of the inputs used in the calculation, then the cached
     // values are still valid even after a reorg.
-    const CBlockIndex *maxInputBlock; // NOLINT(cppcoreguidelines-use-default-member-init)
-
-    LockPoints() : height(0), time(0), maxInputBlock(nullptr) {}
+    const CBlockIndex* maxInputBlock{nullptr};
 };
 
 class CTxMemPool;
@@ -173,9 +166,9 @@ private:
     //!< keep track of transactions that spend a coinbase or confiscation
     bool spendsCoinbaseOrConfiscation;
     // index of insertion to mempool, entry with smaller index is inserted before the one with larger
-    uint64_t insertionIndex;
+    uint64_t insertionIndex{};
     // ancestors count
-    size_t ancestorsCount;
+    size_t ancestorsCount{};
     
 public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
@@ -222,8 +215,7 @@ public:
 };
 
 struct update_fee_delta {
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
-    update_fee_delta(Amount _feeDelta) : feeDelta(_feeDelta) {}
+    update_fee_delta(const Amount& _feeDelta) : feeDelta(_feeDelta) {}
 
     void operator()(CTxMemPoolEntry &e) { e.UpdateFeeDelta(feeDelta); }
 
@@ -447,16 +439,16 @@ private:
     CFeeRate minDebugRejectionFee {Amount{0}};
 
     //!< sum of all mempool tx's virtual sizes.
-    uint64_t totalTxSize;
+    uint64_t totalTxSize{};
 
     //!< sum of dynamic memory usage of all the map elements (NOT the maps
     //! themselves)
-    uint64_t cachedInnerUsage;
+    uint64_t cachedInnerUsage{};
 
-    mutable int64_t lastRollingFeeUpdate;
-    mutable bool blockSinceLastRollingFeeBump;
+    mutable int64_t lastRollingFeeUpdate{};
+    mutable bool blockSinceLastRollingFeeBump{};
     //!< minimum fee to get into the pool, decreases exponentially
-    mutable double rollingMinimumFeeRate;
+    mutable double rollingMinimumFeeRate{};
 
     // Our journal builder
     mutable mining::CJournalBuilder mJournalBuilder;
@@ -653,11 +645,9 @@ public:
     void SuspendSanityCheck() { suspendSanityCheck.store(true); }
     void ResumeSanityCheck() { suspendSanityCheck.store(false); }
 
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
-    void SetBlockMinTxFee(CFeeRate feerate) { blockMinTxfee = feerate; };
+    void SetBlockMinTxFee(const CFeeRate& feerate) { blockMinTxfee = feerate; };
     CFeeRate GetBlockMinTxFee() const { return blockMinTxfee; };
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
-    void SetMinDebugRejectionFee(CFeeRate feerate) { minDebugRejectionFee = feerate; };
+    void SetMinDebugRejectionFee(const CFeeRate& feerate) { minDebugRejectionFee = feerate; };
     CFeeRate GetMinDebugRejectionFee() const { return minDebugRejectionFee; };
 
     /** Rebuilds the mempool by reseting it and then resubmitting transactions that were inside before.
@@ -970,6 +960,27 @@ public:
 
     std::vector<TxMempoolInfo> InfoAll() const;
 
+    template<typename F> requires std::predicate<F, const CTxMemPoolEntry&>
+    std::vector<TxMempoolInfo> InfoMatching(F&& func) const
+    {
+        std::vector<TxMempoolInfo> ret {};
+        ret.reserve(mapTx.size());
+
+        {
+            std::shared_lock lock {smtx};
+            for(const auto& entry : mapTx.get<insertion_order>())
+            {
+                if(std::forward<F>(func)(entry))
+                {
+                    ret.push_back(TxMempoolInfo{entry});
+                }
+            }
+        }
+
+        ret.shrink_to_fit();
+        return ret;
+    }
+
     size_t DynamicMemoryUsage() const;
     size_t SecondaryMempoolUsage() const;
 
@@ -1215,13 +1226,10 @@ private:
     // A non-locking version of IsSpent
     bool IsSpentNL(const COutPoint &outpoint) const;
 
-    void RemoveForReorgNL(
-        const Config &config,
-        const CoinsDB& coinsTip,
-        const mining::CJournalChangeSetPtr& changeSet,
-        const CBlockIndex& tip,
-        int flags);
-
+    void RemoveForReorgNL(const Config&,
+                          const mining::CJournalChangeSetPtr&,
+                          const CBlockIndex& tip,
+                          int flags);
 
     // A non-locking version of AddUnchecked
     // A signal NotifyEntryAdded is decoupled from AddUncheckedNL.
@@ -1347,14 +1355,12 @@ class CPFPGroup
 
 public:
     // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
-    explicit CPFPGroup(SecondaryMempoolEntryData evalParams, std::vector<CTxMemPool::txiter>&& txs)
-    // NOLINTNEXTLINE(performance-unnecessary-value-param)
+    explicit CPFPGroup(const SecondaryMempoolEntryData& evalParams, std::vector<CTxMemPool::txiter>&& txs)
         : evaluationParams{evalParams}
         , transactions{txs}
+        , payingTxId{transactions.back()->GetTxId()}
         , groupId{counter++}
     {
-        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-        payingTxId = transactions.back()->GetTxId();
     }
 
     const TxId& PayingTransactionId() const { return payingTxId; }

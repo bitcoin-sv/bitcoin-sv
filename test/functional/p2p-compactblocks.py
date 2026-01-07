@@ -4,11 +4,20 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-from test_framework.mininode import *
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
 from test_framework.blocktools import create_block, create_coinbase
+from test_framework.mininode import BlockTransactions, \
+    BlockTransactionsRequest, calculate_shortid, CBlock, CBlockHeader, CInv, \
+    COutPoint, CTransaction, CTxIn, CTxOut, FromHex, HeaderAndShortIDs, \
+    mininode_lock, msg_block, msg_blocktxn, msg_cmpctblock, msg_getblocktxn, \
+    msg_getdata, msg_headers, msg_getheaders, msg_inv, msg_sendcmpct, \
+    msg_sendheaders, msg_tx, NetworkThread, NodeConn, NodeConnCB, \
+    NODE_NETWORK, P2PHeaderAndShortIDs, PrefilledTransaction, ToHex
+
 from test_framework.script import CScript, OP_TRUE
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import assert_equal, p2p_port, sync_blocks, wait_until
+
+import random
 
 '''
 CompactBlocksTest -- test compact blocks (BIP 152)
@@ -118,7 +127,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         # Doesn't matter which node we use, just use node0.
         block = self.build_block_on_tip(self.nodes[0])
         self.test_node.send_and_ping(msg_block(block))
-        assert(int(self.nodes[0].getbestblockhash(), 16) == block.sha256)
+        assert (int(self.nodes[0].getbestblockhash(), 16) == block.sha256)
         self.nodes[0].generate(100)
 
         total_value = block.vtx[0].vout[0].nValue
@@ -166,7 +175,7 @@ class CompactBlocksTest(BitcoinTestFramework):
             peer.clear_block_announcement()
             block_hash = int(node.generate(1)[0], 16)
             peer.wait_for_block_announcement(block_hash, timeout=30)
-            assert(peer.block_announced)
+            assert (peer.block_announced)
 
             with mininode_lock:
                 assert predicate(peer), (
@@ -274,10 +283,8 @@ class CompactBlocksTest(BitcoinTestFramework):
         address = node.getnewaddress()
 
         for i in range(num_transactions):
-            txid = node.sendtoaddress(address, 0.1)
+            node.sendtoaddress(address, 0.1)
             test_node.sync_with_ping()
-            hex_tx = node.gettransaction(txid)["hex"]
-            tx = FromHex(CTransaction(), hex_tx)
 
         # Wait until we've seen the block announcement for the resulting tip
         tip = int(node.getbestblockhash(), 16)
@@ -302,7 +309,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         # Now fetch and check the compact block
         header_and_shortids = None
         with mininode_lock:
-            assert("cmpctblock" in test_node.last_message)
+            assert ("cmpctblock" in test_node.last_message)
             # Convert the on-the-wire representation to absolute indexes
             header_and_shortids = HeaderAndShortIDs(
                 test_node.last_message["cmpctblock"].header_and_shortids)
@@ -321,7 +328,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         # Now fetch and check the compact block
         header_and_shortids = None
         with mininode_lock:
-            assert("cmpctblock" in test_node.last_message)
+            assert ("cmpctblock" in test_node.last_message)
             # Convert the on-the-wire representation to absolute indexes
             header_and_shortids = HeaderAndShortIDs(
                 test_node.last_message["cmpctblock"].header_and_shortids)
@@ -334,7 +341,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         assert_equal(header_and_shortids.header.sha256, block_hash)
 
         # Make sure the prefilled_txn appears to have included the coinbase
-        assert(len(header_and_shortids.prefilled_txn) >= 1)
+        assert (len(header_and_shortids.prefilled_txn) >= 1)
         assert_equal(header_and_shortids.prefilled_txn[0].index, 0)
 
         # Check that all prefilled_txn entries match what's in the block.
@@ -401,7 +408,7 @@ class CompactBlocksTest(BitcoinTestFramework):
             assert_equal(int(node.getbestblockhash(), 16), block.hashPrevBlock)
             # Expect a getblocktxn message.
             with mininode_lock:
-                assert("getblocktxn" in test_node.last_message)
+                assert ("getblocktxn" in test_node.last_message)
                 absolute_indexes = test_node.last_message["getblocktxn"].block_txn_request.to_absolute(
                 )
             assert_equal(absolute_indexes, [0])  # should be a coinbase request
@@ -437,7 +444,7 @@ class CompactBlocksTest(BitcoinTestFramework):
             msg = msg_cmpctblock(compact_block.to_p2p())
             peer.send_and_ping(msg)
             with mininode_lock:
-                assert("getblocktxn" in peer.last_message)
+                assert ("getblocktxn" in peer.last_message)
                 absolute_indexes = peer.last_message["getblocktxn"].block_txn_request.to_absolute(
                 )
             assert_equal(absolute_indexes, expected_result)
@@ -516,7 +523,7 @@ class CompactBlocksTest(BitcoinTestFramework):
             node, test_node, msg_cmpctblock(comp_block.to_p2p()), block.sha256)
         with mininode_lock:
             # Shouldn't have gotten a request for any transaction
-            assert("getblocktxn" not in test_node.last_message)
+            assert ("getblocktxn" not in test_node.last_message)
 
     # Incorrectly responding to a getblocktxn shouldn't cause the block to be
     # permanently failed.
@@ -542,7 +549,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         test_node.send_and_ping(msg_cmpctblock(comp_block.to_p2p()))
         absolute_indexes = []
         with mininode_lock:
-            assert("getblocktxn" in test_node.last_message)
+            assert ("getblocktxn" in test_node.last_message)
             absolute_indexes = test_node.last_message["getblocktxn"].block_txn_request.to_absolute(
             )
         assert_equal(absolute_indexes, [6, 7, 8, 9, 10])
@@ -567,7 +574,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         wait_until(lambda: "getdata" in test_node.last_message,
                    timeout=10, lock=mininode_lock)
         assert_equal(len(test_node.last_message["getdata"].inv), 1)
-        assert(test_node.last_message["getdata"].inv[0].type == 2)
+        assert (test_node.last_message["getdata"].inv[0].type == 2)
         assert_equal(
             test_node.last_message["getdata"].inv[0].hash, block.sha256)
 
@@ -671,7 +678,7 @@ class CompactBlocksTest(BitcoinTestFramework):
                 assert_equal(x["status"], "headers-only")
                 found = True
                 break
-        assert(found)
+        assert (found)
 
         # Requesting this block via getblocktxn should silently fail
         # (to avoid fingerprinting attacks).
@@ -688,25 +695,25 @@ class CompactBlocksTest(BitcoinTestFramework):
 
         block = self.build_block_with_transactions(node, utxo, 10)
 
-        [l.clear_block_announcement() for l in listeners]
+        [listener.clear_block_announcement() for listener in listeners]
 
         node.submitblock(ToHex(block))
 
-        for l in listeners:
-            wait_until(lambda: l.received_block_announcement(),
+        for listener in listeners:
+            wait_until(lambda: listener.received_block_announcement(),
                        timeout=30, lock=mininode_lock)
         with mininode_lock:
-            for l in listeners:
-                assert "cmpctblock" in l.last_message
-                l.last_message["cmpctblock"].header_and_shortids.header.calc_sha256(
+            for listener in listeners:
+                assert "cmpctblock" in listener.last_message
+                listener.last_message["cmpctblock"].header_and_shortids.header.calc_sha256(
                 )
                 assert_equal(
-                    l.last_message["cmpctblock"].header_and_shortids.header.sha256, block.sha256)
+                    listener.last_message["cmpctblock"].header_and_shortids.header.sha256, block.sha256)
 
     # Test that we don't get disconnected if we relay a compact block with valid header,
     # but invalid transactions.
     def test_invalid_tx_in_compactblock(self, node, test_node):
-        assert(len(self.utxos))
+        assert (len(self.utxos))
         utxo = self.utxos[0]
 
         block = self.build_block_with_transactions(node, utxo, 5)
@@ -722,7 +729,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         test_node.send_and_ping(msg)
 
         # Check that the tip didn't advance
-        assert(int(node.getbestblockhash(), 16) is not block.sha256)
+        assert (int(node.getbestblockhash(), 16) is not block.sha256)
         test_node.sync_with_ping()
 
     # Helper for enabling cb announcements
@@ -737,7 +744,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         peer.send_and_ping(msg)
 
     def test_compactblock_reconstruction_multiple_peers(self, node, stalling_peer, delivery_peer):
-        assert(len(self.utxos))
+        assert (len(self.utxos))
 
         def announce_cmpct_block(node, peer):
             utxo = self.utxos.pop(0)

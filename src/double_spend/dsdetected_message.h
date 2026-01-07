@@ -114,18 +114,8 @@ private:
     blocks_type mBlockList{};
 };
 
-inline bool operator!=(const DSDetected& a, const DSDetected& b)
-{
-    return !(a == b);
-}
-
 bool operator==(const DSDetected::BlockDetails&,
                 const DSDetected::BlockDetails&);
-inline bool operator!=(const DSDetected::BlockDetails& a,
-                       const DSDetected::BlockDetails& b)
-{
-    return !(a == b);
-}
 
 namespace std
 {
