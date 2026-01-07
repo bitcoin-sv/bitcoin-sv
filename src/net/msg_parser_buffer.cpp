@@ -67,7 +67,7 @@ void msg_parser_buffer::operator()(span<const uint8_t> s)
     buffer_size_reqd_ = bytes_reqd; 
     if(!bytes_reqd)
         parser_full_ = true;
-    
+
     buffer_.insert(buffer_.end(), s.begin() + bytes_read, s.end());
 }
 
@@ -84,12 +84,5 @@ size_t msg_parser_buffer::size() const
 size_t msg_parser_buffer::readable_size() const
 {
     return parser_->readable_size();
-}
-
-void msg_parser_buffer::clear()
-{
-    parser_->clear();
-    buffer_.clear();
-    buffer_size_reqd_ = 0; 
 }
 

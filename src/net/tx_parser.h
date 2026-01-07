@@ -35,14 +35,13 @@ public:
     };
 
     std::pair<size_t, size_t> operator()(std::span<const uint8_t> s);
-    
+
     size_t buffer_size() const;
     size_t size() const;
     [[nodiscard]] size_t readable_size() const;
-    void clear() { size_ = 0;}
 
     value_type buffer() &&;
-    
+
     friend std::ostream& operator<<(std::ostream&, const state&);
 
 private:

@@ -28,7 +28,7 @@ public:
     {}
 
     std::pair<size_t, size_t> operator()(std::span<const uint8_t> s);
-    
+
     size_t size() const;
     [[nodiscard]] size_t readable_size() const;
 
@@ -50,12 +50,11 @@ public:
     std::pair<ptrdiff_t, size_t>  seg_offset(size_t read_pos) const;
 
     void reset(size_t segment);
-    void clear() { segments_.clear(); size_ = 0;}
 
 private:
     std::pair<size_t, size_t> parse_count(std::span<const uint8_t>);
     void init_cum_lengths() const;
-    
+
     std::optional<uint64_t> n_{};
     uint64_t current_{};
 

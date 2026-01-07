@@ -21,7 +21,7 @@ std::pair<size_t, size_t> cmpctblock_parser::operator()(span<const uint8_t> s)
     total_bytes_read += hbytes_read;
     if(hbytes_reqd)
         return make_pair(total_bytes_read, hbytes_reqd);
-    
+
     s = s.subspan(hbytes_read);
 
     const auto [sid_bytes_read, sid_bytes_reqd]{shortid_parser_(s)};
@@ -96,12 +96,5 @@ size_t cmpctblock_parser::readable_size() const
     return header_parser_.size() +
            shortid_parser_.readable_size() +
            pftxs_parser_.readable_size();
-}
-
-void cmpctblock_parser::clear()
-{
-    header_parser_.clear();
-    shortid_parser_.clear();
-    pftxs_parser_.clear();
 }
 

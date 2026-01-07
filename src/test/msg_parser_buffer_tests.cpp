@@ -267,11 +267,6 @@ BOOST_AUTO_TEST_CASE(buffer_unread_input)
     buffer(span{in.data(), in.size()});
     BOOST_CHECK_EQUAL(10U, buffer.buffer_size());
     BOOST_CHECK_EQUAL(0U, buffer.buffer_size_reqd());
-
-    buffer.clear();
-    BOOST_CHECK_EQUAL(0U, buffer.size());
-    BOOST_CHECK_EQUAL(0U, buffer.buffer_size());
-    BOOST_CHECK_EQUAL(0U, buffer.buffer_size_reqd());
 }
 
 BOOST_AUTO_TEST_CASE(buffer_unread_input_and_use_in_next_call)
