@@ -9,9 +9,11 @@
 #include "util.h"
 #include "validation.h"
 
-CCriticalSection cs_warnings;
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
+CCriticalSection cs_warnings;   // NOLINT(cert-err58-cpp)
 std::string strMiscWarning;
 SafeModeLevel currentSafeModeLevel = SafeModeLevel::NONE;
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 void SetSafeModeLevel(const SafeModeLevel& safeModeLevel)
 {
@@ -33,7 +35,6 @@ void SetMiscWarning(const std::string &strWarning) {
 std::string GetWarnings(const std::string &strFor) {
     std::string strStatusBar;
     std::string strRPC;
-    const std::string uiAlertSeperator = "<hr />";
 
     LOCK(cs_warnings);
 
