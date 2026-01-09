@@ -23,6 +23,17 @@ option(ENABLE_CLANG_TIDY "Use ClangTidy" OFF)
 
 option(CMAKE_UNITY_BUILD "Enable Unity build")
 
+# Ensure clang-tidy and unity builds are not enabled together
+if(ENABLE_CLANG_TIDY AND CMAKE_UNITY_BUILD)
+    message(FATAL_ERROR
+        "ENABLE_CLANG_TIDY and CMAKE_UNITY_BUILD cannot be enabled together. "
+        "Unity builds merge multiple source files into single compilation units, "
+        "which prevents clang-tidy from performing accurate per-file analysis. "
+        "Please disable one of these options:\n"
+        "  -DENABLE_CLANG_TIDY=OFF (default)\n"
+        "  -DCMAKE_UNITY_BUILD=OFF")
+endif()
+
 # Ensure that WINDRES_PREPROC is enabled when using windres.
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	list(APPEND CMAKE_RC_FLAGS "-DWINDRES_PREPROC")

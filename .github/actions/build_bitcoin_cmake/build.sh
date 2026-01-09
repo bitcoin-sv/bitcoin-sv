@@ -8,11 +8,16 @@ BUILD_TYPE=${2,,}
 args=()
 args+=(-DCMAKE_BUILD_TYPE="${BUILD_TYPE}")
 args+=(-DCMAKE_CXX_FLAGS=-Werror\ -fno-omit-frame-pointer)
-args+=(-DCMAKE_UNITY_BUILD=ON)
 
-if [[ $TOOLSET == clang ]]; then
+# Unity builds default ON, but disable for clang-tidy
+unity_build=ON
+
+if [[ $TOOLSET == clang ]] && [[ $BUILD_TYPE == debug ]]; then
     args+=(-DENABLE_CLANG_TIDY=ON)
+    unity_build=OFF
 fi
+
+args+=(-DCMAKE_UNITY_BUILD=$unity_build)
 
 if [[ $BUILD_TYPE == debug ]];
 then
