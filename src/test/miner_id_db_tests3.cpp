@@ -444,13 +444,18 @@ struct SetupMinerIDChain : public TestChain100Setup
             forkBlockId = forkBlock.GetHash();
         }
 
+        SetupMinerIDChain(const  SetupMinerIDChain&) = delete;
+        SetupMinerIDChain& operator=(const  SetupMinerIDChain&) = delete;
+        SetupMinerIDChain(SetupMinerIDChain&&) = delete;
+        SetupMinerIDChain& operator=(SetupMinerIDChain&&) = delete;
+ 
         ~SetupMinerIDChain()
         {
             g_dataRefIndex.reset();
             pMerkleTreeFactory.reset();
         }
 
-        // Get a funding txn
+       // Get a funding txn
         CTransactionRef GetFundingTxn()
         {
             CTransactionRef txn { fundingTxns.front() };

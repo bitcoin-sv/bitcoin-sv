@@ -217,6 +217,12 @@ struct SetupMinerIDDBChain : public TestChain100Setup
             forkBlockId = forkBlock.GetHash();
         }
 
+        SetupMinerIDDBChain(const SetupMinerIDDBChain&) = delete;
+        SetupMinerIDDBChain& operator=(const SetupMinerIDDBChain&) = delete;
+
+        SetupMinerIDDBChain(SetupMinerIDDBChain&&) = delete;
+        SetupMinerIDDBChain& operator=(SetupMinerIDDBChain&&) = delete;
+
         ~SetupMinerIDDBChain()
         {
             g_dataRefIndex.reset();
