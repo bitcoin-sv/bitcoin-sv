@@ -24,7 +24,7 @@ jobs:
       matrix:
         org_repo: [nchain/svn_dev]
         tag : [ubuntu_22.04]
-    runs-on: [ self-hosted, docker, large ]
+    runs-on: arc-runner-svnode
     container:
       image: "${{ matrix.org_repo }}:${{ matrix.tag }}"
     timeout-minutes: 5 
@@ -52,7 +52,7 @@ jobs:
         org_repo: [nchain/svn_dev]
         tag: [ubuntu_22.04, debian_12, centos_9]
         toolset: [gcc]
-    runs-on: [ self-hosted, docker, large ]
+    runs-on: arc-runner-svnode
     container:
       image: "${{ matrix.org_repo }}:${{ matrix.tag }}"
     timeout-minutes: 120
@@ -87,7 +87,7 @@ jobs:
             options: cov
           - build_type: Release
             options: asan usan
-    runs-on: [ self-hosted, docker, large ]
+    runs-on: arc-runner-svnode
     container:
       image: "${{ matrix.org_repo }}:${{ matrix.tag }}"
     timeout-minutes: 120 

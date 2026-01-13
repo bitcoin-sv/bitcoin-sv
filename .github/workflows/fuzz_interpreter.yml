@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   fuzz_interpreter:
-    runs-on: [ self-hosted, docker, large ]
+    runs-on: arc-runner-svnode
     container:
       image: nchain/svn_dev:ubuntu_22.04
     steps:
