@@ -41,10 +41,26 @@ You are verifying whether previous code review issues were fixed.
    ```
 
 **IMPORTANT:**
-- DO NOT post new inline comments
+- DO NOT post any inline comments yourself
 - DO NOT re-post existing comments
 - ONLY analyze whether previous issues were addressed
-- Check for new issues on NEW lines and report separately
+- Check for new issues on NEW lines and report them in structured format
+
+**OUTPUT FORMAT:**
+Return verification results AND any new issues in structured format:
+
+For previous issue verification:
+```
+VERIFICATION_START
+thread_id: <thread_id>
+path: <file_path>
+line: <line_number>
+status: FIXED | PERSISTS
+evidence: <Brief explanation of what you found in the code>
+VERIFICATION_END
+```
+
+For new issues found: Read `.claude/prompts/issue-format.md` for the complete ISSUE_START...ISSUE_END format.
 ```
 
 **Step 3: Resolve/Unresolve Threads Based on Verification**
@@ -89,12 +105,17 @@ IMPLEMENTATION:
    - If from CODEOWNER: SKIP (await their decision)
    - If from non-CODEOWNER developer: post reply via gh api POST
 
-**Step 4: Check for New Issues on New Lines**
+**Step 4: Post New Issues (if any)**
 
-After verifying previous threads:
-- Scan the diff for any NEW lines that were NOT previously commented
-- If you find NEW issues on NEW lines (not near previous comments), post NEW inline comments
-- Before posting, check existing comments to avoid duplicates
+After processing verification results from subagents:
+
+1. Parse any ISSUE_START...ISSUE_END blocks from verification subagent responses
+2. These are NEW issues found on NEW lines (not related to previous threads)
+3. Use deduplication logic (same as Step 4 in initial review):
+   - Fetch existing comments: `gh api /repos/$REPO/pulls/$PR_NUMBER/comments`
+   - Build lookup map of existing comments
+   - For each new issue, check if it's a duplicate
+   - Post non-duplicate issues using `mcp__github_inline_comment__create_inline_comment`
 
 **Step 5: Return Summary**
 
