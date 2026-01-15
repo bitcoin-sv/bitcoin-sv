@@ -1,0 +1,23 @@
+# This file provides fallback compilation flags for clangd when analyzing header files.
+# Header files typically don't appear in compile_commands.json (only .cpp files do),
+# so clangd needs this fallback configuration to resolve includes properly.
+#
+# These flags should match what's in the actual build system (CMakeLists.txt).
+
+CompileFlags:
+  Add:
+    # Standard defines used throughout the codebase
+    - -DBOOST_AC_USE_STD_ATOMIC
+    - -DBOOST_SP_USE_STD_ATOMIC
+    - -DHAVE_CONFIG_H
+
+    # C++ standard
+    - -std=gnu++20
+
+    # Embedded third-party dependencies (marked as system includes to suppress warnings)
+    - -isystem src/leveldb/include
+    - -isystem src/secp256k1/include
+    - -isystem src/univalue/include
+
+    # Project source directory
+    - -isystem src
