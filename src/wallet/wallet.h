@@ -328,7 +328,7 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CWalletTx() { Init(nullptr); }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CWalletTx(const CWallet *pwalletIn, CTransactionRef arg)
         : CMerkleTx(std::move(arg)) {
         Init(pwalletIn);

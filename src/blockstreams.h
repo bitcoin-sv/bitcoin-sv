@@ -22,8 +22,8 @@
  */
 struct CStreamVersionAndType
 {
-    const int version; //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members
-    const int type;    //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members
+    const int version; //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+    const int type;    //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 };
 
 /**

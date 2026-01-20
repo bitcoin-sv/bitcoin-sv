@@ -828,6 +828,7 @@ endif()
 
 if(ENABLE_CLANG_TIDY)
     include(ClangTidy)
+    AddClangTidy(util)
     AddClangTidy(server)
     AddClangTidy(bitcoinconsensus)
     AddClangTidy(bitcoind)

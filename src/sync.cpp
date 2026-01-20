@@ -32,16 +32,21 @@ void PrintLockContention(const char *pszName, const char *pszFile, int nLine) {
 // Complain if any thread tries to lock in a different order.
 //
 
-struct CLockLocation {
-    CLockLocation(const char *pszName, const char *pszFile, int nLine,
-                  bool fTryIn) {
-        mutexName = pszName;
-        sourceFile = pszFile;
-        sourceLine = nLine;
-        fTry = fTryIn;
+struct CLockLocation
+{
+    CLockLocation(const char* pszName,
+                  const char* pszFile,
+                  int nLine,
+                  bool fTryIn):
+        fTry{fTryIn},
+        mutexName{pszName},
+        sourceFile{pszFile},
+        sourceLine{nLine}
+    {
     }
 
-    std::string ToString() const {
+    std::string ToString() const
+    {
         return mutexName + "  " + sourceFile + ":" + itostr(sourceLine) +
                (fTry ? " (TRY)" : "");
     }
@@ -60,21 +65,24 @@ typedef std::vector<std::pair<void *, CLockLocation>> LockStack;
 typedef std::map<std::pair<void *, void *>, LockStack> LockOrders;
 typedef std::set<std::pair<void *, void *>> InvLockOrders;
 
-struct LockData {
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
+struct LockData
+{
     // Very ugly hack: as the global constructs and destructors run single
     // threaded, we use this boolean to know whether LockData still exists,
     // as DeleteLock can get called by global CCriticalSection destructors
     // after LockData disappears.
-    bool available;
-    LockData() : available(true) {}
+    bool available{true};
+
     ~LockData() { available = false; }
 
     LockOrders lockorders;
     InvLockOrders invlockorders;
     boost::mutex dd_mutex;
-} static lockdata;
+} static lockdata; //NOLINT(cert-err58-cpp)
 
-boost::thread_specific_ptr<LockStack> lockstack;
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+boost::thread_specific_ptr<LockStack> lockstack; //NOLINT(cert-err58-cpp)
 
 static void
 potential_deadlock_detected(const std::pair<void *, void *> &mismatch,
@@ -105,7 +113,8 @@ potential_deadlock_detected(const std::pair<void *, void *> &mismatch,
 
 static void push_lock(void* c, const CLockLocation& locklocation)
 {
-    if (lockstack.get() == nullptr) lockstack.reset(new LockStack);
+    if(lockstack.get() == nullptr)
+        lockstack.reset(new LockStack); //NOLINT(cppcoreguidelines-owning-memory)
 
     boost::unique_lock<boost::mutex> lock(lockdata.dd_mutex);
 
@@ -151,14 +160,23 @@ std::string LocksHeld() {
     return result;
 }
 
-void AssertLockHeldInternal(const char *pszName, const char *pszFile, int nLine,
-                            void *cs) {
-    for (const std::pair<void *, CLockLocation> &i : *lockstack) {
-        if (i.first == cs) return;
+void AssertLockHeldInternal(const char* pszName,
+                            const char* pszFile,
+                            int nLine,
+                            void* cs)
+{
+    for(const std::pair<void*, CLockLocation>& i : *lockstack)
+    {
+        if(i.first == cs)
+            return;
     }
-    fprintf(stderr,
-            "Assertion failed: lock %s not held in %s:%i; locks held:\n%s",
-            pszName, pszFile, nLine, LocksHeld().c_str());
+
+    std::ignore = fprintf(stderr,   // NOLINT(cppcoreguidelines-pro-type-vararg)
+                          "Assertion failed: lock %s not held in %s:%i; locks held:\n%s",
+                          pszName,
+                          pszFile,
+                          nLine,
+                          LocksHeld().c_str());
     abort();
 }
 

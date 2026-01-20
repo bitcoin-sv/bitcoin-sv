@@ -12,10 +12,13 @@
 #include <cstring>
 #include <limits>
 
+// NOLINTNEXTLINE(cert-err58-cpp)
 static const std::string CHARS_ALPHA_NUM =
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
-static const std::string SAFE_CHARS[] = {
+// NOLINTNEXTLINE(cert-err58-cpp)
+static const std::array<std::string, 3> SAFE_CHARS
+{
     // SAFE_CHARS_DEFAULT
     CHARS_ALPHA_NUM + " .,;-_/:?@()",
     // SAFE_CHARS_UA_COMMENT
@@ -24,16 +27,19 @@ static const std::string SAFE_CHARS[] = {
     CHARS_ALPHA_NUM + ".-_",
 };
 
-std::string SanitizeString(const std::string &str, int rule) {
+std::string SanitizeString(const std::string& str, int rule)
+{
     std::string strResult;
-    for (std::string::size_type i = 0; i < str.size(); i++) {
-        if (SAFE_CHARS[rule].find(str[i]) != std::string::npos)
+    for(std::string::size_type i = 0; i < str.size(); i++)
+    {
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
+        if(SAFE_CHARS[rule].find(str[i]) != std::string::npos)
             strResult.push_back(str[i]);
     }
     return strResult;
 }
 
-const signed char p_util_hexdigit[256] = {
+const std::array<signed char, 256> p_util_hexdigit{
     -1, -1,  -1,  -1,  -1,  -1,  -1,  -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1,  -1,  -1,  -1,  -1,  -1,  -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1,  -1,  -1,  -1,  -1,  -1,  -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -52,7 +58,9 @@ const signed char p_util_hexdigit[256] = {
     -1, -1,  -1,  -1,  -1,  -1,  -1,  -1, -1, -1, -1, -1, -1, -1, -1, -1,
 };
 
-signed char HexDigit(char c) {
+signed char HexDigit(char c)
+{
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
     return p_util_hexdigit[(uint8_t)c];
 }
 
@@ -78,13 +86,16 @@ bool IsHexNumber(const std::string &str) {
 std::vector<uint8_t> ParseHex(const char *psz) {
     // convert hex dump to vector
     std::vector<uint8_t> vch;
-    while (true) {
+    while (true)
+    {  
+        //NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         while (isspace(*psz))
             psz++;
         signed char c = HexDigit(*psz++);
         if (c == (signed char)-1) break;
         uint8_t n = (c << 4);
         c = HexDigit(*psz++);
+        //NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         if (c == (signed char)-1) break;
         n |= c;
         vch.push_back(n);
@@ -110,7 +121,7 @@ void SplitHostPort(std::string in, int& portOut, std::string& hostOut)
     bool fMultiColon =
         fHaveColon && (in.find_last_of(':', colon - 1) != in.npos);
     if (fHaveColon && (colon == 0 || fBracketed || !fMultiColon)) {
-        int32_t n;
+        int32_t n{};
         if (ParseInt32(in.substr(colon + 1), &n) && n > 0 && n < 0x10000) {
             in = in.substr(0, colon);
             portOut = n;
@@ -186,11 +197,13 @@ std::string EncodeBase64(const uint8_t *pch, size_t len) {
     strRet.reserve((len + 2) / 3 * 4);
 
     int mode = 0, left = 0;
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     const uint8_t *pchEnd = pch + len;
 
     while (pch < pchEnd) {
         int enc = *(pch++);
-        switch (mode) {
+        switch(mode) // NOLINT(bugprone-switch-missing-default-case)
+        {
             case 0: // we have no bits
                 strRet += pbase64[enc >> 2];
                 left = (enc & 3) << 4;
@@ -216,16 +229,20 @@ std::string EncodeBase64(const uint8_t *pch, size_t len) {
         strRet += '=';
         if (mode == 1) strRet += '=';
     }
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
     return strRet;
 }
 
-std::string EncodeBase64(const std::string &str) {
+std::string EncodeBase64(const std::string &str)
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     return EncodeBase64((const uint8_t *)str.c_str(), str.size());
 }
 
-std::vector<uint8_t> DecodeBase64(const char *p, bool *pfInvalid) {
-    static const int decode64_table[256] = {
+std::vector<uint8_t> DecodeBase64(const char *p, bool *pfInvalid)
+{
+    static const std::array<int, 256> decode64_table{
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
         -1, -1, -1, -1, -1, -1, -1, 62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57,
@@ -250,11 +267,14 @@ std::vector<uint8_t> DecodeBase64(const char *p, bool *pfInvalid) {
     int mode = 0;
     int left = 0;
 
-    while (1) {
+    while (1)
+    {
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         int dec = decode64_table[(uint8_t)*p];
         if (dec == -1) break;
-        p++;
-        switch (mode) {
+        p++;         // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        switch(mode) // NOLINT(bugprone-switch-missing-default-case)
+        {
             case 0: // we have no bits and get 6
                 left = dec;
                 mode = 1;
@@ -279,7 +299,9 @@ std::vector<uint8_t> DecodeBase64(const char *p, bool *pfInvalid) {
         }
     }
 
-    if (pfInvalid) switch (mode) {
+    if(pfInvalid) 
+        switch(mode)  // NOLINT(bugprone-switch-missing-default-case)
+        {
             case 0: // 4n base64 characters processed: ok
                 break;
 
@@ -287,6 +309,8 @@ std::vector<uint8_t> DecodeBase64(const char *p, bool *pfInvalid) {
                 *pfInvalid = true;
                 break;
 
+            //NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            //NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
             case 2: // 4n+2 base64 characters processed: require '=='
                 if (left || p[0] != '=' || p[1] != '=' ||
                     decode64_table[(uint8_t)p[2]] != -1)
@@ -297,6 +321,8 @@ std::vector<uint8_t> DecodeBase64(const char *p, bool *pfInvalid) {
                 if (left || p[0] != '=' || decode64_table[(uint8_t)p[1]] != -1)
                     *pfInvalid = true;
                 break;
+            //NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
+            //NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         }
 
     return vchRet;
@@ -306,6 +332,7 @@ std::string DecodeBase64(const std::string &str) {
     std::vector<uint8_t> vchRet = DecodeBase64(str.c_str());
     return (vchRet.size() == 0)
                ? std::string()
+                 // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
                : std::string((const char *)&vchRet[0], vchRet.size());
 }
 
@@ -316,11 +343,13 @@ std::string EncodeBase32(const uint8_t *pch, size_t len) {
     strRet.reserve((len + 4) / 5 * 8);
 
     int mode = 0, left = 0;
+    //NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     const uint8_t *pchEnd = pch + len;
 
     while (pch < pchEnd) {
         int enc = *(pch++);
-        switch (mode) {
+        switch(mode) //NOLINT(bugprone-switch-missing-default-case)
+        {
             case 0: // we have no bits
                 strRet += pbase32[enc >> 3];
                 left = (enc & 7) << 2;
@@ -354,22 +383,26 @@ std::string EncodeBase32(const uint8_t *pch, size_t len) {
         }
     }
 
-    static const int nPadding[5] = {0, 6, 4, 3, 1};
+    static const std::array<int, 5> nPadding{0, 6, 4, 3, 1};
     if (mode) {
         strRet += pbase32[left];
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         for (int n = 0; n < nPadding[mode]; n++)
             strRet += '=';
     }
 
     return strRet;
+    //NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 }
 
-std::string EncodeBase32(const std::string &str) {
+std::string EncodeBase32(const std::string &str)
+{
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     return EncodeBase32((const uint8_t *)str.c_str(), str.size());
 }
 
 std::vector<uint8_t> DecodeBase32(const char *p, bool *pfInvalid) {
-    static const int decode32_table[256] = {
+    static const std::array<int, 256> decode32_table{
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 26, 27, 28, 29,
@@ -395,10 +428,12 @@ std::vector<uint8_t> DecodeBase32(const char *p, bool *pfInvalid) {
     int left = 0;
 
     while (1) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         int dec = decode32_table[(uint8_t)*p];
         if (dec == -1) break;
-        p++;
-        switch (mode) {
+        p++;    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        switch(mode) // NOLINT(bugprone-switch-missing-default-case)
+        {
             case 0: // we have no bits and get 5
                 left = dec;
                 mode = 1;
@@ -445,7 +480,9 @@ std::vector<uint8_t> DecodeBase32(const char *p, bool *pfInvalid) {
         }
     }
 
-    if (pfInvalid) switch (mode) {
+    if (pfInvalid)
+        switch(mode) // NOLINT(bugprone-switch-missing-default-case)
+        {
             case 0: // 8n base32 characters processed: ok
                 break;
 
@@ -454,6 +491,9 @@ std::vector<uint8_t> DecodeBase32(const char *p, bool *pfInvalid) {
             case 6: //   +6
                 *pfInvalid = true;
                 break;
+
+            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
 
             case 2: // 8n+2 base32 characters processed: require '======'
                 if (left || p[0] != '=' || p[1] != '=' || p[2] != '=' ||
@@ -479,6 +519,8 @@ std::vector<uint8_t> DecodeBase32(const char *p, bool *pfInvalid) {
                     *pfInvalid = true;
                 break;
         }
+        // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
     return vchRet;
 }
@@ -487,6 +529,7 @@ std::string DecodeBase32(const std::string &str) {
     std::vector<uint8_t> vchRet = DecodeBase32(str.c_str());
     return (vchRet.size() == 0)
                ? std::string()
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
                : std::string((const char *)&vchRet[0], vchRet.size());
 }
 
@@ -573,7 +616,7 @@ bool ParseDouble(const std::string &str, double *out) {
     if (str.size() >= 2 && str[0] == '0' && str[1] == 'x') return false;
     std::istringstream text(str);
     text.imbue(std::locale::classic());
-    double result;
+    double result{};
     text >> result;
     if (out) *out = result;
     return text.eof() && !text.fail();
@@ -644,7 +687,7 @@ int64_t atoi64(const std::string &str) {
 }
 
 int atoi(const std::string &str) {
-    return atoi(str.c_str());
+    return atoi(str.c_str()); //NOLINT(cert-err34-c)
 }
 
 /**
@@ -683,7 +726,7 @@ bool ParseFixedPoint(const std::string &val, int decimals,
     bool mantissa_sign = false;
     bool exponent_sign = false;
     int ptr = 0;
-    int end = val.size();
+    int end = val.size();  //NOLINT(*-narrowing-conversions)
     int point_ofs = 0;
 
     if (ptr < end && val[ptr] == '-') {

@@ -41,17 +41,16 @@ void GetStrongRandBytes(uint8_t *buf, int num);
  * completely deterministic and insecure after that.
  * This class is not thread-safe.
  */
-class FastRandomContext {
-private:
-    bool requires_seed;
+class FastRandomContext
+{
+    bool requires_seed{false};
     ChaCha20 rng;
 
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    uint8_t bytebuf[64];
-    int bytebuf_size;
+    std::array<uint8_t, 64> bytebuf;
+    int bytebuf_size{};
 
-    uint64_t bitbuf;
-    int bitbuf_size;
+    uint64_t bitbuf{};
+    int bitbuf_size{};
 
     void RandomSeed();
 
@@ -59,8 +58,7 @@ private:
         if (requires_seed) {
             RandomSeed();
         }
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-        rng.Output(bytebuf, sizeof(bytebuf));
+        rng.Output(bytebuf.data(), sizeof(bytebuf));
         bytebuf_size = sizeof(bytebuf);
     }
 
@@ -80,8 +78,8 @@ public:
         if (bytebuf_size < 8) {
             FillByteBuffer();
         }
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-*)
-        uint64_t ret = ReadLE64(bytebuf + 64 - bytebuf_size);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        uint64_t ret = ReadLE64(bytebuf.data() + sizeof(bytebuf) - bytebuf_size);
         bytebuf_size -= 8;
         return ret;
     }

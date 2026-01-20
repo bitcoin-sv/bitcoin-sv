@@ -219,7 +219,7 @@ void TestAES256CBC(const std::string &hexkey, const std::string &hexiv,
         std::vector<uint8_t> sub(i, in.end());
         std::vector<uint8_t> subout(sub.size() + AES_BLOCKSIZE);
         int _size = enc.Encrypt(&sub[0],
-                                sub.size(),  // NOLINT(*-narrowing-conversions,
+                                sub.size(),  // NOLINT(*-narrowing-conversions)
                                 &subout[0]);
         if (_size != 0) {
             subout.resize(_size);

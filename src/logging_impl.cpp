@@ -14,7 +14,9 @@
 #include "util.h"
 #include "utiltime.h"
 
-static int FileWriteStr(const std::string &str, FILE *fp) {
+static int FileWriteStr(const std::string &str, FILE *fp)
+{
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     return fwrite(str.data(), 1, str.size(), fp);
 }
 
@@ -25,7 +27,8 @@ LoggerImpl::LoggerImpl(const char* file_name)
 
 LoggerImpl::~LoggerImpl() {
     if (fileout) {
-        fclose(fileout);
+        //NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+        fclose(fileout); // NOLINT(cert-err33-c)
     }
 }
 
@@ -37,7 +40,7 @@ bool LoggerImpl::OpenDebugLog() {
     fileout = fsbridge::fopen(pathDebug, "a");
     if (fileout) {
         // Unbuffered.
-        setbuf(fileout, nullptr);
+        setbuf(fileout, nullptr); // NOLINT(bugprone-unsafe-functions, cert-*)
         // Dump buffered messages from before we opened the log.
         while (!vMsgsBeforeOpenLog.empty()) {
             FileWriteStr(vMsgsBeforeOpenLog.front(), fileout);
@@ -100,8 +103,9 @@ int LoggerImpl::Log(const char* str) {
 
     if (fPrintToConsole) {
         // Print to console.
+        //NOLINTNEXTLINE(*-narrowing-conversions)
         ret = fwrite(strTimestamped.data(), 1, strTimestamped.size(), stdout);
-        fflush(stdout);
+        fflush(stdout); //NOLINT(cert-err33-c)
     } else if (fPrintToDebugLog) {
         std::lock_guard<std::mutex> scoped_lock(mutexDebugLog);
 
@@ -113,7 +117,7 @@ int LoggerImpl::Log(const char* str) {
             }
             else {
                 vMsgsBeforeOpenLog.push_back(strTimestamped);
-                ret = strTimestamped.length();
+                ret = strTimestamped.length(); //NOLINT(*-narrowing-conversions)
             }
         } else {
             // Reopen the log file, if requested.
@@ -122,7 +126,7 @@ int LoggerImpl::Log(const char* str) {
                 fs::path pathDebug = GetDataDir() / this->fileName;
                 if (fsbridge::freopen(pathDebug, "a", fileout) != nullptr) {
                     // unbuffered.
-                    setbuf(fileout, nullptr);
+                    setbuf(fileout, nullptr); // NOLINT(bugprone-unsafe-functions, cert-*)
                 }
             }
 
@@ -132,7 +136,11 @@ int LoggerImpl::Log(const char* str) {
     return ret;
 }
 
-void LoggerImpl::ShrinkDebugFile() {
+void LoggerImpl::ShrinkDebugFile()
+{
+    // NOLINTBEGIN(cert-err33-c)
+    // NOLINTBEGIN(cppcoreguidelines-owning-memory)
+    
     // Amount of fileName to save at end when shrinking (must fit in memory)
     constexpr size_t RECENT_DEBUG_HISTORY_SIZE = 10 * 1000000;
     // Scroll fileName if it's getting too big.
@@ -145,7 +153,7 @@ void LoggerImpl::ShrinkDebugFile() {
         // Restart the file with some of the end.
         std::vector<char> vch(RECENT_DEBUG_HISTORY_SIZE, 0);
         fseek(file, -((long)vch.size()), SEEK_END);
-        int nBytes = fread(vch.data(), 1, vch.size(), file);
+        int nBytes = fread(vch.data(), 1, vch.size(), file); // NOLINT(*narrowing-conversions)
         fclose(file);
 
         file = fsbridge::fopen(pathLog, "w");
@@ -155,6 +163,9 @@ void LoggerImpl::ShrinkDebugFile() {
         }
     } else if (file != nullptr)
         fclose(file);
+
+    // NOLINTEND(cppcoreguidelines-owning-memory)
+    // NOLINTEND(cert-err33-c)
 }
 
 void LoggerImpl::EnableCategory(BCLog::LogFlags category) {

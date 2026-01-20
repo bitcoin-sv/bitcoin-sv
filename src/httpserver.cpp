@@ -499,10 +499,10 @@ std::string HTTPRequest::ReadBody() {
      * better to not copy into an intermediate string but use a stream
      * abstraction to consume the evbuffer on the fly in the parsing algorithm.
      */
-    // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
     // NOLINTNEXTLINE(*-narrowing-conversions)
     const char* data = reinterpret_cast<const char*>(evbuffer_pullup(buf, size));
-    // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast
+    // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
     // returns nullptr in case of empty buffer.
     if (!data) {
         return "";

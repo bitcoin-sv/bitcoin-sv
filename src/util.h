@@ -76,7 +76,7 @@ void FileCommit(FILE *file);
 bool TruncateFile(FILE *file, uint64_t length);
 int RaiseFileDescriptorLimit(int nMinFD);
 void AllocateFileRange(FILE *file, unsigned int offset, uint64_t length);
-bool RenameOver(fs::path src, fs::path dest);
+bool RenameOver(const fs::path& src, const fs::path& dest);
 bool TryCreateDirectories(const fs::path &p);
 fs::path GetDefaultDataDir();
 const fs::path &GetDataDir(bool fNetSpecific = true);
@@ -125,7 +125,7 @@ inline bool IsSwitchChar(char c) {
 
 class ArgsManager {
 private:
-    int64_t parseUnit(std::string argValue, int64_t nMultiples);
+    int64_t parseUnit(const std::string& argValue, int64_t nMultiples);
 
 protected:
     CCriticalSection cs_args;

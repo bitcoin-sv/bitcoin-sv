@@ -166,7 +166,7 @@ inline float ser_uint32_to_float(uint32_t y) {
 //
 class CSizeComputer;
 
-enum  //NOLINT(cppcoreguidelines-use-enum-class
+enum  //NOLINT(cppcoreguidelines-use-enum-class)
 {
     // primary actions
     SER_NETWORK = (1 << 0),

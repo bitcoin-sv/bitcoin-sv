@@ -41,13 +41,18 @@ bool sanity_test_list(unsigned int size) {
 // __throw_out_of_range_fmt.
 // test: force std::string to throw an out_of_range exception. Verify that
 //   it's caught correctly.
-bool sanity_test_range_fmt() {
+bool sanity_test_range_fmt()
+{
     std::string test;
-    try {
+    try
+    {
         std::ignore = test.at(1);
-    } catch (const std::out_of_range &) {
+    }
+    catch (const std::out_of_range &) {
         return true;
-    } catch (...) {
+    }
+    catch(...) // NOLINT(bugprone-empty-catch)
+    { 
     }
     return false;
 }

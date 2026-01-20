@@ -13,6 +13,7 @@
  * for both bitcoind and bitcoin-sv, to make it harder for attackers to
  * target servers.
  */
+// NOLINTNEXTLINE(cert-err58-cpp)
 const std::string CLIENT_NAME("Bitcoin SV");
 
 /**
@@ -84,6 +85,7 @@ const std::string CLIENT_NAME("Bitcoin SV");
 #endif
 #endif
 
+//NOLINTNEXTLINE(cert-err58-cpp)
 const std::string CLIENT_BUILD(BUILD_DESC CLIENT_VERSION_SUFFIX);
 
 static std::string FormatVersion(int shiftedVersion) {

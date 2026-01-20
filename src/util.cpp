@@ -32,7 +32,7 @@
 #undef _POSIX_C_SOURCE
 #endif
 
-#define _POSIX_C_SOURCE 200112L
+#define _POSIX_C_SOURCE 200112L //NOLINT(bugprone-reserved-identifier, cert-dcl*)
 
 #endif // __linux__
 
@@ -82,36 +82,43 @@
 #include <boost/algorithm/string/predicate.hpp>
 
 // Application startup time (used for uptime calculation)
-const int64_t nStartupTime = GetTime();
+const int64_t nStartupTime = GetTime(); // NOLINT(cert-err58-cpp)
 
 const char *const BITCOIN_CONF_FILENAME = "bitcoin.conf";
 const char *const BITCOIN_PID_FILENAME = "bitcoind.pid";
 
+// NOLINTNEXTLINE(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
 ArgsManager gArgs;
 
+// NOLINTNEXTLINE(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
 CTranslationInterface translationInterface;
 
 /** Init OpenSSL library multithreading support */
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static CCriticalSection **ppmutexOpenSSL;
 
 void locking_callback(int mode, int i, const char* /*file*/, int /*line*/)
     NO_THREAD_SAFETY_ANALYSIS
 {
     if (mode & CRYPTO_LOCK) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         ENTER_CRITICAL_SECTION(*ppmutexOpenSSL[i]);
     } else {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         LEAVE_CRITICAL_SECTION(*ppmutexOpenSSL[i]);
     }
 }
 
-// Init
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CInit {
 public:
     CInit() {
         // Init OpenSSL library multithreading support.
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         ppmutexOpenSSL = (CCriticalSection **)OPENSSL_malloc(
             CRYPTO_num_locks() * sizeof(CCriticalSection *));
         for (int i = 0; i < CRYPTO_num_locks(); i++)
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-owning-memory)
             ppmutexOpenSSL[i] = new CCriticalSection();
         CRYPTO_set_locking_callback(locking_callback);
 
@@ -132,21 +139,24 @@ public:
         // Seed OpenSSL PRNG with performance counter.
         RandAddSeed();
     }
-    ~CInit() {
+
+    ~CInit()
+    {
         // Securely erase the memory used by the PRNG.
         RAND_cleanup();
         // Shutdown OpenSSL library multithreading support.
         CRYPTO_set_locking_callback(nullptr);
         for (int i = 0; i < CRYPTO_num_locks(); i++)
-            delete ppmutexOpenSSL[i];
-        OPENSSL_free(ppmutexOpenSSL);
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            delete ppmutexOpenSSL[i]; // NOLINT(cppcoreguidelines-owning-memory)
+        OPENSSL_free(ppmutexOpenSSL); // NOLINT(bugprone-multi-level-implicit-pointer-conversion)
     }
-} instance_of_cinit;
+} instance_of_cinit; //NOLINT(cppcoreguidelines-avoid-non-const-global-variables, cert-err58-cpp)
 
 /** Interpret string as boolean, for argument parsing */
 static bool InterpretBool(const std::string &strValue) {
     if (strValue.empty()) return true;
-    return (atoi(strValue) != 0);
+    return (atoi(strValue) != 0); //NOLINT(cert-err34-c)
 }
 
 /** Turn -noX into -X=0 */
@@ -159,12 +169,16 @@ static void InterpretNegativeSetting(std::string &strKey,
     }
 }
 
-void ArgsManager::ParseParameters(int argc, const char *const argv[]) {
+//NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+void ArgsManager::ParseParameters(int argc, const char *const argv[])
+{
     LOCK(cs_args);
     mapArgs.clear();
     mapMultiArgs.clear();
 
-    for (int i = 1; i < argc; i++) {
+    for (int i = 1; i < argc; i++)
+    {
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         std::string str(argv[i]);
         std::string strValue;
         size_t is_index = str.find('=');
@@ -316,9 +330,9 @@ int64_t ArgsManager::GetArgAsBytes(const std::string& strArg, int64_t nDefault, 
     return returnValue;
 }
 
-int64_t ArgsManager::parseUnit(std::string argValue, int64_t nMultiples)
+int64_t ArgsManager::parseUnit(const std::string& argValue, int64_t nMultiples)
 {
-    long double argNum;
+    long double argNum{};
 
     static const std::regex txt_regex("^\\s*((?:-|\\+)?[0-9]+(?:\\.[0-9]+)?)\\s?((?:KI|K|MI|M|GI|G)?B)?\\s*$", std::regex::icase);
     std::smatch match;
@@ -495,7 +509,8 @@ static std::string FormatException(const std::exception *pex,
 void PrintExceptionContinue(const std::exception *pex, const char *pszThread) {
     std::string message = FormatException(pex, pszThread);
     LogPrintf("\n\n************************\n%s\n", message);
-    fprintf(stderr, "\n\n************************\n%s\n", message.c_str());
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+    fprintf(stderr, "\n\n************************\n%s\n", message.c_str()); //NOLINT(cert-err33-c)
 }
 
 fs::path GetDefaultDataDir() {
@@ -525,7 +540,7 @@ fs::path GetDefaultDataDir() {
 
 static fs::path pathCached;
 static fs::path pathCachedNetSpecific;
-static CCriticalSection csPathCached;
+static CCriticalSection csPathCached; //NOLINT(cert-err58-cpp)
 
 const fs::path &GetDataDir(bool fNetSpecific) {
     LOCK(csPathCached);
@@ -606,14 +621,17 @@ fs::path GetPidFile() {
 
 void CreatePidFile(const fs::path &path, pid_t pid) {
     FILE *file = fsbridge::fopen(path, "w");
-    if (file) {
-        fprintf(file, "%d\n", pid);
-        fclose(file);
+    if (file)
+    {
+        //NOLINTBEGIN(cert-err33-c)
+        fprintf(file, "%d\n", pid); //NOLINT(cppcoreguidelines-pro-type-vararg)
+        fclose(file);               //NOLINT(cppcoreguidelines-owning-memory)
+        //NOLINTEND(cert-err33-c)
     }
 }
 #endif
 
-bool RenameOver(fs::path src, fs::path dest) {
+bool RenameOver(const fs::path& src, const fs::path& dest) {
 #ifdef WIN32
     return MoveFileExA(src.string().c_str(), dest.string().c_str(),
                        MOVEFILE_REPLACE_EXISTING) != 0;
@@ -644,7 +662,7 @@ bool TryCreateDirectories(const fs::path &p) {
 
 void FileCommit(FILE *file) {
     // Harmless if redundantly called.
-    fflush(file);
+    fflush(file); // NOLINT(cert-err33-c)
 #ifdef WIN32
     HANDLE hFile = (HANDLE)_get_osfhandle(_fileno(file));
     FlushFileBuffers(hFile);
@@ -664,7 +682,7 @@ bool TruncateFile(FILE *file, uint64_t length) {
     return _chsize_s(_fileno(file), length) == 0;
 #else
     static_assert(std::is_same_v<off_t, int64_t>, "Type off_t must be 64-bit.");
-    return ftruncate(fileno(file), length) == 0;
+    return ftruncate(fileno(file), length) == 0; //NOLINT(*-narrowing-conversions)
 #endif
 }
 
@@ -677,7 +695,7 @@ int RaiseFileDescriptorLimit(int nMinFD) {
 #if defined(WIN32)
     return 2048;
 #else
-    struct rlimit limitFD;
+    struct rlimit limitFD{};
     if (getrlimit(RLIMIT_NOFILE, &limitFD) != -1) {
         if (limitFD.rlim_cur < (rlim_t)nMinFD) {
             limitFD.rlim_cur = nMinFD;
@@ -686,7 +704,7 @@ int RaiseFileDescriptorLimit(int nMinFD) {
             setrlimit(RLIMIT_NOFILE, &limitFD);
             getrlimit(RLIMIT_NOFILE, &limitFD);
         }
-        return limitFD.rlim_cur;
+        return limitFD.rlim_cur; //NOLINT(*-narrowing-conversions)
     }
     // getrlimit failed, assume it's fine.
     return nMinFD;
@@ -723,7 +741,7 @@ void AllocateFileRange(FILE *file, unsigned int offset, uint64_t length) {
     ftruncate(fileno(file), fst.fst_length);
 #elif defined(__linux__)
     // Version using posix_fallocate.
-    off_t nEndPos = (off_t)offset + length;
+    off_t nEndPos = (off_t)offset + length; //NOLINT(*narrowing-conversions)
     posix_fallocate(fileno(file), 0, nEndPos);
 #else
     // Fallback version
@@ -755,7 +773,7 @@ fs::path GetSpecialFolderPath(int nFolder, bool fCreate) {
 #endif
 
 void runCommand(const std::string &strCommand) {
-    int nErr = ::system(strCommand.c_str());
+    int nErr = ::system(strCommand.c_str()); //NOLINT(cert-env33-c)
     if (nErr)
         LogPrintf("runCommand error: system(%s) returned %d\n", strCommand,
                   nErr);
@@ -853,7 +871,7 @@ bool SetupNetworking() {
 
 int GetNumCores() {
 #if BOOST_VERSION >= 105600
-    return boost::thread::physical_concurrency();
+    return boost::thread::physical_concurrency(); //NOLINT(*-narrowing-conversions)
 #else
     // Must fall back to hardware_concurrency, which unfortunately counts
     // virtual cores.
