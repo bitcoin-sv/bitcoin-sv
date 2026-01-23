@@ -17,10 +17,11 @@
 #include <cstdio>
 #include <cstring>
 #include <ios>
-#include <limits>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <numeric>
+#include <ranges>
 #include <set>
 #include <string>
 #include <utility>
@@ -137,11 +138,12 @@ private:
  * templates. Fills with data in linear time; some stringstream implementations
  * take N^2 time.
  */
-class CDataStream {
+class CDataStream
+{
 protected:
     typedef CSerializeData vector_type;
     vector_type vch;
-    vector_type::difference_type nReadPos;
+    vector_type::difference_type nReadPos{};
 
     int nType;
     int nVersion;
@@ -157,54 +159,35 @@ public:
     typedef vector_type::const_iterator const_iterator;
     typedef vector_type::reverse_iterator reverse_iterator;
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    explicit CDataStream(int nTypeIn, int nVersionIn) {
-        Init(nTypeIn, nVersionIn);
-    }
+    explicit CDataStream(int nTypeIn, int nVersionIn):
+        nType{nTypeIn},
+        nVersion{nVersionIn}
+    {}
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    CDataStream(const_iterator pbegin, const_iterator pend, int nTypeIn,
-                int nVersionIn)
-        : vch(pbegin, pend) {
-        Init(nTypeIn, nVersionIn);
-    }
+    template<std::input_iterator Iterator>
+    CDataStream(Iterator pbegin, Iterator pend,
+                int nTypeIn,
+                int nVersionIn):
+        vch{pbegin, pend},
+        nType{nTypeIn},
+        nVersion{nVersionIn}
+    {}
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    CDataStream(const char *pbegin, const char *pend, int nTypeIn,
-                int nVersionIn)
-        : vch(pbegin, pend) {
-        Init(nTypeIn, nVersionIn);
-    }
+    template<std::ranges::range R>
+    CDataStream(const R& r,
+                int nTypeIn,
+                int nVersionIn):
+        CDataStream{r.begin(), r.end(),
+                    nTypeIn,
+                    nVersionIn}
+    {}
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    CDataStream(const vector_type &vchIn, int nTypeIn, int nVersionIn)
-        : vch(vchIn.begin(), vchIn.end()) {
-        Init(nTypeIn, nVersionIn);
-    }
-
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    CDataStream(const std::vector<char> &vchIn, int nTypeIn, int nVersionIn)
-        : vch(vchIn.begin(), vchIn.end()) {
-        Init(nTypeIn, nVersionIn);
-    }
-
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    CDataStream(const std::vector<uint8_t> &vchIn, int nTypeIn, int nVersionIn)
-        : vch(vchIn.begin(), vchIn.end()) {
-        Init(nTypeIn, nVersionIn);
-    }
-
-    template <typename... Args>
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    CDataStream(int nTypeIn, int nVersionIn, Args &&... args) {
-        Init(nTypeIn, nVersionIn);
+    template<typename... Args>
+    CDataStream(int nTypeIn, int nVersionIn, Args&&... args):
+        nType{nTypeIn},
+        nVersion{nVersionIn}
+    {
         ::SerializeMany(*this, std::forward<Args>(args)...);
-    }
-
-    void Init(int nTypeIn, int nVersionIn) {
-        nReadPos = 0;
-        nType = nTypeIn;
-        nVersion = nVersionIn;
     }
 
     CDataStream &operator+=(const CDataStream &b) {
