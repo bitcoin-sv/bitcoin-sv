@@ -2482,7 +2482,7 @@ void CTxMemPool::AddToDisconnectPoolUpToLimit(
     // we should filter out from the mempool.
     std::optional<MinerId> minerID { FindMinerId(block, height) };
     std::set<TxId> dataRefIds {};
-    if(minerID)
+    if(minerID && g_dataRefIndex)
     {
         auto index = g_dataRefIndex->CreateLockingAccess();
         const std::optional<TxId> & minerInfoTxId = minerID->GetMinerInfoTx();

@@ -16,7 +16,7 @@ import json
 """
 Test for bad miner info coinbase transaction crash scenario.
 
-This test verifies that a node crashes when receiving a block with a bad
+This test verifies that a node no longer crashes when receiving a block with a bad
 miner info coinbase transaction that has only 1 vout instead of the required 2.
 
 A valid miner info coinbase should have:
@@ -86,26 +86,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.num_nodes = 1
         self.setup_clean_chain = True
         self.miner_names = ["miner name 0"]
-        self.extra_args = [['-mindebugrejectionfee=0', '-paytxfee=0.00003']] * self.num_nodes
-
-    def stop_nodes(self):
-        """Override to handle already-crashed nodes gracefully."""
-        for node in self.nodes:
-            try:
-                if node.process.poll() is None:  # Check if process is still running
-                    node.stop_node()
-            except Exception as e:
-                self.log.info(f"Node already stopped (expected for crash test): {e}")
-
-        # Wait for all processes to terminate
-        for node in self.nodes:
-            try:
-                node.wait_until_stopped(timeout=10)
-            except Exception:
-                # Force kill if needed
-                if node.process and node.process.poll() is None:
-                    node.process.kill()
-                    node.process.wait()
+        self.extra_args = [['-mindebugrejectionfee=0', '-paytxfee=0.00003', '-minerid=1']] * self.num_nodes
 
     def create_bad_miner_info_block(self, node, allKeys):
         """Create a block with a bad miner info coinbase transaction.
@@ -176,11 +157,9 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         block, coinbase_tx = self.make_block_with_coinbase(self.nodes[0])
         self.nodes[0].submitblock(ToHex(block))
         self.nodes[0].generate(101)
-        self.sync_all()
         fundingSeedTx = self.create_funding_seed(self.nodes[0], allKeys.fundingKeys, coinbase_tx)
         self.store_funding_info(0, allKeys.fundingKeys, fundingSeedTx.hash, index=0)
         self.nodes[0].generate(1)
-        self.sync_all()
 
         # Create and submit a bad miner info block
         self.log.info("Creating bad miner info block with single vout in coinbase")

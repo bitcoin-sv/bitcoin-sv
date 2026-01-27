@@ -54,7 +54,7 @@ class GetdataDataref(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-        self.extra_args = ['-whitelist=127.0.0.1']
+        self.extra_args = ['-whitelist=127.0.0.1', '-minerid=1']
         self.curve = ecdsa.SECP256k1
 
         # Setup miner ID keys

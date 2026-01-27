@@ -37,7 +37,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.num_nodes = 2
         self.setup_clean_chain = True
         self.miner_names = ["miner name 0", "miner name 1"]
-        args = ['-disablesafemode=1', '-mindebugrejectionfee=0', '-paytxfee=0.00003']
+        args = ['-disablesafemode=1', '-mindebugrejectionfee=0', '-paytxfee=0.00003', '-minerid=1']
         self.extra_args = [args, args]
 
     def make_block_with_coinbase(self, conn_rpc):

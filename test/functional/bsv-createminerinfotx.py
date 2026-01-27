@@ -40,7 +40,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.num_nodes = 2
         self.setup_clean_chain = True
         self.miner_names = ["miner name 0", "miner name 1"]
-        self.extra_args = [['-mindebugrejectionfee=0', '-paytxfee=0.00003'], ['-mindebugrejectionfee=0', '-paytxfee=0.00003']]
+        self.extra_args = [['-mindebugrejectionfee=0', '-paytxfee=0.00003', '-minerid=1']] * self.num_nodes
 
         self.TEST_call_create = 1
         self.TEST_call_create_twice = 2

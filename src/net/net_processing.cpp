@@ -1965,6 +1965,11 @@ static bool ProcessAuthChMessage(const Config& config,
                                  msg_buffer& vRecv,
                                  CConnman& connman)
 {
+    if(!g_minerIDs) {
+        LogPrint(BCLog::MINERID, "MinerID database not initialized, cannot process authch message from peer=%d\n", pfrom->id);
+        return false;
+    }
+
     // Skip the message if the AuthConn has already been established.
     if (pfrom->fAuthConnEstablished) {
         return true;

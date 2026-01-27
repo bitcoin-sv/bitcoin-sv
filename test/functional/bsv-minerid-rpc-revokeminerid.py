@@ -23,7 +23,7 @@ class RovokeMinerIdRpc(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 3
         self.setup_clean_chain = True
-        self.extra_args = [['-whitelist=127.0.0.1']] * self.num_nodes
+        self.extra_args = [['-whitelist=127.0.0.1', '-minerid=1']] * self.num_nodes
 
         # Setup miner ID keys
         self.minerIdKeys = []

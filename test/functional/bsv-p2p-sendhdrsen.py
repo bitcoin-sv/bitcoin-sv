@@ -52,7 +52,7 @@ class SendHdrsEnTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
-        self.extra_args = [['-genesisactivationheight=1']] * 2 # Genesis must be activated so that we can send large transactions
+        self.extra_args = [['-genesisactivationheight=1', '-minerid=1']] * 2 # Genesis must be activated so that we can send large transactions
 
         # Setup miner ID keys and a single revocation key
         self.minerIdKey = MinerIdKeys("01")
