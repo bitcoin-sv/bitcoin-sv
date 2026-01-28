@@ -45,15 +45,16 @@ class MempoolSync(BitcoinTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 3
+        self.setup_clean_chain = True
         self.extra_args = [
-            ["-mempoolsyncpeer=127.0.0.1", "-whitelist=127.0.0.1", "-mempoolsyncage=5", "-mempoolsyncperiod=1"],
+            ["-mempoolsyncpeer=127.0.0.1", "-whitelist=127.0.0.1", "-mempoolsyncage=5", "-mempoolsyncperiod=1", "-importsync=1"],
             ["-mempoolsyncpeer=127.0.0.1", "-mempoolsyncage=10", "-mempoolsyncperiod=2"],
             []
         ]
 
     def run_test(self):
         # Generate some coins
-        self.nodes[0].generate(110)
+        self.nodes[0].generate(111)
         self.sync_all()
 
         # Get UTXOs

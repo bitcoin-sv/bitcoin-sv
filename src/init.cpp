@@ -466,6 +466,12 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                        strprintf(_("Whether to save the mempool on shutdown "
                                    "and load on restart (default: %u)"),
                                  DEFAULT_PERSIST_MEMPOOL));
+    if (showDebug) {
+        strUsage +=
+            HelpMessageOpt("-importsync",
+                           strprintf(_("If true, import of data from disk will be done synchronously "
+                                       "to avoid races (useful for testing) (default: 0)")));
+    }
     strUsage += HelpMessageOpt(
         "-threadsperblock=<n>",
         strprintf(_("Set the number of script verification threads used when "
@@ -1760,12 +1766,15 @@ void CleanupBlockRevFiles() {
  * "import_files" thread can have longer life span than shutdownToken presented with a reference.
  */
 void ThreadImport(const Config& config,
+                  bool inThread,
                   // NOLINTBEGIN(performance-unnecessary-value-param)
                   std::vector<fs::path> vImportFiles,
                   const task::CCancellationToken shutdownToken)
                   // NOLINTEND(performance-unnecessary-value-param)
 {
-    RenameThread("loadblk");
+    if(inThread) {
+        RenameThread("loadblk");
+    }
 
     {
         CImportingNow imp;
@@ -3866,13 +3875,18 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
         }
     }
 
-    threadGroup.create_thread(
-        [&config, vImportFiles, shutdownToken]
-        {
-            TraceThread(
-                "import_files",
-                [&config, &vImportFiles, shutdownToken]{ThreadImport(config, vImportFiles, shutdownToken);});
-        });
+    if(gArgs.GetBoolArg("-importsync", false)) {
+        ThreadImport(config, false, vImportFiles, shutdownToken);
+    }
+    else {
+        threadGroup.create_thread(
+            [&config, vImportFiles, shutdownToken]
+            {
+                TraceThread(
+                    "import_files",
+                    [&config, &vImportFiles, shutdownToken]{ThreadImport(config, true, vImportFiles, shutdownToken);});
+            });
+    }
 
     // Wait for genesis block to be processed
     {
