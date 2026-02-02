@@ -165,6 +165,8 @@ public:
     {}
 
     template<std::input_iterator Iterator>
+        requires(std::same_as<std::iter_value_t<Iterator>, char> ||
+                 std::same_as<std::iter_value_t<Iterator>, uint8_t>)
     CDataStream(Iterator pbegin, Iterator pend,
                 int nTypeIn,
                 int nVersionIn):
@@ -174,6 +176,8 @@ public:
     {}
 
     template<std::ranges::range R>
+        requires(std::same_as<std::ranges::range_value_t<R>, char> ||
+                 std::same_as<std::ranges::range_value_t<R>, uint8_t>)
     CDataStream(const R& r,
                 int nTypeIn,
                 int nVersionIn):
