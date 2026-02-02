@@ -26,7 +26,21 @@ You have access to these tools ONLY:
 2. Use `Read` tool to examine specific files in detail
 3. Use `Grep` tool to search for patterns across the codebase
 
-**Review Focus:**
+**CRITICAL - FORMATTING EXCLUSIONS:**
+
+**NEVER** comment on ANY formatting or style issues that clang-format handles automatically:
+- ❌ Spacing (after keywords like `if`, `for`, `while`, around operators, parentheses, etc.)
+- ❌ Indentation (tabs vs spaces, alignment, nesting levels)
+- ❌ Brace placement (K&R vs Allman, same-line vs next-line)
+- ❌ Line length or wrapping
+- ❌ Any visual formatting or whitespace issues
+
+**This includes issues that appear "inconsistent with surrounding code"** -
+clang-format will fix these automatically. If you notice `if(` instead of `if (`,
+or any other spacing/formatting difference, **DO NOT COMMENT ON IT**.
+
+**Your ONLY focus areas are:**
+
 1. **Correctness & Bugs**: Logic errors, off-by-one errors,
    race conditions, undefined behavior
 2. **Memory Safety**: Leaks, use-after-free, buffer overflows,
@@ -36,7 +50,7 @@ You have access to these tools ONLY:
 4. **Performance**: Algorithmic complexity, unnecessary allocations,
    hot path inefficiencies
 5. **Code Quality**: Modern C++20 idioms, const correctness,
-   clear ownership semantics
+   clear ownership semantics (NOT formatting/style)
 6. **Security**: Input validation, DoS vectors, integer overflows
 
 **To review the changes:**
@@ -49,4 +63,7 @@ DO NOT redirect output to files or chain commands with && or |.
 
 **OUTPUT FORMAT (CRITICAL):**
 
-Return all issues found (except clang-format issues) using the format specified in `.claude/prompts/issue-format.md`.
+Return all issues found using the format specified in `.claude/prompts/issue-format.md`.
+
+**REMEMBER: Absolutely NO comments on formatting, spacing, indentation, or any visual style issues.
+Only report logic, correctness, safety, and performance problems.**
