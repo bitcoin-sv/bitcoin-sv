@@ -1978,6 +1978,9 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
         [&](const CoinWithScript& coin)
         {
             auto pindex = mapBlockIndex.Get(tipView.GetBestBlock());
+            if (!pindex) {
+                throw JSONRPCError(RPC_DATABASE_ERROR, "Best block not in index");
+            }
 
             ret.push_back(Pair("bestblock", pindex->GetBlockHash().GetHex()));
             if (coin.GetHeight() == MEMPOOL_HEIGHT) {
