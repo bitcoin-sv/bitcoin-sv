@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <mutex>
-#include <shared_mutex>
 #include <utility>
 
 /**
@@ -33,9 +31,13 @@ class CLockedRef
     CLockedRef& operator=(const CLockedRef& that) = delete;
     CLockedRef& operator=(CLockedRef&& that) = default;
 
-    // Wrapped member access
-    Wrapped& get() { return mWrapped; }
-    const Wrapped& get() const { return mWrapped; }
+    ~CLockedRef() = default;
+
+    Wrapped& get() & { return mWrapped; }
+    const Wrapped& get() const & { return mWrapped; }
+
+    Wrapped& get() && = delete;
+    const Wrapped& get() const && = delete;
 
   private:
 

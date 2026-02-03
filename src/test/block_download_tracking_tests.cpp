@@ -68,16 +68,21 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
     GetNodeSignals().InitializeNode(pDummyNode3, *connman, nullptr);
 
     // Non-thread-safe pointers to node states (but we're not using threads here so it's fine)
-    const CNodeStatePtr nodeState1 { GetState(pDummyNode1->id).get() };
-    const CNodeStatePtr nodeState2 { GetState(pDummyNode2->id).get() };
-    const CNodeStatePtr nodeState3 { GetState(pDummyNode3->id).get() };
     // Check initial node states
+    const CNodeStateRef stateRef1 { GetState(pDummyNode1->id) };
+    const CNodeStatePtr& nodeState1 { stateRef1.get() };
     BOOST_CHECK_EQUAL(nodeState1->nBlocksInFlight, 0);
     BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 0U);
     BOOST_CHECK_EQUAL(nodeState1->rejects.size(), 0U);
+
+    const CNodeStateRef stateRef2 { GetState(pDummyNode2->id) };
+    const CNodeStatePtr& nodeState2 { stateRef2.get() };
     BOOST_CHECK_EQUAL(nodeState2->nBlocksInFlight, 0);
     BOOST_CHECK_EQUAL(nodeState2->vBlocksInFlight.size(), 0U);
     BOOST_CHECK_EQUAL(nodeState2->rejects.size(), 0U);
+
+    const CNodeStateRef stateRef3 { GetState(pDummyNode3->id) };
+    const CNodeStatePtr& nodeState3 { stateRef3.get() };
     BOOST_CHECK_EQUAL(nodeState3->nBlocksInFlight, 0);
     BOOST_CHECK_EQUAL(nodeState3->vBlocksInFlight.size(), 0U);
     BOOST_CHECK_EQUAL(nodeState3->rejects.size(), 0U);
