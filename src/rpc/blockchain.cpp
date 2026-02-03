@@ -2230,6 +2230,10 @@ void gettxouts(const Config& config,
                 else
                 {
                     auto pindex = mapBlockIndex.Get(tipView.GetBestBlock());
+                    if(!pindex)
+                    {
+                        throw JSONRPCError(RPC_DATABASE_ERROR, "Best block not in index");
+                    }
                     confirmations = int64_t(pindex->GetHeight() - coin.GetHeight() + 1);
                 }
                 jWriter.pushKV("confirmations", confirmations);
