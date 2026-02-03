@@ -1763,12 +1763,17 @@ static void ApplyStats(CCoinsStats &stats, CHashWriter &ss, const uint256 &hash,
 }
 
 //! Calculate statistics about the unspent transaction output set
-static bool GetUTXOStats(CoinsDB& coinsTip, CCoinsStats &stats) {
+static bool GetUTXOStats(CoinsDB& coinsTip, CCoinsStats &stats)
+{
     std::unique_ptr<CCoinsViewDBCursor> pcursor(coinsTip.Cursor());
 
     CHashWriter ss(SER_GETHASH, PROTOCOL_VERSION);
     stats.hashBlock = pcursor->GetBestBlock();
-    stats.nHeight = mapBlockIndex.Get(stats.hashBlock)->GetHeight();
+    const CBlockIndex* pindex = mapBlockIndex.Get(stats.hashBlock);
+    if(!pindex) {
+        return error("%s: best block not in index", __func__);
+    }
+    stats.nHeight = pindex->GetHeight();
     ss << stats.hashBlock;
     uint256 prevkey;
     std::map<uint32_t, CoinWithScript> outputs;
