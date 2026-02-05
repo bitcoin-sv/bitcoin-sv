@@ -185,6 +185,7 @@ BITCOIN_CORE_H = \
   net/blocktxn_parser.h \
   net/cmpct_size.h \
   net/cmpctblock_parser.h \
+  net/disk_backed_parser.h \
   net/fixed_len_multi_parser.h \
   net/fixed_len_parser.h \
   net/mempool_msg.h \
@@ -377,6 +378,7 @@ libbitcoin_server_a_SOURCES = \
   net/blocktxn_parser.cpp \
   net/cmpct_size.cpp \
   net/cmpctblock_parser.cpp \
+  net/disk_backed_parser.cpp \
   net/fixed_len_multi_parser.cpp \
   net/fixed_len_parser.cpp \
   net/msg_buffer.cpp \

@@ -120,6 +120,7 @@ void GlobalConfig::Reset()
     data->invalidChecksumFreq = DEFAULT_INVALID_CHECKSUM_FREQUENCY;
     data->feeFilter = DEFAULT_FEEFILTER;
     data->maxAddNodeConnections = DEFAULT_MAX_ADDNODE_CONNECTIONS;
+    data->maxRecvBuffer = DEFAULT_MAXRECEIVEBUFFER * ONE_KILOBYTE;
 
     // banclientua
     data->mBannedUAClients = DEFAULT_CLIENTUA_BAN_PATTERNS;
@@ -1521,7 +1522,6 @@ bool GlobalConfig::GetFeeFilter() const
     return data->feeFilter;
 }
 
-
 bool GlobalConfig::SetMaxAddNodeConnections(int16_t max, std::string* err)
 {
     if(max < 0)
@@ -1539,6 +1539,25 @@ bool GlobalConfig::SetMaxAddNodeConnections(int16_t max, std::string* err)
 uint16_t GlobalConfig::GetMaxAddNodeConnections() const
 {
     return data->maxAddNodeConnections;
+}
+
+bool GlobalConfig::SetMaxRecvBuffer(int64_t max, std::string* err)
+{
+    if(max <= 0)
+    {
+        if(err)
+        {
+            *err = "Maximum P2P receive buffer size must be > 0";
+        }
+        return false;
+    }
+
+    data->maxRecvBuffer = static_cast<uint64_t>(max);
+    return true;
+}
+uint64_t GlobalConfig::GetMaxRecvBuffer() const
+{
+    return data->maxRecvBuffer;
 }
 
 

@@ -798,6 +798,14 @@ public:
     {
         return DEFAULT_MAX_ADDNODE_CONNECTIONS;
     }
+    bool SetMaxRecvBuffer(int64_t /*max*/, std::string* /*err*/ = nullptr) override
+    {
+        return true;
+    }
+    uint64_t GetMaxRecvBuffer() const override
+    {
+        return DEFAULT_MAXRECEIVEBUFFER * ONE_KILOBYTE;
+    }
 
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t /*num*/, std::string* /*err*/) override

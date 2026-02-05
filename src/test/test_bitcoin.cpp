@@ -16,6 +16,7 @@
 #include "miner_id/miner_info_tracker.h"
 #include "mining/factory.h"
 #include "mining/journal_builder.h"
+#include "net/disk_backed_parser.h"
 #include "net/net_processing.h"
 #include "pow.h"
 #include "random.h"
@@ -153,6 +154,13 @@ TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory:
     RegisterNodeSignals(GetNodeSignals());
 
     mining::g_miningFactory = std::make_unique<mining::CMiningFactory>(testConfig);
+
+    // Initialize P2P message temporary storage directory
+    g_p2p_recv_tmp_dir = GetDataDir() / "p2p_recv_tmp";
+    if (fs::exists(g_p2p_recv_tmp_dir)) {
+        fs::remove_all(g_p2p_recv_tmp_dir);
+    }
+    fs::create_directories(g_p2p_recv_tmp_dir);
 }
 
 TestingSetup::~TestingSetup() { // NOLINT(bugprone-exception-escape)

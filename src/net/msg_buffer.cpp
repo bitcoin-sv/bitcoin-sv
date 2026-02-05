@@ -5,6 +5,7 @@
 #include "msg_buffer.h"
 
 #include "cmpctblock_parser.h"
+#include "disk_backed_parser.h"
 #include "single_seg_parser.h"
 #include "msg_parser_buffer.h"
 #include "net/block_parser.h"
@@ -12,6 +13,7 @@
 #include "net/net_message.h"
 #include "p2p_msg_lengths.h"
 #include "protocol.h"
+
 #include <cstdint>
 #include <ios>
 #include <memory>
@@ -42,16 +44,21 @@ void msg_buffer::command(const string& cmd)
 }
 
 void msg_buffer::payload_len(uint64_t len)
-{ 
+{
     payload_len_ = len;
 }
 
 static std::unique_ptr<msg_parser> make_parser(const string& cmd,
-                                               const uint64_t payload_len)
+                                               const uint64_t payload_len,
+                                               uint64_t max_receive_buffer)
 {
     // Note: It's not a protocol error to call make_parser with an
     // empty cmd string, that's just another example of an unknown
     // command which is detected in later processing.
+
+    // Use disk-backed parser for messages larger than threshold
+    if(payload_len > max_receive_buffer)
+        return make_unique<msg_parser>(disk_backed_parser{payload_len});
 
     if(cmd == "block")
         return make_unique<msg_parser>(block_parser{});
@@ -72,8 +79,9 @@ void msg_buffer::write(span<const uint8_t> s)
     else
     {
         if(!payload_)
-            payload_ = make_unique<msg_parser_buffer>(make_parser(command_, 
-                                                                  payload_len_.value()));
+            payload_ = make_unique<msg_parser_buffer>(make_parser(command_,
+                                                                  payload_len_.value(),
+                                                                  max_recv_buffer_));
 
         (*payload_)(s);
     }

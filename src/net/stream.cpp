@@ -389,11 +389,15 @@ void Stream::ReceiveMsgBytes(const Config& config, const char* pch, uint64_t nBy
     mBytesRecvThisSpot += nBytes;
 
     while (nBytes > 0)
-    {   
+    {
         // Get current incomplete message, or create a new one.
         if (mRecvMsgQueue.empty() || mRecvMsgQueue.back()->Complete())
         {
-            mRecvMsgQueue.emplace_back(std::make_unique<CNetMessage>(Params().NetMagic(), SER_NETWORK, INIT_PROTO_VERSION));
+            mRecvMsgQueue.emplace_back(std::make_unique<CNetMessage>(
+                Params().NetMagic(),
+                SER_NETWORK,
+                INIT_PROTO_VERSION,
+                mMaxRecvBuffSize));
         }
 
         CNetMessage& msg { *(mRecvMsgQueue.back()) };

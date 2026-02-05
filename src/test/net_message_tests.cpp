@@ -27,7 +27,7 @@ BOOST_AUTO_TEST_SUITE(net_msg_tests)
 BOOST_AUTO_TEST_CASE(read_0_bytes)
 {
     CMessageHeader::MessageMagic mm;
-    CNetMessage msg{mm, netmsg_type, netmsg_version};
+    CNetMessage msg{mm, netmsg_type, netmsg_version, ONE_MEGABYTE};
 
     std::vector<uint8_t> ip;
     const auto bytes_read = msg.Read(GlobalConfig::GetConfig(), ip.data(), ip.size());
@@ -38,7 +38,7 @@ BOOST_AUTO_TEST_CASE(read_0_bytes)
 BOOST_AUTO_TEST_CASE(read_header_only_msg)
 {
     CMessageHeader::MessageMagic mm;
-    CNetMessage msg{mm, netmsg_type, netmsg_version};
+    CNetMessage msg{mm, netmsg_type, netmsg_version, ONE_MEGABYTE};
 
     const string com{"verack"};
     array<uint8_t, 12> command{};
@@ -76,7 +76,7 @@ BOOST_AUTO_TEST_CASE(read_header_only_msg)
 BOOST_AUTO_TEST_CASE(read_ping_msg)
 {
     CMessageHeader::MessageMagic mm;
-    CNetMessage msg{mm, netmsg_type, netmsg_version};
+    CNetMessage msg{mm, netmsg_type, netmsg_version, ONE_MEGABYTE};
 
     const string com{"ping"};
     array<uint8_t, 12> command{};
@@ -121,7 +121,7 @@ BOOST_AUTO_TEST_CASE(read_ping_msg)
 BOOST_AUTO_TEST_CASE(read_extmsg_msg)
 {
     CMessageHeader::MessageMagic mm;
-    CNetMessage msg{mm, netmsg_type, netmsg_version};
+    CNetMessage msg{mm, netmsg_type, netmsg_version, ONE_MEGABYTE};
 
     const string com{"extmsg"};
     array<uint8_t, 12> command{};
@@ -180,7 +180,7 @@ BOOST_AUTO_TEST_CASE(read_extmsg_msg)
 BOOST_AUTO_TEST_CASE(read_block_msg)
 {
     CMessageHeader::MessageMagic mm;
-    CNetMessage msg{mm, netmsg_type, netmsg_version};
+    CNetMessage msg{mm, netmsg_type, netmsg_version, ONE_MEGABYTE};
 
     const string com{"block"};
     array<uint8_t, 12> command{};
@@ -254,7 +254,7 @@ BOOST_AUTO_TEST_CASE(block_msg_with_superflous_data)
     config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
 
     CMessageHeader::MessageMagic mm;
-    CNetMessage msg{mm, netmsg_type, netmsg_version};
+    CNetMessage msg{mm, netmsg_type, netmsg_version, ONE_MEGABYTE};
 
     const string com{"block"};
     array<uint8_t, 12> command{};

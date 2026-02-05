@@ -3779,12 +3779,12 @@ static bool ProcessCompactBlockMessage(
     // dummy (empty) BLOCKTXN message, to re-use the logic there in
     // completing processing of the putative block (without cs_main).
     bool fProcessBLOCKTXN = false;
-    msg_buffer blockTxnMsg(SER_NETWORK, PROTOCOL_VERSION);
+    msg_buffer blockTxnMsg { SER_NETWORK, PROTOCOL_VERSION, config.GetMaxRecvBuffer() };
 
     // If we end up treating this as a plain headers message, call that as
     // well without cs_main.
     bool fRevertToHeaderProcessing = false;
-    msg_buffer vHeadersMsg(SER_NETWORK, PROTOCOL_VERSION);
+    msg_buffer vHeadersMsg { SER_NETWORK, PROTOCOL_VERSION, config.GetMaxRecvBuffer() };
 
     // Keep a CBlock for "optimistic" compactblock reconstructions (see below)
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();

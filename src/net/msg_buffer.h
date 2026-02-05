@@ -33,6 +33,8 @@ class msg_buffer
     int nType_;
     int nVersion_;
 
+    uint64_t max_recv_buffer_;
+
 public:
     using size_type = buffer_type::size_type;
     using value_type = buffer_type::value_type;
@@ -41,9 +43,10 @@ public:
     using iterator = buffer_type::iterator;
     using const_iterator = buffer_type::const_iterator;
 
-    explicit msg_buffer(int nType, int nVersion):
+    explicit msg_buffer(int nType, int nVersion, uint64_t maxRecvBuffer):
         nType_{nType},
-        nVersion_{nVersion}
+        nVersion_{nVersion},
+        max_recv_buffer_{maxRecvBuffer}
     {}
 
     size_type size() const;

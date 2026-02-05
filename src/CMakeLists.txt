@@ -367,6 +367,8 @@ add_library(common
     net/cmpct_size.cpp
     net/cmpctblock_parser.cpp
     net/cmpctblock_parser.h
+    net/disk_backed_parser.cpp
+    net/disk_backed_parser.h
     net/fixed_len_multi_parser.h
     net/fixed_len_multi_parser.cpp
     net/fixed_len_parser.h
