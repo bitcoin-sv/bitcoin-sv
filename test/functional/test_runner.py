@@ -86,7 +86,8 @@ SOLO_TESTS = {
     "bsv-dsattack-with-mocked-dsdetector.py",
     "bsv-p2p-dsdetected.py",
     "bsv-safe-mode.py",
-    "bsv-safe-mode-reorg-notification.py"
+    "bsv-safe-mode-reorg-notification.py",
+    "bsv-p2p-max-pending-responses.py"
 }
 
 ENVIRONMENT_TYPE = {

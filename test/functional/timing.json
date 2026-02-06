@@ -1,23 +1,23 @@
 [
  {
   "name": "abandonconflict.py",
-  "time": 15
+  "time": 12
  },
  {
   "name": "abc-cmdline.py",
-  "time": 9
+  "time": 7
  },
  {
   "name": "abc-mempool-accept-txn.py",
-  "time": 5
+  "time": 4
  },
  {
   "name": "abc-p2p-compactblocks.py",
-  "time": 28
+  "time": 18
  },
  {
   "name": "abc-p2p-fullblocktest.py",
-  "time": 26
+  "time": 21
  },
  {
   "name": "abc-rpc.py",
@@ -25,39 +25,39 @@
  },
  {
   "name": "assumevalid.py",
-  "time": 18
+  "time": 8
  },
  {
   "name": "bip65-cltv-p2p.py",
-  "time": 5
- },
- {
-  "name": "bip68-sequence.py",
-  "time": 28
- },
- {
-  "name": "bipdersig-p2p.py",
-  "time": 5
- },
- {
-  "name": "bitcoin_cli.py",
   "time": 4
  },
  {
+  "name": "bip68-sequence.py",
+  "time": 101
+ },
+ {
+  "name": "bipdersig-p2p.py",
+  "time": 4
+ },
+ {
+  "name": "bitcoin_cli.py",
+  "time": 3
+ },
+ {
   "name": "blockchain.py",
-  "time": 11
+  "time": 9
  },
  {
   "name": "bsv-128Mb-blocks.py",
-  "time": 18
+  "time": 12
+ },
+ {
+  "name": "bsv-128Mb-blocks.py --excessiveblocksize=130000000",
+  "time": 12
  },
  {
   "name": "bsv-2Mb-excessiveblock.py",
-  "time": 20
- },
- {
-  "name": "bsv-4gb-plus-block.py",
-  "time": 558
+  "time": 19
  },
  {
   "name": "bsv-accept-header-with-ancestor.py",
@@ -65,43 +65,99 @@
  },
  {
   "name": "bsv-accept_max_sized_orphan.py",
-  "time": 15
+  "time": 14
  },
  {
-  "name": "bsv-ban-useragents.py",
-  "time": 12
+  "name": "bsv-addnode.py",
+  "time": 25
  },
  {
-  "name": "bsv-big-blocks-rest.py",
-  "time": 20
+  "name": "bsv-auth-msg-spam.py",
+  "time": 8
  },
  {
-  "name": "bsv-block-ds-attack.py",
-  "time": 42
+  "name": "bsv-authconntest-badip.py",
+  "time": 3
  },
  {
-  "name": "bsv-block-propagation-priority.py",
-  "time": 43
+  "name": "bsv-authconntest-badsig.py",
+  "time": 3
  },
  {
-  "name": "bsv-block-size-activation-generated-default.py",
-  "time": 18
+  "name": "bsv-authconntest.py",
+  "time": 3
  },
  {
-  "name": "bsv-block-size-activation-genesis.py",
+  "name": "bsv-bad-list-in-blocktxn.py",
   "time": 5
  },
  {
-  "name": "bsv-block-stalling-test.py",
-  "time": 161
+  "name": "bsv-ban-useragents.py",
+  "time": 21
+ },
+ {
+  "name": "bsv-big-blocks-rest.py",
+  "time": 15
+ },
+ {
+  "name": "bsv-block-bad-count.py",
+  "time": 5
+ },
+ {
+  "name": "bsv-block-download-timeout.py",
+  "time": 363
+ },
+ {
+  "name": "bsv-block-ds-attack.py",
+  "time": 38
+ },
+ {
+  "name": "bsv-block-propagation-priority.py --timeoutfactor=1",
+  "time": 9
+ },
+ {
+  "name": "bsv-block-size-activation-generated-default.py",
+  "time": 13
+ },
+ {
+  "name": "bsv-block-size-activation-generated-default.py --blocksizeactivationtime=1770391097",
+  "time": 15
+ },
+ {
+  "name": "bsv-block-size-activation-genesis.py",
+  "time": 4
+ },
+ {
+  "name": "bsv-block-stalling-test.py --timeoutfactor=1",
+  "time": 53
  },
  {
   "name": "bsv-block-storing-in-file.py",
-  "time": 8
+  "time": 6
+ },
+ {
+  "name": "bsv-block-with-cb-proof.py",
+  "time": 17
  },
  {
   "name": "bsv-blocksize-params.py",
   "time": 3
+ },
+ {
+  "name": "bsv-blocktxn-bad-count.py",
+  "time": 5
+ },
+ {
+  "name": "bsv-blocktxn-duplicate.py",
+  "time": 5
+ },
+ {
+  "name": "bsv-blocktxn-incomplete-txns.py",
+  "time": 5
+ },
+ {
+  "name": "bsv-blocktxn-max-percent.py",
+  "time": 4
  },
  {
   "name": "bsv-broadcast_delay.py",
@@ -113,6 +169,18 @@
  },
  {
   "name": "bsv-check-ttor-violation.py",
+  "time": 4
+ },
+ {
+  "name": "bsv-chronicle-general.py",
+  "time": 760
+ },
+ {
+  "name": "bsv-cmpctblock-bad-prefilledtx-count.py",
+  "time": 5
+ },
+ {
+  "name": "bsv-cmpctblock-bad-shortids-count.py",
   "time": 5
  },
  {
@@ -121,67 +189,119 @@
  },
  {
   "name": "bsv-command-line-invalid-block.py",
-  "time": 23
+  "time": 20
  },
  {
   "name": "bsv-conflict.py",
-  "time": 5
- },
- {
-  "name": "bsv-consolidation-any.py",
-  "time": 17
- },
- {
-  "name": "bsv-consolidation-feefilter.py",
-  "time": 8
- },
- {
-  "name": "bsv-consolidation-p2pkh.py",
-  "time": 14
- },
- {
-  "name": "bsv-cpfp.py",
-  "time": 5
- },
- {
-  "name": "bsv-datacarriersize.py",
-  "time": 24
- },
- {
-  "name": "bsv-decoderawtransactions.py",
   "time": 4
  },
  {
-  "name": "bsv-donotcheck-relay-collision-multi.py",
+  "name": "bsv-consolidation-any.py",
   "time": 5
  },
  {
+  "name": "bsv-consolidation-feefilter.py --timeoutfactor=1",
+  "time": 11
+ },
+ {
+  "name": "bsv-consolidation-p2pkh.py",
+  "time": 7
+ },
+ {
+  "name": "bsv-cpfp-1000-children.py",
+  "time": 10
+ },
+ {
+  "name": "bsv-cpfp.py",
+  "time": 4
+ },
+ {
+  "name": "bsv-createdatareftx-reorg-extended.py",
+  "time": 133
+ },
+ {
+  "name": "bsv-createdatareftx-reorg.py",
+  "time": 10
+ },
+ {
+  "name": "bsv-createminerinfotx-mined-by_other-node.py",
+  "time": 5
+ },
+ {
+  "name": "bsv-createminerinfotx-parallel.py",
+  "time": 8
+ },
+ {
+  "name": "bsv-createminerinfotx-reorg.py",
+  "time": 7
+ },
+ {
+  "name": "bsv-createminerinfotx.py",
+  "time": 16
+ },
+ {
+  "name": "bsv-datacarriersize.py",
+  "time": 19
+ },
+ {
+  "name": "bsv-decoderawtransactions.py",
+  "time": 3
+ },
+ {
+  "name": "bsv-donotcheck-relay-collision-multi.py",
+  "time": 4
+ },
+ {
   "name": "bsv-donotcheck-relay-collision.py",
-  "time": 6
+  "time": 4
  },
  {
   "name": "bsv-ds-bad-callback-service.py",
-  "time": 309
+  "time": 304
  },
  {
   "name": "bsv-dsattack-with-mocked-dsdetector.py",
-  "time": 41
+  "time": 61
  },
  {
   "name": "bsv-dsreport.py",
-  "time": 55
+  "time": 51
+ },
+ {
+  "name": "bsv-dump-invalid-tx.py",
+  "time": 30
  },
  {
   "name": "bsv-dumpparameters.py",
   "time": 3
  },
  {
-  "name": "bsv-exit-safe-mode-for-distant-fork.py",
+  "name": "bsv-empty-msg-cmd.py",
+  "time": 5
+ },
+ {
+  "name": "bsv-empty-payload.py",
   "time": 7
  },
  {
+  "name": "bsv-exit-safe-mode-for-distant-fork.py",
+  "time": 4
+ },
+ {
   "name": "bsv-factorMaxSendQueuesBytes.py",
-  "time": 23
+  "time": 20
+ },
+ {
+  "name": "bsv-feefilter-ibd.py",
+  "time": 5
+ },
+ {
+  "name": "bsv-frozentxo-confiscation.py",
+  "time": 12
+ },
+ {
+  "name": "bsv-frozentxo-confiscation_assumewhitelisted.py",
+  "time": 30
  },
  {
   "name": "bsv-frozentxo-freezefunds.py",
@@ -189,39 +309,43 @@
  },
  {
   "name": "bsv-frozentxo-frozen-transaction-mining.py",
-  "time": 14
+  "time": 12
  },
  {
   "name": "bsv-frozentxo-reindex.py",
-  "time": 8
+  "time": 7
  },
  {
   "name": "bsv-frozentxo-soft-consensus-freeze-default.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "bsv-frozentxo-soft-consensus-freeze-startup.py",
-  "time": 14
+  "time": 13
  },
  {
   "name": "bsv-frozentxo-soft-consensus-freeze-unlimited.py",
-  "time": 10
+  "time": 9
  },
  {
   "name": "bsv-frozentxo-soft-consensus-freeze.py",
-  "time": 14
+  "time": 13
  },
  {
   "name": "bsv-frozentxo-transaction-freeze.py",
-  "time": 8
+  "time": 7
  },
  {
   "name": "bsv-frozentxo-unfreezefunds.py",
   "time": 3
  },
  {
+  "name": "bsv-frozentxo-whitelisttx.py",
+  "time": 5
+ },
+ {
   "name": "bsv-genesis-activation-gracefull-period.py",
-  "time": 17
+  "time": 16
  },
  {
   "name": "bsv-genesis-activation-transactions-beforeafter.py",
@@ -236,12 +360,12 @@
   "time": 6
  },
  {
-  "name": "bsv-genesis-general.py",
-  "time": 158
+  "name": "bsv-genesis-general.py --timeoutfactor=1",
+  "time": 140
  },
  {
   "name": "bsv-genesis-journal-reorg.py",
-  "time": 33
+  "time": 24
  },
  {
   "name": "bsv-genesis-mempool-scriptcache.py",
@@ -249,15 +373,15 @@
  },
  {
   "name": "bsv-genesis-nLocktime-nSequence.py",
-  "time": 18
+  "time": 28
  },
  {
   "name": "bsv-genesis-non-final-p2p.py",
-  "time": 6
+  "time": 31
  },
  {
   "name": "bsv-genesis-non-final-pool-limit.py",
-  "time": 11
+  "time": 7
  },
  {
   "name": "bsv-genesis-pushonly-transactions-acceptnonstd.py",
@@ -273,7 +397,7 @@
  },
  {
   "name": "bsv-genesis-spendable-op-return.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "bsv-getblock-rest-rpc.py",
@@ -284,8 +408,12 @@
   "time": 5
  },
  {
+  "name": "bsv-getdata-datareftx.py",
+  "time": 3
+ },
+ {
   "name": "bsv-getdata.py",
-  "time": 6
+  "time": 5
  },
  {
   "name": "bsv-getrawmempool-rpc-rest.py",
@@ -297,19 +425,19 @@
  },
  {
   "name": "bsv-highsigopsdensitymempool.py",
-  "time": 6
+  "time": 5
  },
  {
   "name": "bsv-invalid-transactions.py",
-  "time": 30
+  "time": 29
  },
  {
   "name": "bsv-journal-mempool-reorg-ordering.py",
-  "time": 10
+  "time": 8
  },
  {
   "name": "bsv-log-time-diff.py",
-  "time": 11
+  "time": 10
  },
  {
   "name": "bsv-magicbytes.py",
@@ -317,27 +445,51 @@
  },
  {
   "name": "bsv-mempool-accepting-txs-during-reorg.py",
-  "time": 46
+  "time": 28
  },
  {
-  "name": "bsv-mempool-eviction.py",
-  "time": 42
+  "name": "bsv-mempool-eviction.py --timeoutfactor=1",
+  "time": 30
  },
  {
   "name": "bsv-mempool-limitancestorscount.py",
-  "time": 16
+  "time": 15
  },
  {
-  "name": "bsv-missing-parent-block-data-on-restart.py",
-  "time": 6
+  "name": "bsv-mempool-sync.py",
+  "time": 38
  },
  {
-  "name": "bsv-no-safe-mode-by-large-distant-fork.py",
+  "name": "bsv-merkle-pruned-block.py",
+  "time": 27
+ },
+ {
+  "name": "bsv-merkleproof-storage-overflow.py",
+  "time": 33
+ },
+ {
+  "name": "bsv-minerid-revokemid.py",
+  "time": 5
+ },
+ {
+  "name": "bsv-minerid-rpc-revokeminerid.py",
   "time": 4
  },
  {
+  "name": "bsv-minerinfotx-bad.py",
+  "time": 3
+ },
+ {
+  "name": "bsv-missing-parent-block-data-on-restart.py",
+  "time": 5
+ },
+ {
+  "name": "bsv-no-safe-mode-by-large-distant-fork.py",
+  "time": 3
+ },
+ {
   "name": "bsv-node-settings.py",
-  "time": 9
+  "time": 10
  },
  {
   "name": "bsv-op-separator.py",
@@ -345,11 +497,35 @@
  },
  {
   "name": "bsv-p2p-association.py",
-  "time": 6
+  "time": 4
  },
  {
   "name": "bsv-p2p-dsdetected.py",
   "time": 7
+ },
+ {
+  "name": "bsv-p2p-gethdrsen.py",
+  "time": 4
+ },
+ {
+  "name": "bsv-p2p-invalid-inv.py",
+  "time": 5
+ },
+ {
+  "name": "bsv-p2p-max-connections-from-addr.py",
+  "time": 8
+ },
+ {
+  "name": "bsv-p2p-max-connections.py",
+  "time": 5
+ },
+ {
+  "name": "bsv-p2p-max-pending-responses.py",
+  "time": 48
+ },
+ {
+  "name": "bsv-p2p-sendhdrsen.py",
+  "time": 9
  },
  {
   "name": "bsv-p2p-simple-association-setup.py",
@@ -361,47 +537,47 @@
  },
  {
   "name": "bsv-p2p_inv_msg_time_order.py",
-  "time": 5
- },
- {
-  "name": "bsv-p2p_inv_msg_time_order2.py",
-  "time": 16
- },
- {
-  "name": "bsv-p2sh-wallet.py",
   "time": 6
  },
  {
+  "name": "bsv-p2p_inv_msg_time_order2.py",
+  "time": 15
+ },
+ {
+  "name": "bsv-p2sh-wallet.py",
+  "time": 4
+ },
+ {
   "name": "bsv-p2sh.py",
-  "time": 5
+  "time": 4
  },
  {
   "name": "bsv-parallel-block-downloads.py",
-  "time": 27
+  "time": 26
  },
  {
   "name": "bsv-pbv-firstvalidactive.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "bsv-pbv-getdatabeforevalidated.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "bsv-pbv-invalidate.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "bsv-pbv-preciousblock.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "bsv-pbv-processingorder.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "bsv-pbv-reorg-return-tx-to-mempool.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "bsv-pbv-reorg-shutdown.py",
@@ -409,7 +585,7 @@
  },
  {
   "name": "bsv-pbv-reorg.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "bsv-pbv-sameblock.py",
@@ -417,27 +593,31 @@
  },
  {
   "name": "bsv-pbv-submitblock.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "bsv-pbv-submitminingsolution.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "bsv-pbv-terminate.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "bsv-pbv-waitaftervalidation.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "bsv-pbv-withsigops.py",
-  "time": 18
+  "time": 10
+ },
+ {
+  "name": "bsv-peer-flood.py",
+  "time": 6
  },
  {
   "name": "bsv-protoconf-versions-compatibility.py",
-  "time": 6
+  "time": 4
  },
  {
   "name": "bsv-protoconf-violation.py",
@@ -445,39 +625,39 @@
  },
  {
   "name": "bsv-protoconf.py",
-  "time": 28
+  "time": 20
  },
  {
   "name": "bsv-ptv-cpfp.py",
-  "time": 292
+  "time": 128
  },
  {
   "name": "bsv-ptv-p2p.py",
-  "time": 50
+  "time": 33
  },
  {
   "name": "bsv-ptv-rpc-sendrawtransactions.py",
-  "time": 53
+  "time": 63
  },
  {
   "name": "bsv-ptv-rpc.py",
-  "time": 19
+  "time": 28
  },
  {
   "name": "bsv-ptv-txn-chains.py",
-  "time": 21
+  "time": 16
  },
  {
   "name": "bsv-pvq-timeouts.py",
-  "time": 34
+  "time": 30
  },
  {
   "name": "bsv-required-params.py",
-  "time": 6
+  "time": 5
  },
  {
   "name": "bsv-rpc-verifyscript.py",
-  "time": 11
+  "time": 10
  },
  {
   "name": "bsv-rpc.py",
@@ -485,7 +665,7 @@
  },
  {
   "name": "bsv-safe-mode-ibd.py",
-  "time": 15
+  "time": 13
  },
  {
   "name": "bsv-safe-mode-reorg-notification.py",
@@ -496,52 +676,68 @@
   "time": 19
  },
  {
+  "name": "bsv-script-op_pushdata.py",
+  "time": 70
+ },
+ {
+  "name": "bsv-selfish-mining.py",
+  "time": 48
+ },
+ {
   "name": "bsv-sendrawtransactions-collided.py",
   "time": 3
  },
  {
   "name": "bsv-sendrawtransactions_skipflags.py",
-  "time": 141 
+  "time": 68
  },
  {
   "name": "bsv-setmaxblocksize-override.py",
-  "time": 11
+  "time": 10
+ },
+ {
+  "name": "bsv-short_blocktxn.py",
+  "time": 5
  },
  {
   "name": "bsv-sigopslimit-consensus-test.py",
-  "time": 8
- },
- {
-  "name": "bsv-soft-rejected-blocks.py",
-  "time": 104
- },
- {
-  "name": "bsv-stay-in-safe-mode.py",
-  "time": 15
- },
- {
-  "name": "bsv-test-getArgsAsByte-parser.py",
-  "time": 24
- },
- {
-  "name": "bsv-toobusyrejectmessage.py",
-  "time": 14
- },
- {
-  "name": "bsv-trigger-safe-mode-after-reorg.py",
   "time": 7
  },
  {
-  "name": "bsv-trigger-safe-mode-by-invalid-chain.py",
+  "name": "bsv-soft-rejected-blocks.py",
+  "time": 68
+ },
+ {
+  "name": "bsv-stay-in-safe-mode.py",
+  "time": 13
+ },
+ {
+  "name": "bsv-test-getArgsAsByte-parser.py",
+  "time": 21
+ },
+ {
+  "name": "bsv-toobusyrejectmessage.py",
+  "time": 13
+ },
+ {
+  "name": "bsv-trigger-safe-mode-after-reorg.py",
   "time": 4
  },
  {
+  "name": "bsv-trigger-safe-mode-by-invalid-chain.py",
+  "time": 3
+ },
+ {
   "name": "bsv-trigger-safe-mode-by-valid-chain.py",
-  "time": 9
+  "time": 6
  },
  {
   "name": "bsv-tx-max-coins-cache-size-policy-limit.py",
   "time": 4
+ },
+ {
+  "name": "bsv-txindex-pruned.py",
+  "time": 19
  },
  {
   "name": "bsv-update-invalid-chain-status-at-startup.py",
@@ -552,12 +748,20 @@
   "time": 4
  },
  {
+  "name": "bsv-zero-sat-out.py",
+  "time": 7
+ },
+ {
+  "name": "bsv-zmq-txremovedfrommempool.py",
+  "time": 4
+ },
+ {
   "name": "csv-activation.py",
-  "time": 28
+  "time": 24
  },
  {
   "name": "dbcrash.py",
-  "time": 890
+  "time": 499
  },
  {
   "name": "decodescript.py",
@@ -569,19 +773,19 @@
  },
  {
   "name": "disconnect_ban.py",
-  "time": 10
+  "time": 9
  },
  {
   "name": "dustrelayfee.py",
-  "time": 27
+  "time": 5
  },
  {
   "name": "example_test.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "fundrawtransaction.py",
-  "time": 26
+  "time": 23
  },
  {
   "name": "getblock-from-dataTemplate.1.0.0.py",
@@ -589,7 +793,7 @@
  },
  {
   "name": "getblocktemplate_longpoll.py",
-  "time": 69
+  "time": 68
  },
  {
   "name": "getchaintips.py",
@@ -601,23 +805,23 @@
  },
  {
   "name": "import-rescan.py",
-  "time": 13
+  "time": 4
  },
  {
   "name": "importmulti.py",
-  "time": 10
+  "time": 5
  },
  {
   "name": "importprunedfunds.py",
-  "time": 5
+  "time": 3
  },
  {
   "name": "invalidateblock.py",
-  "time": 9
+  "time": 8
  },
  {
   "name": "invalidblockrequest.py",
-  "time": 5
+  "time": 4
  },
  {
   "name": "invalidtxrequest.py",
@@ -625,43 +829,43 @@
  },
  {
   "name": "keypool-topup.py",
-  "time": 17
+  "time": 9
  },
  {
   "name": "keypool.py",
-  "time": 8
+  "time": 7
  },
  {
   "name": "listsinceblock.py",
-  "time": 6
+  "time": 5
  },
  {
   "name": "listtransactions.py",
-  "time": 6
+  "time": 5
  },
  {
   "name": "max_script_size_test.py",
-  "time": 30
+  "time": 28
  },
  {
   "name": "maxuploadtarget.py",
-  "time": 66
+  "time": 64
  },
  {
   "name": "mempool_eviction_priority.py",
-  "time": 124
+  "time": 58
  },
  {
   "name": "mempool_limit.py",
-  "time": 130
+  "time": 49
  },
  {
   "name": "mempool_persist.py",
-  "time": 18
+  "time": 15
  },
  {
   "name": "mempool_reorg.py",
-  "time": 5
+  "time": 4
  },
  {
   "name": "mempool_resurrect_test.py",
@@ -673,11 +877,11 @@
  },
  {
   "name": "merkle_blocks.py",
-  "time": 5
+  "time": 3
  },
  {
   "name": "merkle_proof.py",
-  "time": 224
+  "time": 27
  },
  {
   "name": "minchainwork.py",
@@ -685,35 +889,35 @@
  },
  {
   "name": "mining.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "mining_api.py",
-  "time": 145
+  "time": 293
  },
  {
   "name": "mining_journal.py",
-  "time": 399
+  "time": 299
  },
  {
   "name": "multi_rpc.py",
-  "time": 5
+  "time": 4
  },
  {
   "name": "multiwallet.py",
-  "time": 8
+  "time": 6
  },
  {
   "name": "net.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "notifications.py",
-  "time": 7
+  "time": 6
  },
  {
   "name": "nulldummy.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "p2p-acceptblock.py",
@@ -721,19 +925,23 @@
  },
  {
   "name": "p2p-compactblocks.py",
-  "time": 26
+  "time": 23
  },
  {
   "name": "p2p-connections.py",
-  "time": 85
+  "time": 78
  },
  {
-  "name": "p2p-feefilter.py",
+  "name": "p2p-feefilter-zerofee.py",
   "time": 10
  },
  {
+  "name": "p2p-feefilter.py",
+  "time": 8
+ },
+ {
   "name": "p2p-fullblocktest.py",
-  "time": 133
+  "time": 70
  },
  {
   "name": "p2p-leaktests.py",
@@ -741,15 +949,15 @@
  },
  {
   "name": "p2p-mempool.py",
-  "time": 27
+  "time": 25
  },
  {
   "name": "p2p-timeouts.py",
-  "time": 65
+  "time": 64
  },
  {
   "name": "p2p-txn_propagation.py",
-  "time": 113
+  "time": 65
  },
  {
   "name": "p2p-txn_propagation2.py",
@@ -765,43 +973,43 @@
  },
  {
   "name": "prioritise_transaction.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "proxy_test.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "pruning.py",
-  "time": 1292
+  "time": 765
  },
  {
   "name": "rawtransactions.py",
-  "time": 194
+  "time": 84
  },
  {
   "name": "receivedby.py",
-  "time": 7
- },
- {
-  "name": "reindex.py",
-  "time": 15
- },
- {
-  "name": "resendwallettransactions.py",
   "time": 6
  },
  {
+  "name": "reindex.py",
+  "time": 12
+ },
+ {
+  "name": "resendwallettransactions.py",
+  "time": 5
+ },
+ {
   "name": "rest.py",
-  "time": 7
+  "time": 6
  },
  {
   "name": "rpc_getblockstats.py",
-  "time": 4
+  "time": 3
  },
  {
   "name": "rpcbind_test.py",
-  "time": 27
+  "time": 24
  },
  {
   "name": "rpcnamedargs.py",
@@ -809,7 +1017,7 @@
  },
  {
   "name": "sendheaders.py",
-  "time": 28
+  "time": 26
  },
  {
   "name": "sendheadersban.py",
@@ -836,8 +1044,16 @@
   "time": 6
  },
  {
-  "name": "txn_doublespend.py",
+  "name": "txn_clone.py --mineblock",
   "time": 6
+ },
+ {
+  "name": "txn_doublespend.py",
+  "time": 4
+ },
+ {
+  "name": "txn_doublespend.py --mineblock",
+  "time": 4
  },
  {
   "name": "uptime.py",
@@ -849,11 +1065,11 @@
  },
  {
   "name": "wallet-accounts.py",
-  "time": 10
+  "time": 3
  },
  {
   "name": "wallet-dump.py",
-  "time": 6
+  "time": 5
  },
  {
   "name": "wallet-encryption.py",
@@ -861,26 +1077,26 @@
  },
  {
   "name": "wallet-hd.py",
-  "time": 80
- },
- {
-  "name": "wallet.py",
-  "time": 32
- },
- {
-  "name": "walletbackup.py",
-  "time": 49
- },
- {
-  "name": "zapwallettxes.py",
   "time": 13
  },
  {
-  "name": "bsv-createdatareftx-reorg-extended.py",
-  "time": 5
+  "name": "wallet.py",
+  "time": 30
  },
  {
-  "name": "bsv-merkleproof-storage-overflow.py",
-  "time": 5
+  "name": "walletbackup.py",
+  "time": 31
+ },
+ {
+  "name": "zapwallettxes.py",
+  "time": 10
+ },
+ {
+  "name": "zmq_new_topics_test.py",
+  "time": 9
+ },
+ {
+  "name": "zmq_test.py",
+  "time": 4
  }
 ]
