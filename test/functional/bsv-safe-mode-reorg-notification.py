@@ -24,7 +24,8 @@ class WebhookHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         content_length = int(self.headers['Content-Length'])
         body = self.rfile.read(content_length).decode("utf-8")
-        self.test.webhook_messages.append(loads(body))
+        with self.test.webhook_lock:
+            self.test.webhook_messages.append(loads(body))
 
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
@@ -37,15 +38,21 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
 class SafeModeReogNotification(BitcoinTestFramework):
 
+    def __init__(self):
+        super().__init__()
+        self.webhook_lock = threading.Lock()  # Protect webhook_messages access
+
     def start_server(self):
         self.serverThread = threading.Thread(target=self.server.serve_forever)
-        self.serverThread.deamon = True
+        self.serverThread.daemon = True
         self.serverThread.start()
 
     def kill_server(self):
         self.server.shutdown()
         self.server.server_close()
-        self.serverThread.join()
+        self.serverThread.join(timeout=10)
+        if self.serverThread.is_alive():
+            raise Exception("Server thread did not terminate")
 
     def make_handler(self, *a, **kw):
         return WebhookHandler(self, *a, **kw)
@@ -71,7 +78,12 @@ class SafeModeReogNotification(BitcoinTestFramework):
     def check_safe_mode_data(self, rpc, forks, check_webhook_messages=True):
         json_messages = [rpc.getsafemodeinfo()]
         if check_webhook_messages:
-            json_messages.append(self.webhook_messages[-1])
+            with self.webhook_lock:
+                if len(self.webhook_messages) == 0:
+                    # Webhook hasn't arrived yet, signal retry
+                    return False
+                json_messages.append(self.webhook_messages[-1])
+
         for safe_mode_json in json_messages:
             if not forks:
                 assert safe_mode_json["safemodeenabled"] is False
@@ -82,33 +94,36 @@ class SafeModeReogNotification(BitcoinTestFramework):
                     assert fork_expected["forkfirstblock"] == fork_json["forkfirstblock"]["hash"]
                     assert fork_expected["lastcommonblock"] == fork_json["lastcommonblock"]["hash"], f'{fork_expected["lastcommonblock"]}, {fork_json["lastcommonblock"]["hash"]}'
                     assert fork_expected["tips"] == set(t["hash"] for t in fork_json["tips"])
+        return True
 
     def wait_for_safe_mode_data(self, rpc, forks, check_webhook_messages=True):
 
         def is_safe_mode_data_ok():
             try:
-                self.check_safe_mode_data(rpc, forks, check_webhook_messages)
+                return self.check_safe_mode_data(rpc, forks, check_webhook_messages)
             except AssertionError:
+                # Validation failure - could be transient state, keep waiting
                 return False
-            return True
 
         wait_until(is_safe_mode_data_ok, check_interval=0.3)
 
     def check_last_webhook_msg_reorged_from(self, old_tip, numberofdisconnectedblocks=None):
-        if old_tip is None:
-            assert self.webhook_messages[-1]["reorg"]["happened"] is False
-            assert self.webhook_messages[-1]["reorg"]["oldtip"] is None
-            assert self.webhook_messages[-1]["reorg"]["numberofdisconnectedblocks"] == 0
-        else:
-            assert self.webhook_messages[-1]["reorg"]["happened"] is True
-            assert self.webhook_messages[-1]["reorg"]["oldtip"]["hash"] == old_tip
-            if numberofdisconnectedblocks is not None:
-                assert self.webhook_messages[-1]["reorg"]["numberofdisconnectedblocks"] == numberofdisconnectedblocks
+        with self.webhook_lock:
+            if old_tip is None:
+                assert self.webhook_messages[-1]["reorg"]["happened"] is False
+                assert self.webhook_messages[-1]["reorg"]["oldtip"] is None
+                assert self.webhook_messages[-1]["reorg"]["numberofdisconnectedblocks"] == 0
+            else:
+                assert self.webhook_messages[-1]["reorg"]["happened"] is True
+                assert self.webhook_messages[-1]["reorg"]["oldtip"]["hash"] == old_tip
+                if numberofdisconnectedblocks is not None:
+                    assert self.webhook_messages[-1]["reorg"]["numberofdisconnectedblocks"] == numberofdisconnectedblocks
 
     def run_test(self):
 
         self.PORT = 8765
-        self.webhook_messages = []
+        with self.webhook_lock:
+            self.webhook_messages = []
         self.server = HTTPServer(('', self.PORT), self.make_handler)
         self.start_server()
 
@@ -143,7 +158,8 @@ class SafeModeReogNotification(BitcoinTestFramework):
             wait_for_tip_status(conn, new_chain[-1].hash, "headers-only")
             self.wait_for_safe_mode_data(conn.rpc, [expected_new_chain_fork_data])
             self.check_last_webhook_msg_reorged_from(None)
-            self.webhook_messages = []
+            with self.webhook_lock:
+                self.webhook_messages = []
 
             # now send blocks of the new chain
             for bl in new_chain:

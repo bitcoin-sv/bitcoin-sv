@@ -49,13 +49,15 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
 
     def start_server(self):
         self.serverThread = threading.Thread(target=self.server.serve_forever)
-        self.serverThread.deamon = True
+        self.serverThread.daemon = True
         self.serverThread.start()
 
     def kill_server(self):
         self.server.shutdown()
         self.server.server_close()
-        self.serverThread.join()
+        self.serverThread.join(timeout=10)
+        if self.serverThread.is_alive():
+            raise Exception("Server thread did not terminate")
 
     def create_and_send_transaction(self, inputs, outputs):
         tx = CTransaction()

@@ -30,7 +30,8 @@ class WebhookHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         content_length = int(self.headers['Content-Length'])
         body = self.rfile.read(content_length).decode("utf-8")
-        self.test.webhook_messages.append(loads(body))
+        with self.test.webhook_lock:
+            self.test.webhook_messages.append(loads(body))
 
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
@@ -43,15 +44,21 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
 class SafeMode(BitcoinTestFramework):
 
+    def __init__(self):
+        super().__init__()
+        self.webhook_lock = threading.Lock()  # Protect webhook_messages access
+
     def start_server(self):
         self.serverThread = threading.Thread(target=self.server.serve_forever)
-        self.serverThread.deamon = True
+        self.serverThread.daemon = True
         self.serverThread.start()
 
     def kill_server(self):
         self.server.shutdown()
         self.server.server_close()
-        self.serverThread.join()
+        self.serverThread.join(timeout=10)
+        if self.serverThread.is_alive():
+            raise Exception("Server thread did not terminate")
 
     def make_handler(self, *a, **kw):
         return WebhookHandler(self, *a, **kw)
@@ -77,7 +84,12 @@ class SafeMode(BitcoinTestFramework):
     def check_safe_mode_data(self, rpc, forks, check_webhook_messages=True):
         json_messages = [rpc.getsafemodeinfo()]
         if check_webhook_messages:
-            json_messages.append(self.webhook_messages[-1])
+            with self.webhook_lock:
+                if len(self.webhook_messages) == 0:
+                    # Webhook hasn't arrived yet, signal retry
+                    return False
+                json_messages.append(self.webhook_messages[-1])
+
         for safe_mode_json in json_messages:
             if not forks:
                 assert safe_mode_json["safemodeenabled"] is False
@@ -88,15 +100,16 @@ class SafeMode(BitcoinTestFramework):
                     assert fork_expected["forkfirstblock"] == fork_json["forkfirstblock"]["hash"]
                     assert fork_expected["lastcommonblock"] == fork_json["lastcommonblock"]["hash"], f'{fork_expected["lastcommonblock"]}, {fork_json["lastcommonblock"]["hash"]}'
                     assert fork_expected["tips"] == set(t["hash"] for t in fork_json["tips"])
+        return True
 
     def wait_for_safe_mode_data(self, rpc, forks, check_webhook_messages=True):
 
         def is_safe_mode_data_ok():
             try:
-                self.check_safe_mode_data(rpc, forks, check_webhook_messages)
+                return self.check_safe_mode_data(rpc, forks, check_webhook_messages)
             except AssertionError:
+                # Validation failure - could be transient state, keep waiting
                 return False
-            return True
 
         wait_until(is_safe_mode_data_ok, check_interval=0.3)
 
@@ -183,7 +196,8 @@ class SafeMode(BitcoinTestFramework):
                                                      ])
 
         # stopping the node
-        self.webhook_messages = []
+        with self.webhook_lock:
+            self.webhook_messages = []
         args_off_by_one = [f"-safemodemaxforkdistance={max_fork_distance-1}",
                            f"-safemodeminforklength={min_fork_len+1}",
                            f"-safemodeminblockdifference={max_height_difference+1}",
@@ -195,7 +209,8 @@ class SafeMode(BitcoinTestFramework):
 
             # The node is not in the safe mode, no forks
             self.wait_for_safe_mode_data(conn1.rpc, [], check_webhook_messages=False)
-            assert len(self.webhook_messages) == 0 # we are starting without safe mode, the message is not sent
+            with self.webhook_lock:
+                assert len(self.webhook_messages) == 0 # we are starting without safe mode, the message is not sent
 
         # Restaring the node with original params, the node should be in the safe mode again
         with self.run_node_with_connections("Preparation", 0, args,
@@ -282,7 +297,8 @@ class SafeMode(BitcoinTestFramework):
     def run_test(self):
 
         self.PORT = 8765
-        self.webhook_messages = []
+        with self.webhook_lock:
+            self.webhook_messages = []
         self.server = HTTPServer(('', self.PORT), self.make_handler)
         self.start_server()
 
