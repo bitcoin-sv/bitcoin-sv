@@ -176,6 +176,9 @@ target_compile_options(leveldb
                        -Wno-suggest-override
                        -Wno-unused-parameter)
 
+# Suppress Clang 21+ warning for intentionally non-null-terminated string in testrand_impl.h
+set(SECP256K1_APPEND_CFLAGS "${SECP256K1_APPEND_CFLAGS} -Wno-unterminated-string-initialization"
+    CACHE STRING "Extra flags appended to secp256k1 compile commands" FORCE)
 add_subdirectory(secp256k1)
 add_subdirectory(univalue)
 
