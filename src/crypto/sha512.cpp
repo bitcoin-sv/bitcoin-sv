@@ -287,6 +287,7 @@ CSHA512& CSHA512::Write(const uint8_t* data, size_t len)
     if(end > data)
     {
         // Fill the buffer with what remains.
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         memcpy(buf.data() + bufsize, data, end - data);
         bytes += end - data;
     }
@@ -297,10 +298,12 @@ void CSHA512::Finalize(const span hash)
 {
     static const std::array<uint8_t, 128> pad = {0x80};
     std::array<uint8_t, 16> sizedesc = {0x00};
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     WriteBE64(sizedesc.data() + 8, bytes << 3);
     Write(pad.data(), 1 + ((239 - (bytes % pad.size())) % pad.size()));
     Write(sizedesc.data(), 16);
     WriteBE64(hash.data(), s[0]);
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     WriteBE64(hash.data() + 8, s[1]);
     WriteBE64(hash.data() + 16, s[2]);
     WriteBE64(hash.data() + 24, s[3]);
@@ -308,6 +311,7 @@ void CSHA512::Finalize(const span hash)
     WriteBE64(hash.data() + 40, s[5]);
     WriteBE64(hash.data() + 48, s[6]);
     WriteBE64(hash.data() + 56, s[7]);
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 }
 
 CSHA512& CSHA512::Reset()

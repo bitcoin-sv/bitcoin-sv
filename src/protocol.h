@@ -67,7 +67,7 @@ static const unsigned int MIN_RECV_INV_QUEUE_FACTOR = 1;
  */
 struct CMessageFields
 {
-    enum 
+    enum  //NOLINT(cppcoreguidelines-use-enum-class)
     {
         MESSAGE_START_SIZE = 4,
         COMMAND_SIZE = 12,
@@ -452,7 +452,8 @@ const std::vector<std::string> &getAllNetMessageTypes();
 /**
  * nServices flags.
  */
-enum ServiceFlags : uint64_t {
+enum ServiceFlags : uint64_t //NOLINT(cppcoreguidelines-use-enum-class)
+{
     // Nothing
     NODE_NONE = 0,
     // NODE_NETWORK means that the node is capable of serving the block chain.
@@ -529,7 +530,8 @@ const uint32_t MSG_TYPE_MASK = 0xffffffff >> 3;
  * These numbers are defined by the protocol. When adding a new value, be sure
  * to mention it in the respective BIP.
  */
-enum GetDataMsg {
+enum GetDataMsg //NOLINT(cppcoreguidelines-use-enum-class)
+{
     UNDEFINED = 0,
     MSG_TX = 1,
     MSG_BLOCK = 2,

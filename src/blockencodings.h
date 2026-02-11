@@ -118,7 +118,9 @@ size_t ser_size(const BlockTransactions&);
 
 // Dumb serialization/storage-helper for CBlockHeaderAndShortTxIDs and
 // PartiallyDownloadedBlock
-struct PrefilledTransaction {
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+struct PrefilledTransaction
+{
     // Used as an offset since last prefilled tx in CBlockHeaderAndShortTxIDs,
     // as a proper transaction-in-block-index in PartiallyDownloadedBlock
     uint32_t index;
@@ -138,7 +140,8 @@ struct PrefilledTransaction {
     }
 };
 
-typedef enum ReadStatus_t {
+typedef enum ReadStatus_t // NOLINT(cppcoreguidelines-use-enum-class)
+{
     READ_STATUS_OK,
     // Invalid object, peer is sending bogus crap.
     // FIXME: differenciate bogus crap from crap that do not fit our policy.

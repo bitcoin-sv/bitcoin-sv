@@ -76,7 +76,8 @@ public:
     }
 };
 
-enum RetFormat {
+enum RetFormat // NOLINT(cppcoreguidelines-use-enum-class)
+{
     RF_UNDEF,
     RF_BINARY,
     RF_HEX,

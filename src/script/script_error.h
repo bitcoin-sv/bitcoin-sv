@@ -8,7 +8,7 @@
 
 #include <iosfwd>
 
-typedef enum ScriptError_t
+typedef enum ScriptError_t //NOLINT(cppcoreguidelines-use-enum-class)
 {
     SCRIPT_ERR_OK = 0,
     SCRIPT_ERR_UNKNOWN_ERROR,

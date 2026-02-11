@@ -18,7 +18,7 @@ namespace BCLog{class Logger;}
 /**
  * Logger used to log events related to frozen transaction outputs
  */
-class CFrozenTXOLogger
+class CFrozenTXOLogger //NOLINT(cppcoreguidelines-special-member-functions)
 {
 private:
     std::unique_ptr<BCLog::Logger> logger;
@@ -84,7 +84,7 @@ public:
         /**
          * Reference to rejected transaction
          */
-        const CTransaction& rejectedTx;
+        const CTransaction& rejectedTx; //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 
         /**
          * Source of rejected entity

@@ -144,6 +144,6 @@ public:
 
 private:
     uint256 hashPrev; // hashPrev is not set only for genesis block
-    CBlockIndex& blockIndex;
+    CBlockIndex& blockIndex; //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 };
 

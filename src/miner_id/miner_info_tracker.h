@@ -70,7 +70,9 @@ std::unique_ptr<BlockDatarefTracker> make_from_dir(const boost::filesystem::path
 
 } // namespace mining
 
+//NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 extern std::unique_ptr<mining::BlockDatarefTracker> g_BlockDatarefTracker;
 extern std::unique_ptr<mining::MempoolDatarefTracker> g_MempoolDatarefTracker;
+//NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 #endif // MINER_ID_TRACKER_H

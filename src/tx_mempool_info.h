@@ -110,13 +110,13 @@ private:
             : mValue{std::move(ref)}
         {}
 
-        AtomicTxRef(AtomicTxRef&& other)
+        AtomicTxRef(AtomicTxRef&& other) //NOLINT(*-noexcept-move-*)
         {
             std::lock_guard lockOther {other.mMtx};
-            mValue = std::move(other.mValue);
+            mValue = std::move(other.mValue); //NOLINT(cppcoreguidelines-prefer-member-initializer)
         }
 
-        AtomicTxRef& operator=(AtomicTxRef&& other)
+        AtomicTxRef& operator=(AtomicTxRef&& other) // NOLINT(*-noexcept-move-*)
         {
             if(this == &other)
                 return *this;
@@ -129,7 +129,7 @@ private:
         AtomicTxRef(const AtomicTxRef& other)
         {
             std::shared_lock lockOther {other.mMtx};
-            mValue = other.mValue;
+            mValue = other.mValue; //NOLINT(cppcoreguidelines-prefer-member-initializer)
         }
 
         AtomicTxRef& operator=(const AtomicTxRef& other)

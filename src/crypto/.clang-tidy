@@ -1,0 +1,4 @@
+# Inherit parent config but exclude third-party ctaes from header filtering
+InheritParentConfig: true
+HeaderFilterRegex: '^(?!.*/ctaes/).*$'
+...

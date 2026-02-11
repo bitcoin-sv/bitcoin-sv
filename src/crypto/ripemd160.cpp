@@ -325,6 +325,7 @@ CRIPEMD160& CRIPEMD160::Write(const uint8_t* data, size_t len)
     if(end > data)
     {
         // Fill the buffer with what remains.
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         memcpy(buf.data() + bufsize, data, end - data);
         bytes += end - data;
     }
@@ -340,10 +341,12 @@ void CRIPEMD160::Finalize(const span hash)
     Write(pad.data(), 1 + ((119 - (bytes % 64)) % 64));
     Write(sizedesc.data(), 8);
     WriteLE32(hash.data(), s[0]);
+    //NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     WriteLE32(hash.data() + 4, s[1]);
     WriteLE32(hash.data() + 8, s[2]);
     WriteLE32(hash.data() + 12, s[3]);
     WriteLE32(hash.data() + 16, s[4]);
+    //NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 }
 
 CRIPEMD160& CRIPEMD160::Reset()

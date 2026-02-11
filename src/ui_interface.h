@@ -18,13 +18,15 @@ class uint256;
 class CBlockIndex;
 
 /** General change type (added, updated, removed). */
+//NOLINTNEXTLINE(cppcoreguidelines-use-enum-class)
 enum ChangeType { CT_NEW, CT_UPDATED, CT_DELETED };
 
 /** Signals for UI communication. */
 class CClientUIInterface {
 public:
     /** Flags for CClientUIInterface::ThreadSafeMessageBox */
-    enum MessageBoxFlags {
+    enum MessageBoxFlags //NOLINT(cppcoreguidelines-use-enum-class)
+    {
         ICON_INFORMATION = 0,
         ICON_WARNING = (1U << 0),
         ICON_ERROR = (1U << 1),

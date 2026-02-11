@@ -4,11 +4,10 @@
 #ifndef BITCOIN_ASYNC_FILE_READER_H
 #define BITCOIN_ASYNC_FILE_READER_H
 
-#include <cstdio>
-#include <memory>
-#include <string>
+#include <cassert>
+#include <cstring>
 
-#include "streams.h"
+#include "cfile_util.h"
 
 #ifdef _WIN32
 
@@ -32,7 +31,7 @@
     class CAsyncFileReader
     {
     public:
-        CAsyncFileReader(UniqueCFile file)
+        CAsyncFileReader(UniqueCFile file) //NOLINT(cppcoreguidelines-pro-type-member-init)
             : mFile{std::move(file)}
         {
             assert(mFile);
@@ -49,7 +48,8 @@
             }
         }
 
-        CAsyncFileReader(CAsyncFileReader&& other)
+        // NOLINTNEXTLINE(*noexcept-move*)
+        CAsyncFileReader(CAsyncFileReader&& other) //NOLINT(cppcoreguidelines-pro-type-member-init)
             : mFileId{other.mFileId}
             , mOffset{other.mOffset}
             , mEndOfStream{other.mEndOfStream}
@@ -90,7 +90,7 @@
                 memset(&mControllBlock, 0, sizeof(aiocb));
                 mControllBlock.aio_nbytes = maxSize;
                 mControllBlock.aio_fildes = mFileId;
-                mControllBlock.aio_offset = mOffset;
+                mControllBlock.aio_offset = mOffset; //NOLINT(*-narrowing-conversions)
                 mControllBlock.aio_buf = pch;
 
                 EnqueueReadRequest(mControllBlock);
@@ -100,7 +100,7 @@
 
             if(IsReadRequestDone(mControllBlock))
             {
-                int numBytes = aio_return(&mControllBlock);
+                int numBytes = aio_return(&mControllBlock); //NOLINT(*-narrowing-conversions)
                 mReadInProgress = false;
 
                 if(numBytes < 0)

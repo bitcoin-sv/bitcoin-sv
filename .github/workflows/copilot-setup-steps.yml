@@ -29,4 +29,4 @@ jobs:
         uses: ./.github/actions/select_toolset_version
         with: 
           toolset: clang 
-          version: 19
+          version: 21

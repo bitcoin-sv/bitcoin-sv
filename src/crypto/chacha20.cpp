@@ -34,6 +34,7 @@ void ChaCha20::SetKey(std::span<const uint8_t> k)
 {
     const uint8_t* constants{};
 
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     input[4] = ReadLE32(k.data() + 0);
     input[5] = ReadLE32(k.data() + 4);
     input[6] = ReadLE32(k.data()  + 8);
@@ -55,7 +56,6 @@ void ChaCha20::SetKey(std::span<const uint8_t> k)
     input[9] = ReadLE32(k.data()  + 4);
     input[10] = ReadLE32(k.data()  + 8);
     input[11] = ReadLE32(k.data()  + 12);
-    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     input[0] = ReadLE32(constants + 0);
     input[1] = ReadLE32(constants + 4);
     input[2] = ReadLE32(constants + 8);

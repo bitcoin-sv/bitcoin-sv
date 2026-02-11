@@ -39,7 +39,7 @@ private:
     // File info map with file's suffix as key
     MerkleTreeFileInfoMap fileInfoMap;
     // Disk size in bytes taken by all Merkle Tree data files
-    uint64_t diskUsage;
+    uint64_t diskUsage{};
     // Absolute path to the folder containing Merkle Tree data files
     const fs::path merkleStorePath;
     /**
@@ -55,7 +55,7 @@ private:
      * - index was successfully loaded from database
      * - index was successfully rebuilt from data files
      */
-    bool writeIndexToDatabase;
+    bool writeIndexToDatabase{};
     /**
      * Defines if index was successfully loaded from database or rebuilt from data files.
      * Value is set to true when:
@@ -68,7 +68,7 @@ private:
      * - index was successfully loaded from the database
      * - index was successfully rebuilt from data files
      */
-    bool indexNotLoaded;
+    bool indexNotLoaded{true};
     // LevelDB cache size
     size_t databaseCacheSize;
     // Merkle Tree data files information stored in the database
@@ -185,7 +185,7 @@ private:
     CCriticalSection cs_merkleTreeFactory;
     std::unordered_map<uint256, CMerkleTreeRef, BlockHasher> merkleTreeMap;
     std::queue<uint256> merkleTreeQueue;
-    uint64_t cacheSizeBytes;
+    uint64_t cacheSizeBytes{};
     CMerkleTreeStore merkleTreeStore;
     std::unique_ptr<CThreadPool<CQueueAdaptor>> merkleTreeThreadPool;
 
@@ -220,6 +220,7 @@ private:
 };
 
 /** Access to global Merkle Tree factory */
+//NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern std::unique_ptr<CMerkleTreeFactory> pMerkleTreeFactory;
 
 #endif // MERKLETREESTORE_H

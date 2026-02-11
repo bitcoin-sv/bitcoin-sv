@@ -47,10 +47,11 @@ class SafeMode
     /**
     * Represents single forking of the main chain
     */
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     struct SafeModeFork
     {
         std::set<const CBlockIndex*> tips;
-        const CBlockIndex* base;
+        const CBlockIndex* base; //NOLINT(cppcoreguidelines-pro-type-member-init)
         static bool CompareBlockIndex(const CBlockIndex* lhs, const CBlockIndex* rhs) 
         {
             if (lhs->GetHeight() == rhs->GetHeight())

@@ -80,7 +80,7 @@ public:
         if (bytebuf_size < 8) {
             FillByteBuffer();
         }
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-*)
         uint64_t ret = ReadLE64(bytebuf + 64 - bytebuf_size);
         bytebuf_size -= 8;
         return ret;

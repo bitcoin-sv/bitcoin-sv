@@ -71,5 +71,6 @@ class BlockReadCache
 };
 
 // Global block reading cache
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables
 inline std::unique_ptr<BlockReadCache> g_blockReadCache {nullptr};
 

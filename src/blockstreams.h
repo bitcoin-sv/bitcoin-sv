@@ -22,8 +22,8 @@
  */
 struct CStreamVersionAndType
 {
-    const int version;
-    const int type;
+    const int version; //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members
+    const int type;    //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members
 };
 
 /**
@@ -34,7 +34,7 @@ struct CStreamVersionAndType
  * next block transaction.
  */
 template<typename Reader>
-class CBlockStreamReader
+class CBlockStreamReader //NOLINT(cppcoreguidelines-special-member-functions)
 {
 public:
     /**
@@ -50,6 +50,7 @@ public:
           mDiskBlockPos{diskBlockPos}
     {
         mDeserializationStream >> mBlockHeader;
+        //NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
         mRemainingTransactionsCounter = ReadCompactSize(mDeserializationStream);
     }
 
@@ -139,6 +140,7 @@ public:
 
         if (mCalculateDiskBlockMetadata) 
         {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
             updateDiskBlockMetadata(reinterpret_cast<uint8_t*>(pch), size);
         }
     }
@@ -180,7 +182,7 @@ private:
  * the data bit by bit.
  */
 template<typename Reader>
-class CBlockStream : public CForwardReadonlyStream
+class CBlockStream : public CForwardReadonlyStream  //NOLINT(cppcoreguidelines-special-member-functions)
 {
 public:
     CBlockStream(

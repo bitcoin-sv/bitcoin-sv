@@ -42,8 +42,8 @@ private:
             : socketPointer(socket_pointer),
               topic(t),
               // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
-              // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
               data(std::vector<std::byte>(reinterpret_cast<const std::byte*>(d),
+              // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                                           reinterpret_cast<const std::byte*>(d) +
                                               size)),
               // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)

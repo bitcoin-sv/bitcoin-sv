@@ -9,6 +9,7 @@
 // CEvictionCandidateTracker is class that tracks which transaction should be removed. candidates for the removal
 // are childless transactions. they are internally arranged in the heap structure with tx with lowest score on the top.
 // for all calls to this class mempool should be locked
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CEvictionCandidateTracker
 {
 public:
@@ -24,8 +25,9 @@ private:
     std::reference_wrapper<const CTxMemPool::txlinksMap> links;
     // function calculates transaction worth, tx with lower worth will be evicted first
     Evaluator evaluator;
-    
+
     // class that represents estimated worth of the transaction
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
     class EvalResult
     {
         // the score of the entry, transactions with lower score will be evicted first.
@@ -37,7 +39,7 @@ private:
         // if the value is nullptr the object is expired (not tracked any more) and not referenced in the map any more
         EvalResult** ptrToMe; 
     public:
-        
+
         EvalResult(CTxMemPool::txiter _entry, Evaluator& evaluator, EvalResult*& _ptrToMe )
             :score{evaluator(_entry)}
             ,entry{_entry}
@@ -46,7 +48,7 @@ private:
             *ptrToMe = this;
         }
 
-        EvalResult(EvalResult&& other)
+        EvalResult(EvalResult&& other) // NOLINT(*-noexcept-move-*)
             :score{other.score}
             ,entry{other.entry}
             ,ptrToMe{other.ptrToMe}
@@ -58,7 +60,7 @@ private:
             }
         }
 
-        EvalResult& operator=(EvalResult&& other)
+        EvalResult& operator=(EvalResult&& other) // NOLINT(*-noexcept-move-*)
         {
             score = other.score;
             entry = other.entry;

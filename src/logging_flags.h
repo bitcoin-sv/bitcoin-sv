@@ -15,7 +15,8 @@ constexpr bool DEFAULT_LOGTIMESTAMPS = true;
 
 namespace BCLog {
 
-enum LogFlags : uint32_t {
+enum LogFlags : uint32_t // NOLINT(cppcoreguidelines-use-enum-class)
+{
     NONE = 0,
     MEMPOOL = (1 << 1),
     HTTP = (1 << 2),

@@ -167,6 +167,7 @@ public:
             if(index.GetHeight() > blockIndex->GetHeight() &&
                index.GetHeight() <= maxHeight)
             {
+                //NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
                 blocks.emplace_back(const_cast<CBlockIndex*>(&index));
             }
         });

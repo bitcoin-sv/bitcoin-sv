@@ -79,6 +79,7 @@ CTxInputData::CTxInputData(
 
 const Config& CTxInputData::GetConfig( const Config& defaultConfig ) const
 {
+    //NOLINTNEXTLINE(bugprone-return-const-ref-from-parameter)
     return mConfig ?  *mConfig : defaultConfig;
 }
 

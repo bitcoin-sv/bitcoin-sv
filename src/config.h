@@ -786,7 +786,8 @@ public:
 private:
     void  CheckSetDefaultCalled() const;
 
-    struct GlobalConfigData {
+    struct GlobalConfigData  //NOLINT(clang-analyzer-optin.performance.Padding)
+    {
     private: friend class GlobalConfig;
         // All fields are initialized in Reset()    
         CFeeRate feePerKB;

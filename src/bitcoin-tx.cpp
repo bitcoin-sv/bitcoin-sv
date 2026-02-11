@@ -847,7 +847,7 @@ static int CommandLineRawTx(int argc, char *argv[],
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         while (argc > 1 && IsSwitchChar(argv[1][0]) && (argv[1][1] != 0)) {
             argc--;
-            argv++;
+            argv++; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         }
 
         CMutableTransaction tx;

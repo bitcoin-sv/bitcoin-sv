@@ -80,7 +80,7 @@ jobs:
         org_repo: [nchain/svn_dev]
         tag : [ubuntu_24.04]
         toolset: [clang]
-        version: [ 19 ]
+        version: [ 21 ]
         build_type: [ Release, Debug ]
         include:
           - build_type: Debug

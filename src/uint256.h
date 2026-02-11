@@ -22,13 +22,14 @@
 /** Template base class for fixed-sized opaque blobs. */
 template <unsigned int BITS> class base_blob {
 protected:
+    // NOLINTNEXTLINE(cppcoreguidelines-use-enum-class)
     enum { WIDTH = BITS / 8 };
     std::array<uint8_t, WIDTH> data;
 
 public:
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     base_blob() noexcept { memset(data.data(), 0, data.size()); }
-    
+
     template<typename T>
     base_blob(T first, T last)
     {
@@ -44,7 +45,7 @@ public:
 
     bool IsNull() const {
         for (int i = 0; i < WIDTH; i++)
-            if (data[i] != 0) return false;
+            if (data[i] != 0) return false; //NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         return true;
     }
 
@@ -98,9 +99,11 @@ public:
     std::string ToString() const { return GetHex(); };
 
     uint8_t* begin() { return data.data(); }
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     uint8_t* end() { return data.data() + WIDTH; }
 
     const uint8_t* begin() const { return data.data(); }
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     const uint8_t* end() const { return data.data() + WIDTH; }
 
     constexpr unsigned int size() const { return data.size(); }

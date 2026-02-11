@@ -89,6 +89,7 @@ static constexpr uint64_t MIN_DISK_SPACE_FOR_MERKLETREE_FILES{ 288 / 2 * ONE_MEB
 /** The default maximum size of a Merkle Tree memory cache */
 static constexpr uint64_t DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE{ 32 * ONE_MEBIBYTE }; // 32 MiB
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CMerkleTree
 {
 private:
@@ -183,7 +184,7 @@ public:
         MerkleProof(size_t index) : transactionIndex(index) {};
 
         std::vector<uint256> merkleTreeHashes;
-        const size_t transactionIndex;
+        const size_t transactionIndex; //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     };
 
     CMerkleTree() {};

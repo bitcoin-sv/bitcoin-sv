@@ -6,7 +6,7 @@ FROM ubuntu:24.04
 ENV TZ=Europe/London \
     DEBIAN_FRONTEND=noninteractive
 
-ARG clang_version=19
+ARG clang_version=21
 
 # Install packages, build Boost, and install Python packages in one layer
 RUN set -xeu \

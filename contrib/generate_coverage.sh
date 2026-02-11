@@ -34,7 +34,7 @@ while getopts 'ht:' VAL; do
     esac
 done
 shift $((OPTIND -1))
-    
+
 (($# < 1)) && Display_Help
 BINARY=$1
 
@@ -54,10 +54,10 @@ elif [ $TOOLSET = 'clang' ]; then
         exit 1
     fi
 
-    llvm_path="/usr/lib/llvm-19/bin"
+    llvm_path="/usr/lib/llvm-21/bin"
     $llvm_path/llvm-profdata merge -sparse default.profraw -o default.profdata
     $llvm_path/llvm-cov export --format=lcov -instr-profile=default.profdata $BINARY > coverage.lcov
-    
+
 else
     echo "$TOOLSET is not a valid toolset. Use 'clang' or 'gcc'."
     exit 1

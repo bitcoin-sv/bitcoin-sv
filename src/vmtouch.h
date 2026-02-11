@@ -34,6 +34,7 @@ struct dev_and_inode
  * @brief The VMTouch class. This class implements the VM touch functionality into
  * bitcoind. It used to preload chainstate leveldb databse into memory.
  */
+//NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class VMTouch
 {
 public:
@@ -50,7 +51,7 @@ public:
     int64_t total_pages_in_core = 0;
     int64_t total_files=0;
     int64_t total_dirs=0;
-    const long pagesize;
+    const long pagesize; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 
     const std::vector<std::string>& get_warnings() const
     {   return warnings; }
@@ -90,7 +91,7 @@ private:
     std::set<dev_and_inode> seen_inodes; 
     std::vector<std::string> ignoreList;
     int curr_crawl_depth{};
-    ino_t crawl_inodes[MAX_CRAWL_DEPTH];
+    ino_t crawl_inodes[MAX_CRAWL_DEPTH]; //NOLINT(cppcoreguidelines-avoid-c-arrays)
     std::vector<std::string> filenameFilterList;
 
     // eviction is asnyc and might not take effect immedialtey (or al all)

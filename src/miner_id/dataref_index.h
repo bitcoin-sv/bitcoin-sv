@@ -72,4 +72,5 @@ public:
 
 };
 
+//NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern std::unique_ptr<DataRefTxnDB> g_dataRefIndex;

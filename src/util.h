@@ -57,7 +57,8 @@ extern const char *const BITCOIN_PID_FILENAME;
  * returned, and simply return the input.
  */
 // NOLINTNEXTLINE(bugprone-reserved-identifier)
-inline std::string _(const char *psz) {
+inline std::string _(const char *psz) //NOLINT(cert-dcl*)
+{
     boost::optional<std::string> rv = translationInterface.Translate(psz);
     return rv ? (*rv) : psz;
 }
@@ -132,6 +133,7 @@ protected:
     std::map<std::string, std::vector<std::string>> mapMultiArgs;
 
 public:
+    //NOLINTNEXTLINE(cert-err58-cpp)
     static inline const std::array<std::string, 3> sensitiveArgs{"-rpcuser", "-rpcpassword", "-rpcauth"};
 
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)

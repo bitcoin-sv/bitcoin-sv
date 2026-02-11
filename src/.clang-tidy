@@ -25,6 +25,8 @@ CheckOptions:
     value:           'true'
   - key:             cppcoreguidelines-avoid-non-const-global-variables.AllowInternalLinkage
     value:           'true'
+  - key:             cppcoreguidelines-explicit-virtual-functions.IgnoreDestructors
+    value:           'true'
   - key:             cppcoreguidelines-pro-type-member-init.IgnoreArrays
     value:           'true'
   - key:             cppcoreguidelines-rvalue-reference-param-not-moved.AllowPartialMove

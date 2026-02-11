@@ -17,7 +17,8 @@
 #include <string>
 #include <vector>
 
-enum Network {
+enum Network //NOLINT(cppcoreguidelines-use-enum-class)
+{
     NET_UNROUTABLE = 0,
     NET_IPV4,
     NET_IPV6,

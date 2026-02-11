@@ -93,7 +93,7 @@ private:
      * @tparam VRecordType Iterator will iterate only over records of this type.
      */
     template<std::uint8_t VRecordType>
-    class IteratorBase
+    class IteratorBase // NOLINT(cppcoreguidelines-special-member-functions)
     {
     protected:
         static constexpr std::uint8_t record_type = VRecordType;
@@ -122,7 +122,7 @@ private:
          */
         bool Valid() const
         {
-            std::uint8_t rt;
+            std::uint8_t rt{};
             return this->db_iter->Valid() && this->db_iter->GetKey(rt) && rt==record_type;
         }
 
@@ -176,12 +176,12 @@ public:
      *
      * Use methods IsFrozenOnPolicy() and IsFrozenOnConsensus() to check if TXO is actually considered frozen.
      */
-    class FrozenTXOData
+    class FrozenTXOData //NOLINT(cppcoreguidelines-pro-type-member-init)
     {
     private:
         // Default constructor leaves all fields uninitialized and is private so that
         // Create* factory method must be used.
-        explicit FrozenTXOData() = default;
+        explicit FrozenTXOData() = default; //NOLINT(cppcoreguidelines-pro-type-member-init)
 
     public:
         // NOTE: All data members are public so that un/serialization function can be implemented externally.
@@ -586,12 +586,12 @@ public:
     /**
      * Provides data about a whitelisted confiscation transaction
      */
-    class WhitelistedTxData
+    class WhitelistedTxData //NOLINT(cppcoreguidelines-pro-type-member-init)
     {
     private:
         // Default constructor leaves all fields uninitialized and is private so that
         // Create* factory method must be used.
-        explicit WhitelistedTxData() = default;
+        explicit WhitelistedTxData() = default; //NOLINT(cppcoreguidelines-pro-type-member-init)
 
     public:
         /**

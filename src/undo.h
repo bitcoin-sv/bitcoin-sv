@@ -35,7 +35,7 @@ public:
     template <typename Stream> void Serialize(Stream &s) const {
         ::Serialize(
             // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
-            s, VARINT( (pcoin->IsConfiscation() ? 0x100000000ll : 0ll) + pcoin->GetHeight() * 2 + (pcoin->IsCoinBase() ? 1 : 0) ));
+            s, VARINT( (pcoin->IsConfiscation() ? 0x100000000LL : 0LL) + pcoin->GetHeight() * 2 + (pcoin->IsCoinBase() ? 1 : 0) ));
         if (pcoin->GetHeight() > 0) {
             // Required to maintain compatibility with older undo format.
             ::Serialize(s, uint8_t(0));
@@ -119,7 +119,8 @@ public:
     }
 };
 
-enum DisconnectResult {
+enum DisconnectResult //NOLINT(cppcoreguidelines-use-enum-class)
+{
     // All good.
     DISCONNECT_OK,
     // Rolled back, but UTXO set was inconsistent with block.

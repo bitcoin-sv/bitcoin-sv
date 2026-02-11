@@ -156,7 +156,7 @@ struct TestMemPoolEntryHelper {
         return *this;
     }
     TestMemPoolEntryHelper &Height(unsigned int _height) {
-        nHeight = _height;
+        nHeight = _height; //NOLINT(*-narrowing-conversions)
         return *this;
     }
     TestMemPoolEntryHelper &SpendsCoinbase(bool _flag) {

@@ -465,8 +465,11 @@ void HTTPEvent::trigger(struct timeval *tv) {
         evtimer_add(ev, tv);
     }
 }
+
 HTTPRequest::HTTPRequest(struct evhttp_request *_req)
-    : req(_req), replySent(false) {}
+    : req(_req)
+{}
+
 HTTPRequest::~HTTPRequest() {
     if (!replySent) {
         // Keep track of whether reply was sent to avoid request leaks

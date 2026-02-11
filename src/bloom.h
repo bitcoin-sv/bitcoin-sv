@@ -21,7 +21,8 @@ static const unsigned int MAX_HASH_FUNCS = 50;
  * First two bits of nFlags control how much IsRelevantAndUpdate actually
  * updates. The remaining bits are reserved.
  */
-enum bloomflags {
+enum bloomflags //NOLINT(cppcoreguidelines-use-enum-class)
+{
     BLOOM_UPDATE_NONE = 0,
     BLOOM_UPDATE_ALL = 1,
     // Only adds outpoints to the filter if the output is a

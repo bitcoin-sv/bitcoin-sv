@@ -111,7 +111,8 @@ std::unique_ptr<CZMQNotificationInterface> pzmqNotificationInterface;
 #endif
 
 /** Used to pass flags to the Bind() function */
-enum BindFlags {
+enum BindFlags // NOLINT(cppcoreguidelines-use-enum-class)
+{
     BF_NONE = 0,
     BF_EXPLICIT = (1U << 0),
     BF_REPORT_ERROR = (1U << 1),

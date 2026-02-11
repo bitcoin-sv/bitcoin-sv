@@ -426,6 +426,7 @@ void ScheduleMinerIdPeriodicTasks(CScheduler& scheduler, MinerIdDatabase& db);
 std::optional<std::pair<CoinbaseDocument, std::string>> GetMinerCoinbaseDocInfo(const MinerIdDatabase& db, const CPubKey& id);
 
 // Global reference to the MinerID database
+//NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 inline std::unique_ptr<MinerIdDatabase> g_minerIDs;
 
 // Enable enum_cast for MinerIdEntry::State

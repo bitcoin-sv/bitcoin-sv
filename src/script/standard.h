@@ -70,7 +70,8 @@ static const uint32_t POST_CHRONICLE_MANDATORY_SCRIPT_VERIFY_FLAGS =
 // Get mandatory script verify flags for the given protocol era
 uint32_t MandatoryScriptVerifyFlags(ProtocolEra era);
 
-enum txnouttype {
+enum txnouttype //NOLINT(cppcoreguidelines-use-enum-class)
+{
     TX_NONSTANDARD,
     // 'standard' transaction types:
     TX_PUBKEY,

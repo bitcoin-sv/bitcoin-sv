@@ -88,7 +88,7 @@ static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE = 1000;
 /** Default for -maxnonfinalmempool, maximum megabytes of non-final mempool memory usage */
 static const unsigned int DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE = 50;
 /** Minimum feerate increase for mempool limiting **/
-static const CFeeRate MEMPOOL_FULL_FEE_INCREMENT(Amount{1'000});
+static const CFeeRate MEMPOOL_FULL_FEE_INCREMENT(Amount{1'000}); // NOLINT(cert-err58-cpp)
 /** Default for -maxscriptsizepolicy **/
 static const unsigned int DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS = 500 * ONE_KILOBYTE;
 /** Default -maxmempoolsizedisk factor, maximum megabytes of total mempool disk usage as scaled -maxmempool */
@@ -160,7 +160,7 @@ static const uint64_t DEFAULT_SCRIPT_NUM_LENGTH_POLICY = 10 * ONE_KILOBYTE;
 static const uint64_t MIN_COINS_PROVIDER_CACHE_SIZE = ONE_MEGABYTE;
 static const uint64_t DEFAULT_COINS_PROVIDER_CACHE_SIZE = ONE_GIGABYTE;
 
-static const std::set<std::string> DEFAULT_CLIENTUA_BAN_PATTERNS {"abc","cash","bch"};
+static const std::set<std::string> DEFAULT_CLIENTUA_BAN_PATTERNS {"abc","cash","bch"}; //NOLINT(cert-err58-cpp)
 
 /* Default min time difference in sec between the last block and last mempool
 * transaction for the block to be classified as selfishly mined */

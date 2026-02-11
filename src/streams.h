@@ -350,7 +350,7 @@ public:
             return;
         }
         memcpy(pch, &vch[nReadPos], nSize);
-        nReadPos = nReadPosNext;
+        nReadPos = nReadPosNext; //NOLINT(*-narrowing-conversions)
     }
 
     void ignore(int nSize) {
@@ -368,7 +368,7 @@ public:
             vch.clear();
             return;
         }
-        nReadPos = nReadPosNext;
+        nReadPos = nReadPosNext; //NOLINT(*-narrowing-conversions)
     }
 
     void write(const char *pch, size_t nSize) {

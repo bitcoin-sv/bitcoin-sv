@@ -11,7 +11,8 @@
 #include <stdexcept>
 
 /** Signature hash types/flags */
-enum {
+enum //NOLINT(cppcoreguidelines-use-enum-class)
+{
     SIGHASH_ALL = 1,
     SIGHASH_NONE = 2,
     SIGHASH_SINGLE = 3,
