@@ -1513,8 +1513,14 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
                     s.erase(0, delimiterPos + delimiter.length());
                     std::string re_s = s;
 
-                    uint64_t rs = std::stoll(rs_s);
-                    uint64_t re = std::stoll(re_s);
+                    auto rsl = std::stoll(rs_s);
+                    auto rel = std::stoll(re_s);
+                    if(rsl < 0 || rel < 0)
+                    {
+                        throw block_parse_error("Invalid Range parameter, negative value");
+                    }
+                    uint64_t rs = static_cast<uint64_t>(rsl);
+                    uint64_t re = static_cast<uint64_t>(rel);
 
                     if (rs > re)
                     {
@@ -1634,7 +1640,7 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
         }
     } while (!stream->EndOfStream());
 
-    if (!hasDiskBlockMetaData)
+    if (!hasDiskBlockMetaData && !hasRangeHeader)
     {
         hasher.Finalize(CHash256::span{metadata.diskDataHash.begin(),
                         CHash256::OUTPUT_SIZE});
