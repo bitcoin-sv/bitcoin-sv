@@ -111,6 +111,7 @@ class MiningTest(BitcoinTestFramework):
         self.num_nodes = 2
         self.setup_clean_chain = False
         self.extra_args = [['-whitelist=127.0.0.1']] * self.num_nodes
+        self.relayfee = None
 
     def setup_network(self):
         super().setup_network()

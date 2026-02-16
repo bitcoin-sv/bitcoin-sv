@@ -19,6 +19,7 @@ class ABC_RPC_Test (BitcoinTestFramework):
         self.tip = None
         self.setup_clean_chain = True
         self.extra_args = [['-whitelist=127.0.0.1']]
+        self.genesis_hash = None
 
     def test_excessiveblock(self):
         # Check that we start with REGTEST_DEFAULT_MAX_BLOCK_SIZE

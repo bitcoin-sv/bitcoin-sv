@@ -60,23 +60,28 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 2
+        self.maxtxsize = None
+        self.maxscriptsize = None
+        self.maxscriptnumlength = None
+        self.maxstackmemoryusagepolicy = None
+        self.limitancestorcount = None
+        self.limitcpfpgroupmemberscount = None
+        self.minconsolidationfactor = None
+        self.minconfconsolidationinput = None
 
     def setup_network(self):
         self.maxtxsize = 150000
-        self.datacarriersize = 145000
+        datacarriersize = 145000
         self.maxscriptsize = 140000
         self.maxscriptnumlength = 2000
         self.maxstackmemoryusagepolicy = 7000
         self.limitancestorcount = 5
         self.limitcpfpgroupmemberscount = 7
-        self.acceptnonstdoutputs = 1 #default
-        self.datacarrier = 1 #default
-        self.maxstdtxvalidationduration = 5
-        self.maxnonstdtxvalidationduration = 10
+        acceptnonstdoutputs = 1 #default
+        datacarrier = 1 #default
         self.minconsolidationfactor = 10
-        self.maxconsolidationinputscriptsize = 151
+        maxconsolidationinputscriptsize = 151
         self.minconfconsolidationinput = 5
-        self.acceptnonstdconsolidationinput = False
         self.extra_args = [["-debug",
                             "-genesisactivationheight=1",
                             "-minminingtxfee=0.000003",
@@ -84,16 +89,16 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
                             "-checkmempool=0",
                             "-maxscriptsizepolicy=%d" % self.maxscriptsize,
                             "-maxtxsizepolicy=%d" % self.maxtxsize,
-                            "-datacarriersize=%d" % self.datacarriersize,
+                            "-datacarriersize=%d" % datacarriersize,
                             "-maxscriptnumlengthpolicy=%d" % self.maxscriptnumlength,
                             "-maxstackmemoryusagepolicy=%d" % self.maxstackmemoryusagepolicy,
                             "-limitancestorcount=%d" % self.limitancestorcount,
                             "-limitcpfpgroupmemberscount=%d" % self.limitcpfpgroupmemberscount,
-                            "-acceptnonstdoutputs=%s" % self.acceptnonstdoutputs,
-                            "-datacarrier=%s" % self.datacarrier,
+                            "-acceptnonstdoutputs=%s" % acceptnonstdoutputs,
+                            "-datacarrier=%s" % datacarrier,
                             "-acceptnonstdtxn=false", #avoid accepting nonstd txes (doesnt check datacarrier size..) - regtest policy
                             "-minconsolidationfactor=%d" % self.minconsolidationfactor,
-                            "-maxconsolidationinputscriptsize=%d" % self.maxconsolidationinputscriptsize,
+                            "-maxconsolidationinputscriptsize=%d" % maxconsolidationinputscriptsize,
                             "-minconfconsolidationinput=%d" % self.minconfconsolidationinput,
                             "-acceptnonstdconsolidationinput=0",
                             '-banscore=10000000',

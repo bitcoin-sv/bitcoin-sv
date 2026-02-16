@@ -50,6 +50,8 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                 "-acceptnonstdtxn=1",
             ]
         ]
+        self.consolidation_factor = None
+        self.minConfirmations = None
 
     def create_utxos_value10000(self, node, utxo_count, min_confirmations):
 

@@ -47,6 +47,13 @@ class NULLDUMMYTest(BitcoinTestFramework):
         self.num_nodes = 1
         self.setup_clean_chain = True
         self.extra_args = [['-whitelist=127.0.0.1', '-minrelaytxfee=0']]
+        self.address = None
+        self.ms_address = None
+        self.coinbase_blocks = None
+        self.lastblockhash = None
+        self.tip = None
+        self.lastblockheight = None
+        self.lastblocktime = None
 
     def run_test(self):
         self.address = self.nodes[0].getnewaddress()

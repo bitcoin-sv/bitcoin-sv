@@ -227,6 +227,8 @@ class CompetingChainsTest(BitcoinTestFramework):
         self.lenChain0 = 8  # more than SAFE_MODE_MAX_VALID_FORK_LENGTH 7
         self.lenChain1 = 18  # less than SAFE_MODE_MAX_VALID_FORK_DISTANCE (72)
         self.FORK_ROOT_HEIGHT = 200
+        self.dsdetector = None
+        self.exchange = None
 
     def setup_network(self):
         self.setup_nodes()

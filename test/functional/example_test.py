@@ -88,6 +88,8 @@ class ExampleTest(BitcoinTestFramework):
         self.num_nodes = 3
         # Use self.extra_args to change command-line arguments for the nodes
         self.extra_args = [[], ["-logips"], []]
+        self.tip = None
+        self.block_time = None
 
         # self.log.info("I've finished set_test_params")  # Oops! Can't run self.log before run_test()
 

@@ -81,18 +81,18 @@ class BIP65Test(BitcoinTestFramework):
         # Break the generate 1349 blocks call into smaller chunks to avoid occasional timeout
         # when node is too busy to send getdata msg
         rem = (CLTV_HEIGHT - 2) % 10
-        self.coinbase_blocks = []
+        coinbase_blocks = []
         for i in range((CLTV_HEIGHT - 2) // 10):
-            self.coinbase_blocks += self.nodes[0].generate(10)
-        self.coinbase_blocks += self.nodes[0].generate(rem)
+            coinbase_blocks += self.nodes[0].generate(10)
+        coinbase_blocks += self.nodes[0].generate(rem)
 
-        self.nodeaddress = self.nodes[0].getnewaddress()
+        nodeaddress = self.nodes[0].getnewaddress()
 
         self.log.info(
             "Test that an invalid-according-to-CLTV transaction can still appear in a block")
 
-        spendtx = create_transaction(self.nodes[0], self.coinbase_blocks[0],
-                                     self.nodeaddress, 1.0)
+        spendtx = create_transaction(self.nodes[0], coinbase_blocks[0],
+                                     nodeaddress, 1.0)
         cltv_invalidate(spendtx)
         spendtx.rehash()
 
@@ -130,8 +130,8 @@ class BIP65Test(BitcoinTestFramework):
             "Test that invalid-according-to-cltv transactions cannot appear in a block")
         block.nVersion = 4
 
-        spendtx = create_transaction(self.nodes[0], self.coinbase_blocks[1],
-                                     self.nodeaddress, 1.0)
+        spendtx = create_transaction(self.nodes[0], coinbase_blocks[1],
+                                     nodeaddress, 1.0)
         cltv_invalidate(spendtx)
         spendtx.rehash()
 

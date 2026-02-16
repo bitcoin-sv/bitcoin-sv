@@ -112,6 +112,9 @@ class CompactBlocksTest(BitcoinTestFramework):
         self.num_nodes = 2
         self.extra_args = [["-maxblocktxnpercent=100"], ["-txindex", "-maxblocktxnpercent=100"]]
         self.utxos = []
+        self.test_node = None
+        self.ex_softfork_node = None
+        self.old_node = None
 
     def build_block_on_tip(self, node):
         height = node.getblockcount()

@@ -62,6 +62,8 @@ class FeeFilterTest(BitcoinTestFramework):
         self.utxo_test_bsvs = satoshi_round(self.utxo_test_sats / COIN)
         self.blockmintxfee_sats = 500
         self.minrelaytxfee_sats = 250
+        self.consolidation_factor = None
+        self.minConfirmations = None
 
     def setup_nodes(self):
         self.extra_args = [

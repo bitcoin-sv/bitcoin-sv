@@ -59,6 +59,7 @@ class AssumeValidTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 3
+        self.blocks = None
 
     def setup_network(self):
         self.add_nodes(3)
@@ -107,8 +108,8 @@ class AssumeValidTest(BitcoinTestFramework):
         node0.wait_for_verack()
 
         # Build the blockchain
-        self.tip = int(self.nodes[0].getbestblockhash(), 16)
-        self.block_time = self.nodes[0].getblock(
+        tip = int(self.nodes[0].getbestblockhash(), 16)
+        block_time = self.nodes[0].getblock(
             self.nodes[0].getbestblockhash())['time'] + 1
 
         self.blocks = []
@@ -120,54 +121,54 @@ class AssumeValidTest(BitcoinTestFramework):
 
         # Create the first block with a coinbase output to our key
         height = 1
-        block = create_block(self.tip, create_coinbase(
-            height, coinbase_pubkey), self.block_time)
+        block = create_block(tip, create_coinbase(
+            height, coinbase_pubkey), block_time)
         self.blocks.append(block)
-        self.block_time += 1
+        block_time += 1
         block.solve()
         # Save the coinbase for later
-        self.block1 = block
-        self.tip = block.sha256
+        block1 = block
+        tip = block.sha256
         height += 1
 
         # Bury the block 100 deep so the coinbase output is spendable
         for i in range(100):
             block = create_block(
-                self.tip, create_coinbase(height), self.block_time)
+                tip, create_coinbase(height), block_time)
             block.solve()
             self.blocks.append(block)
-            self.tip = block.sha256
-            self.block_time += 1
+            tip = block.sha256
+            block_time += 1
             height += 1
 
         # Create a transaction spending the coinbase output with an invalid (null) signature
         tx = CTransaction()
         tx.vin.append(
-            CTxIn(COutPoint(self.block1.vtx[0].sha256, 0), scriptSig=b""))
+            CTxIn(COutPoint(block1.vtx[0].sha256, 0), scriptSig=b""))
         tx.vout.append(CTxOut(49 * 100000000, CScript([OP_TRUE])))
         tx.calc_sha256()
 
         block102 = create_block(
-            self.tip, create_coinbase(height), self.block_time)
-        self.block_time += 1
+            tip, create_coinbase(height), block_time)
+        block_time += 1
         block102.vtx.extend([tx])
         block102.hashMerkleRoot = block102.calc_merkle_root()
         block102.rehash()
         block102.solve()
         self.blocks.append(block102)
-        self.tip = block102.sha256
-        self.block_time += 1
+        tip = block102.sha256
+        block_time += 1
         height += 1
 
         # Bury the assumed valid block 2100 deep
         for i in range(2100):
             block = create_block(
-                self.tip, create_coinbase(height), self.block_time)
+                tip, create_coinbase(height), block_time)
             block.nVersion = 4
             block.solve()
             self.blocks.append(block)
-            self.tip = block.sha256
-            self.block_time += 1
+            tip = block.sha256
+            block_time += 1
             height += 1
 
         # Start node1 and node2 with assumevalid so they accept a block with a bad signature.

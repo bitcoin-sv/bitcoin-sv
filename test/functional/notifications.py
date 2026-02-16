@@ -14,6 +14,8 @@ class NotificationsTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
+        self.dir_notify_block = None
+        self.dir_notify_tx = None
 
     def setup_network(self):
         self.dir_notify_block = os.path.join(self.options.tmpdir, "notify_block")

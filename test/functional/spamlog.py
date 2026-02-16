@@ -36,20 +36,20 @@ class SpamLog(BitcoinTestFramework):
         self.extra_args = [['-whitelist=127.0.0.1', '-debugexclude=net']]
 
     def run_test(self):
-        self.test_node = TestNode()
-        self.test_node.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), self.test_node),
-                                                 self.nodes[0]))
+        test_node = TestNode()
+        test_node.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), test_node),
+                                            self.nodes[0]))
 
         NetworkThread().start()
 
         self.log.info("Wait for verack")
-        self.test_node.wait_for_verack()
+        test_node.wait_for_verack()
 
         garbage = msg_garbage()
         self.log.info("Spamming")
         start_time = time.time()
         while (time.time() - start_time) < 5:
-            self.test_node.send_message(garbage)
+            test_node.send_message(garbage)
 
         # Check size of generated log file (arbitrary check it's below 100k)
         logfile = "{}/node0/regtest/bitcoind.log".format(self.options.tmpdir)

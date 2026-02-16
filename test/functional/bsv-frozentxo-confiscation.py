@@ -116,6 +116,8 @@ class FrozenTXOConfiscation(BitcoinTestFramework):
                             "-maxtxsigopscountspolicy=1MB",
                             "-permitbaremultisig=0"]] * 2
         self.block_count = 0
+        self.prvkey = None
+        self.pubkey = None
 
     def _init(self):
         # Private key used in scripts with CHECKSIG

@@ -59,6 +59,8 @@ class BIP66Test(BitcoinTestFramework):
         self.extra_args = [
             ['-promiscuousmempoolflags=1', '-whitelist=127.0.0.1']]
         self.setup_clean_chain = True
+        self.coinbase_blocks = None
+        self.nodeaddress = None
 
     def run_test(self):
         node0 = P2PHandler.connect('127.0.0.1', p2p_port(0), self.nodes[0])

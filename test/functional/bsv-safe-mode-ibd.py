@@ -63,6 +63,9 @@ class SafeModeIBDTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 2
+        self.webhook_messages = None
+        self.server = None
+        self.serverThread = None
 
     def setup_network(self):
         self.setup_nodes()
@@ -77,14 +80,14 @@ class SafeModeIBDTest(BitcoinTestFramework):
         self.stop_node(0)
 
         # setting up webhook http server
-        self.PORT = 8999
+        PORT = 8999
         with self.webhook_lock:
             self.webhook_messages = []
-        self.server = HTTPServer(('', self.PORT), self.make_handler)
+        self.server = HTTPServer(('', PORT), self.make_handler)
         self.start_server()
 
         # restart node and force reindexing
-        self.start_node(0, extra_args=["-reindex=1", f"-safemodewebhookurl=http://127.0.0.1:{self.PORT}/safemode", ])
+        self.start_node(0, extra_args=["-reindex=1", f"-safemodewebhookurl=http://127.0.0.1:{PORT}/safemode", ])
         # wait until reindexing finishes
         wait_until(lambda: self.nodes[0].getbestblockhash() == tip_hash,
                    timeout=30,
@@ -98,7 +101,7 @@ class SafeModeIBDTest(BitcoinTestFramework):
             assert len(self.webhook_messages) == 0
 
         # start second node with 48 hours in the furture. this will trigger initial block download mode
-        self.start_node(1, extra_args=[f"-mocktime={int(time.time()) + 48 * 60 * 60}", f"-safemodewebhookurl=http://127.0.0.1:{self.PORT}/safemode", ])
+        self.start_node(1, extra_args=[f"-mocktime={int(time.time()) + 48 * 60 * 60}", f"-safemodewebhookurl=http://127.0.0.1:{PORT}/safemode", ])
         connect_nodes(self.nodes, 0, 1)
 
         # wait until nodes sync themselves

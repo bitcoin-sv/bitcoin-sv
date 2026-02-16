@@ -56,6 +56,8 @@ class ZMQRemovedFromMempool(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
+        self.zmqContext = None
+        self.zmqSubSocket = None
 
     def setup_nodes(self):
 

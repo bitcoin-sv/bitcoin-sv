@@ -97,6 +97,10 @@ class DoubleSpendReport(BitcoinTestFramework):
                             "-maxnonstdtxvalidationduration=15000",
                             "-maxtxnvalidatorasynctasksrunduration=15001",
                             "-dsnotifylevel=2"]]
+        self.server = None
+        self.conn = None
+        self.serverThread = None
+        self.node0 = None
 
     def start_server(self):
         self.serverThread = threading.Thread(target=self.server.serve_forever)

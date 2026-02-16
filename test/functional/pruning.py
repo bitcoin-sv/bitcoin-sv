@@ -50,6 +50,14 @@ class PruneTest(BitcoinTestFramework):
                            ["-maxreceivebuffer=20000", "-disablesafemode=1", "-blockmaxsize=999000"],
                            ["-maxreceivebuffer=20000", "-disablesafemode=1", "-blockmaxsize=999000"],
                            ["-disablesafemode=1", "-prune=550"]]
+        self.prunedir = None
+        self.relayfee = None
+        self.utxo_cache_0 = None
+        self.utxo_cache_1 = None
+        self.mainchainheight = None
+        self.mainchainhash2 = None
+        self.forkheight = None
+        self.forkhash = None
 
     def setup_network(self):
         self.setup_nodes()

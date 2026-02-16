@@ -42,6 +42,13 @@ RANGE_BEGIN = PORT_MIN + 2 * PORT_RANGE  # Start after p2p and rpc ports
 class ProxyTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 3
+        self.have_ipv6 = None
+        self.conf1 = None
+        self.conf2 = None
+        self.conf3 = None
+        self.serv1 = None
+        self.serv2 = None
+        self.serv3 = None
 
     def setup_nodes(self):
         self.have_ipv6 = test_ipv6_local()

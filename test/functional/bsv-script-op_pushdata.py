@@ -34,6 +34,7 @@ class TestOP_PUSHDATA(BitcoinTestFramework):
                             '-maxtxnvalidatorasynctasksrunduration=100000',
                             '-maxtxsizepolicy=0',
                             '-txnvalidationqueuesmaxmemory=3000MB']]
+        self.node0 = None
 
     def add_node_connections(self):
         self.node0 = P2PHandler.connect('127.0.0.1', p2p_port(0), self.nodes[0])

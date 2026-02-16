@@ -13,6 +13,7 @@ from .associations import Association, AssociationCB
 from .authproxy import JSONRPCException
 from . import coverage
 from .test_node import TestNode, TestNode_process_list, BITCOIND_PROC_WAIT_TIMEOUT
+from .static_attributes import StaticAttrsMeta
 from .util import (
     MAX_NODES,
     PortSeed,
@@ -60,7 +61,7 @@ TEST_EXIT_FAILED = 1
 TEST_EXIT_SKIPPED = 77
 
 
-class BitcoinTestFramework():
+class BitcoinTestFramework(metaclass=StaticAttrsMeta):
     """Base class for a bitcoin test script.
 
     Individual bitcoin test scripts should subclass this class and override the set_test_params() and run_test() methods.
@@ -74,7 +75,9 @@ class BitcoinTestFramework():
 
     The __init__() and main() methods should not be overridden.
 
-    This class also contains various public and private helper methods."""
+    This class also contains various public and private helper methods.
+
+    Uses StaticAttrsMeta to catch attribute typos after initialization."""
 
     def __init__(self):
         """Sets test framework defaults. Do not override this method. Instead, override the set_test_params() method"""
@@ -83,6 +86,10 @@ class BitcoinTestFramework():
         self.mocktime = 0
         self.runNodesWithRequiredParams = True
         self.bitcoind_proc_wait_timeout = BITCOIND_PROC_WAIT_TIMEOUT
+        self.extra_args = None
+        self.options = None
+        self.args = None
+        self.log = None
         self.set_test_params()
 
         assert hasattr(
@@ -256,9 +263,7 @@ class BitcoinTestFramework():
 
     def setup_nodes(self):
         """Override this method to customize test node setup"""
-        extra_args = None
-        if hasattr(self, "extra_args"):
-            extra_args = self.extra_args
+        extra_args = self.extra_args
         self.add_nodes(self.num_nodes, extra_args)
         self.start_nodes()
 
@@ -668,6 +673,7 @@ class ComparisonTestFramework(BitcoinTestFramework):
         super(ComparisonTestFramework, self).__init__()
         self.chain = ChainManager()
         self.destAddr = destAddress
+        self.test = None
         self._network_thread = None
         if not hasattr(self, "testbinary"):
             self.testbinary = [os.getenv("BITCOIND", "bitcoind")]
@@ -684,7 +690,7 @@ class ComparisonTestFramework(BitcoinTestFramework):
 
     def setup_network(self):
         extra_args = [['-whitelist=127.0.0.1']] * self.num_nodes
-        if hasattr(self, "extra_args"):
+        if self.extra_args is not None:
             extra_args = self.extra_args
         if self.options.testbinary:
             self.testbinary = [self.options.testbinary]

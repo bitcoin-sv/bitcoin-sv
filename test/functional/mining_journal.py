@@ -181,6 +181,7 @@ class MiningJournal(BitcoinTestFramework):
         self.conncbs = []
         self.num_utxos = 5000
         self.ancestor_depth = 25
+        self.relayfee = None
 
     def setup_network(self):
         self.setup_nodes()

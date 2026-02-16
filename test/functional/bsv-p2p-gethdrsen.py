@@ -30,6 +30,7 @@ class BsvHeadersEnrichedTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 1
+        self.test_node = None
 
     def setup_network(self):
         self.setup_nodes()

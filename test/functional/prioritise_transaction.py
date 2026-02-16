@@ -10,7 +10,7 @@
 from test_framework.cdefs import ONE_KILOBYTE
 from test_framework.mininode import COIN
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import create_confirmed_utxos, gen_return_txouts, satoshi_round
+from test_framework.util import create_confirmed_utxos, satoshi_round
 # FIXME: review how this test needs to be adapted w.r.t _LEGACY_MAX_BLOCK_SIZE
 
 from decimal import Decimal
@@ -29,8 +29,6 @@ class PrioritiseTransactionTest(BitcoinTestFramework):
         self.start_node(0, ["-minminingtxfee=0.00003"])
 
         node = self.nodes[0]
-        self.txouts = gen_return_txouts()
-
         utxo = create_confirmed_utxos(Decimal(1000) / Decimal(COIN), node, 1, age=101)[0]
 
         relayfeerate = self.nodes[0].getnetworkinfo()['relayfee']

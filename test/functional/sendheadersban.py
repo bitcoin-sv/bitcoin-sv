@@ -32,8 +32,6 @@ class TestSendHeadersBanScore(BitcoinTestFramework):
         inv_node = TestNode()
         test_node = TestNode()
 
-        self.p2p_connections = [inv_node, test_node]
-
         connections = []
 
         connection1 = P2PHandler(Connection('127.0.0.1', p2p_port(0), inv_node),
