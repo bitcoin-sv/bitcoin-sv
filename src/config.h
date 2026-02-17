@@ -140,6 +140,8 @@ public:
 
     // RPC parameters
     virtual uint64_t GetWebhookClientNumThreads() const = 0;
+    virtual int64_t GetWebhookClientMaxResponseBodySize() const = 0;
+    virtual int64_t GetWebhookClientMaxResponseHeadersSize() const = 0;
 
 #if ENABLE_ZMQ
     virtual int64_t GetInvalidTxZMQMaxMessageSize() const = 0;
@@ -318,6 +320,8 @@ public:
 
     // RPC parameters
     virtual bool SetWebhookClientNumThreads(int64_t num, std::string* err) = 0;
+    virtual bool SetWebhookClientMaxResponseBodySize(int64_t size, std::string* err = nullptr) = 0;
+    virtual bool SetWebhookClientMaxResponseHeadersSize(int64_t size, std::string* err = nullptr) = 0;
 
     virtual bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) = 0;
 
@@ -669,6 +673,10 @@ public:
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t num, std::string* err) override;
     uint64_t GetWebhookClientNumThreads() const override;
+    bool SetWebhookClientMaxResponseBodySize(int64_t size, std::string* err = nullptr) override;
+    int64_t GetWebhookClientMaxResponseBodySize() const override;
+    bool SetWebhookClientMaxResponseHeadersSize(int64_t size, std::string* err = nullptr) override;
+    int64_t GetWebhookClientMaxResponseHeadersSize() const override;
 
     bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) override;
     bool GetDisableBIP30Checks() const override;
@@ -895,6 +903,8 @@ private:
 
         // RPC parameters
         uint64_t webhookClientNumThreads;
+        int64_t webhookClientMaxResponseBodySize;
+        int64_t webhookClientMaxResponseHeadersSize;
 
         // Double-Spend parameters
         DSAttemptHandler::NotificationLevel dsNotificationLevel;

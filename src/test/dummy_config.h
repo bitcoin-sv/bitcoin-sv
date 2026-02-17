@@ -808,6 +808,22 @@ public:
     {
         return rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS;
     }
+    bool SetWebhookClientMaxResponseBodySize(int64_t /*size*/, std::string* /*err*/ = nullptr) override
+    {
+        return true;
+    }
+    int64_t GetWebhookClientMaxResponseBodySize() const override
+    {
+        return rpc::client::WebhookClientDefaults::DEFAULT_MAX_RESPONSE_BODY_SIZE_BYTES;
+    }
+    bool SetWebhookClientMaxResponseHeadersSize(int64_t /*size*/, std::string* /*err*/ = nullptr) override
+    {
+        return true;
+    }
+    int64_t GetWebhookClientMaxResponseHeadersSize() const override
+    {
+        return rpc::client::WebhookClientDefaults::DEFAULT_MAX_RESPONSE_HEADERS_SIZE_BYTES;
+    }
 
     // Double-Spend processing parameters
     bool SetDoubleSpendNotificationLevel(int /*level*/, std::string* /*err*/) override

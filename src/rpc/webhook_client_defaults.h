@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "consensus/consensus.h"
+
 #include <cstddef>
 #include <cstdint>
 
@@ -23,6 +25,14 @@ struct WebhookClientDefaults
 
     // Default port for webhook notifications
     static constexpr int16_t DEFAULT_WEBHOOK_PORT { 80 };
+
+    // Default maximum HTTP response body size for webhook endpoints (in KB)
+    static constexpr uint64_t DEFAULT_MAX_RESPONSE_BODY_SIZE { 32 };
+    static constexpr int64_t DEFAULT_MAX_RESPONSE_BODY_SIZE_BYTES { static_cast<int64_t>(DEFAULT_MAX_RESPONSE_BODY_SIZE * ONE_KILOBYTE) };
+
+    // Default maximum HTTP response headers size for webhook endpoints (in KB)
+    static constexpr uint64_t DEFAULT_MAX_RESPONSE_HEADERS_SIZE { 32 };
+    static constexpr int64_t DEFAULT_MAX_RESPONSE_HEADERS_SIZE_BYTES { static_cast<int64_t>(DEFAULT_MAX_RESPONSE_HEADERS_SIZE * ONE_KILOBYTE) };
 };
 
 }   // namespace

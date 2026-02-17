@@ -6,6 +6,7 @@
 #include <rpc/client_utils.h>
 
 #include <string>
+#include <cstdint>
 
 class Config; // NOLINT(cppcoreguidelines-virtual-class-destructor)
 
@@ -43,6 +44,8 @@ class RPCClientConfig
     const std::string& GetWallet() const { return mWallet; }
     const std::string& GetEndpoint() const { return mEndpoint; }
     bool GetValidEmptyResponse() const { return mValidEmptyResponse; }
+    int64_t GetMaxResponseBodySize() const { return mMaxResponseBodySize; }
+    int64_t GetMaxResponseHeadersSize() const { return mMaxResponseHeadersSize; }
 
     bool UsesAuth() const { return ! mUsernamePassword.empty(); }
 
@@ -66,6 +69,10 @@ class RPCClientConfig
 
     // Are empty responses to be expected?
     bool mValidEmptyResponse {false};
+
+    // Maximum response body/headers size in bytes (0 for unlimited)
+    int64_t mMaxResponseBodySize {0};
+    int64_t mMaxResponseHeadersSize {0};
 
 };
 

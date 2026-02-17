@@ -75,7 +75,7 @@ class CallBackServiceTest():
         self.callback_service = "localhost:8080"
 
         #turn on server
-        handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.YES)
+        handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.YES, 0, 0)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
         self.conn = httplib.HTTPConnection(self.callback_service)
@@ -150,7 +150,7 @@ class CallBackServiceTest():
 
         self.kill_server()
 
-        handler = partial(CallbackService, RECEIVE.YES, STATUS.SERVER_ERROR, RESPONSE_TIME.FAST, FLAG.YES)
+        handler = partial(CallbackService, RECEIVE.YES, STATUS.SERVER_ERROR, RESPONSE_TIME.FAST, FLAG.YES, 0, 0)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
 
@@ -165,7 +165,7 @@ class CallBackServiceTest():
 
         self.kill_server()
 
-        handler = partial(CallbackService, RECEIVE.YES, STATUS.CLIENT_ERROR, RESPONSE_TIME.FAST, FLAG.YES)
+        handler = partial(CallbackService, RECEIVE.YES, STATUS.CLIENT_ERROR, RESPONSE_TIME.FAST, FLAG.YES, 0, 0)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
 

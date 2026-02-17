@@ -1349,6 +1349,14 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt("-rpcwebhookclientnumthreads=<n>",
         strprintf(_("Number of threads available for submitting HTTP requests to webhook endpoints. (default: %u, maximum: %u)"),
             rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS, rpc::client::WebhookClientDefaults::MAX_NUM_THREADS));
+    strUsage += HelpMessageOpt("-rpcwebhookclientmaxresponsebodysize=<n>",
+        strprintf(_("Maximum size of HTTP response body from webhook endpoints in bytes. "
+                    "(default: %ukB, 0 = unlimited). The value may be given with unit (B, kB, MB, GB)."),
+            rpc::client::WebhookClientDefaults::DEFAULT_MAX_RESPONSE_BODY_SIZE));
+    strUsage += HelpMessageOpt("-rpcwebhookclientmaxresponseheaderssize=<n>",
+        strprintf(_("Maximum size of HTTP response headers from webhook endpoints in bytes. "
+                    "(default: %ukB, 0 = unlimited). The value may be given with unit (B, kB, MB, GB)."),
+            rpc::client::WebhookClientDefaults::DEFAULT_MAX_RESPONSE_HEADERS_SIZE));
     if (showDebug) {
         strUsage += HelpMessageOpt(
             "-rpcworkqueue=<n>", strprintf("Set the depth of the work queue to "
@@ -2585,6 +2593,18 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     // RPC parameters
     if(std::string err; !config.SetWebhookClientNumThreads(gArgs.GetArg("-rpcwebhookclientnumthreads", rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS), &err)) {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetWebhookClientMaxResponseBodySize(
+        gArgs.GetArgAsBytes("-rpcwebhookclientmaxresponsebodysize",
+                            rpc::client::WebhookClientDefaults::DEFAULT_MAX_RESPONSE_BODY_SIZE_BYTES), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetWebhookClientMaxResponseHeadersSize(
+        gArgs.GetArgAsBytes("-rpcwebhookclientmaxresponseheaderssize",
+                            rpc::client::WebhookClientDefaults::DEFAULT_MAX_RESPONSE_HEADERS_SIZE_BYTES), &err))
+    {
         return InitError(err);
     }
 

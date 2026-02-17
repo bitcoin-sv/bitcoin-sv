@@ -107,6 +107,10 @@ RPCClientConfig RPCClientConfig::CreateForDoubleSpendEndpoint(
     // Server sends empty responses
     clientConfig.mValidEmptyResponse = true;
 
+    // Maximum response body/header size
+    clientConfig.mMaxResponseBodySize = config.GetWebhookClientMaxResponseBodySize();
+    clientConfig.mMaxResponseHeadersSize = config.GetWebhookClientMaxResponseHeadersSize();
+
     return clientConfig;
 }
 
@@ -123,6 +127,10 @@ RPCClientConfig RPCClientConfig::CreateForSafeModeWebhook(const Config& config)
 
     // Server sends empty responses
     clientConfig.mValidEmptyResponse = true;
+
+    // Maximum response body/header size
+    clientConfig.mMaxResponseBodySize = config.GetWebhookClientMaxResponseBodySize();
+    clientConfig.mMaxResponseHeadersSize = config.GetWebhookClientMaxResponseHeadersSize();
 
     return clientConfig;
 }
@@ -141,6 +149,10 @@ RPCClientConfig RPCClientConfig::CreateForDoubleSpendDetectedWebhook(const Confi
     // Server sends empty responses
     clientConfig.mValidEmptyResponse = true;
 
+    // Maximum response body/header size
+    clientConfig.mMaxResponseBodySize = config.GetWebhookClientMaxResponseBodySize();
+    clientConfig.mMaxResponseHeadersSize = config.GetWebhookClientMaxResponseHeadersSize();
+
     return clientConfig;
 }
 
@@ -158,6 +170,10 @@ RPCClientConfig RPCClientConfig::CreateForMinerIdGenerator(const Config& config,
     // Some http endpoints are not disruptive if they fail but very disruptive if they stall.
     // We should set timeout to a low value for those cases.
     clientConfig.mConnectionTimeout = timeout;
+
+    // Maximum response body/header size
+    clientConfig.mMaxResponseBodySize = config.GetWebhookClientMaxResponseBodySize();
+    clientConfig.mMaxResponseHeadersSize = config.GetWebhookClientMaxResponseHeadersSize();
 
     return clientConfig;
 }
