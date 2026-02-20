@@ -16,7 +16,6 @@
 #include "policy/fees.h"
 #include "policy/policy.h"
 #include "protocol_era.h"
-#include "timedata.h"
 #include "txdb.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -2478,31 +2477,39 @@ void CTxMemPool::AddToDisconnectPoolUpToLimit(
     const CBlock& block,
     int32_t height)
 {
-    // If this is a miner ID enabled block, there may be txns contained in it
-    // we should filter out from the mempool.
-    std::optional<MinerId> minerID { FindMinerId(block, height) };
-    std::set<TxId> dataRefIds {};
-    if(minerID && g_dataRefIndex)
+    std::optional<MinerId> minerID;
+    std::set<TxId> dataRefIds{};
+    try
     {
-        auto index = g_dataRefIndex->CreateLockingAccess();
-        const std::optional<TxId> & minerInfoTxId = minerID->GetMinerInfoTx();
-        if (minerInfoTxId) {
-            // will do nothing if it is not in the database
-            index.DeleteMinerInfoTxn(*minerInfoTxId);
-        }
-        if(minerID->GetCoinbaseDocument().GetDataRefs())
+        // If this is a miner ID enabled block, there may be txns contained in it
+        // we should filter out from the mempool.
+        minerID = FindMinerId(block, height);
+        if(minerID && g_dataRefIndex)
         {
-            // Build set of dataref txids for speedy lookup
-            const auto& dataRefs{minerID->GetCoinbaseDocument().GetDataRefs()};
-            if(dataRefs)
+            auto index = g_dataRefIndex->CreateLockingAccess();
+            const std::optional<TxId> & minerInfoTxId = minerID->GetMinerInfoTx();
+            if (minerInfoTxId) {
+                // will do nothing if it is not in the database
+                index.DeleteMinerInfoTxn(*minerInfoTxId);
+            }
+            if(minerID->GetCoinbaseDocument().GetDataRefs())
             {
-                for(const auto& dataref : *dataRefs)
+                // Build set of dataref txids for speedy lookup
+                const auto& dataRefs{minerID->GetCoinbaseDocument().GetDataRefs()};
+                if(dataRefs)
                 {
-                    dataRefIds.insert(dataref.txid);
-                    index.DeleteDatarefTxn(dataref.txid);
+                    for(const auto& dataref : *dataRefs)
+                    {
+                        dataRefIds.insert(dataref.txid);
+                        index.DeleteDatarefTxn(dataref.txid);
+                    }
                 }
             }
         }
+    }
+    catch(const std::exception& e)
+    {
+        LogPrint(BCLog::MINERID, "Error filtering tx from mempool: %s\n", e.what());
     }
 
     for(const auto& tx : boost::adaptors::reverse(block.vtx))
