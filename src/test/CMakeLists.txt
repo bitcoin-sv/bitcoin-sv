@@ -224,6 +224,11 @@ add_test_to_suite(bitcoin test_bitcoin
 
 enable_coverage(test_bitcoin)
 
+# Disable unity build for test_bitcoin_main.cpp because BOOST_TEST_MODULE must be
+# defined before any other includes. Unity builds can cause other files to include
+# boost/test/unit_test.hpp first, which prevents main() from being generated.
+set_source_files_properties(test_bitcoin_main.cpp PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+
 target_include_directories(test_bitcoin
 	PUBLIC
 		# To access the generated json headers.
