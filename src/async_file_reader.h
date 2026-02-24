@@ -6,6 +6,7 @@
 
 #include <cassert>
 #include <cstring>
+#include <memory>
 
 #include "cfile_util.h"
 
@@ -31,8 +32,9 @@
     class CAsyncFileReader
     {
     public:
-        CAsyncFileReader(UniqueCFile file) //NOLINT(cppcoreguidelines-pro-type-member-init)
-            : mFile{std::move(file)}
+        explicit CAsyncFileReader(UniqueCFile file):
+            mFile{std::move(file)},
+            mControllBlock{std::make_unique<aiocb>()}
         {
             assert(mFile);
             mOffset = ftell(mFile.get());
@@ -44,30 +46,42 @@
         {
             if(mReadInProgress)
             {
-                aio_cancel(mFileId, &mControllBlock);
+                aio_cancel(mFileId, mControllBlock.get());
             }
         }
 
-        // NOLINTNEXTLINE(*noexcept-move*)
-        CAsyncFileReader(CAsyncFileReader&& other) //NOLINT(cppcoreguidelines-pro-type-member-init)
-            : mFileId{other.mFileId}
-            , mOffset{other.mOffset}
-            , mEndOfStream{other.mEndOfStream}
-        {
-            // Check that we aren't moving while read is in progress as
-            // aio_return takes a reference to other.mControllBlock instance
-            assert(other.mReadInProgress == false);
-
-            mFile = std::move(other.mFile);
-        }
-
-        // Move assignment is never used (nor expected to ever be) so we mark it
-        // as deleted since default version would not be strict enough as it
-        // would require the same mReadInProgress check as move constructor.
-        CAsyncFileReader& operator=(CAsyncFileReader&& other) = delete;
-
         CAsyncFileReader(const CAsyncFileReader&) = delete;
         CAsyncFileReader& operator=(const CAsyncFileReader&) = delete;
+
+        CAsyncFileReader(CAsyncFileReader&& other) noexcept:
+            mFile{std::move(other.mFile)},
+            mFileId{other.mFileId},
+            mControllBlock{std::move(other.mControllBlock)},
+            mOffset{other.mOffset},
+            mReadInProgress{other.mReadInProgress},
+            mEndOfStream{other.mEndOfStream}
+        {
+            other.mReadInProgress = false;
+        }
+
+        CAsyncFileReader& operator=(CAsyncFileReader&& other) noexcept
+        {
+            if(this != &other)
+            {
+                if(mReadInProgress)
+                {
+                    aio_cancel(mFileId, mControllBlock.get());
+                }
+                mFile = std::move(other.mFile);
+                mFileId = other.mFileId;
+                mControllBlock = std::move(other.mControllBlock);
+                mOffset = other.mOffset;
+                mReadInProgress = other.mReadInProgress;
+                mEndOfStream = other.mEndOfStream;
+                other.mReadInProgress = false;
+            }
+            return *this;
+        }
 
         /**
          * pch: buffer to which data will be read
@@ -87,20 +101,20 @@
 
             if(!mReadInProgress)
             {
-                memset(&mControllBlock, 0, sizeof(aiocb));
-                mControllBlock.aio_nbytes = maxSize;
-                mControllBlock.aio_fildes = mFileId;
-                mControllBlock.aio_offset = mOffset; //NOLINT(*-narrowing-conversions)
-                mControllBlock.aio_buf = pch;
+                memset(mControllBlock.get(), 0, sizeof(aiocb));
+                mControllBlock->aio_nbytes = maxSize;
+                mControllBlock->aio_fildes = mFileId;
+                mControllBlock->aio_offset = mOffset;
+                mControllBlock->aio_buf = pch;
 
-                EnqueueReadRequest(mControllBlock);
+                EnqueueReadRequest(*mControllBlock);
 
                 mReadInProgress = true;
             }
 
-            if(IsReadRequestDone(mControllBlock))
+            if(IsReadRequestDone())
             {
-                int numBytes = aio_return(&mControllBlock); //NOLINT(*-narrowing-conversions)
+                const auto numBytes{aio_return(mControllBlock.get())};
                 mReadInProgress = false;
 
                 if(numBytes < 0)
@@ -147,22 +161,15 @@
             }
         }
 
-        static bool IsReadRequestDone(aiocb& controllBlock)
+        bool IsReadRequestDone() const
         {
-            return aio_error(&controllBlock) != EINPROGRESS;
+            return aio_error(mControllBlock.get()) != EINPROGRESS;
         }
 
         UniqueCFile mFile;
-        int mFileId;
-        size_t mOffset;
-#if !defined(__clang__) && defined(__GNUC__)
-	//warning: invalid use of ‘struct aiocb’ with a zero-size array in ‘class CAsyncFileReader’ [-Wpedantic]
-        #pragma GCC diagnostic ignored "-Wpedantic"
-#endif
-        aiocb mControllBlock;
-#if !defined(__clang__) && defined(__GNUC__)
-        #pragma GCC diagnostic pop
-#endif
+        int mFileId{};
+        std::unique_ptr<aiocb> mControllBlock;
+        off_t mOffset{};
 
         bool mReadInProgress = false;
         bool mEndOfStream = false;
