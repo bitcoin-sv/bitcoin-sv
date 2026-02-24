@@ -132,7 +132,8 @@ public:
         return clock::now() - mCreated;
     }
 
-    const Config& GetConfig( const Config& defaultConfig ) const;
+    const Config& GetConfig(const Config&) const;
+    const Config& GetConfig(Config&&) const = delete;
 
     /**
      * Setters
