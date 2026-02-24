@@ -372,11 +372,14 @@ public:
     DSAttemptHandler& GetDSAttemptHandler() { return mDSHandler; }
 
     /** Call the specified function for each node */
-    template <typename Callable> void ForEachNode(Callable&& func) const { 
+    template<typename Callable>
+    void ForEachNode(const Callable& func) const
+    { 
         LOCK(cs_vNodes);
-        for(const CNodePtr& node : vNodes) {
+        for(const CNodePtr& node : vNodes)
+        {
             if(NodeFullyConnected(node))
-                std::forward<Callable>(func)(node); //NOLINT(bugprone-use-after-move) cjg
+                func(node);
         }
     }
 
