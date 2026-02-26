@@ -13,6 +13,7 @@
 #include "test/test_bitcoin.h"
 #include "utilstrencodings.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <vector>
 
@@ -586,6 +587,12 @@ BOOST_AUTO_TEST_CASE(aes_cbc_testvectors) {
         "39F23369A9D9BACFA530E26304231461", true,
         "f69f2445df4f9b17ad2b417be66c3710",
         "b2eb05e2c39be9fcda6c19078c6a9d1b3f461796d6b0d6b2e0c2a72b4d80e644");
+}
+
+BOOST_AUTO_TEST_CASE(chacha20_default_ctor_zeroes_state)
+{
+    ChaCha20 c{};
+    BOOST_CHECK(std::ranges::all_of(c, [](uint32_t v) { return v == 0; }));
 }
 
 BOOST_AUTO_TEST_CASE(chacha20_testvector) {

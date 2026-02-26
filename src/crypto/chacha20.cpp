@@ -9,7 +9,6 @@
 #include "crypto/common.h"
 
 #include <array>
-#include <cstring>
 
 constexpr static inline uint32_t rotl32(uint32_t v, int c) {
     return (v << c) | (v >> (32 - c));
@@ -67,10 +66,8 @@ void ChaCha20::SetKey(std::span<const uint8_t> k)
     input[15] = 0;
 }
 
-// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-ChaCha20::ChaCha20()
+ChaCha20::ChaCha20() : input{}
 {
-    memset(input.data(), 0, input.size());
 }
 
 // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
