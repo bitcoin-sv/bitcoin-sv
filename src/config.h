@@ -786,10 +786,11 @@ public:
 private:
     void  CheckSetDefaultCalled() const;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     struct GlobalConfigData  //NOLINT(clang-analyzer-optin.performance.Padding)
     {
     private: friend class GlobalConfig;
-        // All fields are initialized in Reset()    
+        // All fields are initialized in Reset()
         CFeeRate feePerKB;
         CFeeRate dustRelayFee{DUST_RELAY_TX_FEE};
         int64_t dustLimitFactor;

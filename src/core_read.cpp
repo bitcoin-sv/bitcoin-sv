@@ -70,7 +70,7 @@ CScript ParseScript(const std::string& s)
             // Number
             int64_t n = atoi64(w);
             result << n;
-            goto next;
+            goto next; //NOLINT(cppcoreguidelines-avoid-goto)
         }
 
         // Hex Data
@@ -88,7 +88,7 @@ CScript ParseScript(const std::string& s)
                 ParseHex(std::string(w.begin() + 2, w.end()));
 
             result.insert(result.end(), raw.begin(), raw.end());
-            goto next;
+            goto next; //NOLINT(cppcoreguidelines-avoid-goto)
         }
 
         if (w.size() >= 2 && boost::algorithm::starts_with(w, "'") &&
@@ -98,14 +98,14 @@ CScript ParseScript(const std::string& s)
             // work.
             std::vector<uint8_t> value(w.begin() + 1, w.end() - 1);
             result << value;
-            goto next;
+            goto next; //NOLINT(cppcoreguidelines-avoid-goto)
         }
 
         if(const auto it{mapOpNames.find(w)}; it != end(mapOpNames))
         {
             // opcode, e.g. OP_ADD or ADD:
             result << it->second;
-            goto next;
+            goto next; //NOLINT(cppcoreguidelines-avoid-goto)
         }
 
         throw std::runtime_error("Error parsing script: " + s);

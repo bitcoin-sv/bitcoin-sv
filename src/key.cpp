@@ -18,8 +18,10 @@
 
 namespace
 {
+    //NOLINTNEXTLINE(cert-err58-cpp)
     const ecc_guard secp256k1_context_sign{ecc_guard::operation::sign};
 
+    //NOLINTNEXTLINE(cert-err58-cpp)
     const bool secp256k1_seeded = [] {
         // Pass in a random blinding seed to the secp256k1 context.
         std::vector<uint8_t, secure_allocator<uint8_t>> vseed(32);
@@ -33,6 +35,7 @@ namespace
 
 /** These functions are taken from the libsecp256k1 distribution and are very
  * ugly. */
+//NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 static int ec_privkey_import_der(const secp256k1_context *ctx, uint8_t *out32,
                                  const uint8_t *privkey, size_t privkeylen) {
     const uint8_t *end = privkey + privkeylen;
@@ -81,9 +84,12 @@ static int ec_privkey_import_der(const secp256k1_context *ctx, uint8_t *out32,
     return 1;
 }
 
-static int ec_privkey_export_der(const secp256k1_context *ctx, uint8_t *privkey,
-                                 size_t *privkeylen, const uint8_t *key32,
-                                 int compressed) {
+static int ec_privkey_export_der(const secp256k1_context* ctx,
+                                 uint8_t* privkey,
+                                 size_t* privkeylen,
+                                 const uint8_t* key32,
+                                 int compressed)
+{
     secp256k1_pubkey pubkey;
     size_t pubkeylen = 0;
     if (!secp256k1_ec_pubkey_create(ctx, &pubkey, key32)) {
@@ -92,9 +98,9 @@ static int ec_privkey_export_der(const secp256k1_context *ctx, uint8_t *privkey,
     }
 
     if (compressed) {
-        static const uint8_t begin[] = {0x30, 0x81, 0xD3, 0x02,
-                                        0x01, 0x01, 0x04, 0x20};
-        static const uint8_t middle[] = {
+        static const std::array<uint8_t, 8> begin{0x30, 0x81, 0xD3, 0x02,
+                                                  0x01, 0x01, 0x04, 0x20};
+        static const std::array<uint8_t, 141> middle{
             0xA0, 0x81, 0x85, 0x30, 0x81, 0x82, 0x02, 0x01, 0x01, 0x30, 0x2C,
             0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x01, 0x01, 0x02, 0x21,
             0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
@@ -109,11 +115,11 @@ static int ec_privkey_export_der(const secp256k1_context *ctx, uint8_t *privkey,
             0xAF, 0x48, 0xA0, 0x3B, 0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36, 0x41,
             0x41, 0x02, 0x01, 0x01, 0xA1, 0x24, 0x03, 0x22, 0x00};
         uint8_t *ptr = privkey;
-        memcpy(ptr, begin, sizeof(begin));
+        memcpy(ptr, begin.data(), sizeof(begin));
         ptr += sizeof(begin);
         memcpy(ptr, key32, 32);
         ptr += 32;
-        memcpy(ptr, middle, sizeof(middle));
+        memcpy(ptr, middle.data(), sizeof(middle));
         ptr += sizeof(middle);
         pubkeylen = 33;
         secp256k1_ec_pubkey_serialize(ctx, ptr, &pubkeylen, &pubkey,
@@ -121,9 +127,9 @@ static int ec_privkey_export_der(const secp256k1_context *ctx, uint8_t *privkey,
         ptr += pubkeylen;
         *privkeylen = ptr - privkey;
     } else {
-        static const uint8_t begin[] = {0x30, 0x82, 0x01, 0x13, 0x02,
-                                        0x01, 0x01, 0x04, 0x20};
-        static const uint8_t middle[] = {
+        static const std::array<uint8_t, 9> begin {0x30, 0x82, 0x01, 0x13, 0x02,
+                                                   0x01, 0x01, 0x04, 0x20};
+        static const std::array<uint8_t, 173> middle{
             0xA0, 0x81, 0xA5, 0x30, 0x81, 0xA2, 0x02, 0x01, 0x01, 0x30, 0x2C,
             0x06, 0x07, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x01, 0x01, 0x02, 0x21,
             0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
@@ -141,11 +147,11 @@ static int ec_privkey_export_der(const secp256k1_context *ctx, uint8_t *privkey,
             0x48, 0xA0, 0x3B, 0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36, 0x41, 0x41,
             0x02, 0x01, 0x01, 0xA1, 0x44, 0x03, 0x42, 0x00};
         uint8_t *ptr = privkey;
-        memcpy(ptr, begin, sizeof(begin));
+        memcpy(ptr, begin.data(), sizeof(begin));
         ptr += sizeof(begin);
         memcpy(ptr, key32, 32);
         ptr += 32;
-        memcpy(ptr, middle, sizeof(middle));
+        memcpy(ptr, middle.data(), sizeof(middle));
         ptr += sizeof(middle);
         pubkeylen = 65;
         secp256k1_ec_pubkey_serialize(ctx, ptr, &pubkeylen, &pubkey,
@@ -155,32 +161,34 @@ static int ec_privkey_export_der(const secp256k1_context *ctx, uint8_t *privkey,
     }
     return 1;
 }
+//NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
 bool CKey::Check(const uint8_t *vch) {
     return secp256k1_ec_seckey_verify(secp256k1_context_sign.get(), vch);
 }
 
 void CKey::MakeNewKey(bool fCompressedIn) {
-    do {
+    do
+    {
+        //NOLINTNEXTLINE(*-narrowing-conversions)
         GetStrongRandBytes(keydata.data(), keydata.size());
     } while (!Check(keydata.data()));
     fValid = true;
     fCompressed = fCompressedIn;
 }
 
-CPrivKey CKey::GetPrivKey() const {
+CPrivKey CKey::GetPrivKey() const
+{
     assert(fValid);
     CPrivKey privkey;
-    int ret;
-    size_t privkeylen;
-    privkey.resize(279);
-    privkeylen = 279;
-    ret = ec_privkey_export_der(secp256k1_context_sign.get(),
-                                (uint8_t*)&privkey[0],
-                                &privkeylen,
-                                begin(),
-                                fCompressed ? SECP256K1_EC_COMPRESSED
-                                            : SECP256K1_EC_UNCOMPRESSED);
+    size_t privkeylen{279};
+    privkey.resize(privkeylen);
+    const int ret = ec_privkey_export_der(secp256k1_context_sign.get(),
+                                          (uint8_t*)&privkey[0],
+                                          &privkeylen,
+                                          begin(),
+                                          fCompressed ? SECP256K1_EC_COMPRESSED
+                                                      : SECP256K1_EC_UNCOMPRESSED);
     assert(ret);
     privkey.resize(privkeylen);
     return privkey;
@@ -205,20 +213,22 @@ CPubKey CKey::GetPubKey() const {
     return result;
 }
 
-bool CKey::Sign(const uint256 &hash, std::vector<uint8_t> &vchSig,
-                uint32_t test_case) const {
+bool CKey::Sign(const uint256& hash,
+                std::vector<uint8_t>& vchSig,
+                uint32_t test_case) const
+{
     if (!fValid) return false;
     vchSig.resize(72);
     size_t nSigLen = 72;
-    uint8_t extra_entropy[32] = {0};
-    WriteLE32(extra_entropy, test_case);
+    std::array<uint8_t, 32> extra_entropy = {0};
+    WriteLE32(extra_entropy.data(), test_case);
     secp256k1_ecdsa_signature sig;
     int ret = secp256k1_ecdsa_sign(secp256k1_context_sign.get(),
                                    &sig,
                                    hash.begin(),
                                    begin(),
                                    secp256k1_nonce_function_rfc6979,
-                                   test_case ? extra_entropy : nullptr);
+                                   test_case ? extra_entropy.data() : nullptr);
     assert(ret);
     secp256k1_ecdsa_signature_serialize_der(
         secp256k1_context_sign.get(), (uint8_t*)&vchSig[0], &nSigLen, &sig);
@@ -226,17 +236,20 @@ bool CKey::Sign(const uint256 &hash, std::vector<uint8_t> &vchSig,
     return true;
 }
 
-bool CKey::VerifyPubKey(const CPubKey &pubkey) const {
+bool CKey::VerifyPubKey(const CPubKey& pubkey) const
+{
     if (pubkey.IsCompressed() != fCompressed) {
         return false;
     }
-    uint8_t rnd[8];
+
+    std::array<uint8_t, 8> rnd{};
     std::string str = "Bitcoin key verification\n";
-    GetRandBytes(rnd, sizeof(rnd));
+    GetRandBytes(rnd.data(), sizeof(rnd));
     uint256 hash;
     CHash256()
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         .Write((uint8_t*)str.data(), str.size())
-        .Write(rnd, sizeof(rnd))
+        .Write(rnd.data(), sizeof(rnd))
         .Finalize(CHash256::span{hash.begin(), CHash256::OUTPUT_SIZE});
     std::vector<uint8_t> vchSig;
     Sign(hash, vchSig);
@@ -264,9 +277,12 @@ bool CKey::SignCompact(const uint256 &hash,
     return true;
 }
 
-bool CKey::Load(CPrivKey &privkey, CPubKey &vchPubKey,
-                bool fSkipCheck = false) {
+bool CKey::Load(CPrivKey& privkey,
+                CPubKey& vchPubKey,
+                bool fSkipCheck)
+{
     if(!ec_privkey_import_der(secp256k1_context_sign.get(),
+                              //NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
                               (uint8_t*)begin(),
                               &privkey[0],
                               privkey.size()))
@@ -279,8 +295,12 @@ bool CKey::Load(CPrivKey &privkey, CPubKey &vchPubKey,
     return VerifyPubKey(vchPubKey);
 }
 
-bool CKey::Derive(CKey &keyChild, ChainCode &ccChild, unsigned int nChild,
-                  const ChainCode &cc) const {
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+bool CKey::Derive(CKey& keyChild,
+                  ChainCode& ccChild,
+                  unsigned int nChild,
+                  const ChainCode& cc) const
+{
     assert(IsValid());
     assert(IsCompressed());
     std::vector<uint8_t, secure_allocator<uint8_t>> vout(64);
@@ -296,6 +316,7 @@ bool CKey::Derive(CKey &keyChild, ChainCode &ccChild, unsigned int nChild,
     }
     else
     {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         assert(begin() + 32 == end());
         BIP32Hash(cc,
                   nChild,
@@ -303,14 +324,19 @@ bool CKey::Derive(CKey &keyChild, ChainCode &ccChild, unsigned int nChild,
                   std::span<const uint8_t, 32>{begin(), 32},
                   std::span<uint8_t, 64>{vout});
     }
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     memcpy(ccChild.begin(), vout.data() + 32, 32);
-    memcpy((uint8_t *)keyChild.begin(), begin(), 32);
-    bool ret = secp256k1_ec_seckey_tweak_add(
-        secp256k1_context_sign.get(), (uint8_t*)keyChild.begin(), vout.data());
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
+    memcpy((uint8_t*)keyChild.begin(), begin(), 32);
+    const bool ret = secp256k1_ec_seckey_tweak_add(secp256k1_context_sign.get(),
+                                                   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
+                                                   (uint8_t*)keyChild.begin(),
+                                                   vout.data());
     keyChild.fCompressed = true;
     keyChild.fValid = ret;
     return ret;
 }
+// NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
 bool CExtKey::Derive(CExtKey& out, unsigned int _nChild) const
 {
@@ -323,13 +349,13 @@ bool CExtKey::Derive(CExtKey& out, unsigned int _nChild) const
 
 void CExtKey::SetMaster(const uint8_t *seed, unsigned int nSeedLen)
 {
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    static const uint8_t hashkey[] = {'B', 'i', 't', 'c', 'o', 'i',
+    static const std::array<uint8_t, 12> hashkey{'B', 'i', 't', 'c', 'o', 'i',
                                       'n', ' ', 's', 'e', 'e', 'd'};
     std::vector<uint8_t, secure_allocator<uint8_t>> vout(64);
-    CHMAC_SHA512(hashkey, sizeof(hashkey))
-        .Write(seed, nSeedLen)
-        .Finalize(CHMAC_SHA512::span{vout.begin(), CHMAC_SHA512::OUTPUT_SIZE});
+    CHMAC_SHA512(hashkey.data(),
+                 sizeof(hashkey))
+                 .Write(seed, nSeedLen)
+                 .Finalize(CHMAC_SHA512::span{vout.begin(), CHMAC_SHA512::OUTPUT_SIZE});
     key.Set(&vout[0], &vout[32], true);
     memcpy(chaincode.begin(), &vout[32], 32);
     nDepth = 0;
@@ -350,6 +376,7 @@ CExtPubKey CExtKey::Neuter() const
     return ret;
 }
 
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 void CExtKey::Encode(const std::span<uint8_t, BIP32_EXTKEY_SIZE> code) const
 {
     code[0] = nDepth;
@@ -376,6 +403,7 @@ void CExtKey::Decode(const std::span<const uint8_t, BIP32_EXTKEY_SIZE> code)
     memcpy(chaincode.begin(), code.data() + 9, 32);
     key.Set(code.data() + 42, code.data() + BIP32_EXTKEY_SIZE, true);
 }
+// NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
 bool ECC_InitSanityCheck() {
     CKey key;

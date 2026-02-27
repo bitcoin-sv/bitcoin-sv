@@ -45,10 +45,12 @@
 
 /* This implements a constant-space merkle root/path calculator, limited to 2^32
  * leaves. */
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
 static void MerkleComputation(const std::vector<uint256> &leaves,
                               uint256 *proot, bool *pmutated,
                               uint32_t branchpos,
-                              std::vector<uint256> *pbranch) {
+                              std::vector<uint256> *pbranch)
+{
     if (pbranch) pbranch->clear();
     if (leaves.size() == 0) {
         if (pmutated) *pmutated = false;
@@ -63,7 +65,7 @@ static void MerkleComputation(const std::vector<uint256> &leaves,
     // For example, when count is 25 (11001 in binary), inner[4] is the hash of
     // the first 16 leaves, inner[3] of the next 8 leaves, and inner[0] equal to
     // the last leaf. The other inner entries are undefined.
-    uint256 inner[32];
+    std::array<uint256, 32> inner;
     // Which position in inner is a hash that depends on the matching leaf.
     int matchlevel = -1;
     // First process all leaves into 'inner' values.
@@ -71,11 +73,11 @@ static void MerkleComputation(const std::vector<uint256> &leaves,
         uint256 h = leaves[count];
         bool matchh = count == branchpos;
         count++;
-        int level;
+        int level{};
         // For each of the lower bits in count that are 0, do 1 step. Each
         // corresponds to an inner value that existed before processing the
         // current leaf, and each needs a hash to combine it.
-        for (level = 0; !(count & (((uint32_t)1) << level)); level++) {
+        for(; !(count & (((uint32_t)1) << level)); level++) {
             if (pbranch) {
                 if (matchh) {
                     pbranch->push_back(inner[level]);
@@ -143,6 +145,7 @@ static void MerkleComputation(const std::vector<uint256> &leaves,
     if (pmutated) *pmutated = mutated;
     if (proot) *proot = h;
 }
+// NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
 
 uint256 ComputeMerkleRoot(const std::vector<uint256> &leaves, bool *mutated) {
     uint256 hash;

@@ -19,6 +19,9 @@
 static const char *pszBase58 =
     "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
+//NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+//NOLINTBEGIN(*-narrowing-conversions)
+
 bool DecodeBase58(const char *psz, std::vector<uint8_t> &vch) {
     // Skip leading spaces.
     while (*psz && isspace(*psz)) {
@@ -130,9 +133,12 @@ std::string EncodeBase58Check(const std::vector<uint8_t> &vchIn) {
     // add 4-byte hash check to the end
     std::vector<uint8_t> vch(vchIn);
     uint256 hash = Hash(vch.begin(), vch.end());
-    vch.insert(vch.end(), (uint8_t *)&hash, (uint8_t *)&hash + 4);
+    vch.insert(vch.end(), hash.begin(), hash.begin() + 4);
     return EncodeBase58(vch);
 }
+
+//NOLINTEND(*-narrowing-conversions)
+//NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
 bool DecodeBase58Check(const char *psz, std::vector<uint8_t> &vchRet) {
     if (!DecodeBase58(psz, vchRet) || (vchRet.size() < 4)) {
@@ -202,7 +208,7 @@ std::string CBase58Data::ToString() const {
 namespace {
 class DestinationEncoder : public boost::static_visitor<std::string> {
 private:
-    const CChainParams &m_params;
+    const CChainParams &m_params; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 
 public:
     DestinationEncoder(const CChainParams &params) : m_params(params) {}

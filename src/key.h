@@ -69,15 +69,23 @@ public:
 
     //! Initialize using begin and end iterators to byte data.
     template <typename T>
-    void Set(const T pbegin, const T pend, bool fCompressedIn) {
+    void Set(const T pbegin, const T pend, bool fCompressedIn)
+    {
+        if(size_t(pend - pbegin) != keydata.size())
         // NOLINTNEXTLINE(bugprone-branch-clone)
-        if (size_t(pend - pbegin) != keydata.size()) {
+        {
             fValid = false;
-        } else if (Check(&pbegin[0])) {
-            memcpy(keydata.data(), (uint8_t *)&pbegin[0], keydata.size());
+        }
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        else if(Check(&pbegin[0]))
+        {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            memcpy(keydata.data(), (uint8_t*)&pbegin[0], keydata.size());
             fValid = true;
             fCompressed = fCompressedIn;
-        } else {
+        }
+        else
+        {
             fValid = false;
         }
     }

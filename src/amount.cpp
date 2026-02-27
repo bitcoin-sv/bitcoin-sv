@@ -7,7 +7,7 @@
 
 #include "tinyformat.h"
 
-const std::string CURRENCY_UNIT = "BSV";
+const std::string CURRENCY_UNIT = "BSV"; // NOLINT(cert-err58-cpp)
 
 std::string Amount::ToString() const {
     return strprintf("%d.%08d %s", amount_ / COIN.GetSatoshis(),

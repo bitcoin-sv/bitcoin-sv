@@ -11,10 +11,7 @@
 #include <thread>
 #include <utility>
 
-CScheduler::CScheduler()
-    : nThreadsServicingQueue(0), stopRequested(false), stopWhenEmpty(false) {}
-
-CScheduler::~CScheduler()
+CScheduler::~CScheduler() //NOLINT(bugprone-exception-escape)
 {
     stop();
 }
@@ -123,8 +120,9 @@ void CScheduler::stop(bool drain) {
     }
 }
 
-void CScheduler::schedule(CScheduler::Function f,
-                          boost::chrono::system_clock::time_point t) {
+void CScheduler::schedule(const CScheduler::Function& f,
+                          boost::chrono::system_clock::time_point t)
+{
     {
         boost::unique_lock<boost::mutex> lock(newTaskMutex);
         taskQueue.insert(std::make_pair(t, f));
@@ -132,22 +130,26 @@ void CScheduler::schedule(CScheduler::Function f,
     newTaskScheduled.notify_one();
 }
 
-void CScheduler::scheduleFromNow(CScheduler::Function f,
-                                 int64_t deltaMilliSeconds) {
+void CScheduler::scheduleFromNow(const CScheduler::Function& f,
+                                 int64_t deltaMilliSeconds)
+{
     schedule(f,
              boost::chrono::system_clock::now() +
                  boost::chrono::milliseconds(deltaMilliSeconds));
 }
 
-static void Repeat(CScheduler *s, CScheduler::Function f,
-                   int64_t deltaMilliSeconds) {
+static void Repeat(CScheduler* s,
+                   const CScheduler::Function& f,
+                   int64_t deltaMilliSeconds)
+{
     f();
     s->scheduleFromNow(boost::bind(&Repeat, s, f, deltaMilliSeconds),
                        deltaMilliSeconds);
 }
 
-void CScheduler::scheduleEvery(CScheduler::Function f,
-                               int64_t deltaMilliSeconds) {
+void CScheduler::scheduleEvery(const CScheduler::Function& f,
+                               int64_t deltaMilliSeconds)
+{
     scheduleFromNow(boost::bind(&Repeat, this, f, deltaMilliSeconds),
                     deltaMilliSeconds);
 }

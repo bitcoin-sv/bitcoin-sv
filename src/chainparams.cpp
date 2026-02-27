@@ -42,9 +42,13 @@ static CBlock CreateGenesisBlock(const char *pszTimestamp,
     txNew.vout.resize(1);
     txNew.vin[0].scriptSig =
         CScript() << 486604799 << CScriptNum(4)
+                  // NOLINTBEGIN(cppcoreguidelines-pro-type-cstyle-cast)
+                  // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                   << std::vector<uint8_t>((const uint8_t *)pszTimestamp,
                                           (const uint8_t *)pszTimestamp +
                                               strlen(pszTimestamp));
+                  // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                  // NOLINTEND(cppcoreguidelines-pro-type-cstyle-cast)
     txNew.vout[0].nValue = genesisReward;
     txNew.vout[0].scriptPubKey = genesisOutputScript;
 
@@ -180,8 +184,7 @@ public:
         base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x88, 0xB2, 0x1E};
         base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x88, 0xAD, 0xE4};
 
-        vFixedSeeds = std::vector<SeedSpec6>(
-            pnSeed6_main, pnSeed6_main + ARRAYLEN(pnSeed6_main));
+        vFixedSeeds = std::vector<SeedSpec6>{pnSeed6_main.begin(), pnSeed6_main.end()};
 
         fMiningRequiresPeers = true;
         fDefaultConsistencyChecks = false;
@@ -456,8 +459,7 @@ public:
         base58Prefixes[SECRET_KEY] = std::vector<uint8_t>(1, 239);
         base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
         base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
-        vFixedSeeds = std::vector<SeedSpec6>(
-            pnSeed6_test, pnSeed6_test + ARRAYLEN(pnSeed6_test));
+        vFixedSeeds = std::vector<SeedSpec6>{pnSeed6_test.begin(), pnSeed6_test.end()};
 
         fMiningRequiresPeers = true;
         fDefaultConsistencyChecks = false;
