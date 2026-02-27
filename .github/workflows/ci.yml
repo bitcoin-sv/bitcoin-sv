@@ -113,9 +113,12 @@ jobs:
         uses: ./.github/actions/unit_test_secp256k1_cmake
       - name: Unit test Bitcoin
         uses: ./.github/actions/unit_test_bitcoin_cmake
-      - name: Generate unit test coverage
+      - name: Generate unit test coverage lcov
         if: ${{ matrix.build_type == 'Debug' && matrix.options == 'cov' }}
-        run: contrib/generate_coverage.sh -t ${{ matrix.toolset }} src/test/test_bitcoin
+        run: contrib/coverage_lcov.sh -t ${{ matrix.toolset }} src/test/test_bitcoin
+      - name: Generate unit test coverage report
+        if: ${{ matrix.build_type == 'Debug' && matrix.options == 'cov' }}
+        run: contrib/coverage_html.sh -o src/test/test_bitcoin_cov -n "test_bitcoin" coverage.lcov
       - name: Set now environment variable
         if: ${{ matrix.build_type == 'Debug' && matrix.options == 'cov' }}
         run: |

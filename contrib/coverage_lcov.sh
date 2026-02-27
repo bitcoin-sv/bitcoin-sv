@@ -12,13 +12,16 @@ function Display_Help
 {
     cat <<EoH
 
-    Produces html coverage reports for a given binary using lcov or llvm-cov.
+    Generates coverage.lcov from profraw (clang) or gcov (gcc) data.
 
     usage e.g.
       "$PROGRAM -t gcc test_bitcoin"
+      "$PROGRAM -t clang test_bitcoin"
+      "$PROGRAM -t clang -s test_bitcoin"
 
     Options:
       -t = Toolset [clang|gcc] (default: clang)
+      -s = Use llvm-cov show for development (interactive terminal output)
       -h = Show this help message and exit
 EoH
     exit 0
@@ -26,10 +29,12 @@ EoH
 
 (($# < 1)) && Display_Help
 TOOLSET=clang
+SHOW_MODE=false
 
-while getopts 'ht:' VAL; do
+while getopts 'hst:' VAL; do
     case $VAL in
         h ) Display_Help;;
+        s ) SHOW_MODE=true;;
         t ) TOOLSET=$OPTARG;;
     esac
 done
@@ -39,6 +44,11 @@ shift $((OPTIND -1))
 BINARY=$1
 
 if [ $TOOLSET = 'gcc' ]; then
+    if [ "$SHOW_MODE" = true ]; then
+        echo "Error: -s (show mode) is only supported with clang toolset."
+        exit 1
+    fi
+
     lcov --capture \
          --directory . \
          --exclude='/usr/*' \
@@ -56,6 +66,12 @@ elif [ $TOOLSET = 'clang' ]; then
 
     llvm_path="/usr/lib/llvm-21/bin"
     $llvm_path/llvm-profdata merge -sparse default.profraw -o default.profdata
+
+    if [ "$SHOW_MODE" = true ]; then
+        $llvm_path/llvm-cov show -instr-profile=default.profdata $BINARY
+        exit 0
+    fi
+
     $llvm_path/llvm-cov export --format=lcov -instr-profile=default.profdata $BINARY > coverage.lcov
 
 else
@@ -63,4 +79,3 @@ else
     exit 1
 fi
 
-genhtml coverage.lcov --output-directory ${BINARY}_cov
