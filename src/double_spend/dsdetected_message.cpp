@@ -36,7 +36,7 @@ size_t hash_value(const CBlockHeader& header)
     size_t seed{0};
     boost::hash_combine(seed, header.nVersion);
     boost::hash_combine(seed, header.hashPrevBlock);
-    boost::hash_combine(seed, header.hashPrevBlock);
+    boost::hash_combine(seed, header.hashMerkleRoot);
     boost::hash_combine(seed, header.nTime);
     boost::hash_combine(seed, header.nBits);
     boost::hash_combine(seed, header.nNonce);
