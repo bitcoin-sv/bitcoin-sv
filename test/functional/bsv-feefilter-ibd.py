@@ -41,7 +41,8 @@ class FeeFilterIBD(BitcoinTestFramework):
             # Node is currently in IBD.
             # Exact fee filter node will send depends on several things, so just
             # check it's at least 1 cent
-            wait_until(lambda: conn.transport.cb.last_feerate >= COIN / 100)
+            wait_until(lambda: conn.transport.cb.last_feerate is not None
+                       and conn.transport.cb.last_feerate >= COIN / 100)
             ibd_feerate = conn.transport.cb.last_feerate
 
             # Get node out of IBD
