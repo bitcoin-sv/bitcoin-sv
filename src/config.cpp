@@ -20,7 +20,7 @@
 
 GlobalConfig::GlobalConfig()
 {
-    Reset(); //NOLINT(clang-analyzer-optin.cplusplus.VirtualCall)
+    GlobalConfig::Reset();
 }
 
 void GlobalConfig::Reset()
