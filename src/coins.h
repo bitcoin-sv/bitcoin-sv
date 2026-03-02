@@ -349,6 +349,7 @@ public:
 
     enum Flags : uint8_t //NOLINT(cppcoreguidelines-use-enum-class)
     {
+        NONE = 0,
         // This cache entry is potentially different from the version in the
         // parent view.
         DIRTY = (1 << 0),
@@ -360,7 +361,7 @@ public:
            that condition is not guaranteed. */
     };
 
-    CCoinsCacheEntry() : flags(0u) {}
+    CCoinsCacheEntry() : flags(NONE) {}
     CCoinsCacheEntry(CoinImpl&& coinIn, uint8_t flagsIn)
         : coin(std::move(coinIn))
         , flags(flagsIn)

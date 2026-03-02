@@ -367,8 +367,7 @@ const CoinImpl& CoinsStore::AddCoin(const COutPoint& outpoint, CoinImpl&& coin)
             .emplace(std::piecewise_construct,
                      std::forward_as_tuple(outpoint),
                      std::forward_as_tuple(std::move(coin),
-                     //NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
-                     CCoinsCacheEntry::Flags(0)));
+                     CCoinsCacheEntry::NONE));
 
     assert(res.second);
 
