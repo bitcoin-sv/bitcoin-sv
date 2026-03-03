@@ -107,7 +107,7 @@ class CKeyPool {
 public:
     int64_t nTime;
     CPubKey vchPubKey;
-    bool fInternal; // for change outputs
+    bool fInternal{}; // for change outputs
 
     CKeyPool();
     CKeyPool(const CPubKey &vchPubKeyIn, bool internalIn);
@@ -875,9 +875,13 @@ public:
      */
     int64_t IncOrderPosNext(CWalletDB *pwalletdb = nullptr);
     DBErrors ReorderTransactions();
-    bool AccountMove(std::string strFrom, std::string strTo,
-                     const Amount nAmount, std::string strComment = "");
-    bool GetAccountPubkey(CPubKey &pubKey, std::string strAccount,
+    bool AccountMove(const std::string& strFrom,
+                     const std::string& strTo,
+                     const Amount nAmount,
+                     const std::string& strComment = "");
+
+    bool GetAccountPubkey(CPubKey& pubKey,
+                          const std::string& strAccount,
                           bool bForceNew = false);
 
     void MarkDirty();
@@ -1106,7 +1110,7 @@ public:
      * in case of an error.
      */
     static std::unique_ptr<CWallet> CreateWalletFromFile(const CChainParams& chainParams,
-                                                         const std::string walletFile);
+                                                         const std::string& walletFile);
     static bool InitLoadWallet(const CChainParams &chainParams);
 
     /**
@@ -1159,7 +1163,7 @@ public:
     {}
 
     // NOLINTNEXTLINE(cppcoreguidelines-explicit-virtual-functions)
-    ~CReserveKey() { ReturnKey(); }
+    ~CReserveKey() { ReturnKey(); } // NOLINT(bugprone-exception-escape)
 
     void ReturnKey();
     bool GetReservedKey(CPubKey &pubkey, bool internal = false);

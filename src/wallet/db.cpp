@@ -5,7 +5,6 @@
 
 #include "db.h"
 #include "fs.h"
-#include "hash.h"
 #include "protocol.h"
 #include "util.h"
 #include "utilstrencodings.h"
@@ -19,7 +18,7 @@
 // CDB
 //
 #include <boost/thread/thread.hpp>
-CDBEnv bitdb;
+CDBEnv bitdb; //NOLINT(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
 
 void CDBEnv::EnvShutdown() {
     if (!fDbEnvInit) {
@@ -41,12 +40,13 @@ void CDBEnv::EnvShutdown() {
 
 void CDBEnv::Reset() {
     delete dbenv;
-    dbenv = new DbEnv(DB_CXX_NO_EXCEPTIONS);
+    dbenv = new DbEnv(DB_CXX_NO_EXCEPTIONS); // NOLINT(cppcoreguidelines-owning-memory)
     fDbEnvInit = false;
     fMockDb = false;
 }
 
-CDBEnv::CDBEnv() : dbenv(nullptr) {
+CDBEnv::CDBEnv()
+{
     Reset();
 }
 
@@ -203,7 +203,6 @@ bool CDB::Recover(const std::string &filename, void *callbackDataIn,
         if (recoverKVcallback) {
             CDataStream ssKey(row.first, SER_DISK, CLIENT_VERSION);
             CDataStream ssValue(row.second, SER_DISK, CLIENT_VERSION);
-            std::string strType, strErr;
             if (!(*recoverKVcallback)(callbackDataIn, ssKey, ssValue)) {
                 continue;
             }
@@ -234,16 +233,20 @@ bool CDB::VerifyEnvironment(const std::string &walletFile,
         return false;
     }
 
-    if (!bitdb.Open(dataDir)) {
+    if(!bitdb.Open(dataDir))
+    {
         // try moving the database env out of the way
         fs::path pathDatabase = dataDir / "database";
         fs::path pathDatabaseBak =
             dataDir / strprintf("database.%d.bak", GetTime());
-        try {
+        try
+        {
             fs::rename(pathDatabase, pathDatabaseBak);
             LogPrintf("Moved old %s to %s. Retrying.\n", pathDatabase.string(),
                       pathDatabaseBak.string());
-        } catch (const fs::filesystem_error &) {
+        }
+        catch(const fs::filesystem_error&) //NOLINT(bugprone-empty-catch)
+        {
             // failure is ok (well, not really, but it's not worse than what we
             // started with)
         }
@@ -368,15 +371,15 @@ void CDBEnv::CheckpointLSN(const std::string &strFile) {
     dbenv->lsn_reset(strFile.c_str(), 0);
 }
 
-CDB::CDB(CWalletDBWrapper &dbw, const char *pszMode, bool fFlushOnCloseIn)
-    : pdb(nullptr), activeTxn(nullptr) {
-    int ret;
-    fReadOnly = (!strchr(pszMode, '+') && !strchr(pszMode, 'w'));
-    fFlushOnClose = fFlushOnCloseIn;
-    env = dbw.env;
-    if (dbw.IsDummy()) {
+CDB::CDB(CWalletDBWrapper& dbw,
+         const char* pszMode,
+         bool fFlushOnCloseIn):
+    fReadOnly{(!strchr(pszMode, '+') && !strchr(pszMode, 'w'))},
+    fFlushOnClose{fFlushOnCloseIn},
+    env{dbw.env}
+{
+    if(dbw.IsDummy())
         return;
-    }
 
     const std::string &strFilename = dbw.strFile;
 
@@ -396,9 +399,11 @@ CDB::CDB(CWalletDBWrapper &dbw, const char *pszMode, bool fFlushOnCloseIn)
         strFile = strFilename;
         ++env->mapFileUseCount[strFile];
         pdb = env->mapDb[strFile];
-        if (pdb == nullptr) {
-            pdb = new Db(env->dbenv, 0);
+        if(pdb == nullptr)
+        {
+            pdb = new Db(env->dbenv, 0); //NOLINT(cppcoreguidelines-owning-memory)
 
+            int ret{};
             bool fMockDb = env->IsMock();
             if (fMockDb) {
                 DbMpoolFile *mpf = pdb->get_mpf();
@@ -479,13 +484,15 @@ void CDB::Close() {
     --env->mapFileUseCount[strFile];
 }
 
-void CDBEnv::CloseDb(const std::string &strFile) {
+void CDBEnv::CloseDb(const std::string& strFile)
+{
     LOCK(cs_db);
-    if (mapDb[strFile] != nullptr) {
+    if (mapDb[strFile] != nullptr)
+    {
         // Close the database handle
         Db *pdb = mapDb[strFile];
         pdb->close(0);
-        delete pdb;
+        delete pdb; //NOLINT(cppcoreguidelines-owning-memory)
         mapDb[strFile] = nullptr;
     }
 }
@@ -512,7 +519,8 @@ bool CDB::Rewrite(CWalletDBWrapper &dbw, const char *pszSkip) {
                 {
                     // surround usage of db with extra {}
                     CDB db(dbw, "r");
-                    Db *pdbCopy = new Db(env->dbenv, 0);
+                    //NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+                    Db* pdbCopy = new Db(env->dbenv, 0);
 
                     int ret = pdbCopy->open(nullptr,            // Txn pointer
                                             strFileRes.c_str(), // Filename
@@ -567,7 +575,7 @@ bool CDB::Rewrite(CWalletDBWrapper &dbw, const char *pszSkip) {
                         if (pdbCopy->close(0)) {
                             fSuccess = false;
                         }
-                        delete pdbCopy;
+                        delete pdbCopy; // NOLINT(cppcoreguidelines-owning-memory)
                     }
                 }
                 if (fSuccess) {
@@ -631,9 +639,11 @@ void CDBEnv::Flush(bool fShutdown) {
                  fShutdown ? "true" : "false",
                  fDbEnvInit ? "" : " database not started",
                  GetTimeMillis() - nStart);
-        if (fShutdown) {
-            char **listp;
-            if (mapFileUseCount.empty()) {
+        if(fShutdown)
+        {
+            char** listp{};
+            if(mapFileUseCount.empty())
+            {
                 dbenv->log_archive(&listp, DB_ARCH_REMOVE);
                 Close();
                 if (!fMockDb) {

@@ -7,30 +7,40 @@
 #include "crypto/sha512.h"
 #include "script/standard.h"
 #include "util.h"
+
+#include <array>
 #include <vector>
 
-int CCrypter::BytesToKeySHA512AES(const std::vector<uint8_t> &chSalt,
-                                  const SecureString &strKeyData, int count,
-                                  uint8_t *key, uint8_t *iv) const {
+int CCrypter::BytesToKeySHA512AES(const std::vector<uint8_t>& chSalt,
+                                  const SecureString& strKeyData,
+                                  int count,
+                                  uint8_t* key,
+                                  uint8_t* iv) const
+{
     // This mimics the behavior of openssl's EVP_BytesToKey with an aes256cbc
     // cipher and sha512 message digest. Because sha512's output size (64b) is
     // greater than the aes256 block size (16b) + aes256 key size (32b), there's
     // no need to process more than once (D_0).
     if (!count || !key || !iv) return 0;
 
-    uint8_t buf[CSHA512::OUTPUT_SIZE];
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, CSHA512::OUTPUT_SIZE> buf;
     CSHA512 di;
 
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     di.Write((const uint8_t *)strKeyData.c_str(), strKeyData.size());
-    if (chSalt.size()) di.Write(&chSalt[0], chSalt.size());
+    if(!chSalt.empty())
+        di.Write(chSalt.data(), chSalt.size());
+
     di.Finalize(buf);
 
-    for (int i = 0; i != count - 1; i++)
-        di.Reset().Write(buf, sizeof(buf)).Finalize(buf);
+    for (int i = 0; i != count - 1; ++i)
+        di.Reset().Write(buf.data(), sizeof(buf)).Finalize(buf);
 
-    memcpy(key, buf, WALLET_CRYPTO_KEY_SIZE);
-    memcpy(iv, buf + WALLET_CRYPTO_KEY_SIZE, WALLET_CRYPTO_IV_SIZE);
-    memory_cleanse(buf, sizeof(buf));
+    memcpy(key, buf.data(), WALLET_CRYPTO_KEY_SIZE);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    memcpy(iv, buf.data() + WALLET_CRYPTO_KEY_SIZE, WALLET_CRYPTO_IV_SIZE);
+    memory_cleanse(buf.data(), sizeof(buf));
     return WALLET_CRYPTO_KEY_SIZE;
 }
 
@@ -42,7 +52,10 @@ bool CCrypter::SetKeyFromPassphrase(const SecureString &strKeyData,
 
     int i = 0;
     if (nDerivationMethod == 0)
-        i = BytesToKeySHA512AES(chSalt, strKeyData, nRounds, vchKey.data(),
+        i = BytesToKeySHA512AES(chSalt,
+                                strKeyData,
+                                nRounds, //NOLINT(*-narrowing-conversions)
+                                vchKey.data(),
                                 vchIV.data());
 
     if (i != (int)WALLET_CRYPTO_KEY_SIZE) {
@@ -79,9 +92,13 @@ bool CCrypter::Encrypt(const CKeyingMaterial &vchPlaintext,
     AES256CBCEncrypt enc(AES256CBCEncrypt::key_span{vchKey},
                          AES256CBCEncrypt::block_span{vchIV},
                          true);
-    size_t nLen =
-        enc.Encrypt(&vchPlaintext[0], vchPlaintext.size(), &vchCiphertext[0]);
-    if (nLen < vchPlaintext.size()) return false;
+    const size_t nLen = enc.Encrypt(&vchPlaintext[0],
+                                    vchPlaintext.size(),  //NOLINT(*-narrowing-conversions)
+                                    &vchCiphertext[0]);
+
+    if(nLen < vchPlaintext.size())
+        return false;
+
     vchCiphertext.resize(nLen);
 
     return true;
@@ -92,15 +109,16 @@ bool CCrypter::Decrypt(const std::vector<uint8_t> &vchCiphertext,
     if (!fKeySet) return false;
 
     // plaintext will always be equal to or lesser than length of ciphertext
-    int nLen = vchCiphertext.size();
+    int nLen = vchCiphertext.size(); //NOLINT(*-narrowing-conversions)
 
     vchPlaintext.resize(nLen);
 
     AES256CBCDecrypt dec(AES256CBCDecrypt::key_span{vchKey},
                          AES256CBCDecrypt::block_span{vchIV},
                          true);
-    nLen =
-        dec.Decrypt(&vchCiphertext[0], vchCiphertext.size(), &vchPlaintext[0]);
+    nLen = dec.Decrypt(&vchCiphertext[0],
+                       vchCiphertext.size(), // NOLINT(*-narrowing-conversions)
+                       &vchPlaintext[0]);
     if (nLen == 0) return false;
     vchPlaintext.resize(nLen);
     return true;

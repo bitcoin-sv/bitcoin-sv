@@ -5,44 +5,34 @@
 #ifndef BITCOIN_WALLET_COINCONTROL_H
 #define BITCOIN_WALLET_COINCONTROL_H
 
-/** Coin Control Features. */
-class CCoinControl {
+#include "primitives/transaction.h"
+#include "pubkey.h"
+#include "script/standard.h"
+
+class CCoinControl
+{
 public:
-    CTxDestination destChange;
+    CTxDestination destChange{};
     //! If false, allows unselected inputs, but requires all selected inputs be
     //! used
-    bool fAllowOtherInputs;
+    bool fAllowOtherInputs{false};
     //! Includes watch only addresses which match the ISMINE_WATCH_SOLVABLE
     //! criteria
-    bool fAllowWatchOnly;
+    bool fAllowWatchOnly{false};
     //! Minimum absolute fee (not per kilobyte)
-    Amount nMinimumTotalFee;
+    Amount nMinimumTotalFee{};
     //! Override estimated feerate
-    bool fOverrideFeeRate;
+    bool fOverrideFeeRate{false};
     //! Feerate to use if overrideFeeRate is true
-    CFeeRate nFeeRate;
+    CFeeRate nFeeRate{};
 
-    CCoinControl() { SetNull(); }
+    bool HasSelected() const { return !setSelected.empty(); }
 
-    void SetNull() {
-        destChange = CNoDestination();
-        fAllowOtherInputs = false;
-        fAllowWatchOnly = false;
-        setSelected.clear();
-        nMinimumTotalFee = Amount(0);
-        nFeeRate = CFeeRate(Amount(0));
-        fOverrideFeeRate = false;
-    }
+    bool IsSelected(const COutPoint& output) const { return setSelected.contains(output); }
 
-    bool HasSelected() const { return (setSelected.size() > 0); }
+    void Select(const COutPoint& output) { setSelected.insert(output); }
 
-    bool IsSelected(const COutPoint &output) const {
-        return (setSelected.count(output) > 0);
-    }
-
-    void Select(const COutPoint &output) { setSelected.insert(output); }
-
-    void ListSelected(std::vector<COutPoint> &vOutpoints) const {
+    void ListSelected(std::vector<COutPoint>& vOutpoints) const {
         vOutpoints.assign(setSelected.begin(), setSelected.end());
     }
 

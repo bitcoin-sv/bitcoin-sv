@@ -18,7 +18,6 @@
 #include "rpc/mining.h"
 #include "rpc/misc.h"
 #include "rpc/server.h"
-#include "timedata.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "validation.h"
@@ -30,6 +29,7 @@
 
 #include <event2/http.h>
 
+//NOLINTNEXTLINE(cert-err58-cpp)
 static const std::string WALLET_ENDPOINT_BASE = "/wallet/";
 
 static std::string urlDecode(const std::string &urlEncoded) {
@@ -38,7 +38,8 @@ static std::string urlDecode(const std::string &urlEncoded) {
         char *decoded = evhttp_uridecode(urlEncoded.c_str(), false, nullptr);
         if (decoded) {
             res = std::string(decoded);
-            free(decoded);
+            //NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+            free(decoded); //NOLINT(cppcoreguidelines-no-malloc)
         }
     }
     return res;
@@ -199,8 +200,10 @@ static UniValue getnewaddress(const Config&, const JSONRPCRequest& request)
     return EncodeDestination(keyID);
 }
 
-CTxDestination GetAccountAddress(CWallet *const pwallet, std::string strAccount,
-                                 bool bForceNew = false) {
+CTxDestination GetAccountAddress(CWallet* const  pwallet,
+                                 const std::string& strAccount,
+                                 bool bForceNew = false)
+{
     CPubKey pubKey;
     if (!pwallet->GetAccountPubkey(pubKey, strAccount, bForceNew)) {
         throw JSONRPCError(
@@ -771,6 +774,7 @@ static UniValue getreceivedbyaddress(const Config &config,
                 config,
                *wtx.tx,
                 chainActive.Height(),
+                // NOLINTNEXTLINE(*-narrowing-conversions)
                 chainActive.Tip()->GetMedianTimePast(),
                 state)) {
             continue;
@@ -845,6 +849,7 @@ static UniValue getreceivedbyaccount(const Config &config,
                 config,
                *wtx.tx,
                 chainActive.Height(),
+                //NOLINTNEXTLINE(*-narrowing-conversions)
                 chainActive.Tip()->GetMedianTimePast(),
                 state)) {
             continue;
@@ -1377,16 +1382,12 @@ static UniValue addmultisigaddress(const Config&, const JSONRPCRequest& request)
     return EncodeDestination(innerID);
 }
 
-struct tallyitem {
-    Amount nAmount;
-    int nConf;
+struct tallyitem
+{
+    Amount nAmount{};
+    int nConf{std::numeric_limits<int>::max()};
     std::vector<uint256> txids;
-    bool fIsWatchonly;
-    tallyitem() {
-        nAmount = Amount(0);
-        nConf = std::numeric_limits<int>::max();
-        fIsWatchonly = false;
-    }
+    bool fIsWatchonly{false};
 };
 
 static UniValue ListReceived(
@@ -1584,6 +1585,7 @@ static UniValue listreceivedbyaddress(const Config &config,
                 request.params,
                 false,
                 chainActive.Height(),
+                //NOLINTNEXTLINE(*-narrowing-conversions)
                 chainActive.Tip()->GetMedianTimePast());
 }
 
@@ -1637,6 +1639,7 @@ static UniValue listreceivedbyaccount(const Config &config,
                 request.params,
                 true,
                 chainActive.Height(),
+                //NOLINTNEXTLINE(*-narrowing-conversions)
                 chainActive.Tip()->GetMedianTimePast());
 }
 
@@ -3513,7 +3516,7 @@ void RegisterWalletRPCCommands(CRPCTable& t)
         return;
 
     // clang-format off
-    static const CRPCCommand commands[] = {
+    static const std::array<CRPCCommand, 39> commands{{
         //  category            name                        actor (function)          okSafeMode
         //  ------------------- ------------------------    ----------------------    ----------
         { "rawtransactions",    "fundrawtransaction",       fundrawtransaction,       false,  {"hexstring","options"} },
@@ -3556,10 +3559,12 @@ void RegisterWalletRPCCommands(CRPCTable& t)
         { "wallet",             "walletpassphrase",         walletpassphrase,         true,   {"passphrase","timeout"} },
 
         { "generating",         "generate",                 generate,                 true,   {"nblocks","maxtries"} },
-    };
+    }};
     // clang-format on
 
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++) {
+    for (unsigned int vcidx = 0; vcidx < commands.size(); vcidx++)
+    {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         t.appendCommand(commands[vcidx].name, &commands[vcidx]);
     }
 }

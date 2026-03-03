@@ -252,23 +252,17 @@ void CWalletDB::ListAccountCreditDebit(const std::string &strAccount,
     pcursor->close();
 }
 
-class CWalletScanState {
+class CWalletScanState
+{
 public:
-    unsigned int nKeys;
-    unsigned int nCKeys;
-    unsigned int nWatchKeys;
-    unsigned int nKeyMeta;
-    bool fIsEncrypted;
-    bool fAnyUnordered;
-    int nFileVersion;
+    unsigned int nKeys{};
+    unsigned int nCKeys{};
+    unsigned int nWatchKeys{};
+    unsigned int nKeyMeta{};
+    bool fIsEncrypted{};
+    bool fAnyUnordered{};
+    int nFileVersion{};
     std::vector<uint256> vWalletUpgrade;
-
-    CWalletScanState() {
-        nKeys = nCKeys = nWatchKeys = nKeyMeta = 0;
-        fIsEncrypted = false;
-        fAnyUnordered = false;
-        nFileVersion = 0;
-    }
 };
 
 bool ReadKeyValue(CWallet *pwallet, CDataStream &ssKey, CDataStream &ssValue,
@@ -316,14 +310,14 @@ bool ReadKeyValue(CWallet *pwallet, CDataStream &ssKey, CDataStream &ssValue,
             if (31404 <= wtx.fTimeReceivedIsTxTime &&
                 wtx.fTimeReceivedIsTxTime <= 31703) {
                 if (!ssValue.empty()) {
-                    char fTmp;
-                    char fUnused;
+                    char fTmp;      //NOLINT(cppcoreguidelines-init-variables)
+                    char fUnused;   //NOLINT(cppcoreguidelines-init-variables)
                     ssValue >> fTmp >> fUnused >> wtx.strFromAccount;
                     strErr =
                         strprintf("LoadWallet() upgrading tx ver=%d %d '%s' %s",
                                   wtx.fTimeReceivedIsTxTime, fTmp,
                                   wtx.strFromAccount, hash.ToString());
-                    wtx.fTimeReceivedIsTxTime = fTmp;
+                    wtx.fTimeReceivedIsTxTime = fTmp; //NOLINT(cert-str34-c, bugprone-signed-char-misuse)
                 } else {
                     strErr =
                         strprintf("LoadWallet() repairing tx ver=%d %s",
@@ -341,7 +335,7 @@ bool ReadKeyValue(CWallet *pwallet, CDataStream &ssKey, CDataStream &ssValue,
         } else if (strType == "acentry") {
             std::string strAccount;
             ssKey >> strAccount;
-            uint64_t nNumber;
+            uint64_t nNumber; //NOLINT(cppcoreguidelines-init-variables)
             ssKey >> nNumber;
             if (nNumber > pwallet->nAccountingEntryNumber) {
                 pwallet->nAccountingEntryNumber = nNumber;
@@ -358,7 +352,7 @@ bool ReadKeyValue(CWallet *pwallet, CDataStream &ssKey, CDataStream &ssValue,
             wss.nWatchKeys++;
             CScript script;
             ssKey >> script;
-            char fYes;
+            char fYes; //NOLINT(cppcoreguidelines-init-variables)
             ssValue >> fYes;
             if (fYes == '1') {
                 pwallet->LoadWatchOnly(script);
@@ -389,9 +383,12 @@ bool ReadKeyValue(CWallet *pwallet, CDataStream &ssKey, CDataStream &ssValue,
             // as a checksum. Newer wallets store keys as "key"[pubkey] =>
             // [privkey][hash(pubkey,privkey)], which is much faster while
             // remaining backwards-compatible.
-            try {
+            try
+            {
                 ssValue >> hash;
-            } catch (...) {
+            } 
+            catch(...) //NOLINT(bugprone-empty-catch)
+            {
             }
 
             bool fSkipCheck = false;
@@ -420,8 +417,10 @@ bool ReadKeyValue(CWallet *pwallet, CDataStream &ssKey, CDataStream &ssValue,
                 strErr = "Error reading wallet database: LoadKey failed";
                 return false;
             }
-        } else if (strType == "mkey") {
-            unsigned int nID;
+        }
+        else if (strType == "mkey")
+        {
+            unsigned int nID; //NOLINT(cppcoreguidelines-init-variables)
             ssKey >> nID;
             CMasterKey kMasterKey;
             ssValue >> kMasterKey;
@@ -479,7 +478,7 @@ bool ReadKeyValue(CWallet *pwallet, CDataStream &ssKey, CDataStream &ssValue,
                 return false;
             }
         } else if (strType == "pool") {
-            int64_t nIndex;
+            int64_t nIndex; //NOLINT(cppcoreguidelines-init-variables)
             ssKey >> nIndex;
             CKeyPool keypool;
             ssValue >> keypool;
@@ -815,12 +814,15 @@ bool CWalletDB::Recover(const std::string &filename,
     return CWalletDB::Recover(filename, nullptr, nullptr, out_backup_filename);
 }
 
-bool CWalletDB::RecoverKeysOnlyFilter(void *callbackData, CDataStream ssKey,
-                                      CDataStream ssValue) {
-    CWallet *dummyWallet = reinterpret_cast<CWallet *>(callbackData);
+bool CWalletDB::RecoverKeysOnlyFilter(void* callbackData,
+                                      CDataStream ssKey,
+                                      CDataStream ssValue)
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    CWallet* dummyWallet = reinterpret_cast<CWallet*>(callbackData);
     CWalletScanState dummyWss;
     std::string strType, strErr;
-    bool fReadOK;
+    bool fReadOK; //NOLINT(cppcoreguidelines-init-variables)
     {
         // Required in LoadKeyMetadata():
         LOCK2(cs_main, dummyWallet->cs_wallet);
