@@ -75,6 +75,8 @@ LARGE_BLOCK_TESTS = [
 # - A test is vulnerable to CPU/RAM availability fluctuations
 
 SOLO_TESTS = {
+    "bsv-4gb-plus-block.py",
+    "bsv-genesis-large-blockfile-max-32-bit.py",
     "bsv-rpc-verifyscript.py",
     "wallet-encryption.py",
     "bsv-ptv-txn-chains.py",
