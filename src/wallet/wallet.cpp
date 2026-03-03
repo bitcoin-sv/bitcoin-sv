@@ -2856,18 +2856,6 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 return false;
             }
 
-            for (const auto &pcoin : setCoins) {
-                // The coin age after the next block (depth+1) is used instead
-                // of the current, reflecting an assumption the user would
-                // accept a bit more delay for a chance at a free transaction.
-                // But mempool inputs might still be in the mempool, so their
-                // age stays 0.
-                int age = pcoin.first->GetDepthInMainChain();
-                assert(age >= 0);
-                if(age != 0) 
-                    age += 1; //NOLINT(clang-analyzer-deadcode.DeadStores)
-            }
-
             const Amount nChange = nValueIn - nValueToSelect;
             if (nChange > Amount(0)) {
                 // Fill a vout to ourself.
