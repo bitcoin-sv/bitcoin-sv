@@ -348,10 +348,9 @@ UniValue importprunedfunds(const Config&,
                                "Block not found in chain");
         }
 
-        std::vector<uint256>::const_iterator it;
-        //NOLINTNEXTLINE(bugprone-assignment-in-if-condition)
-        if ((it = std::find(vMatch.begin(), vMatch.end(), txid)) ==
-            vMatch.end()) {
+        const auto it = std::find(vMatch.begin(), vMatch.end(), txid);
+        if(it == vMatch.end())
+        {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                                "Transaction given doesn't exist in proof");
         }

@@ -3692,12 +3692,11 @@ std::set<std::set<CTxDestination>> CWallet::GetAddressGroupings() {
     for(const auto& _grouping : groupings)
     {
         // Make a set of all the groups hit by this new group.
-        std::set<std::set<CTxDestination> *> hits;
-        std::map<CTxDestination, std::set<CTxDestination> *>::iterator it;
-        for(const CTxDestination& address : _grouping) {
-            // NOLINTNEXTLINE(bugprone-assignment-in-if-condition)
-            if ((it = setmap.find(address)) != setmap.end())
-                hits.insert((*it).second);
+        std::set<std::set<CTxDestination>*> hits;
+        for(const CTxDestination& address : _grouping)
+        {
+            if(const auto it = setmap.find(address); it != setmap.end())
+                hits.insert(it->second);
         }
 
         // Merge all hit groups into a new single group and delete old groups.
