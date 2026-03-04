@@ -15,6 +15,17 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import wait_until
 
 
+def extract_fork_data(json):
+    """Extract fork data from a JSON response."""
+    if not json["safemodeenabled"]:
+        return []
+
+    return [{"forkfirstblock": fork["forkfirstblock"]["hash"],
+             "lastcommonblock": fork["lastcommonblock"]["hash"],
+             "tips": {tip["hash"] for tip in fork["tips"]}}
+            for fork in json["forks"]]
+
+
 class WebhookHandler(BaseHTTPRequestHandler):
 
     def __init__(self, test, *a, **kw):
@@ -76,24 +87,14 @@ class SafeModeReogNotification(BitcoinTestFramework):
         return result
 
     def check_safe_mode_data(self, rpc, forks, check_webhook_messages=True):
-        json_messages = [rpc.getsafemodeinfo()]
         if check_webhook_messages:
             with self.webhook_lock:
-                if len(self.webhook_messages) == 0:
-                    # Webhook hasn't arrived yet, signal retry
+                # Webhooks may be delivered out of order, so find a
+                # matching message rather than assuming the last one
+                # received is the most recent state.
+                if not any(forks == extract_fork_data(msg) for msg in self.webhook_messages):
                     return False
-                json_messages.append(self.webhook_messages[-1])
-
-        for safe_mode_json in json_messages:
-            if not forks:
-                assert safe_mode_json["safemodeenabled"] is False
-            else:
-                assert safe_mode_json["safemodeenabled"] is True
-                assert len(forks) == len(safe_mode_json["forks"])
-                for fork_expected, fork_json in zip(forks, safe_mode_json["forks"]):
-                    assert fork_expected["forkfirstblock"] == fork_json["forkfirstblock"]["hash"]
-                    assert fork_expected["lastcommonblock"] == fork_json["lastcommonblock"]["hash"], f'{fork_expected["lastcommonblock"]}, {fork_json["lastcommonblock"]["hash"]}'
-                    assert fork_expected["tips"] == set(t["hash"] for t in fork_json["tips"])
+        assert forks == extract_fork_data(rpc.getsafemodeinfo())
         return True
 
     def wait_for_safe_mode_data(self, rpc, forks, check_webhook_messages=True):
