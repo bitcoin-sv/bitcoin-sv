@@ -50,7 +50,7 @@ def setup():
         os.remove(vm_base_path)
 
     # Create base VM
-    make_image_prog = ['bin/make-base-vm', '--suite', ubuntu_version, '--arch', ubuntu_arch]
+    make_image_prog = ['bin/make-base-vm', '--suite', ubuntu_version, '--arch', ubuntu_arch, '--disksize', '16000']
     make_image_prog += ['--lxc']
     print("Running VM: %s" % make_image_prog)
     subprocess.check_call(make_image_prog)
