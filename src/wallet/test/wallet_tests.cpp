@@ -43,7 +43,8 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
 
 // Critical section is used to prevent concurrent execution of
 // tests in this fixture
-static CCriticalSection walletCriticalSection; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+// NOLINTNEXTLINE(cert-err58-cpp, cppcoreguidelines-avoid-non-const-global-variables)
+static CCriticalSection walletCriticalSection;
 
 static std::vector<COutput> vCoins; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
