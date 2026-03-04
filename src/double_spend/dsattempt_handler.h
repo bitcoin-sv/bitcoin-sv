@@ -60,7 +60,7 @@ class DSAttemptHandler final
     // Default submit queue size limit in MB
     static constexpr size_t DEFAULT_MAX_SUBMIT_MEMORY { 4096 };
     // Default notification level
-    static constexpr NotificationLevel DEFAULT_NOTIFY_LEVEL { NotificationLevel::STANDARD };
+    static constexpr NotificationLevel DEFAULT_NOTIFY_LEVEL { NotificationLevel::NONE };
 
     DSAttemptHandler(const Config& config);
     ~DSAttemptHandler() = default;
