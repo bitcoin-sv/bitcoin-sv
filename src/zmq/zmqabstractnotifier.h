@@ -15,13 +15,17 @@ class CZMQAbstractNotifier;
 
 typedef CZMQAbstractNotifier *(*CZMQNotifierFactory)();
 
-class CZMQAbstractNotifier {
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
+class CZMQAbstractNotifier
+{
 public:
-    CZMQAbstractNotifier() : psocket(0) {}
+    CZMQAbstractNotifier() = default;
     virtual ~CZMQAbstractNotifier();
 
-    template <typename T> static CZMQAbstractNotifier *Create() {
-        return new T();
+    template<typename T>
+    static CZMQAbstractNotifier *Create()
+    {
+        return new T(); // NOLINT(cppcoreguidelines-owning-memory)
     }
 
     std::string GetType() const { return type; }
@@ -42,7 +46,7 @@ public:
     virtual bool NotifyRemovedFromMempoolBlock(const uint256& txid, const MemPoolRemovalReason reason);
 
 protected:
-    void *psocket;
+    void* psocket{};
     std::string type;
     std::string address;
 };

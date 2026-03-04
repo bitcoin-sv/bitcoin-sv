@@ -23,3 +23,7 @@ endif()
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	target_compile_definitions(zmq PUBLIC ZMQ_STATIC)
 endif()
+
+if(ENABLE_CLANG_TIDY)
+    AddClangTidy(zmq)
+endif()
