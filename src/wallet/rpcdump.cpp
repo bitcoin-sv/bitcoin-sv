@@ -1320,7 +1320,7 @@ UniValue importmulti(const Config&, const JSONRPCRequest& mainRequest)
                             strprintf("Failed to rescan before time %d, "
                                       "transactions may be missing.",
                                       scannedRange->GetBlockTimeMax())));
-                    response.push_back(std::move(result)); //NOLINT(performance-move-const-arg)
+                    response.push_back(result);
                 }
                 ++i;
             }
