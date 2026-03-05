@@ -103,7 +103,17 @@ IMPLEMENTATION:
 2. Check thread.comments.nodes[-1].author.login (latest comment)
    - If from "claude": SKIP (already responded)
    - If from CODEOWNER: SKIP (await their decision)
-   - If from non-CODEOWNER developer: post reply via gh api POST
+   - If from non-CODEOWNER developer: post reply using GraphQL:
+     ```bash
+     gh api graphql -f query='mutation {
+       addPullRequestReviewThreadReply(input: {
+         pullRequestReviewThreadId: "<thread_id>",
+         body: "<reply_text>"
+       }) {
+         comment { id }
+       }
+     }'
+     ```
 
 **Step 4: Post New Issues (if any)**
 
