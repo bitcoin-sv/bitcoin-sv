@@ -11,7 +11,13 @@ set -euo pipefail
 
 readonly owner=${GITHUB_REPOSITORY%/*}
 
-mapfile -t codeowners < <(gh api "/orgs/$owner/teams/svn-global-owners/members" --jq '.[].login' 2>/dev/null)
+mapfile -t codeowners < <(gh api "/orgs/$owner/teams/svn-global-owners/members" --jq '.[].login')
+
+if ((${#codeowners[@]} == 0)); then
+  echo "FATAL: Failed to fetch CODEOWNERS team members - cannot verify thread permissions" >&2
+  exit 1
+fi
+
 threads=$(cat /tmp/claude-threads.json)
 
 actionable_threads="[]"
