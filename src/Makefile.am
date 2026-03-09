@@ -97,7 +97,6 @@ BITCOIN_CORE_H = \
   chain.h \
   chainparams.h \
   chainparamsbase.h \
-  chainparamsseeds.h \
   checkpoints.h \
   checkqueue.h \
   checkqueuepool.h \

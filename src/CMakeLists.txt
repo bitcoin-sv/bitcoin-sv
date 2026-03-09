@@ -315,7 +315,6 @@ add_library(common
 	chain.h
 	chainparams.cpp
 	chainparams.h
-	chainparamsseeds.h
 	coins.cpp
 	coins.h
 	compressor.cpp
