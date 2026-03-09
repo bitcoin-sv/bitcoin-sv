@@ -51,12 +51,13 @@ For each issue from subagents:
    - side: "RIGHT"
 
 **Step 6: Return Unified Summary**
-Return your final response covering:
-- C++ review summary (if applicable)
-- Python review summary (if applicable)
-- Overall assessment
-- Any positive aspects worth noting
-- Total count of issues found and posted
+Return a brief summary covering:
+- Total count of issues posted (by severity)
+- Short overall assessment include both positive and negative points
+
+**Do NOT list individual issues or file:line locations in the summary.**
+All specific feedback belongs in inline comments only. The summary should be
+high-level so reviewers aren't reading the same information twice.
 
 (Posted automatically via sticky_comment - do not use gh pr comment)
 

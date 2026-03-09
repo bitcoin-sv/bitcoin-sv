@@ -75,8 +75,8 @@ REQUIRED OUTCOME:
 
 IMPLEMENTATION:
 1. Check thread.comments.nodes[0].author.login (first comment author)
-   - If NOT "claude": SKIP (cannot resolve other reviewers' threads)
-   - If "claude": Proceed to resolve using GraphQL
+   - If NOT "claude" or "github-actions": SKIP (cannot resolve other reviewers' threads)
+   - If "claude" or "github-actions": Proceed to resolve using GraphQL
 2. Resolve via GraphQL mutation:
    ```bash
    gh api graphql -f query='mutation {
@@ -101,7 +101,7 @@ IMPLEMENTATION:
    - If CODEOWNER resolved: SKIP (do nothing, dismissal is final)
    - If non-CODEOWNER and isResolved==true: unresolve via GraphQL
 2. Check thread.comments.nodes[-1].author.login (latest comment)
-   - If from "claude": SKIP (already responded)
+   - If from "claude" or "github-actions": SKIP (already responded)
    - If from CODEOWNER: SKIP (await their decision)
    - If from non-CODEOWNER developer: post reply using GraphQL:
      ```bash
@@ -129,11 +129,14 @@ After processing verification results from subagents:
 
 **Step 5: Return Summary**
 
-Return a summary covering:
-- Total previous threads verified
-- How many were FIXED vs PERSISTS
-- Any new issues found on new lines
-- Overall re-review assessment
+Return a brief summary covering:
+- Total previous threads verified: N fixed, N persists
+- New issues posted (count only)
+- Short overall re-review assessment covering both positive and negative points
+
+**Do NOT list individual issues or file:line locations in the summary.**
+All specific feedback belongs in inline comments only. The summary should be
+high-level so reviewers aren't reading the same information twice.
 
 (Posted automatically via sticky_comment - do not use gh pr comment)
 

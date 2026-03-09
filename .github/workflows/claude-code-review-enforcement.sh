@@ -2,32 +2,33 @@
 # Copyright (c) 2025 Bitcoin Association Distributed under the Open BSV
 # software license, see the accompanying file LICENSE
 
-# Enforce Zero-Tolerance Policy for Claude Code Review
+# Enforce Zero-Tolerance Policy for Code Review
 
 set -euo pipefail
 
-: "${COMMIT_SHA:?Required}"
 : "${GITHUB_REPOSITORY:?Required}"
 : "${PR_NUMBER:?Required}"
+: "${COMMIT_SHA:?Required}"
 
-readonly sha=$COMMIT_SHA
-readonly pr=$PR_NUMBER
 readonly owner=${GITHUB_REPOSITORY%/*}
 readonly repo=${GITHUB_REPOSITORY#*/}
+readonly pr=$PR_NUMBER
+readonly sha=$COMMIT_SHA
+readonly status_context="AI Code Review"
 
-# Check that Claude review step completed successfully
+# Check that code review step completed successfully
 
-printf "Checking Claude review execution status...\n"
+printf "Checking code review execution status...\n"
 
-# Check step outcome (built-in GitHub Actions variable)
-if [[ "${CLAUDE_OUTCOME:-}" != "success" ]]; then
-  printf "ERROR: Claude review step failed (outcome: %s)\n" \
-    "${CLAUDE_OUTCOME:-unknown}"
+# Check review outcome
+if [[ "${REVIEW_OUTCOME:-}" != "success" ]]; then
+  printf "ERROR: code review step failed (outcome: %s)\n" \
+    "${REVIEW_OUTCOME:-unknown}"
   printf "The review execution failed or was cancelled.\n"
   printf "Check the action logs for errors or permission denials.\n"
   gh api "repos/$owner/$repo/statuses/$sha" \
     -f state=failure \
-    -f context="Claude Code Review" \
+    -f context="$status_context" \
     -f description="Review execution failed"
   exit 1
 fi
@@ -41,41 +42,41 @@ if [[ -n "${EXECUTION_FILE:-}" && -f "${EXECUTION_FILE}" ]]; then
   denials=$(jq -r 'map(select(.type == "result")) | last | .permission_denials | length' "$EXECUTION_FILE" 2>/dev/null || echo "0")
 
   if [[ "$is_error" == "true" ]]; then
-    printf "ERROR: Claude review completed with errors\n"
+    printf "ERROR: Code review completed with errors\n"
     gh api "repos/$owner/$repo/statuses/$sha" \
       -f state=failure \
-      -f context="Claude Code Review" \
+      -f context="$status_context" \
       -f description="Review completed with errors"
     exit 1
   fi
 
   if [[ "$denials" -gt 0 ]]; then
-    printf "WARNING: Claude had %s permission denial(s)\n" "$denials"
+    printf "WARNING: Code review had %s permission denial(s)\n" "$denials"
   fi
 else
   printf "Note: Execution file not found, skipping detailed error check\n"
 fi
 
-printf "✓ Claude execution completed successfully\n\n"
+printf "✓ Code review execution completed successfully\n\n"
 
 # ─────────────────────────────────────────────────────────────────
-# Check for Claude's summary comment
-# The workflow uses track_progress: true, so Claude always posts
+# Check for Code review's summary comment
+# The workflow uses track_progress: true, so code review always posts
 # a summary on successful review. No summary = review failed.
 # ─────────────────────────────────────────────────────────────────
 
-printf "Checking for Claude summary comment...\n"
+printf "Checking for code review summary comment...\n"
 
 summary_count=$(gh api "/repos/$owner/$repo/issues/$pr/comments" \
   --jq '[.[] | select(.user.login == "claude[bot]" or .user.login == "github-actions[bot]")] | length')
 
 if [[ "$summary_count" -eq 0 ]]; then
-  printf "ERROR: No Claude summary comment found\n"
+  printf "ERROR: No code review summary comment found\n"
   printf "The review did not complete successfully.\n"
   printf "Check the action logs for permission denials or errors.\n"
   gh api "repos/$owner/$repo/statuses/$sha" \
     -f state=failure \
-    -f context="Claude Code Review" \
+    -f context="$status_context" \
     -f description="Review incomplete: no summary posted"
   exit 1
 fi
@@ -105,7 +106,7 @@ query {
   }
 }" -q '.data.repository.pullRequest.reviewThreads.nodes')
 
-# Count unresolved Claude threads (excluding outdated)
+# Count unresolved code review threads (excluding outdated)
 unresolved=0
 total=0
 outdated_count=0
@@ -137,7 +138,7 @@ else
 fi
 
 resolved=$((total - unresolved - outdated_count))
-printf "\nClaude issues: %d resolved out of %d" "$resolved" "$total"
+printf "\nCode review issues: %d resolved out of %d" "$resolved" "$total"
 if ((outdated_count > 0)); then
   printf " (skipped %d outdated)" "$outdated_count"
 fi
@@ -148,7 +149,7 @@ if ((unresolved > 0)); then
   printf "\n%d unresolved issue(s) - BLOCKING\n" "$unresolved"
   gh api "repos/$owner/$repo/statuses/$sha" \
     -f state=failure \
-    -f context="Claude Code Review" \
+    -f context="$status_context" \
     -f description="$unresolved unresolved issue(s) block merge"
   exit 1
 fi
@@ -156,5 +157,5 @@ fi
 printf "All issues resolved - PASSING\n"
 gh api "repos/$owner/$repo/statuses/$sha" \
   -f state=success \
-  -f context="Claude Code Review" \
+  -f context="$status_context" \
   -f description="All issues resolved"
