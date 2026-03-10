@@ -121,8 +121,8 @@ else
     if [[ $author =~ ^(claude|github-actions)(\[bot\])?$ ]]; then
       ((++total))
 
-      # Skip outdated comments - they refer to code that has changed
-      if [[ $is_outdated == "true" ]]; then
+      # Skip outdated comments only if resolved
+      if [[ $is_outdated == "true" && $is_resolved == "true" ]]; then
         ((++outdated_count))
         continue
       fi
@@ -138,11 +138,8 @@ else
 fi
 
 resolved=$((total - unresolved - outdated_count))
-printf "\nCode review issues: %d resolved out of %d" "$resolved" "$total"
-if ((outdated_count > 0)); then
-  printf " (skipped %d outdated)" "$outdated_count"
-fi
-printf "\n"
+printf "\nCode review issues: %d resolved, %d unresolved, %d outdated\n" \
+  "$resolved" "$unresolved" "$outdated_count"
 
 # Set commit status and exit
 if ((unresolved > 0)); then

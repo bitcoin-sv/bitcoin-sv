@@ -5,7 +5,7 @@
 # Classify bot review issues and determine review mode.
 #
 # Outputs (stdout, key=value):
-#   mode=initial    — no bot issues found (first review)
+#   mode=review    — no actionable issues (full review)
 #   mode=rereview   — issues with developer replies needing verification
 #
 # Diagnostics go to stderr.
@@ -24,21 +24,7 @@ set -euo pipefail
 readonly owner=${GITHUB_REPOSITORY%/*}
 readonly repo=${GITHUB_REPOSITORY#*/}
 
-# Bot logins that the code review action may post as:
-#   "claude"          - when using the action's built-in GitHub App token
-#   "github-actions"  - when using the workflow's GITHUB_TOKEN
-readonly bot_logins=("claude" "github-actions")
-
-function is_bot
-{
-  local user=$1
-  for bot in "${bot_logins[@]}"; do
-    if [[ $user == "$bot" ]]; then
-      return 0
-    fi
-  done
-  return 1
-}
+source .github/workflows/bot_logins.sh
 
 # Fetch all review issues
 all_issues_json=$(gh api graphql \
@@ -87,7 +73,7 @@ printf "PR #%s: %d review issues (%d from bot)\n" \
 
 # No bot issues → initial review
 if ((issue_count == 0)); then
-  printf "mode=initial\n"
+  printf "mode=review\n"
   exit 0
 fi
 
@@ -95,8 +81,10 @@ source .github/workflows/code_owners.sh
 
 needs_verification="[]"
 resolved_count=0
-unresolved_count=0
-verify_count=0
+new_count=0
+disputed_count=0
+rereview_count=0
+issues=()
 
 while IFS= read -r issue; do
   IFS=$'\t' read -r resolved_by is_resolved comment_count \
@@ -114,38 +102,57 @@ while IFS= read -r issue; do
     continue
   fi
 
-  # Rule 1: CODEOWNER resolved → skip
-  if [[ $is_resolved == "true" ]] && is_codeowner "$resolved_by"; then
+  # Rule 1: Resolved → skip
+  if [[ $is_resolved == "true" ]]; then
     ((++resolved_count))
-    printf "  Resolved (CODEOWNER): %s:%s\n" "$path" "$line" >&2
+    issues+=("$(printf "%s:%s resolved" "$path" "$line")")
     continue
   fi
 
-  # Rule 2: Latest comment is bot → unresolved
+  # Rule 2: Latest comment is bot
   if is_bot "$latest_author"; then
-    ((++unresolved_count))
-    printf "  Unresolved: %s:%s\n" "$path" "$line" >&2
+    if ((comment_count == 1)); then
+      ((++new_count))
+      issues+=("$(printf "%s:%s ** NEW **" "$path" "$line")")
+    else
+      ((++disputed_count))
+      issues+=("$(printf "%s:%s ** DISPUTED **" "$path" "$line")")
+    fi
     continue
   fi
 
-  # Rule 3: Latest comment is anyone else → needs verification
-  ((++verify_count))
-  printf "  Needs verification: %s:%s\n" "$path" "$line" >&2
+  # Rule 3: Latest comment is anyone else → needs re-review
+  ((++rereview_count))
+  issues+=("$(printf "%s:%s needs AI re-review" "$path" "$line")")
   needs_verification=$(jq --argjson issue "$issue" \
     '. += [$issue]' <<< "$needs_verification")
 
 done < <(jq -c '.[]' <<< "$issues_json")
 
-printf "Summary: %d resolved, %d needs verification, %d unresolved\n" \
-  "$resolved_count" "$verify_count" "$unresolved_count" >&2
+printf "%s\n" "${issues[@]}" | sort >&2
 
-if ((unresolved_count > 0)); then
-  printf "FATAL: %d issue(s) have no developer response\n" \
-    "$unresolved_count" >&2
-  exit 1
+printf "Summary: %d new, %d re-review required, %d disputed, %d resolved\n" \
+  "$new_count" "$rereview_count" "$disputed_count" "$resolved_count" >&2
+
+# Output existing bot issue locations for full review deduplication
+existing_locations=$(jq -r '
+  .[] | (.comments.nodes[0].path // "unknown")
+      + ":" + ((.comments.nodes[0].originalLine // 0) | tostring)
+' <<< "$issues_json" | sort -u)
+printf "existing_issues<<EOF\n"
+printf "%s\n" "$existing_locations"
+printf "EOF\n"
+
+# Output blocking count for workflow to gate full review
+blocking_count=$((new_count + disputed_count))
+printf "blocking_count=%d\n" "$blocking_count"
+
+if ((rereview_count > 0)); then
+  printf "%s" "$needs_verification" > /tmp/claude-actionable-issues.json
+  printf "mode=rereview\nactionable_count=%d\ntotal_count=%d\n" \
+    "$rereview_count" "$issue_count"
+elif ((blocking_count > 0)); then
+  printf "mode=enforce\n"
+else
+  printf "mode=review\n"
 fi
-
-actionable_count=$(jq 'length' <<< "$needs_verification")
-printf "%s" "$needs_verification" > /tmp/claude-actionable-issues.json
-printf "mode=rereview\nactionable_count=%d\ntotal_count=%d\n" \
-  "$actionable_count" "$issue_count"
