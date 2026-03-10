@@ -1,8 +1,5 @@
 # Copyright (c) 2023 Bitcoin Association Distributed under the Open BSV
 # software license, see the accompanying file LICENSE
 
-# Format
-# <scope> <organisation>/<group>
-
-* @teranode-group/svn-global-owners
+* @chrisgibson01 @richmills3
 

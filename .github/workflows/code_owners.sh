@@ -2,21 +2,29 @@
 # Copyright (c) 2026 Bitcoin Association Distributed under the Open BSV
 # software license, see the accompanying file LICENSE
 
-# Fetch CODEOWNERS team members and provide is_codeowner lookup.
+# Parse CODEOWNERS file and provide is_codeowner lookup.
 #
 # Source this file to get:
 #   - codeowners: newline-separated string of CODEOWNER logins
 #   - is_codeowner <user>: returns 0 if user is a CODEOWNER
 
-: "${GITHUB_REPOSITORY:?Required}"
+readonly codeowners_file=".github/CODEOWNERS"
 
-codeowners=$(gh api "/orgs/${GITHUB_REPOSITORY%/*}/teams/svn-global-owners/members" --jq '.[].login') || {
-  echo "FATAL: Failed to fetch CODEOWNERS team members (check organization:read permission)" >&2
+if [[ ! -f $codeowners_file ]]; then
+  echo "FATAL: $codeowners_file not found" >&2
   exit 1
-}
+fi
+
+# Strip comments, extract @user entries
+codeowners=$(awk '{
+  gsub(/#.*/, "")
+  for(i = 1; i <= NF; i++)
+    if($i ~ /^@[^/]+$/)
+      print substr($i, 2)
+}' "$codeowners_file" | sort -u)
 
 if [[ -z $codeowners ]]; then
-  echo "FATAL: CODEOWNERS team has no members" >&2
+  echo "FATAL: No individual code owners found in $codeowners_file" >&2
   exit 1
 fi
 
