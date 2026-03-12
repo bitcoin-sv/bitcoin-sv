@@ -172,13 +172,15 @@ jobs:
             Bash(gh api graphql:*),
             Bash(.github/workflows/resolve-review-issue.sh:*)"
 
-      - name: Enforce Zero-Tolerance Policy
+      - name: Evaluate Review Outcome
         if: "!cancelled()"
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
           GH_TOKEN: ${{ github.token }}
+          CLASSIFY_MODE: ${{ steps.classify_issues.outputs.mode }}
+          BLOCKING_COUNT: ${{ steps.classify_issues.outputs.blocking_count }}
           REVIEW_OUTCOME: ${{ steps.claude-review.outcome == 'skipped' && steps.rereview.outcome || steps.claude-review.outcome }}
           EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
         run: .github/workflows/claude-code-review-enforcement.sh

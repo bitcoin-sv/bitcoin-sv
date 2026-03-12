@@ -2,28 +2,40 @@
 # Copyright (c) 2025 Bitcoin Association Distributed under the Open BSV
 # software license, see the accompanying file LICENSE
 
-# Enforce Zero-Tolerance Policy for Code Review
-
 set -euo pipefail
 
 : "${GITHUB_REPOSITORY:?Required}"
-: "${PR_NUMBER:?Required}"
-: "${COMMIT_SHA:?Required}"
-
+: "${GH_TOKEN:?Required}"
 readonly owner=${GITHUB_REPOSITORY%/*}
 readonly repo=${GITHUB_REPOSITORY#*/}
-readonly pr=$PR_NUMBER
-readonly sha=$COMMIT_SHA
+readonly pr=${PR_NUMBER:?Required}
+readonly sha=${COMMIT_SHA:?Required}
+readonly classify_mode=${CLASSIFY_MODE:?Required}
+readonly blocking_count=${BLOCKING_COUNT:?Required}
+readonly review_outcome=${REVIEW_OUTCOME:?Required}
+readonly execution_file=${EXECUTION_FILE:-}
 readonly status_context="AI Code Review"
 
 # Check that code review step completed successfully
 
 printf "Checking code review execution status...\n"
 
+# Check if review was skipped due to unaddressed issues
+if [[ "$classify_mode" == "unaddressed_issues_only" ]]; then
+  printf "BLOCKED: %s unaddressed review issue(s) from previous review\n" \
+    "$blocking_count"
+  printf "Developers must address or CODEOWNERS must resolve these issues before a new review runs.\n"
+  gh api "repos/$owner/$repo/statuses/$sha" \
+    -f state=failure \
+    -f context="$status_context" \
+    -f description="$blocking_count unaddressed review issue(s)"
+  exit 1
+fi
+
 # Check review outcome
-if [[ "${REVIEW_OUTCOME:-}" != "success" ]]; then
+if [[ "$review_outcome" != "success" ]]; then
   printf "ERROR: code review step failed (outcome: %s)\n" \
-    "${REVIEW_OUTCOME:-unknown}"
+    "$review_outcome"
   printf "The review execution failed or was cancelled.\n"
   printf "Check the action logs for errors or permission denials.\n"
   gh api "repos/$owner/$repo/statuses/$sha" \
@@ -34,12 +46,18 @@ if [[ "${REVIEW_OUTCOME:-}" != "success" ]]; then
 fi
 
 # Check execution file for detailed error information
-if [[ -n "${EXECUTION_FILE:-}" && -f "${EXECUTION_FILE}" ]]; then
-  printf "Parsing execution file: %s\n" "$EXECUTION_FILE"
+if [[ -n "$execution_file" && -f "$execution_file" ]]; then
+  printf "Parsing execution file: %s\n" "$execution_file"
 
   # Extract result message from execution file
-  is_error=$(jq -r 'map(select(.type == "result")) | last | .is_error | if . == null then "unknown" else tostring end' "$EXECUTION_FILE" 2>/dev/null || echo "unknown")
-  denials=$(jq -r 'map(select(.type == "result")) | last | .permission_denials | length' "$EXECUTION_FILE" 2>/dev/null || echo "0")
+  is_error=$(jq -r '
+    map(select(.type == "result")) | last | .is_error
+    | if . == null then "unknown" else tostring end
+    ' "$execution_file" 2>/dev/null || echo "unknown")
+  denials=$(jq -r '
+    map(select(.type == "result")) | last
+    | .permission_denials | length
+    ' "$execution_file" 2>/dev/null || echo "0")
 
   if [[ "$is_error" == "true" ]]; then
     printf "ERROR: Code review completed with errors\n"

@@ -81,9 +81,9 @@ source .github/workflows/code_owners.sh
 
 needs_verification="[]"
 resolved_count=0
-new_count=0
+raised_count=0
 disputed_count=0
-rereview_count=0
+addressed_count=0
 issues=()
 
 while IFS= read -r issue; do
@@ -112,8 +112,8 @@ while IFS= read -r issue; do
   # Rule 2: Latest comment is bot
   if is_bot "$latest_author"; then
     if ((comment_count == 1)); then
-      ((++new_count))
-      issues+=("$(printf "%s:%s ** NEW **" "$path" "$line")")
+      ((++raised_count))
+      issues+=("$(printf "%s:%s ** RAISED **" "$path" "$line")")
     else
       ((++disputed_count))
       issues+=("$(printf "%s:%s ** DISPUTED **" "$path" "$line")")
@@ -122,7 +122,7 @@ while IFS= read -r issue; do
   fi
 
   # Rule 3: Latest comment is anyone else → needs re-review
-  ((++rereview_count))
+  ((++addressed_count))
   issues+=("$(printf "%s:%s needs AI re-review" "$path" "$line")")
   needs_verification=$(jq --argjson issue "$issue" \
     '. += [$issue]' <<< "$needs_verification")
@@ -131,8 +131,8 @@ done < <(jq -c '.[]' <<< "$issues_json")
 
 printf "%s\n" "${issues[@]}" | sort >&2
 
-printf "Summary: %d new, %d re-review required, %d disputed, %d resolved\n" \
-  "$new_count" "$rereview_count" "$disputed_count" "$resolved_count" >&2
+printf "Summary: %d raised, %d addressed, %d disputed, %d resolved\n" \
+  "$raised_count" "$addressed_count" "$disputed_count" "$resolved_count" >&2
 
 # Output existing bot issue locations for full review deduplication
 existing_locations=$(jq -r '
@@ -144,15 +144,15 @@ printf "%s\n" "$existing_locations"
 printf "EOF\n"
 
 # Output blocking count for workflow to gate full review
-blocking_count=$((new_count + disputed_count))
+blocking_count=$((raised_count + disputed_count))
 printf "blocking_count=%d\n" "$blocking_count"
 
-if ((rereview_count > 0)); then
+if ((addressed_count > 0)); then
   printf "%s" "$needs_verification" > /tmp/claude-actionable-issues.json
   printf "mode=rereview\nactionable_count=%d\ntotal_count=%d\n" \
-    "$rereview_count" "$issue_count"
+    "$addressed_count" "$issue_count"
 elif ((blocking_count > 0)); then
-  printf "mode=enforce\n"
+  printf "mode=unaddressed_issues_only\n"
 else
   printf "mode=review\n"
 fi
