@@ -30,7 +30,7 @@ jobs:
     timeout-minutes: 5 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: ''
       - name: Check functional tests are executable
@@ -58,7 +58,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: ''
       - name: Benchmark
@@ -93,7 +93,7 @@ jobs:
     timeout-minutes: 120 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: ''
       - name: Benchmark
