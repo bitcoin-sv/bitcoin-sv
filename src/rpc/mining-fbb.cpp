@@ -118,16 +118,14 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
     return candidate;
 }
 
-//NOLINTNEXTLINE(performance-unnecessary-value-param)
-std::vector<uint256> GetMerkleProofBranches(CBlockRef pblock)
+std::vector<uint256> GetMerkleProofBranches(const CBlock& block)
 {
-    std::vector<uint256> ret;
-    const auto len = pblock->vtx.size();
+    const auto len = block.vtx.size();
     std::vector<uint256> leaves;
     leaves.reserve(len);
     for(size_t i = 0; i < len; ++i)
     {
-        leaves.emplace_back(pblock->vtx[i]->GetHash());
+        leaves.emplace_back(block.vtx[i]->GetHash());
     }
 
     return ComputeMerkleBranch(leaves, 0);
@@ -185,7 +183,7 @@ UniValue MkMiningCandidateJson(bool coinbaseRequired, CMiningCandidateRef &candi
     ret.push_back(Pair("sizeWithoutCoinbase", static_cast<uint64_t>(block->GetSizeWithoutCoinbase())));
 
     // merkleProof:
-    std::vector<uint256> brancharr = GetMerkleProofBranches(block);
+    std::vector<uint256> brancharr = GetMerkleProofBranches(*block);
     UniValue merkleProof(UniValue::VARR);
     for (const auto &i : brancharr)
     {
@@ -342,7 +340,7 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
 
     // Merkle root
     {
-        std::vector<uint256> merkleProof = GetMerkleProofBranches(block);
+        std::vector<uint256> merkleProof = GetMerkleProofBranches(*block);
         uint256 t = block->vtx[0]->GetHash();
         block->hashMerkleRoot = CalculateMerkleRoot(t, merkleProof);
     }
