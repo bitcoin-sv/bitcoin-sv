@@ -22,11 +22,12 @@
 
 class CRPCCommand;
 
-namespace RPCServer {
-void OnStarted(std::function<void()> slot);
-void OnStopped(std::function<void()> slot);
-void OnPreCommand(std::function<void(const CRPCCommand &)> slot);
-void OnPostCommand(std::function<void(const CRPCCommand &)> slot);
+namespace RPCServer
+{
+    void OnStarted(const std::function<void()>& slot);
+    void OnStopped(const std::function<void()>& slot);
+    void OnPreCommand(const std::function<void(const CRPCCommand&)>& slot);
+    void OnPostCommand(const std::function<void(const CRPCCommand&)>& slot);
 } // namespace RPCServer
 
 class CBlockIndex;
@@ -277,10 +278,11 @@ extern CRPCTable tableRPC; // NOLINT(cppcoreguidelines-avoid-non-const-global-va
  * Utilities: convert hex-encoded Values
  * (throws error if not hex).
  */
-extern uint256 ParseHashV(const UniValue &v, std::string strName);
-extern uint256 ParseHashO(const UniValue &o, std::string strKey);
-extern std::vector<uint8_t> ParseHexV(const UniValue &v, std::string strName);
-extern std::vector<uint8_t> ParseHexO(const UniValue &o, std::string strKey);
+extern uint256 ParseHashV(const UniValue& v, const std::string& strName);
+extern uint256 ParseHashO(const UniValue& o, const std::string& strKey);
+
+extern std::vector<uint8_t> ParseHexV(const UniValue& v, const std::string& strName);
+extern std::vector<uint8_t> ParseHexO(const UniValue& o, const std::string& strKey);
 
 extern Amount AmountFromValue(const UniValue &value);
 extern UniValue ValueFromAmount(const Amount &amount);

@@ -16,6 +16,7 @@ namespace
 namespace rpc::client
 {
 
+//NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 std::unique_ptr<WebhookClient> g_pWebhookClient {nullptr};
 
 WebhookClient::WebhookClient(const Config& config)

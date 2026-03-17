@@ -160,7 +160,7 @@ void getrawtransaction(const Config& config,
                        const JSONRPCRequest& request,
                        CTextWriter& textWriter,
                        bool processedInBatch,
-                       std::function<void()> httpCallback) 
+                       const std::function<void()>& httpCallback)
 {
     TxId txid = TxId(ParseHashV(request.params[0], "parameter 1"));
 
@@ -327,7 +327,7 @@ static CBlockIndex* GetBlockIndex(const Config& config,
     {
         CTransactionRef tx;
         uint256 foundBlockHash;
-        if (ProtocolEra era; !GetTransaction(config, *setTxIds.cbegin(), tx, false, foundBlockHash, era) ||
+        if(ProtocolEra era{}; !GetTransaction(config, *setTxIds.cbegin(), tx, false, foundBlockHash, era) ||
             foundBlockHash.IsNull())
         {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
@@ -723,7 +723,7 @@ void decoderawtransaction(const Config&,
                           const JSONRPCRequest& request,
                           CTextWriter& textWriter, 
                           bool processedInBatch,
-                          std::function<void()> httpCallback) 
+                          const std::function<void()>& httpCallback) 
 {
     RPCTypeCheck(request.params, {UniValue::VSTR});
 
@@ -960,9 +960,9 @@ static UniValue signrawtransaction(const Config &config,
     CBasicKeyStore tempKeystore;
     if (request.params.size() > 2 && !request.params[2].isNull()) {
         fGivenKeys = true;
-        UniValue keys = request.params[2].get_array();
+        const UniValue& keys = request.params[2].get_array();
         for (size_t idx = 0; idx < keys.size(); idx++) {
-            UniValue k = keys[idx];
+            const UniValue& k = keys[idx];
             CBitcoinSecret vchSecret;
             bool fGood = vchSecret.SetString(k.get_str());
             if (!fGood) {
@@ -999,8 +999,7 @@ static UniValue signrawtransaction(const Config &config,
                                    "{\"txid'\",\"vout\",\"scriptPubKey\"}");
             }
 
-            UniValue prevOut = p.get_obj();
-
+            const UniValue& prevOut = p.get_obj();
             RPCTypeCheckObj(prevOut,
                             {
                                 {"txid", UniValueType(UniValue::VSTR)},
@@ -1029,7 +1028,7 @@ static UniValue signrawtransaction(const Config &config,
                     coin.has_value() && !coin->IsSpent() &&
                     coin->GetTxOut().scriptPubKey != scriptPubKey) {
                     std::string err("Previous output scriptPubKey mismatch:\n");
-                    err = err + ScriptToAsmStr(coin->GetTxOut().scriptPubKey) +
+                    err += ScriptToAsmStr(coin->GetTxOut().scriptPubKey) +
                           "\nvs:\n" + ScriptToAsmStr(scriptPubKey);
                     throw JSONRPCError(RPC_DESERIALIZATION_ERROR, err);
                 }
@@ -1295,7 +1294,7 @@ namespace
         // Check if we only have flags that are supported
         for(UniValue jsonConfigValue : jsonConfig.getKeys())
         {
-            std::string strJsonValue = jsonConfigValue.get_str();
+            const std::string& strJsonValue = jsonConfigValue.get_str();
             if(allPolicySettings.find(strJsonValue) == allPolicySettings.end())
             {
                 rejectReason =  strJsonValue + " is not a valid policy setting.";
@@ -1340,12 +1339,21 @@ namespace
         {
             return false;
         }
-    
-       if (UniValue maxstackmemoryusagepolicy_uv; !getNumOrRejectReason(jsonConfig, "maxstackmemoryusagepolicy", maxstackmemoryusagepolicy_uv, rejectReason) || 
-           (!maxstackmemoryusagepolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxStackMemoryUsage(tsc.GlobalConfig::GetMaxStackMemoryUsage(true, true), maxstackmemoryusagepolicy_uv.get_int64(), &rejectReason)))
-       {
-          return false;
-       }
+
+        if(UniValue maxstackmemoryusagepolicy_uv;
+           !getNumOrRejectReason(jsonConfig,
+                                 "maxstackmemoryusagepolicy",
+                                 maxstackmemoryusagepolicy_uv,
+                                 rejectReason) ||
+           (!maxstackmemoryusagepolicy_uv.isNull() &&
+            !tsc.SetTransactionSpecificMaxStackMemoryUsage(
+                //NOLINTNEXTLINE(*-narrowing-conversions)
+                tsc.GlobalConfig::GetMaxStackMemoryUsage(true, true),
+                maxstackmemoryusagepolicy_uv.get_int64(),
+                &rejectReason)))
+        {
+            return false;
+        }
 
         if (UniValue maxscriptnumlengthpolicy_uv; !getNumOrRejectReason(jsonConfig, "maxscriptnumlengthpolicy", maxscriptnumlengthpolicy_uv, rejectReason) || 
             (!maxscriptnumlengthpolicy_uv.isNull() && !tsc.SetTransactionSpecificMaxScriptNumLengthPolicy(era, maxscriptnumlengthpolicy_uv.get_int64(), &rejectReason)))
@@ -1389,14 +1397,30 @@ namespace
             return false;
         }
 
-        if (UniValue maxstdtxvalidationduration_uv; !getNumOrRejectReason(jsonConfig, "maxstdtxvalidationduration", maxstdtxvalidationduration_uv, rejectReason) ||
-            (!maxstdtxvalidationduration_uv.isNull() && !tsc.SetTransactionSpecificMaxStdTxnValidationDuration(maxstdtxvalidationduration_uv.get_int64(), &rejectReason)))
+        if(UniValue maxstdtxvalidationduration_uv;
+           !getNumOrRejectReason(jsonConfig,
+                                 "maxstdtxvalidationduration",
+                                 maxstdtxvalidationduration_uv,
+                                 rejectReason) ||
+           (!maxstdtxvalidationduration_uv.isNull() &&
+            !tsc.SetTransactionSpecificMaxStdTxnValidationDuration(
+                //NOLINTNEXTLINE(*-narrowing-conversions)
+                maxstdtxvalidationduration_uv.get_int64(),
+                &rejectReason)))
         {
             return false;
         }
 
-        if (UniValue maxnonstdtxvalidationduration_uv; !getNumOrRejectReason(jsonConfig, "maxnonstdtxvalidationduration", maxnonstdtxvalidationduration_uv, rejectReason) ||
-            (!maxnonstdtxvalidationduration_uv.isNull() && !tsc.SetTransactionSpecificMaxNonStdTxnValidationDuration(maxnonstdtxvalidationduration_uv.get_int64(), &rejectReason)))
+        if(UniValue maxnonstdtxvalidationduration_uv;
+           !getNumOrRejectReason(jsonConfig,
+                                 "maxnonstdtxvalidationduration",
+                                 maxnonstdtxvalidationduration_uv,
+                                 rejectReason) ||
+           (!maxnonstdtxvalidationduration_uv.isNull() &&
+            !tsc.SetTransactionSpecificMaxNonStdTxnValidationDuration(
+                //NOLINTNEXTLINE(*-narrowing-conversions)
+                maxnonstdtxvalidationduration_uv.get_int64(),
+                &rejectReason)))
         {
             return false;
         }
@@ -1425,13 +1449,23 @@ namespace
             return false;
         }
 
-        if (UniValue maxtxnvalidatorasynctasksrunduration_uv; !getNumOrRejectReason(jsonConfig, "maxtxnvalidatorasynctasksrunduration", maxtxnvalidatorasynctasksrunduration_uv, rejectReason) ||
-            (!maxtxnvalidatorasynctasksrunduration_uv.isNull() && !tsc.SetTransactionSpecificMaxTxnValidatorAsyncTasksRunDuration(maxtxnvalidatorasynctasksrunduration_uv.get_int64(), &rejectReason)))
+        if(UniValue maxtxnvalidatorasynctasksrunduration_uv;
+           !getNumOrRejectReason(jsonConfig,
+                                 "maxtxnvalidatorasynctasksrunduration",
+                                 maxtxnvalidatorasynctasksrunduration_uv,
+                                 rejectReason) ||
+           (!maxtxnvalidatorasynctasksrunduration_uv.isNull() &&
+            !tsc.SetTransactionSpecificMaxTxnValidatorAsyncTasksRunDuration(
+                //NOLINTNEXTLINE(*-narrowing-conversions)
+                maxtxnvalidatorasynctasksrunduration_uv.get_int64(),
+                &rejectReason)))
         {
             return false;
         }
 
-        if(!tsc.SetTransactionSpecificSkipScriptFlags(skipScriptFlags, &rejectReason))
+        //NOLINTNEXTLINE(*-narrowing-conversions)
+        if(!tsc.SetTransactionSpecificSkipScriptFlags(skipScriptFlags,
+                                                      &rejectReason))
         {
             return false;
         }
@@ -1453,7 +1487,7 @@ namespace
 
         if (skipscriptflags_uv.isArray())
         {
-            UniValue skipFlagsArray = skipscriptflags_uv.get_array();
+            const UniValue& skipFlagsArray = skipscriptflags_uv.get_array();
             for (size_t arrayIndex = 0; arrayIndex < skipFlagsArray.size(); arrayIndex++)
             {
                 const UniValue &myElement = skipFlagsArray[arrayIndex];
@@ -2309,7 +2343,8 @@ static UniValue getmerkleproof2(const Config& config, const JSONRPCRequest& requ
 {
 
     // see also TSC description in  https://tsc.bitcoinassociation.net/standards/merkle-proof-standardised-format/?utm_source=Twitter&utm_medium=social&utm_campaign=Orlo
-    auto message_to_user = [](std::string hints) -> std::string {
+    auto message_to_user = [](const std::string& hints) -> std::string
+    {
         std::ostringstream msg;
         if (!hints.empty())
             msg << hints << "\n" << "usage:\n";
@@ -2441,7 +2476,7 @@ static UniValue getmerkleproof2(const Config& config, const JSONRPCRequest& requ
         {
             CTransactionRef tx;
             uint256 hashBlock;
-            if (ProtocolEra era; !GetTransaction(config, txid, tx, true, hashBlock, era))
+            if(ProtocolEra era{}; !GetTransaction(config, txid, tx, true, hashBlock, era))
             {
                 if (fTxIndex)
                     hints << "No such mempool or blockchain transaction";
@@ -2457,6 +2492,7 @@ static UniValue getmerkleproof2(const Config& config, const JSONRPCRequest& requ
                 assert(requestedBlockHash == hashBlock);
 
             CStringWriter writer;
+            //NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
             writer.ReserveAdditional(tx->GetTotalSize() * 2);
             EncodeHexTx(*tx, writer, RPCSerializationFlags());
             std::string hex = writer.MoveOutString();
@@ -2577,8 +2613,8 @@ static UniValue verifymerkleproof(const Config&, const JSONRPCRequest& request)
 
 void RegisterRawTransactionRPCCommands(CRPCTable& t)
 {
-    // clang-format off
-    static const CRPCCommand commands[] = {
+    static const std::array<CRPCCommand, 12> commands
+    {{
         //  category            name                      actor (function)        okSafeMode
         //  ------------------- ------------------------  ----------------------  ----------
         { "rawtransactions",    "getrawtransaction",      getrawtransaction,      true,  {"txid","verbose"} },
@@ -2594,10 +2630,8 @@ void RegisterRawTransactionRPCCommands(CRPCTable& t)
         { "blockchain",         "getmerkleproof",         getmerkleproof,         true,  {"txid", "blockhash"} },
         { "blockchain",         "getmerkleproof2",        getmerkleproof2,        true,  {"txid", "blockhash","includeFullTx","targetType","format"} },
         { "blockchain",         "verifymerkleproof",      verifymerkleproof,      true,  {"proof", "txid"} },
-    };
-    // clang-format on
+    }};
 
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++) {
-        t.appendCommand(commands[vcidx].name, &commands[vcidx]);
-    }
+    for(const auto& cmd : commands)
+        t.appendCommand(cmd.name, &cmd);
 }

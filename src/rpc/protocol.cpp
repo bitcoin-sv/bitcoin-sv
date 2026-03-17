@@ -56,9 +56,9 @@ UniValue JSONRPCError(int code, const std::string &message) {
 /** Username used when cookie authentication is in use (arbitrary, only for
  * recognizability in debugging/logging purposes)
  */
-static const std::string COOKIEAUTH_USER = "__cookie__";
+static const std::string COOKIEAUTH_USER = "__cookie__"; //NOLINT(cert-err58-cpp)
 /** Default name for auth cookie file */
-static const std::string COOKIEAUTH_FILE = ".cookie";
+static const std::string COOKIEAUTH_FILE = ".cookie"; //NOLINT(cert-err58-cpp)
 
 fs::path GetAuthCookieFile() {
     fs::path path(gArgs.GetArg("-rpccookiefile", COOKIEAUTH_FILE));
@@ -66,12 +66,13 @@ fs::path GetAuthCookieFile() {
     return path;
 }
 
-bool GenerateAuthCookie(std::string *cookie_out) {
-    const size_t COOKIE_SIZE = 32;
-    uint8_t rand_pwd[COOKIE_SIZE];
-    GetRandBytes(rand_pwd, COOKIE_SIZE);
-    std::string cookie =
-        COOKIEAUTH_USER + ":" + HexStr(rand_pwd, rand_pwd + COOKIE_SIZE);
+bool GenerateAuthCookie(std::string* cookie_out)
+{
+    constexpr size_t COOKIE_SIZE = 32;
+    std::array<uint8_t, COOKIE_SIZE> rand_pwd; // NOLINT(cppcoreguidelines-pro-type-member-init)
+    GetRandBytes(rand_pwd.data(), sizeof(rand_pwd));
+    std::string cookie = COOKIEAUTH_USER + ":" +
+                         HexStr(rand_pwd.begin(), rand_pwd.end());
 
     /** the umask determines what permissions are used to create this file -
      * these are set to 077 in init.cpp unless overridden with -sysperms.

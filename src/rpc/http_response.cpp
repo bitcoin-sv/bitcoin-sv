@@ -3,10 +3,9 @@
 
 #include <rpc/http_response.h>
 
-namespace rpc::client
-{
+//NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
 
-void StringHTTPResponse::SetBody(const unsigned char* body, size_t size)
+void rpc::client::StringHTTPResponse::SetBody(const unsigned char* body, size_t size)
 {
     if(body)
     {
@@ -15,7 +14,7 @@ void StringHTTPResponse::SetBody(const unsigned char* body, size_t size)
     }
 }
 
-void JSONHTTPResponse::SetBody(const unsigned char* body, size_t size)
+void rpc::client::JSONHTTPResponse::SetBody(const unsigned char* body, size_t size)
 {
     if(body)
     {
@@ -24,14 +23,15 @@ void JSONHTTPResponse::SetBody(const unsigned char* body, size_t size)
     }
 }
 
-void BinaryHTTPResponse::SetBody(const unsigned char* body, size_t size)
+void rpc::client::BinaryHTTPResponse::SetBody(const unsigned char* body, size_t size)
 {
     if(body)
     {
         const uint8_t* data { reinterpret_cast<const uint8_t*>(body) };
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         mBody = { data, data + size };
     }
 }
 
-}
+//NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
 

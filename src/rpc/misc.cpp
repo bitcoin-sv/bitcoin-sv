@@ -155,9 +155,10 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
 }
 
 #ifdef ENABLE_WALLET
-class DescribeAddressVisitor : public boost::static_visitor<UniValue> {
+class DescribeAddressVisitor : public boost::static_visitor<UniValue>
+{
 public:
-    CWallet *const pwallet;
+    CWallet *const pwallet; //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 
     DescribeAddressVisitor(CWallet *_pwallet) : pwallet(_pwallet) {}
 
@@ -182,8 +183,8 @@ public:
         obj.push_back(Pair("isscript", true));
         if (pwallet && pwallet->GetCScript(scriptID, subscript)) {
             std::vector<CTxDestination> addresses;
-            txnouttype whichType;
-            int nRequired;
+            txnouttype whichType; //NOLINT(cppcoreguidelines-init-variables)
+            int nRequired{};
             // DescribeAddressVisitor is used by RPC call validateaddress, which only takes address as input. 
             // We have no block height available - treat all transactions as post-Genesis except P2SH to be able to spend them.
             ProtocolEra era { IsP2SH(subscript)? ProtocolEra::PreGenesis : ProtocolEra::PostGenesis };
@@ -696,7 +697,7 @@ Examples:
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid value for n in "+itemstr+"!");
             }
 
-            uint32_t flags;
+            uint32_t flags{};
             const auto& flags_json = item["flags"];
             const auto& prevblockhash_json = item["prevblockhash"];
             if(!flags_json.isNull())
@@ -709,7 +710,7 @@ Examples:
             }
             else
             {
-                const CBlockIndex* pindexPrev;
+                const CBlockIndex* pindexPrev{};
                 if(prevblockhash_json.isNull())
                 {
                     pindexPrev = tip;
@@ -1276,9 +1277,11 @@ static UniValue dumpparameters(const Config&, const JSONRPCRequest &request)
 
     return obj;
 }
+
 namespace 
 {
-    const std::map<std::string, uint32_t> mapFlagNames = {
+    const std::map<std::string, uint32_t> mapFlagNames = //NOLINT(cert-err58-cpp)
+    {
         {"NONE", SCRIPT_VERIFY_NONE},
         {"P2SH", SCRIPT_VERIFY_P2SH},
         {"STRICTENC", SCRIPT_VERIFY_STRICTENC},
@@ -1318,8 +1321,8 @@ std::optional<uint32_t> GetFlagNumber(const std::string& flagName, std::string& 
 
 void RegisterMiscRPCCommands(CRPCTable& t)
 {
-    // clang-format off
-    static const CRPCCommand commands[] = {
+    static const std::array<CRPCCommand, 14> commands
+    {{
         //  category            name                      actor (function)        okSafeMode
         //  ------------------- ------------------------  ----------------------  ----------
         { "control",            "getinfo",                getinfo,                true,  {} }, /* uses wallet if enabled */
@@ -1339,10 +1342,8 @@ void RegisterMiscRPCCommands(CRPCTable& t)
         { "hidden",             "setmocktime",            setmocktime,            true,  {"timestamp"}},
         { "hidden",             "echo",                   echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
         { "hidden",             "echojson",               echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
-    };
-    // clang-format on
+    }};
 
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++) {
-        t.appendCommand(commands[vcidx].name, &commands[vcidx]);
-    }
+    for(const auto& cmd : commands)
+        t.appendCommand(cmd.name, &cmd);
 }

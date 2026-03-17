@@ -1,13 +1,16 @@
 // Copyright (c) 2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include <rpc/client.h>
-#include <rpc/http_protocol.h>
-#include <rpc/http_request.h>
-#include <rpc/http_response.h>
-#include <support/events.h>
-#include <tinyformat.h>
-#include <utilstrencodings.h>
+#include "rpc/client.h"
+
+#include <tuple>
+
+#include "rpc/http_protocol.h"
+#include "rpc/http_request.h"
+#include "rpc/http_response.h"
+#include "support/events.h"
+#include "tinyformat.h"
+#include "utilstrencodings.h"
 
 #include <event2/buffer.h>
 
@@ -146,7 +149,10 @@ void RPCClient::SubmitRequest(HTTPRequest& request, HTTPResponse* response) cons
     assert(output_buffer);
     if(request.GetContentsFD().Get() >= 0)
     {
-        if(evbuffer_add_file(output_buffer, request.GetContentsFD().Release(), 0, request.GetContentsSize()) != 0)
+        if(evbuffer_add_file(output_buffer,
+                             request.GetContentsFD().Release(),
+                             0,
+                             request.GetContentsSize()) != 0) //NOLINT(*-narrowing-conversions)
         {
             throw std::runtime_error("Failed to add file contents to HTTP request");
         }
@@ -165,9 +171,9 @@ void RPCClient::SubmitRequest(HTTPRequest& request, HTTPResponse* response) cons
     int res { evhttp_make_request(evcon.get(), req.get(), ConvertCmdType(request.GetCommand()), endPoint.c_str()) };
 
     // Ownership moved to evcon in above call
-    req.release();
+    std::ignore = req.release();
     if(res != 0)
-    {   
+    {
         throw CConnectionFailed("Send http request failed");
     }
 

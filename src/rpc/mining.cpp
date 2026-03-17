@@ -79,7 +79,7 @@ static UniValue GetNetworkHashPS(int lookup, int32_t height) {
 
     // If lookup is -1, then use blocks since last difficulty change.
     if (lookup <= 0) {
-        lookup = pb->GetHeight() %
+        lookup = pb->GetHeight() % // NOLINT(*-narrowing-conversions)
                      Params().GetConsensus().DifficultyAdjustmentInterval() +
                  1;
     }
@@ -108,7 +108,7 @@ static UniValue GetNetworkHashPS(int lookup, int32_t height) {
     arith_uint256 workDiff = pb->GetChainWork() - pb0->GetChainWork();
     int64_t timeDiff = maxTime - minTime;
 
-    return workDiff.getdouble() / timeDiff;
+    return workDiff.getdouble() / timeDiff; //NOLINT(*-narrowing-conversions)
 }
 
 static UniValue getnetworkhashps(const Config&, const JSONRPCRequest& request)
@@ -140,9 +140,13 @@ static UniValue getnetworkhashps(const Config&, const JSONRPCRequest& request)
         request.params.size() > 1 ? request.params[1].get_int() : -1);
 }
 
-UniValue generateBlocks(const Config &config,
+UniValue generateBlocks(const Config& config,
+                        // NOLINTNEXTLINE(performance-unnecessary-value-param)
                         std::shared_ptr<CReserveScript> coinbaseScript,
-                        int nGenerate, uint64_t nMaxTries, bool keepScript) {
+                        int nGenerate,
+                        uint64_t nMaxTries,
+                        bool keepScript)
+{
     static const int nInnerLoopCount = 0x100000;
     int32_t nHeightStart = chainActive.Height();
     int32_t nHeightEnd = nHeightStart + nGenerate;
@@ -598,11 +602,11 @@ void getblocktemplate(const Config& config,
         // passed and there are more transactions
         uint256 hashWatchedChain;
         boost::system_time checktxtime;
-        unsigned int nTransactionsUpdatedLastLP;
+        unsigned int nTransactionsUpdatedLastLP{};
 
         if (lpval.isStr()) {
             // Format: <hashBestChain><nTransactionsUpdatedLast>
-            std::string lpstr = lpval.get_str();
+            const std::string& lpstr = lpval.get_str();
 
             hashWatchedChain.SetHex(lpstr.substr(0, 64));
             nTransactionsUpdatedLastLP = atoi64(lpstr.substr(64));
@@ -644,7 +648,7 @@ void getblocktemplate(const Config& config,
     static int64_t nStart;
     static std::unique_ptr<CBlockTemplate> pblocktemplate;
 
-    const CBlockIndex* tip;
+    const CBlockIndex* tip{};
 
     {
         LOCK(cs_main);
@@ -765,6 +769,7 @@ void getblocktemplate(const Config& config,
 
         jWriter.pushKV("noncerange", "00000000ffffffff");
 
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         int64_t defaultmaxBlockSize = config.GetChainParams().GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter;
         jWriter.pushKV("sizelimit", defaultmaxBlockSize);
 
@@ -786,21 +791,25 @@ void getblocktemplate(const Config& config,
     } 
 }
 
-class submitblock_StateCatcher : public CValidationInterface {
+// NOLINTNEXTLINE(cppcoreguidelines-virtual-class-destructor)
+class submitblock_StateCatcher : public CValidationInterface
+{
 public:
     uint256 hash;
-    bool found;
-    CValidationState state;
+    bool found{false};
+    CValidationState state{};
     boost::signals2::scoped_connection slotConnection {};
 
-    submitblock_StateCatcher(const uint256 &hashIn)
-        : hash(hashIn), found(false), state() {}
+    submitblock_StateCatcher(const uint256 &hashIn):
+        hash{hashIn}
+    {}
 
     void RegisterValidationInterface() override
     {
         using namespace boost::placeholders;
         slotConnection = GetMainSignals().BlockChecked.connect(boost::bind(&submitblock_StateCatcher::BlockChecked, this, _1, _2));
     }
+
     void UnregisterValidationInterface() override
     {
         slotConnection.disconnect();
@@ -821,7 +830,7 @@ protected:
 UniValue processBlock(
     const Config& config,
     const std::shared_ptr<CBlock>& blockptr,
-    std::function<bool(const Config&, const std::shared_ptr<CBlock>&)> performBlockOperation)
+    const std::function<bool(const Config&, const std::shared_ptr<CBlock>&)>& performBlockOperation)
 {
     CBlock &block = *blockptr;
     if (block.vtx.empty() || !block.vtx[0]->IsCoinBase()) {
@@ -945,8 +954,8 @@ static UniValue submitblock(const Config &config,
 
 void RegisterMiningRPCCommands(CRPCTable& t)
 {
-    // clang-format off
-    static const CRPCCommand commands[] = {
+    static const std::array<CRPCCommand, 7> commands
+    {{
         //  category   name                     actor (function)       okSafeMode
         //  ---------- ------------------------ ---------------------- ----------
         {"mining",     "getnetworkhashps",      getnetworkhashps,      true, {"nblocks", "height"}},
@@ -957,10 +966,9 @@ void RegisterMiningRPCCommands(CRPCTable& t)
         {"mining",     "submitblock",           submitblock,           true, {"hexdata", "parameters"}},
 
         {"generating", "generatetoaddress",     generatetoaddress,     true, {"nblocks", "address", "maxtries"}},
-    };
-    // clang-format on
+    }};
 
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
-        t.appendCommand(commands[vcidx].name, &commands[vcidx]);
+    for(const auto& cmd : commands)
+        t.appendCommand(cmd.name, &cmd);
 }
 
