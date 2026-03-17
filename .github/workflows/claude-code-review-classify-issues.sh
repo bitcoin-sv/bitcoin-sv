@@ -73,6 +73,7 @@ printf "PR #%s: %d review issues (%d from bot)\n" \
 
 # No bot issues → initial review
 if ((issue_count == 0)); then
+  printf "blocking_count=0\n"
   printf "mode=review\n"
   exit 0
 fi

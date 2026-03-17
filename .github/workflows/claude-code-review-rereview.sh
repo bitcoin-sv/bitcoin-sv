@@ -6,7 +6,7 @@
 #
 # For each issue in /tmp/claude-actionable-issues.json:
 #   1. Read source code context around the issue location
-#   2. Call Anthropic Messages API for a RESOLVED/UNRESOLVED verdict
+#   2. Call Claude Code CLI for a RESOLVED/UNRESOLVED verdict
 #   3. Call resolve-review-issue.sh to update the thread state on GitHub
 
 set -euo pipefail
@@ -18,44 +18,49 @@ set -euo pipefail
 
 readonly resolve_script=".github/workflows/resolve-review-issue.sh"
 readonly issues_file="/tmp/claude-actionable-issues.json"
-readonly model="claude-sonnet-4-20250514"
-readonly max_tokens=512
-readonly api_url="https://api.anthropic.com/v1/messages"
+readonly model="claude-sonnet-4-6"
 
 readonly owner=${GITHUB_REPOSITORY%/*}
 readonly repo=${GITHUB_REPOSITORY#*/}
 
 source .github/workflows/bot_logins.sh
 
-function call_anthropic
+# Install Claude Code CLI
+if ! command -v claude &>/dev/null; then
+  printf "Installing Claude Code CLI...\n"
+  npm install -g @anthropic-ai/claude-code 2>&1
+  printf "Claude Code CLI installed.\n\n"
+fi
+
+function call_claude
 {
-  local body=$1
-  local response=$(curl -s --connect-timeout 10 --max-time 120 \
-    -w "\n%{http_code}" \
-    "$api_url" \
-    -H "content-type: application/json" \
-    -H "x-api-key: $ANTHROPIC_API_KEY" \
-    -H "anthropic-version: 2023-06-01" \
-    -d "$body")
+  local prompt=$1
 
-  local http_code=$(tail -1 <<< "$response")
-  response=$(sed '$d' <<< "$response")
+  local response stderr_output
+  stderr_output=$(mktemp)
+  if ! response=$(printf '%s' "$prompt" | claude -p \
+    --model "$model" \
+    2>"$stderr_output"); then
+    printf "  Claude CLI exited with error:\n" >&2
+    cat "$stderr_output" >&2
+    rm -f "$stderr_output"
+    return 1
+  fi
+  rm -f "$stderr_output"
 
-  local -r success=200
-  if [[ $http_code == $success ]]; then
-    echo "$response"
-    return 0
+  if [[ -z $response ]]; then
+    printf "  Empty response from Claude CLI\n" >&2
+    return 1
   fi
 
-  printf "  API error: HTTP %s\n%s\n" "$http_code" "$response" >&2
-  return 1
+  echo "$response"
 }
 
 function get_source_context
 {
   local file=$1
   local line=$2
-  
+
   local -r context_lines=50
   local start=$((line - context_lines))
   ((start < 1)) && start=1
@@ -106,51 +111,30 @@ while IFS= read -r issue; do
 
   source_context=$(get_source_context "$path" "$line")
 
-  # Build the API request body in a single jq call.
-  # jq --arg safely handles JSON-escaping of all user-supplied strings
-  # (source code, issue bodies, developer responses) in one pass.
-  request_body=$(jq -n \
-    --arg model "$model" \
-    --argjson max_tokens "$max_tokens" \
-    --arg path "$path" \
-    --arg line "$line" \
-    --arg issue_body "$issue_body" \
-    --arg dev_response "$latest_comment" \
-    --arg source_code "$source_context" \
-    '{
-      model: $model,
-      max_tokens: $max_tokens,
-      messages: [{
-        role: "user",
-        content: (
-          "You are reviewing whether a code review issue has been resolved.\n\n"
-          + "ISSUE LOCATION: " + $path + ":" + $line + "\n\n"
-          + "ORIGINAL ISSUE:\n" + $issue_body + "\n\n"
-          + "DEVELOPER RESPONSE:\n" + $dev_response + "\n\n"
-          + "CURRENT SOURCE CODE (around line " + $line + "):\n" + $source_code + "\n\n"
-          + "Has this issue been resolved? Look at the current source code carefully.\n"
-          + "Respond with exactly one of:\n"
-          + "  RESOLVED: <brief reason>\n"
-          + "  UNRESOLVED: <brief reason>\n\n"
-          + "Your response must start with RESOLVED or UNRESOLVED."
-        )
-      }]
-    }')
+  # Build the prompt as plain text
+  prompt="You are reviewing whether a code review issue has been resolved.
 
-  if ! api_response=$(call_anthropic "$request_body"); then
-    printf "  SKIP: API call failed\n" >&2
-    ((++error_count))
-    results+=("${thread_id}|ERROR|${path}|${line}|API call failed")
-    continue
-  fi
+ISSUE LOCATION: ${path}:${line}
 
-  # Parse the verdict from the response text
-  verdict_text=$(jq -r '.content[0].text // ""' <<< "$api_response")
-  if [[ -z $verdict_text ]]; then
-    printf "  SKIP: Empty API response\n" >&2
-    printf "  Full response: %s\n" "$api_response" >&2
+ORIGINAL ISSUE:
+${issue_body}
+
+DEVELOPER RESPONSE:
+${latest_comment}
+
+CURRENT SOURCE CODE (around line ${line}):
+${source_context}
+
+Has this issue been resolved? Look at the current source code carefully.
+Respond with exactly one of:
+  RESOLVED: <brief reason>
+  UNRESOLVED: <brief reason>
+
+Your response must start with RESOLVED or UNRESOLVED."
+
+  if ! verdict_text=$(call_claude "$prompt"); then
     ((++error_count))
-    results+=("${thread_id}|ERROR|${path}|${line}|Empty API response")
+    results+=("${thread_id}|ERROR|${path}|${line}|Claude CLI call failed")
     continue
   fi
 
@@ -225,6 +209,11 @@ done < <(jq -c '.[]' "$issues_file")
 
 printf "Re-review complete: %d resolved, %d unresolved, %d errors\n" \
   "$resolved_count" "$unresolved_count" "$error_count"
+
+if ((error_count > 0)); then
+  printf "FATAL: %d re-review(s) failed due to API or processing errors.\n" "$error_count" >&2
+  exit 1
+fi
 
 # Post/update summary comment on the PR
 

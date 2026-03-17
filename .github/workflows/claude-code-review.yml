@@ -173,7 +173,7 @@ jobs:
             Bash(.github/workflows/resolve-review-issue.sh:*)"
 
       - name: Evaluate Review Outcome
-        if: "!cancelled()"
+        if: success()
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
