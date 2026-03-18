@@ -142,6 +142,7 @@ void LimitedVector::shrink(difference_type start, difference_type length)
     valtype tmp{stackElement.begin() + start,
                 stackElement.begin() + start + len};
     stackElement.swap(tmp);
+    stack.get().decreaseCombinedStackSize(size - len);
 }
 
 LimitedStack::LimitedStack(uint64_t maxStackSizeIn):
