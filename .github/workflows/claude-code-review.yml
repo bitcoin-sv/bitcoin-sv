@@ -96,19 +96,6 @@ jobs:
           cat .claude/prompts/code-review-guidelines.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Load subagent instructions
-        id: subagent-instructions
-        if: steps.classify_issues.outputs.blocking_count == '0'
-          && (steps.rereview.outcome == 'skipped'
-           || steps.rereview.outputs.outstanding_count == '0')
-        run: |
-          echo "cpp<<EOF" >> $GITHUB_OUTPUT
-          cat .claude/prompts/claude-code-review-cpp-instructions.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          echo "python<<EOF" >> $GITHUB_OUTPUT
-          cat .claude/prompts/claude-code-review-python-instructions.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
       - name: Load review prompt
         id: review-prompt
         if: steps.classify_issues.outputs.blocking_count == '0'

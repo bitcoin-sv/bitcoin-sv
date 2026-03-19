@@ -11,10 +11,20 @@ Subagents inherit these tools: Read, Grep, Glob, Task, and limited gh commands.
 Based on file extensions, launch appropriate subagents:
 
 **For C++/C files** (.cpp, .h, .c, .hpp, .cc, .cxx, .hxx):
-Launch cpp-pro subagent with the prompt from `.claude/prompts/claude-code-review-cpp-instructions.md`.
+Launch cpp-pro subagent with this prompt:
+> You are reviewing C++ code changes in PR $PR_NUMBER.
+> Focus on C++ files only (.cpp, .h, .c, .hpp, .cc, .cxx, .hxx).
+> Run `gh pr diff $PR_NUMBER` to see the diff, then use Read, Grep, Glob
+> to examine files in detail. Do NOT use shell redirects, pipes, or chaining.
+> Return all issues using the format in `.claude/prompts/issue-format.md`.
 
 **For Python files** (.py):
-Launch general-purpose subagent with the prompt from `.claude/prompts/claude-code-review-python-instructions.md`.
+Launch general-purpose subagent with this prompt:
+> You are reviewing Python code changes in PR $PR_NUMBER.
+> Focus on Python files only (.py). These are primarily test scripts.
+> Run `gh pr diff $PR_NUMBER` to see the diff, then use Read, Grep, Glob
+> to examine files in detail. Do NOT use shell redirects, pipes, or chaining.
+> Return all issues (except flake8) using the format in `.claude/prompts/issue-format.md`.
 
 **Step 3: Parse Subagent Issues**
 Once all subagents complete:
