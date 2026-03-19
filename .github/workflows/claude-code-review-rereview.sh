@@ -25,6 +25,18 @@ readonly repo=${GITHUB_REPOSITORY#*/}
 
 source .github/workflows/bot_logins.sh
 
+# Map file extension to review agent name.
+# Returns empty string for unsupported file types (no agent).
+function agent_for_file
+{
+  local file=$1
+  case "${file##*.}" in
+    cpp|h|c|hpp|cc|cxx|hxx) echo "cpp-pro" ;;
+    py)                      echo "python-pro" ;;
+    *)                       echo "" ;;
+  esac
+}
+
 # Install Claude Code CLI
 if ! command -v claude &>/dev/null; then
   printf "Installing Claude Code CLI...\n"
@@ -35,11 +47,16 @@ fi
 function call_claude
 {
   local prompt=$1
+  local agent=${2:-}
+
+  local -a cli_args=(-p --model "$model")
+  if [[ -n $agent ]]; then
+    cli_args+=(--agent "$agent")
+  fi
 
   local response stderr_output
   stderr_output=$(mktemp)
-  if ! response=$(printf '%s' "$prompt" | claude -p \
-    --model "$model" \
+  if ! response=$(printf '%s' "$prompt" | claude "${cli_args[@]}" \
     2>"$stderr_output"); then
     printf "  Claude CLI exited with error:\n" >&2
     cat "$stderr_output" >&2
@@ -125,21 +142,37 @@ ${latest_comment}
 CURRENT SOURCE CODE (around line ${line}):
 ${source_context}
 
-Has this issue been resolved? Look at the current source code carefully.
+Evaluate whether this issue should remain open. Consider THREE possibilities:
+
+1. The code was changed to address the issue.
+2. The developer's response demonstrates the original issue was incorrect
+   or inapplicable (e.g. the suggestion was wrong, based on a misunderstanding,
+   or the existing code is actually correct).
+3. The issue remains valid and unaddressed.
+
+Be willing to concede if the developer makes a sound technical argument.
+The original review can be wrong.
+
 Respond with exactly one of:
-  RESOLVED: <brief reason>
-  UNRESOLVED: <brief reason>
+  RESOLVED: <brief reason why the code fix addresses the issue>
+  WITHDRAWN: <brief reason why the original issue was incorrect>
+  UNRESOLVED: <brief reason why the issue still needs attention>
 
-Your response must start with RESOLVED or UNRESOLVED."
+Your response must start with RESOLVED, WITHDRAWN, or UNRESOLVED."
 
-  if ! verdict_text=$(call_claude "$prompt"); then
+  agent=$(agent_for_file "$path")
+  if [[ -n $agent ]]; then
+    printf "  Using agent: %s\n" "$agent"
+  fi
+
+  if ! verdict_text=$(call_claude "$prompt" "$agent"); then
     ((++error_count))
     results+=("${thread_id}|ERROR|${path}|${line}|Claude CLI call failed")
     continue
   fi
 
-  # Extract verdict (first line starting with RESOLVED or UNRESOLVED)
-  verdict_line=$(grep -m1 -Ei '^(RESOLVED|UNRESOLVED):' <<< "$verdict_text" || true)
+  # Extract verdict (first line starting with RESOLVED, WITHDRAWN, or UNRESOLVED)
+  verdict_line=$(grep -m1 -Ei '^(RESOLVED|WITHDRAWN|UNRESOLVED):' <<< "$verdict_text" || true)
   if [[ -z $verdict_line ]]; then
     printf "  SKIP: Could not parse verdict from response\n" >&2
     printf "  Response: %s\n" "$verdict_text" >&2
@@ -148,21 +181,37 @@ Your response must start with RESOLVED or UNRESOLVED."
     continue
   fi
 
-  verdict=$(echo "$verdict_line" | grep -oEi '^(RESOLVED|UNRESOLVED)' | tr '[:lower:]' '[:upper:]')
+  verdict=$(echo "$verdict_line" | grep -oEi '^(RESOLVED|WITHDRAWN|UNRESOLVED)' | tr '[:lower:]' '[:upper:]')
   reason=$(echo "$verdict_line" | sed 's/^[^:]*: *//')
 
   printf "  Verdict: %s -- %s\n" "$verdict" "$reason"
 
   # Act on the verdict
-  if [[ $verdict == "RESOLVED" ]]; then
-    if "$resolve_script" resolve "$thread_id" 2>&1; then
-      printf "  Thread resolved\n"
+  if [[ $verdict == "RESOLVED" || $verdict == "WITHDRAWN" ]]; then
+    failed=false
+
+    # Post concession reply for withdrawn issues
+    if [[ $verdict == "WITHDRAWN" ]]; then
+      reply_body="Withdrawn: ${reason}"
+      if "$resolve_script" reply "$thread_id" "$reply_body" 2>&1; then
+        printf "  Withdrawal reply posted\n"
+      else
+        printf "  WARNING: reply failed for %s\n" "$thread_id" >&2
+        failed=true
+      fi
+    fi
+
+    if [[ $failed == "false" ]] && "$resolve_script" resolve "$thread_id" 2>&1; then
+      printf "  Thread resolved (%s)\n" "$verdict"
       ((++resolved_count))
-      results+=("${thread_id}|RESOLVED|${path}|${line}|${reason}")
-    else
+      results+=("${thread_id}|${verdict}|${path}|${line}|${reason}")
+    elif [[ $failed == "false" ]]; then
       printf "  WARNING: resolve-review-issue.sh failed for %s\n" "$thread_id" >&2
       ((++error_count))
       results+=("${thread_id}|ERROR|${path}|${line}|Resolve call failed")
+    else
+      ((++error_count))
+      results+=("${thread_id}|ERROR|${path}|${line}|Reply/resolve call failed")
     fi
 
   elif [[ $verdict == "UNRESOLVED" ]]; then

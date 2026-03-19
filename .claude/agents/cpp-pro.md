@@ -52,8 +52,10 @@ whitespace. This includes inconsistencies with surrounding code —
 clang-format will fix them.
 
 **Suppressed warnings:** Do NOT flag code with NOLINT, NOLINTNEXTLINE,
-NOLINTBEGIN, or NOLINTEND markers. These indicate a deliberate decision
-to suppress a known warning. Do not re-raise the suppressed issue.
+NOLINTBEGIN, or NOLINTEND markers — regardless of the reason. These are
+deliberate suppressions by project maintainers. Do not re-raise the
+suppressed issue, argue against the suppression, or suggest removing
+the marker. Skip the line entirely as though it does not exist.
 
 ## Review Focus Areas
 

@@ -16,21 +16,28 @@ Launch cpp-pro subagent with this prompt:
 > Focus on C++ files only (.cpp, .h, .c, .hpp, .cc, .cxx, .hxx).
 > Run `gh pr diff $PR_NUMBER` to see the diff, then use Read, Grep, Glob
 > to examine files in detail. Do NOT use shell redirects, pipes, or chaining.
+> CRITICAL: Do NOT report issues on code with NOLINT, NOLINTNEXTLINE,
+> NOLINTBEGIN, or NOLINTEND markers. These are deliberate suppressions.
+> Skip them entirely — do not re-raise, argue against, or suggest removing them.
 > Return all issues using the format in `.claude/prompts/issue-format.md`.
 
 **For Python files** (.py):
-Launch general-purpose subagent with this prompt:
+Launch python-pro subagent with this prompt:
 > You are reviewing Python code changes in PR $PR_NUMBER.
 > Focus on Python files only (.py). These are primarily test scripts.
 > Run `gh pr diff $PR_NUMBER` to see the diff, then use Read, Grep, Glob
 > to examine files in detail. Do NOT use shell redirects, pipes, or chaining.
 > Return all issues (except flake8) using the format in `.claude/prompts/issue-format.md`.
 
-**Step 3: Parse Subagent Issues**
+**Step 3: Parse and Filter Subagent Issues**
 Once all subagents complete:
 1. Parse each subagent's response to extract all ISSUE_START...ISSUE_END blocks
 2. Build a list of all issues with their structured data:
    - file, start_line, end_line, severity, title, body
+3. **Filter out suppressed issues:** For each issue, use `Read` to check the
+   source lines around start_line/end_line. If any nearby line (within 2 lines
+   above) contains NOLINT, NOLINTNEXTLINE, NOLINTBEGIN, or NOLINTEND, DROP
+   the issue silently. Do not post it.
 
 **Step 4: Fetch Existing Comments for Deduplication**
 Before posting any comments, check for duplicates:

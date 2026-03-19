@@ -149,15 +149,15 @@ jobs:
             Grep,
             Read,
             Task,
-            Bash(gh issue view:*),
-            Bash(gh issue list:*),
-            Bash(gh search:*),
-            Bash(gh pr diff:*),
-            Bash(gh pr view:*),
-            Bash(gh pr list:*),
-            Bash(gh api /repos/${{ github.repository }}/pulls:*),
-            Bash(gh api graphql:*),
-            Bash(.github/workflows/resolve-review-issue.sh:*)"
+            Bash(gh issue view *),
+            Bash(gh issue list *),
+            Bash(gh search *),
+            Bash(gh pr diff *),
+            Bash(gh pr view *),
+            Bash(gh pr list *),
+            Bash(gh api /repos/${{ github.repository }}/pulls/*),
+            Bash(gh api graphql *),
+            Bash(.github/workflows/resolve-review-issue.sh *)"
 
       - name: Evaluate Review Outcome
         if: success()
