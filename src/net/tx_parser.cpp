@@ -73,7 +73,7 @@ std::pair<size_t, size_t> tx_parser::parse_output(span<const uint8_t> s)
         const auto [bytes_read, val] = parse_compact_size(s.subspan(value_len));
         if(!bytes_read)
             return make_pair(0, value_len + val);
-        
+
         script_len_ = val;
         total_bytes_read += bytes_read;
         vector<uint8_t> v;
@@ -142,7 +142,7 @@ std::pair<size_t, size_t> tx_parser::parse_inputs(span<const uint8_t> s)
 
         if(bytes_reqd)
             return make_pair(total_bytes_read, bytes_reqd);
-                
+
         ++current_ip_;
 
     }
@@ -179,12 +179,12 @@ std::pair<size_t, size_t> tx_parser::parse_outputs(span<const uint8_t> s)
 
         if(bytes_reqd)
             return make_pair(total_bytes_read, bytes_reqd);
-                
+
         ++current_op_;
     }
     return make_pair(total_bytes_read, 0);
 }
-    
+
 std::pair<size_t, size_t> tx_parser::parse_locktime(const span<const uint8_t> s)
 {
     assert(state_ == state::lock_time);
@@ -196,7 +196,7 @@ std::pair<size_t, size_t> tx_parser::parse_locktime(const span<const uint8_t> s)
     copy(s.begin(), s.begin() + locktime_len, locktime_buffer_.begin());
     return make_pair(locktime_len, 0);
 }
-    
+
 // return bytes_read, bytes_required
 std::pair<size_t, size_t> tx_parser::operator()(span<const uint8_t> s)
 {
@@ -211,7 +211,7 @@ std::pair<size_t, size_t> tx_parser::operator()(span<const uint8_t> s)
         s = s.subspan(bytes_read);
         if(s.size() < bytes_reqd)
             return make_pair(total_bytes_read, bytes_reqd);
-        
+
         [[fallthrough]];
     }
     case state::ip_count:
@@ -310,7 +310,7 @@ std::pair<size_t, size_t> tx_parser::operator()(span<const uint8_t> s)
     default:
         assert(false);
     }
-           
+
     return make_pair(total_bytes_read, 0);
 }
 
@@ -330,15 +330,15 @@ size_t tx_parser::buffer_size() const
                 locktime_buffer_.size()};
 
     size += accumulate(ip_buffers_.cbegin(), ip_buffers_.cend(),
-                       0,
-                       [](auto acc, const auto& buffer)
+                       size_t{},
+                       [](size_t acc, const auto& buffer)
                        {
                            return acc + buffer.size();
                        });
 
     size += accumulate(op_buffers_.cbegin(), op_buffers_.cend(),
-                       0,
-                       [](auto acc, const auto& buffer)
+                       size_t{},
+                       [](size_t acc, const auto& buffer)
                        {
                            return acc + buffer.size();
                        });
