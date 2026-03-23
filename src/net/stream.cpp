@@ -323,6 +323,8 @@ void Stream::CopyStats(StreamStats& stats) const
     }
 }
 
+//NOLINTBEGIN(*-narrowing-conversions)
+
 void Stream::AvgBandwithCalc()
 {   
     LOCK(cs_mRecvMsgQueue);
@@ -582,3 +584,4 @@ Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, uint6
     return {true, sentSize};
 }
 
+//NOLINTEND(*-narrowing-conversions)

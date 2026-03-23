@@ -76,13 +76,14 @@ inline std::pair<size_t, size_t> array_parser<T>::parse_seg_count(std::span<cons
         return make_pair(bytes_read, val);
 
     value_type v;
-    v.insert(v.cend(), s.begin(), s.begin() + bytes_read);
+    v.insert(v.cend(), s.begin(),
+             s.begin() + bytes_read); //NOLINT(*-narrowing-conversions)
     segments_.push_back(std::move(v));
     size_ += bytes_read;
     n_ = val;
     return make_pair(bytes_read, 0);
 }
-    
+
 // return bytes_read, bytes_required
 template<typename T>
 inline std::pair<size_t, size_t> array_parser<T>::operator()(std::span<const uint8_t> s)

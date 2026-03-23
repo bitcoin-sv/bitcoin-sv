@@ -29,7 +29,9 @@ std::pair<size_t, size_t> fixed_len_multi_parser::parse_count(span<const uint8_t
         return make_pair(bytes_read, val);
 
     value_type v;
-    v.insert(v.cend(), s.begin(), s.begin() + bytes_read);
+    v.insert(v.cend(),
+             s.begin(),
+             s.begin() + bytes_read); //NOLINT(*-narrowing-conversions)
     segments_.push_back(std::move(v));
     size_ += bytes_read;
     readable_size_ += bytes_read;
@@ -37,7 +39,7 @@ std::pair<size_t, size_t> fixed_len_multi_parser::parse_count(span<const uint8_t
 
     return make_pair(bytes_read, 0);
 }
-    
+
 // return bytes_read, bytes_required
 std::pair<size_t, size_t> fixed_len_multi_parser::operator()(span<const uint8_t> s)
 {
@@ -55,9 +57,9 @@ std::pair<size_t, size_t> fixed_len_multi_parser::operator()(span<const uint8_t>
 
     if(current_ >= n_.value())
         return make_pair(total_bytes_read, 0);
-    
+
     const auto max_fixed_lens{ numeric_limits<uint64_t>::max() / fixed_len_ };
-       
+
     // Add any bytes that are given to the buffer, but only create
     // a new segment when the buffer has read the min seg size
     while(s.size() >= fixed_len_)
@@ -71,12 +73,13 @@ std::pair<size_t, size_t> fixed_len_multi_parser::operator()(span<const uint8_t>
         const size_t n_bytes{min(s.size(), min_bytes_reqd)};
         const size_t quotient{(n_bytes / fixed_len_) * fixed_len_};
         buffer_.insert(buffer_.cend(), 
-                       s.begin(), s.begin() + quotient);
+                       s.begin(),
+                       s.begin() + quotient); //NOLINT(*-narrowing-conversions)
         size_ += quotient;
         current_ += quotient / fixed_len_;
         total_bytes_read += quotient;
         assert(buffer_.size() <= seg_size_);
-        
+
         if(buffer_.size() == seg_size_ || 
            (current_ >= n_ && !buffer_.empty()))
         {
@@ -87,7 +90,7 @@ std::pair<size_t, size_t> fixed_len_multi_parser::operator()(span<const uint8_t>
             if(current_ >= n_)
                 break;
         }
-        
+
         s = s.subspan(quotient);
     }
 
@@ -101,7 +104,7 @@ size_t fixed_len_multi_parser::size() const
 {
     return size_;
 }
-    
+
 size_t fixed_len_multi_parser::readable_size() const
 {
     return readable_size_;
@@ -132,7 +135,7 @@ void fixed_len_multi_parser::init_cum_lengths() const
                    {
                        return a.size();
                    });
-    
+
     std::partial_sum(seg_lengths.cbegin(), seg_lengths.cend(), 
                      back_inserter(cum_lengths_));
 }

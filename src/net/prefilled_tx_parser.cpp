@@ -25,8 +25,8 @@ pair<size_t, size_t> prefilled_tx_parser::operator()(span<const uint8_t> s)
 
         buffer_.insert(buffer_.cend(), 
                        s.begin(),
-                       s.begin() + index_bytes_read);
-        
+                       s.begin() + index_bytes_read); //NOLINT(*-narrowing-conversions)
+
         s = s.subspan(index_bytes_read);
     }
 
@@ -34,7 +34,7 @@ pair<size_t, size_t> prefilled_tx_parser::operator()(span<const uint8_t> s)
     total_bytes_read += bytes_read;
     return make_pair(total_bytes_read, bytes_reqd);
 }
-    
+
 std::size_t prefilled_tx_parser::size() const
 {
     return buffer_.size() + tx_parser_.size();

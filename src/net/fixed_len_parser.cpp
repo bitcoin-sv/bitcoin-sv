@@ -20,6 +20,7 @@ std::pair<size_t, size_t> fixed_len_parser::operator()(
     }
     else
     {
+        //NOLINTNEXTLINE(*-narrowing-conversions)
         buffer_.insert(buffer_.cend(), s.begin(), s.begin() + delta);
         return make_pair(delta, 0);
     }

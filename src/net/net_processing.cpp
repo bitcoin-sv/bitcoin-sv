@@ -329,6 +329,8 @@ bool PeerHasHeader(const CNodeStatePtr& state, const CBlockIndex *pindex) {
     return false;
 }
 
+//NOLINTBEGIN(*-narrowing-conversions)
+
 /**
  * Update pindexLastCommonBlock and add not-in-flight missing successors to
  * vBlocks, until it has at most count entries.
@@ -5851,3 +5853,4 @@ bool SendMessages(const Config& config,
     return true;
 }
 
+//NOLINTEND(*-narrowing-conversions)

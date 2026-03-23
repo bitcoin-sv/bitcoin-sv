@@ -687,6 +687,8 @@ void CConnman::CAsyncTaskPool::AddToPool(
         std::move(source));
 }
 
+//NOLINTBEGIN(*-narrowing-conversions)
+
 void CConnman::CAsyncTaskPool::HandleCompletedAsyncProcessing()
 {
     using namespace std::literals::chrono_literals;
@@ -3432,3 +3434,5 @@ std::string userAgent() {
 
     return subversion;
 }
+
+//NOLINTEND(*-narrowing-conversions)

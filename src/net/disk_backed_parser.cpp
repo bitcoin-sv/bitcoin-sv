@@ -128,7 +128,7 @@ size_t disk_backed_parser::read(size_t read_pos, const std::span<uint8_t> s)
         }
     }
 
-    file_stream_.seekg(read_pos);
+    file_stream_.seekg(read_pos); // NOLINT(*-narrowing-conversions)
     if(!file_stream_.good())
     {
         throw std::runtime_error(
@@ -139,6 +139,7 @@ size_t disk_backed_parser::read(size_t read_pos, const std::span<uint8_t> s)
     // Calculate how many bytes we can read
     uint64_t bytes_available = bytes_written_ - read_pos;
     uint64_t bytes_to_read_max = std::min<uint64_t>(s.size(), bytes_available);
+    //NOLINTNEXTLINE(*-narrowing-conversions)
     std::streamsize bytes_to_read = std::min(bytes_to_read_max, static_cast<uint64_t>(max_streamsize));
 
     // Read from file

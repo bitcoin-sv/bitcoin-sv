@@ -37,7 +37,9 @@ std::pair<size_t, size_t> tx_parser::parse_input(span<const uint8_t> s)
         total_bytes_read += bytes_read;
         vector<uint8_t> v;
         v.reserve(total_bytes_read);
-        v.insert(v.cend(), s.begin(), s.begin() + total_bytes_read);
+        v.insert(v.cend(),
+                 s.begin(),
+                 s.begin() + total_bytes_read); //NOLINT(*-narrowing-conversions)
         ip_buffers_.push_back(std::move(v));
         s = s.subspan(total_bytes_read);
     }
@@ -51,7 +53,7 @@ std::pair<size_t, size_t> tx_parser::parse_input(span<const uint8_t> s)
 
     auto& cur_ip_buffer{ip_buffers_[ip_buffers_.size() - 1]};
     cur_ip_buffer.insert(cur_ip_buffer.cend(), s.begin(),
-                         s.begin() + extra_bytes_reqd);
+                         s.begin() + extra_bytes_reqd); //NOLINT(*-narrowing-conversions)
 
     return make_pair(total_bytes_read + extra_bytes_reqd, 0);
 }
@@ -78,7 +80,9 @@ std::pair<size_t, size_t> tx_parser::parse_output(span<const uint8_t> s)
         total_bytes_read += bytes_read;
         vector<uint8_t> v;
         v.reserve(total_bytes_read);
-        v.insert(v.cend(), s.begin(), s.begin() + total_bytes_read);
+        v.insert(v.cend(),
+                 s.begin(),
+                 s.begin() + total_bytes_read); //NOLINT(*-narrowing-conversions)
         op_buffers_.push_back(std::move(v));
         s = s.subspan(total_bytes_read);
     }
@@ -92,7 +96,7 @@ std::pair<size_t, size_t> tx_parser::parse_output(span<const uint8_t> s)
     auto& cur_op_buffer{op_buffers_[op_buffers_.size() - 1]};
     cur_op_buffer.insert(cur_op_buffer.cend(), 
                          s.begin(),
-                         s.begin() + extra_bytes_reqd);
+                         s.begin() + extra_bytes_reqd); //NOLINT(*-narrowing-conversions)
 
     return make_pair(total_bytes_read + extra_bytes_reqd, 0);
 }
@@ -119,7 +123,9 @@ std::pair<size_t, size_t> tx_parser::parse_ip_count(span<const uint8_t> s)
 
     n_ips_ = val;
     ip_count_buffer_.resize(bytes_read);
-    copy(s.begin(), s.begin() + bytes_read, ip_count_buffer_.begin());
+    copy(s.begin(),
+         s.begin() + bytes_read, //NOLINT(*-narrowing-conversions)
+         ip_count_buffer_.begin());
     return make_pair(bytes_read, 0);
 }
 
@@ -159,7 +165,9 @@ std::pair<size_t, size_t> tx_parser::parse_op_count(span<const uint8_t> s)
 
     n_ops_ = val;
     op_count_buffer_.resize(bytes_read);
-    copy(s.begin(), s.begin() + bytes_read, op_count_buffer_.begin());
+    copy(s.begin(),
+         s.begin() + bytes_read, //NOLINT(*-narrowing-conversions)
+         op_count_buffer_.begin());
     return make_pair(bytes_read, 0);
 }
 

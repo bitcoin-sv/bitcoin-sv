@@ -1,5 +1,7 @@
 Checks: '-*,
          clang-analyzer-*,
+         bugprone-narrowing-conversions*,
+         cppcoreguidelines-narrowing-conversions*,
       '
 
 InheritParentConfig: true

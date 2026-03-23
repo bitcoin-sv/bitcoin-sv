@@ -13,8 +13,10 @@ std::pair<size_t, size_t> single_seg_parser::operator()(const std::span<const ui
 size_t single_seg_parser::read(const size_t read_pos, std::span<uint8_t> s)
 {
     const size_t size{std::min(s.size(), segment_.size() - read_pos)};
+    //NOLINTBEGIN(*-narrowing-conversions)
     const auto cbegin{segment_.cbegin() + read_pos};
     copy(cbegin, cbegin + size, s.begin());
+    //NOLINTEND(*-narrowing-conversions)
     return size;
 }
 
