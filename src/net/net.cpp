@@ -1735,6 +1735,7 @@ void CConnman::ThreadDNSAddressSeed() {
                         CService(ip, config_->GetChainParams().GetDefaultPort()),
                         requiredServiceBits);
                     // Use a random age between 3 and 7 days old.
+                    // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
                     addr.nTime = GetTime() - 3 * nOneDay - GetRand(4 * nOneDay);
                     vAdd.push_back(addr);
                     found++;
@@ -2421,6 +2422,7 @@ void CConnman::SetNetworkActive(bool active) {
 
 CConnman::CConnman(
     const Config &configIn,
+    //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     uint64_t nSeed0In,
     uint64_t nSeed1In,
     std::chrono::milliseconds debugP2PTheadStallsThreshold)
@@ -2641,6 +2643,7 @@ bool CConnman::Start(CScheduler& scheduler,
 
     // Schedule average bandwidth measurements
     scheduler.scheduleEvery(std::bind(&CConnman::PeerAvgBandwithCalc, this),
+                            // NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
                             PEER_AVG_BANDWIDTH_CALC_FREQUENCY_SECS * 1000);
 
     // Schedule mempool syncing
@@ -3016,6 +3019,7 @@ CNode::MonitoredPendingResponses::MonitoredPendingResponses()
 {}
 
 
+//NOLINTBEGIN(bugprone-easily-swappable-parameters)
 CNode::CNode(
     NodeId idIn,
     ServiceFlags nLocalServicesIn,
@@ -3027,6 +3031,7 @@ CNode::CNode(
     CConnman::CAsyncTaskPool& asyncTaskPool,
     const std::string& addrNameIn,
     bool fInboundIn)
+//NOLINTEND(bugprone-easily-swappable-parameters)
 :     nTimeConnected(GetSystemTimeInSeconds())
     , fInbound(fInboundIn)
     , id(idIn)
@@ -3385,7 +3390,9 @@ bool CConnman::ForNode(NodeId id, std::function<bool(const CNodePtr& pnode)> fun
     return found && NodeFullyConnected(found) && func(found);
 }
 
-int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds) {
+int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds)
+{
+    //NOLINTNEXTLINE(bugprone-incorrect-roundings)
     return nNow + int64_t(log1p(GetRand(1ULL << 48) *
                                 -0.0000000000000035527136788 /* -1/2^48 */) *
                               average_interval_seconds * -1000000.0 +

@@ -43,6 +43,7 @@ public:
     using iterator = buffer_type::iterator;
     using const_iterator = buffer_type::const_iterator;
 
+    //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     explicit msg_buffer(int nType, int nVersion, uint64_t maxRecvBuffer):
         nType_{nType},
         nVersion_{nVersion},

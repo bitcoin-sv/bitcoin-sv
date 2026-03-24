@@ -55,7 +55,8 @@ std::pair<size_t, size_t> fixed_len_multi_parser::operator()(span<const uint8_t>
         s = s.subspan(bytes_read);
     }
 
-    if(current_ >= n_.value())
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access) n_ set by parse_count
+    if(current_ >= *n_)
         return make_pair(total_bytes_read, 0);
 
     const auto max_fixed_lens{ numeric_limits<uint64_t>::max() / fixed_len_ };
@@ -64,7 +65,8 @@ std::pair<size_t, size_t> fixed_len_multi_parser::operator()(span<const uint8_t>
     // a new segment when the buffer has read the min seg size
     while(s.size() >= fixed_len_)
     {
-        const auto fixed_lens_reqd{n_.value() - current_};
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access) n_ set by parse_count
+        const auto fixed_lens_reqd{*n_ - current_};
         const auto n_fixed_lens{min(fixed_lens_reqd, max_fixed_lens)}; 
         const auto bytes_reqd{ n_fixed_lens * fixed_len_ };
 
@@ -94,8 +96,9 @@ std::pair<size_t, size_t> fixed_len_multi_parser::operator()(span<const uint8_t>
         s = s.subspan(quotient);
     }
 
-    const auto fixed_lens_reqd{n_.value() - current_};
-    const auto n_fixed_lens{min(fixed_lens_reqd, max_fixed_lens)}; 
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access) n_ set by parse_count
+    const auto fixed_lens_reqd{*n_ - current_};
+    const auto n_fixed_lens{min(fixed_lens_reqd, max_fixed_lens)};
     const auto bytes_reqd{ n_fixed_lens * fixed_len_ };
     return make_pair(total_bytes_read, bytes_reqd);
 }

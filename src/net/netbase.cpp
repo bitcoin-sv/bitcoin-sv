@@ -174,8 +174,12 @@ struct timeval MillisToTimeval(int64_t nTimeout) {
  *
  * @note This function requires that hSocket is in non-blocking mode.
  */
-static bool InterruptibleRecv(uint8_t* data, size_t len, int timeout,
-                              SOCKET &hSocket) {
+static bool InterruptibleRecv(uint8_t* data,
+                              //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                              size_t len,
+                              int timeout,
+                              SOCKET& hSocket)
+{
     int64_t curTime = GetTimeMillis();
     int64_t endTime = curTime + timeout;
     // Maximum time to wait in one select call. It will take up until this time
@@ -583,9 +587,14 @@ bool ConnectSocket(const CService &addrDest, SOCKET &hSocketRet, int nTimeout,
     }
 }
 
-bool ConnectSocketByName(CService &addr, SOCKET &hSocketRet,
-                         const char *pszDest, int portDefault, int nTimeout,
-                         bool *outProxyConnectionFailed) {
+bool ConnectSocketByName(CService& addr,
+                         SOCKET& hSocketRet,
+                         const char* pszDest,
+                         //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                         int portDefault,
+                         int nTimeout,
+                         bool* outProxyConnectionFailed)
+{
     // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
     std::string strDest;
     int port = portDefault;

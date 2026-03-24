@@ -219,7 +219,7 @@ std::strong_ordering operator<=>(const CNetAddr& a, const CNetAddr& b)
 
 bool operator==(const CNetAddr& a, const CNetAddr& b)
 {
-    return a <=> b == std::strong_ordering::equal;
+    return (a <=> b) == std::strong_ordering::equal;
 }
 
 bool CNetAddr::GetInAddr(struct in_addr *pipv4Addr) const {
@@ -344,16 +344,6 @@ int CNetAddr::GetReachabilityFrom(const CNetAddr *paddrPartner) const {
                     return fTunnel ? REACH_IPV6_WEAK : REACH_IPV6_STRONG;
             }
         case NET_TEREDO:
-            switch (ourNet) {
-                default:
-                    return REACH_DEFAULT;
-                case NET_TEREDO:
-                    return REACH_TEREDO;
-                case NET_IPV6:
-                    return REACH_IPV6_WEAK;
-                case NET_IPV4:
-                    return REACH_IPV4;
-            }
         case NET_UNKNOWN:
         case NET_UNROUTABLE:
         default:
@@ -501,7 +491,8 @@ CSubNet::CSubNet(const CNetAddr &addr, int32_t mask):
     }
 }
 
-CSubNet::CSubNet(const CNetAddr &addr, const CNetAddr &mask):
+//NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+CSubNet::CSubNet(const CNetAddr& addr, const CNetAddr& mask):
     network{addr},
     valid{true}
 {
@@ -633,6 +624,6 @@ std::strong_ordering operator<=>(const CSubNet& a, const CSubNet& b)
 bool operator==(const CSubNet& a, const CSubNet& b)
 {
     return a.valid == b.valid
-           && a <=> b == std::strong_ordering::equal;
+           && (a <=> b) == std::strong_ordering::equal;
 }
 

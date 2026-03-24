@@ -12,7 +12,6 @@
 #include "blockencodings.h"
 #include "blockstreams.h"
 #include "chainparams.h"
-#include "clientversion.h"
 #include "config.h"
 #include "consensus/validation.h"
 #include "double_spend/dsdetected_message.h"
@@ -20,7 +19,6 @@
 #include "init.h"
 #include "invalid_txn_publisher.h"
 #include "limited_cache.h"
-#include "locked_ref.h"
 #include "merkleblock.h"
 #include "merkleproof.h"
 #include "merkletreestore.h"
@@ -49,7 +47,6 @@
 #include "txmempool.h"
 #include "ui_interface.h"
 #include "util.h"
-#include "utilmoneystr.h"
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "validationinterface.h"
@@ -319,7 +316,8 @@ bool PeerHasHeader(const CNodeStatePtr& state, const CBlockIndex *pindex) {
         return false;
     }
     else if (state->pindexBestKnownBlock &&
-        pindex == state->pindexBestKnownBlock->GetAncestor(pindex->GetHeight())) {
+        pindex == state->pindexBestKnownBlock->GetAncestor(pindex->GetHeight()))
+    {   //NOLINT(bugprone-branch-clone)
         return true;
     }
     else if (state->pindexBestHeaderSent &&
@@ -355,7 +353,7 @@ static void FindNextBlocksToDownload(
     ProcessBlockAvailability(state);
 
     if (state->pindexBestKnownBlock == nullptr)
-    {
+    {   //NOLINT(bugprone-branch-clone)
         // This peer has nothing interesting.
         return;
     }
@@ -859,6 +857,7 @@ void PeerLogicValidation::NewPoWValidBlock(
     });
 }
 
+//NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void PeerLogicValidation::UpdatedBlockTip(const CBlockIndex *pindexNew,
                                           const CBlockIndex *pindexFork,
                                           bool fInitialDownload) {
@@ -906,8 +905,11 @@ void PeerLogicValidation::BlockChecked(const CBlock& block,
 //
 // Messages
 //
-bool AlreadyHave(const CInv &inv) {
-    switch (inv.type) {
+bool AlreadyHave(const CInv &inv)
+{
+    //NOLINTNEXTLINE(bugprone-switch-missing-default-case)
+    switch (inv.type)
+    {
         case MSG_TX: {
             return IsTxnKnown(inv);
         }
@@ -1978,7 +1980,7 @@ static bool ProcessAuthChMessage(const Config& config,
     }
 
     // Limit message spamming
-    if(pfrom->authRateLimit += 1)
+    if(pfrom->authRateLimit += 1) //NOLINT(bugprone-assignment-in-if-condition)
     {
         LogPrint(BCLog::MINERID | BCLog::NETCONN, "authch rate limit exceeded from peer=%d\n", pfrom->id);
         Misbehaving(pfrom, 10, "authch-rate-limit");
@@ -2129,7 +2131,7 @@ static bool ProcessAuthRespMessage(const CNodePtr& pfrom,
     }
 
     // Limit message spamming
-    if(pfrom->authRateLimit += 1)
+    if(pfrom->authRateLimit += 1) //NOLINT(bugprone-assignment-in-if-condition)
     {
         LogPrint(BCLog::MINERID | BCLog::NETCONN, "authresp rate limit exceeded from peer=%d\n", pfrom->id);
         Misbehaving(pfrom, 10, "authresp-rate-limit");
@@ -5013,32 +5015,42 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
             fMoreWork = true;
         }
     }
-    catch (const std::ios_base::failure &e) {
+    catch(const std::ios_base::failure& e)
+    {
         connman.PushMessage(pfrom,
                             CNetMsgMaker(INIT_PROTO_VERSION)
                             .Make(NetMsgType::REJECT, strCommand,
                                   REJECT_MALFORMED,
                                   std::string("error parsing message")));
-        if (strstr(e.what(), "end of data")) {
+        if(strstr(e.what(), "end of data"))
+        {
             // Allow exceptions from under-length message on vRecv
             LogPrint(BCLog::NETMSG,
                      "%s(%s, %lu bytes): Exception '%s' caught, normally caused by a "
                      "message being shorter than its stated length\n",
                      __func__, SanitizeString(strCommand), nPayloadLength, e.what());
-        } else if (strstr(e.what(), "size too large")) {
+        }
+        else if (strstr(e.what(), "size too large"))
+        {
             // Allow exceptions from over-long size
             LogPrint(BCLog::NETMSG, "%s(%s, %lu bytes): Exception '%s' caught\n", __func__,
                      SanitizeString(strCommand), nPayloadLength, e.what());
             Misbehaving(pfrom, 1, "Over-long size message protection");
-        } else if (strstr(e.what(), "non-canonical ReadCompactSize()")) {
+        }
+        else if (strstr(e.what(), "non-canonical ReadCompactSize()"))
+        {   //NOLINT(bugprone-branch-clone)
             // Allow exceptions from non-canonical encoding
             LogPrint(BCLog::NETMSG, "%s(%s, %lu bytes): Exception '%s' caught\n", __func__,
                      SanitizeString(strCommand), nPayloadLength, e.what());
-        } else if (strstr(e.what(), "parsing error")) {
+        }
+        else if (strstr(e.what(), "parsing error"))
+        {
             // Allow generic parsing errors
             LogPrint(BCLog::NETMSG, "%s(%s, %lu bytes): Exception '%s' caught\n", __func__,
                      SanitizeString(strCommand), nPayloadLength, e.what());
-        } else {
+        }
+        else
+        {
             PrintExceptionContinue(&e, "ProcessMessages()");
         }
     }
@@ -5771,12 +5783,14 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
         // If the fee filter has changed substantially and it's still more than
         // MAX_FEEFILTER_CHANGE_DELAY until scheduled broadcast, then move the
         // broadcast to within MAX_FEEFILTER_CHANGE_DELAY.
+        //NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
         else if (timeNow + MAX_FEEFILTER_CHANGE_DELAY * 1000000 <
                      pto->nextSendTimeFeeFilter &&
                  (currentFilter < 3 * pto->lastSentFeeFilter / 4 ||
                   currentFilter > 4 * pto->lastSentFeeFilter / 3))
         {
             pto->nextSendTimeFeeFilter =
+                //NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
                 timeNow + GetRandInt(MAX_FEEFILTER_CHANGE_DELAY) * 1000000;
         }
     }

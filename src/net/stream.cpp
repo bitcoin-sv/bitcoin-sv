@@ -40,7 +40,10 @@ namespace
     }
 }
 
-Stream::Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRecvBuffSize)
+Stream::Stream(CNode* node,
+               StreamType streamType,
+               SOCKET socket,  //NOLINT(bugprone-easily-swappable-parameters)
+               uint64_t maxRecvBuffSize)
 : mNode{node}, mStreamType{streamType}, mSocket{socket}, mMaxRecvBuffSize{maxRecvBuffSize}
 {
     // Setup bytes count per message type
@@ -73,6 +76,7 @@ Stream::Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRe
 #endif
 }
 
+//NOLINTNEXTLINE(bugprone-exception-escape)
 Stream::~Stream()
 {
     Shutdown();
@@ -92,7 +96,10 @@ void Stream::Shutdown()
     }
 }
 
-bool Stream::SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
+//NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+bool Stream::SetSocketForSelect(fd_set& setRecv,
+                                fd_set& setSend,
+                                fd_set& setError,
                                 SOCKET& socketMax) const
 {
     // Implement the following logic:
@@ -127,8 +134,15 @@ bool Stream::SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setErr
     return true;
 }
 
-void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, const Config& config,
-                           bool& gotNewMsgs, uint64_t& bytesRecv, uint64_t& bytesSent)
+//NOLINTBEGIN(bugprone-easily-swappable-parameters)
+void Stream::ServiceSocket(fd_set& setRecv,
+                           fd_set& setSend,
+                           fd_set& setError,
+                           const Config& config,
+                           bool& gotNewMsgs,
+                           uint64_t& bytesRecv,
+                           uint64_t& bytesSent)
+//NOLINTEND(bugprone-easily-swappable-parameters)
 {
     //
     // Receive

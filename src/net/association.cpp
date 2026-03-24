@@ -64,6 +64,7 @@ void Association::ClearAssociationID()
     LogPrint(BCLog::NETCONN, "association ID cleared for peer=%d\n", mNode->GetId());
 }
 
+//NOLINTNEXTLINE(bugprone-exception-escape)
 Association::~Association()
 {
     Shutdown();

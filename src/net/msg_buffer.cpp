@@ -29,17 +29,17 @@ size_t msg_buffer::size() const
 }
 
 bool msg_buffer::empty() const
-{ 
+{
     return size() == 0; 
 }
 
 const uint8_t* msg_buffer::data() const
-{ 
+{
     return header_.data() + read_pos_; 
 }
 
 void msg_buffer::command(const string& cmd)
-{ 
+{
     command_ = cmd;
 }
 
@@ -80,9 +80,9 @@ void msg_buffer::write(span<const uint8_t> s)
     {
         if(!payload_)
             payload_ = make_unique<msg_parser_buffer>(make_parser(command_,
+            // NOLINTNEXTLINE(bugprone-unchecked-optional-access) protected by header_complete()
                                                                   payload_len_.value(),
                                                                   max_recv_buffer_));
-
         (*payload_)(s);
     }
 }
@@ -106,7 +106,7 @@ void msg_buffer::read(span<uint8_t> s)
         const auto payload_len{payload_ ? payload_->readable_size() : 0};
         if(end_pos > header_.size() + payload_len)
             throw std::ios_base::failure( "msg_buffer::read(): end of data");
-    
+
         if(payload_)
         {
             payload_->read(read_pos_ - header_.size(), s);
@@ -121,7 +121,7 @@ void msg_buffer::read(char* p, size_t n)
 }
 
 void msg_buffer::write(const char* p, size_t n)
-{ 
+{
     write(span{reinterpret_cast<const uint8_t*>(p), n});
 }
 
