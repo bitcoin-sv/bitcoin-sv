@@ -100,9 +100,11 @@ size_t CTxnDoubleSpendDetector::getKnownSpendsSize() const {
     return mKnownSpends.size();
 }
 
-void CTxnDoubleSpendDetector::clear() {
+void CTxnDoubleSpendDetector::clear()
+{
     std::lock_guard lock(mMainMtx);
     mKnownSpends.clear();
+    mKnownSpendsTx.clear();
 }
 
 bool CTxnDoubleSpendDetector::isAnyOfInputsKnownNL(
