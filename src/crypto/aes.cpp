@@ -4,6 +4,8 @@
 
 #include "aes.h"
 
+#include "support/cleanse.h"
+
 #include <array>
 #include <cassert>
 #include <cstring>
@@ -18,8 +20,9 @@ AES128Encrypt::AES128Encrypt(const cspan key)
     AES128_init(&ctx, key.data());
 }
 
-AES128Encrypt::~AES128Encrypt() {
-    memset(&ctx, 0, sizeof(ctx));
+AES128Encrypt::~AES128Encrypt()
+{
+    memory_cleanse(&ctx, sizeof(ctx));
 }
 
 void AES128Encrypt::Encrypt(uint8_t ciphertext[16], // NOLINT(cppcoreguidelines-avoid-c-arrays)
@@ -34,8 +37,9 @@ AES128Decrypt::AES128Decrypt(const cspan key)
     AES128_init(&ctx, key.data());
 }
 
-AES128Decrypt::~AES128Decrypt() {
-    memset(&ctx, 0, sizeof(ctx));
+AES128Decrypt::~AES128Decrypt()
+{
+    memory_cleanse(&ctx, sizeof(ctx));
 }
 
 void AES128Decrypt::Decrypt(uint8_t plaintext[16], // NOLINT(cppcoreguidelines-avoid-c-arrays)
@@ -50,8 +54,9 @@ AES256Encrypt::AES256Encrypt(const cspan key)
     AES256_init(&ctx, key.data());
 }
 
-AES256Encrypt::~AES256Encrypt() {
-    memset(&ctx, 0, sizeof(ctx));
+AES256Encrypt::~AES256Encrypt()
+{
+    memory_cleanse(&ctx, sizeof(ctx));
 }
 
 void AES256Encrypt::Encrypt(uint8_t ciphertext[16], // NOLINT(cppcoreguidelines-avoid-c-arrays)
@@ -66,8 +71,9 @@ AES256Decrypt::AES256Decrypt(const cspan key)
     AES256_init(&ctx, key.data());
 }
 
-AES256Decrypt::~AES256Decrypt() {
-    memset(&ctx, 0, sizeof(ctx));
+AES256Decrypt::~AES256Decrypt()
+{
+    memory_cleanse(&ctx, sizeof(ctx));
 }
 
 void AES256Decrypt::Decrypt(uint8_t plaintext[16], // NOLINT(cppcoreguidelines-avoid-c-arrays)
@@ -185,7 +191,7 @@ int AES256CBCEncrypt::Encrypt(const uint8_t* data, int size, uint8_t* out) const
 
 AES256CBCEncrypt::~AES256CBCEncrypt()
 {
-    memset(iv.data(), 0, iv.size());
+    memory_cleanse(iv.data(), sizeof(iv));
 }
 
 // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
@@ -203,7 +209,7 @@ int AES256CBCDecrypt::Decrypt(const uint8_t* data, int size, uint8_t* out) const
 
 AES256CBCDecrypt::~AES256CBCDecrypt()
 {
-    memset(iv.data(), 0, iv.size());
+    memory_cleanse(iv.data(), sizeof(iv));
 }
 
 // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
@@ -216,7 +222,7 @@ AES128CBCEncrypt::AES128CBCEncrypt(const key_span key, const block_span ivIn, bo
 
 AES128CBCEncrypt::~AES128CBCEncrypt()
 {
-    memset(iv.data(), 0, AES_BLOCKSIZE);
+    memory_cleanse(iv.data(), sizeof(iv));
 }
 
 int AES128CBCEncrypt::Encrypt(const uint8_t* data, int size, uint8_t* out) const
@@ -234,7 +240,7 @@ AES128CBCDecrypt::AES128CBCDecrypt(const key_span key, const block_span ivIn, bo
 
 AES128CBCDecrypt::~AES128CBCDecrypt()
 {
-    memset(iv.data(), 0, AES_BLOCKSIZE);
+    memory_cleanse(iv.data(), sizeof(iv));
 }
 
 int AES128CBCDecrypt::Decrypt(const uint8_t* data, int size, uint8_t* out) const
