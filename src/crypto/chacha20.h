@@ -6,6 +6,7 @@
 #define BITCOIN_CRYPTO_CHACHA20_H
 
 #include <array>
+#include <concepts>
 #include <cstdint>
 #include <cstdlib>
 #include <span>
@@ -15,16 +16,23 @@ class ChaCha20
 {
     std::array<uint32_t, 16> input;
 
+    void SetKeyImpl(std::span<const uint8_t, 32> k);
+
 public:
     using const_iterator = std::array<uint32_t, 16>::const_iterator;
 
     ChaCha20();
-    ChaCha20(std::span<const uint8_t> key);
 
     const_iterator begin() const noexcept { return input.begin(); }
     const_iterator end() const noexcept { return input.end(); }
 
-    void SetKey(std::span<const uint8_t> key);
+    template<typename T>
+        requires std::convertible_to<const T&, std::span<const uint8_t, 32>>
+    void SetKey(const T& key)
+    {
+        SetKeyImpl(key);
+    }
+
     void SetIV(uint64_t iv);
     void Seek(uint64_t pos);
     void Output(uint8_t* output, size_t bytes);
