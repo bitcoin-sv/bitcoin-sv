@@ -3,7 +3,7 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import msg_block, msg_revokemid, NodeConnCB
+from test_framework.mininode import msg_block, msg_revokemid, P2PEventHandler
 from test_framework.util import create_confirmed_utxos, wait_until
 from test_framework.miner_id import MinerIdKeys, make_miner_id_block
 from decimal import Decimal
@@ -15,7 +15,7 @@ Test P2P handling of the MinerID revokemid message.
 '''
 
 
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
     def __init__(self):
         super().__init__()
         self.revokemid_count = 0
@@ -30,7 +30,7 @@ class RevokeMid(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 3
         self.setup_clean_chain = True
-        self.extra_args = [['-whitelist=127.0.0.1']] * self.num_nodes
+        self.extra_args = [['-whitelist=127.0.0.1', '-minerid=1']] * self.num_nodes
 
         # Setup miner ID keys
         self.minerIdKeys = []
@@ -115,9 +115,9 @@ class RevokeMid(BitcoinTestFramework):
             wait_until(lambda: self.nodes[2].dumpminerids()['miners'][0]['minerids'][0]['state'] == 'REVOKED')
 
             # Check we get the revokmid msg forwarded to us from the 2 peers we didn't initially send it to
-            wait_until(lambda: p2p_0.cb.revokemid_count == 2)
+            wait_until(lambda: p2p_0.transport.cb.revokemid_count == 2)
             time.sleep(1)
-            assert (p2p_0.cb.revokemid_count == 2)
+            assert (p2p_0.transport.cb.revokemid_count == 2)
 
             # Honest node revokes and rotates their stolen key in the next block
             minerIdParams = {

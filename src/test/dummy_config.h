@@ -128,10 +128,15 @@ public:
     void SetDataCarrierSize(uint64_t dataCarrierSizeIn) override
     {
         dataCarrierSize = dataCarrierSizeIn;
+        dummyPolicySettings.SetDataCarrierSize(dataCarrierSizeIn);
     }
 
     bool GetDataCarrier() const override { return dataCarrier; }
-    void SetDataCarrier(bool dataCarrierIn) override { dataCarrier = dataCarrierIn; }
+    void SetDataCarrier(bool dataCarrierIn) override
+    {
+        dataCarrier = dataCarrierIn;
+        dummyPolicySettings.SetDataCarrier(dataCarrierIn);
+    }
 
     bool SetLimitAncestorCount(int64_t /*limitAncestorCount*/,
                                std::string* /*err*/ = nullptr) override
@@ -378,10 +383,21 @@ public:
         return MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE;
     }
 
-    void SetAcceptNonStandardOutput(bool) override {}
+    void SetAcceptNonStandardOutput(bool accept) override
+    {
+        dummyPolicySettings.SetAcceptNonStandardOutput(accept);
+    }
     bool GetAcceptNonStandardOutput(ProtocolEra era) const override
     {
-        return IsProtocolActive(era, ProtocolName::Genesis) ? true : !fRequireStandard;
+        return dummyPolicySettings.GetAcceptNonStandardOutput(era);
+    }
+    void SetRequireStandard(bool require) override
+    {
+        dummyPolicySettings.SetRequireStandard(require);
+    }
+    void SetPermitBareMultisig(bool permit) override
+    {
+        dummyPolicySettings.SetPermitBareMultisig(permit);
     }
 
     bool SetMaxCoinsViewCacheSize(int64_t /*max*/, std::string* err) override
@@ -791,6 +807,22 @@ public:
     uint64_t GetWebhookClientNumThreads() const override
     {
         return rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS;
+    }
+    bool SetWebhookClientMaxResponseBodySize(int64_t /*size*/, std::string* /*err*/ = nullptr) override
+    {
+        return true;
+    }
+    int64_t GetWebhookClientMaxResponseBodySize() const override
+    {
+        return rpc::client::WebhookClientDefaults::DEFAULT_MAX_RESPONSE_BODY_SIZE_BYTES;
+    }
+    bool SetWebhookClientMaxResponseHeadersSize(int64_t /*size*/, std::string* /*err*/ = nullptr) override
+    {
+        return true;
+    }
+    int64_t GetWebhookClientMaxResponseHeadersSize() const override
+    {
+        return rpc::client::WebhookClientDefaults::DEFAULT_MAX_RESPONSE_HEADERS_SIZE_BYTES;
     }
 
     // Double-Spend processing parameters

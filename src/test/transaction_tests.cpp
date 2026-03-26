@@ -314,7 +314,7 @@ BOOST_AUTO_TEST_CASE(test_Get) {
     BOOST_CHECK(
         AreInputsStandard(
             task::CCancellationSource::Make()->GetToken(),
-            testConfig,
+            testConfig.GetConfigScriptPolicy(),
             CTransaction(t1),
             coins,
             0));
@@ -832,44 +832,44 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
     t.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
 
     std::string reason;
-    BOOST_CHECK(IsStandardTx(testConfig, CTransaction(t), 1, reason));
+    BOOST_CHECK(IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
 
     // Check dust with default relay fee:
     Amount nDustThreshold = Amount{1};
     // dust:
     t.vout[0].nValue = nDustThreshold - Amount(1);
-    BOOST_CHECK(!IsStandardTx(testConfig, CTransaction(t), 1, reason));
+    BOOST_CHECK(!IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
     // not dust:
     t.vout[0].nValue = nDustThreshold;
-    BOOST_CHECK(IsStandardTx(testConfig, CTransaction(t), 1, reason));
+    BOOST_CHECK(IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
 
     // Check dust with odd relay fee to verify rounding:
     // nDustThreshold = 182 * 1234 / 1000 * 3
     testConfig.SetDustRelayFee(Amount(1234));
     // dust:
     t.vout[0].nValue = Amount(0);
-    BOOST_CHECK(!IsStandardTx(testConfig, CTransaction(t), 1, reason));
+    BOOST_CHECK(!IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
     // not dust:
     t.vout[0].nValue = Amount(1);
-    BOOST_CHECK(IsStandardTx(testConfig, CTransaction(t), 1, reason));
+    BOOST_CHECK(IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
     testConfig.SetDustRelayFee(DUST_RELAY_TX_FEE);
 
     t.vout[0].scriptPubKey = CScript() << OP_1;
-    BOOST_CHECK(!IsStandardTx(testConfig, CTransaction(t), 1, reason));
+    BOOST_CHECK(!IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
 
     // OP_TRUE, OP_RETURN is not a standard transaction
     t.vout[0].scriptPubKey = CScript() << OP_TRUE << OP_RETURN;
-    BOOST_CHECK(!IsStandardTx(testConfig, CTransaction(t), 1, reason));
+    BOOST_CHECK(!IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
 
     // OP_FALSE OP_RETURN is standard before and after genesis upgrade:
     t.vout[0].scriptPubKey = CScript() << OP_FALSE << OP_RETURN;
-    BOOST_CHECK(IsStandardTx(testConfig, CTransaction(t), testConfig.GetGenesisActivationHeight() - 1 , reason));
-    BOOST_CHECK(IsStandardTx(testConfig, CTransaction(t), testConfig.GetGenesisActivationHeight(), reason));
+    BOOST_CHECK(IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), testConfig.GetGenesisActivationHeight() - 1 , reason));
+    BOOST_CHECK(IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), testConfig.GetGenesisActivationHeight(), reason));
 
     // OP_RETURN is standard only before Genesis upgrade:
     t.vout[0].scriptPubKey = CScript() << OP_RETURN;
-    BOOST_CHECK(IsStandardTx(testConfig, CTransaction(t), testConfig.GetGenesisActivationHeight() - 1 , reason));
-    BOOST_CHECK(!IsStandardTx(testConfig, CTransaction(t), testConfig.GetGenesisActivationHeight(), reason));
+    BOOST_CHECK(IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), testConfig.GetGenesisActivationHeight() - 1 , reason));
+    BOOST_CHECK(!IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), testConfig.GetGenesisActivationHeight(), reason));
 }
 
 void AppendScriptPubKeyToFitTxSize(CMutableTransaction& t, uint64_t txSizeNew)
@@ -920,10 +920,10 @@ BOOST_AUTO_TEST_CASE(test_IsStandard_MaxTxSizePolicy)
 
     // before SetMaxTxSizePolicy
 
-    BOOST_CHECK(IsStandardTx(config, tx_lt_def, genesisActivationHeight - 1, reason));
+    BOOST_CHECK(IsStandardTx(config.GetConfigScriptPolicy(), tx_lt_def, genesisActivationHeight - 1, reason));
 
     reason.clear();
-    BOOST_CHECK(!IsStandardTx(config, tx_gt_def, genesisActivationHeight - 1, reason));
+    BOOST_CHECK(!IsStandardTx(config.GetConfigScriptPolicy(), tx_gt_def, genesisActivationHeight - 1, reason));
     BOOST_CHECK(reason == "tx-size");    
 
 
@@ -933,10 +933,10 @@ BOOST_AUTO_TEST_CASE(test_IsStandard_MaxTxSizePolicy)
     // after SetMaxTxSizePolicy
 
     reason.clear();
-    BOOST_CHECK(!IsStandardTx(config, tx_gt_def, genesisActivationHeight - 1, reason));
+    BOOST_CHECK(!IsStandardTx(config.GetConfigScriptPolicy(), tx_gt_def, genesisActivationHeight - 1, reason));
     BOOST_CHECK(reason == "tx-size");
 
-    BOOST_CHECK(IsStandardTx(config, tx_gt_def, genesisActivationHeight, reason));
+    BOOST_CHECK(IsStandardTx(config.GetConfigScriptPolicy(), tx_gt_def, genesisActivationHeight, reason));
 }
 
 void TestIsStandardWithScriptFactory(const std::function<CScript()>& scriptFactory,
@@ -970,7 +970,7 @@ void TestIsStandardWithScriptFactory(const std::function<CScript()>& scriptFacto
                               "f5d00d4adf73f2dd112ca75cf19754651909becfbe65aed1"
                               "3afb2ab8");
     BOOST_CHECK_EQUAL(TEMP_DATA_CARRIER_SIZE, t.vout[0].scriptPubKey.size());
-    BOOST_CHECK(IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(IsStandardTx(config.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
 
     // TEMP_DATA_CARRIER_SIZE+1-byte TX_NULL_DATA (non-standard)
     t.vout[0].scriptPubKey =
@@ -986,7 +986,7 @@ void TestIsStandardWithScriptFactory(const std::function<CScript()>& scriptFacto
                               "f5d00d4adf73f2dd112ca75cf19754651909becfbe65aed1"
                               "3afb2ab800");
     BOOST_CHECK_EQUAL(TEMP_DATA_CARRIER_SIZE + 1, t.vout[0].scriptPubKey.size());
-    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(!IsStandardTx(config.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
 
     /**
      * Check when a custom value is used for -datacarriersize .
@@ -1002,7 +1002,7 @@ void TestIsStandardWithScriptFactory(const std::function<CScript()>& scriptFacto
                               "271967f1a67130b7105cd6a828e03909a67962e0ea1f61de"
                               "b649f6bc3f4cef3877696e64657878");
     BOOST_CHECK_EQUAL(t.vout[0].scriptPubKey.size(), newMaxSize);
-    BOOST_CHECK(IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(IsStandardTx(config.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
 
     // Max user provided payload size + 1 is non-standard
     t.vout[0].scriptPubKey =
@@ -1012,37 +1012,37 @@ void TestIsStandardWithScriptFactory(const std::function<CScript()>& scriptFacto
                               "271967f1a67130b7105cd6a828e03909a67962e0ea1f61de"
                               "b649f6bc3f4cef3877696e6465787800");
     BOOST_CHECK_EQUAL(t.vout[0].scriptPubKey.size(), newMaxSize + 1);
-    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(!IsStandardTx(config.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
 
     // Clear custom confirguration.
     config.SetDataCarrierSize(DEFAULT_DATA_CARRIER_SIZE);
 
     // Data payload can be encoded in any way...
     t.vout[0].scriptPubKey = scriptFactory() << ParseHex("");
-    BOOST_CHECK(IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(IsStandardTx(config.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
     t.vout[0].scriptPubKey = scriptFactory()
                              << ParseHex("00") << ParseHex("01");
-    BOOST_CHECK(IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(IsStandardTx(config.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
     // OP_RESERVED *is* considered to be a PUSHDATA type opcode by IsPushOnly()!
     t.vout[0].scriptPubKey = scriptFactory() << OP_RESERVED << -1 << 0
                                        << ParseHex("01") << 2 << 3 << 4 << 5
                                        << 6 << 7 << 8 << 9 << 10 << 11 << 12
                                        << 13 << 14 << 15 << 16;
-    BOOST_CHECK(IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(IsStandardTx(config.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
     t.vout[0].scriptPubKey = scriptFactory()
                              << 0 << ParseHex("01") << 2
                              << ParseHex("fffffffffffffffffffffffffffffffffffff"
                                          "fffffffffffffffffffffffffffffffffff");
-    BOOST_CHECK(IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(IsStandardTx(config.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
 
     // ...so long as it only contains PUSHDATA's
     t.vout[0].scriptPubKey = scriptFactory() << OP_RETURN;
-    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(!IsStandardTx(config.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
 
     // TX_NULL_DATA w/o PUSHDATA
     t.vout.resize(1);
     t.vout[0].scriptPubKey = scriptFactory();
-    BOOST_CHECK(IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(IsStandardTx(config.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
 
     // Multiple TX_NULL_DATA are permitted
     t.vout.resize(2);
@@ -1055,18 +1055,18 @@ void TestIsStandardWithScriptFactory(const std::function<CScript()>& scriptFacto
                   << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909"
                               "a67962e0ea1f61deb649f6bc3f4cef38");
 
-    BOOST_CHECK(IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(IsStandardTx(config.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
     t.vout[0].scriptPubKey =
         scriptFactory()
                   << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909"
                               "a67962e0ea1f61deb649f6bc3f4cef38");
     t.vout[1].scriptPubKey = scriptFactory();
     
-    BOOST_CHECK(IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(IsStandardTx(config.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
 
     t.vout[0].scriptPubKey = scriptFactory();
     t.vout[1].scriptPubKey = scriptFactory();
-    BOOST_CHECK(IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(IsStandardTx(config.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
 
     //Check datacarriersize for multiple TX_NULL_DATA
 
@@ -1084,7 +1084,7 @@ void TestIsStandardWithScriptFactory(const std::function<CScript()>& scriptFacto
                               "a67962e0ea1f61deb649f6bc3f4cef38");
 
     BOOST_CHECK_EQUAL(newMaxSize, t.vout[0].scriptPubKey.size() + t.vout[1].scriptPubKey.size());
-    BOOST_CHECK(IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(IsStandardTx(config.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
 
     t.vout[0].scriptPubKey =
         scriptFactory()
@@ -1096,7 +1096,7 @@ void TestIsStandardWithScriptFactory(const std::function<CScript()>& scriptFacto
                               "a67962e0ea1f61deb649f6bc3f4cef38ff");
 
     BOOST_CHECK_EQUAL(newMaxSize + 1, t.vout[0].scriptPubKey.size() + t.vout[1].scriptPubKey.size());
-    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(!IsStandardTx(config.GetConfigScriptPolicy(), CTransaction(t), 1, reason));
     BOOST_CHECK_EQUAL(reason, "datacarrier-size-exceeded");
 }
 

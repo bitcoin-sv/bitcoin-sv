@@ -46,12 +46,12 @@ class AcceptHeaderWithAncestor(BitcoinTestFramework):
             # 2. Connection sends HEADERS msg to bitcoind and waits for GETDATA.
             headers_message = msg_headers()
             headers_message.headers = [CBlockHeader(block_0)]
-            connection.cb.send_message(headers_message)
-            connection.cb.wait_for_getdata()
-            wait_until(lambda: connection.cb.last_message["getdata"].inv[0].hash == block_0.sha256)
+            connection.transport.cb.send_message(headers_message)
+            connection.transport.cb.wait_for_getdata()
+            wait_until(lambda: connection.transport.cb.last_message["getdata"].inv[0].hash == block_0.sha256)
 
             # 3. Connection sends BLOCK to bitcoind.
-            connection.cb.send_message(msg_block(block_0))
+            connection.transport.cb.send_message(msg_block(block_0))
 
             # 4. Bitcoind adds block to active chain.
             wait_for_tip(self.nodes[0], block_0.hash)
@@ -63,25 +63,25 @@ class AcceptHeaderWithAncestor(BitcoinTestFramework):
             # 6. Connection sends HEADERS of the second block to bitcoind. It should be rejected.
             headers_message = msg_headers()
             headers_message.headers = [CBlockHeader(block_2)]
-            connection.cb.send_message(headers_message)
+            connection.transport.cb.send_message(headers_message)
             wait_until(lambda: check_for_log_msg(self, "received header " + block_2.hash + ": missing prev block", "/node0"))
 
             # 7. Connection sends HEADERS of the first block to bitcoind. It should be accepted.
             headers_message = msg_headers()
             headers_message.headers = [CBlockHeader(block_1)]
-            connection.cb.send_message(headers_message)
-            wait_until(lambda: connection.cb.last_message["getdata"].inv[0].hash == block_1.sha256)
+            connection.transport.cb.send_message(headers_message)
+            wait_until(lambda: connection.transport.cb.last_message["getdata"].inv[0].hash == block_1.sha256)
 
             # 8. Connection sends HEADERS of the second block to bitcoind. It should be accepted now that previous block is known.
             headers_message = msg_headers()
             headers_message.headers = [CBlockHeader(block_2)]
-            connection.cb.send_message(headers_message)
-            wait_until(lambda: connection.cb.last_message["getdata"].inv[0].hash == block_2.sha256)
+            connection.transport.cb.send_message(headers_message)
+            wait_until(lambda: connection.transport.cb.last_message["getdata"].inv[0].hash == block_2.sha256)
 
             # 9. Try to send alternative Genesis block (no previous block). It should be rejected.
             genesis_block = create_block(hashprev=0, coinbase=create_coinbase(height=0, outputValue=25))
             genesis_block.solve()
-            connection.cb.send_message(msg_block(genesis_block))
+            connection.transport.cb.send_message(msg_block(genesis_block))
             wait_until(lambda: check_for_log_msg(self, "ERROR: FindPreviousBlockIndex: prev block not found", "/node0"))
 
 

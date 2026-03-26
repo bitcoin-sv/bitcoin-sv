@@ -17,8 +17,9 @@
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 std::unique_ptr<CMerkleTreeFactory> pMerkleTreeFactory = nullptr;
 
-CMerkleTreeStore::CMerkleTreeStore(const fs::path& storePath, size_t leveldbCacheSize)
-    : diskUsage(0), merkleStorePath(storePath), writeIndexToDatabase(false), indexNotLoaded(true), databaseCacheSize(leveldbCacheSize)
+CMerkleTreeStore::CMerkleTreeStore(const fs::path& storePath, size_t leveldbCacheSize):
+    merkleStorePath(storePath), 
+    databaseCacheSize(leveldbCacheSize)
 {
     merkleTreeIndexDB = std::make_unique<CMerkleTreeIndexDB>(merkleStorePath / "index", leveldbCacheSize);
 }
@@ -524,7 +525,7 @@ bool CMerkleTreeStore::ReindexMerkleTreeStoreNL()
 }
 
 CMerkleTreeFactory::CMerkleTreeFactory(const fs::path& storePath, size_t databaseCacheSize, size_t maxNumberOfThreadsForCalculations)
-    :cacheSizeBytes(0), merkleTreeStore(CMerkleTreeStore(storePath, databaseCacheSize)),
+    :merkleTreeStore(CMerkleTreeStore(storePath, databaseCacheSize)),
     merkleTreeThreadPool(std::make_unique<CThreadPool<CQueueAdaptor>>(true, "MerkleTreeThreadPool", maxNumberOfThreadsForCalculations))
 {
     LogPrintf("Using up to %u additional threads for Merkle tree computation\n", maxNumberOfThreadsForCalculations - 1);

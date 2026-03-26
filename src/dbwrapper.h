@@ -80,6 +80,7 @@ public:
     {}
 
     // Access to serialized data
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     const value_type* data() const { return buf_.data() + nReadPos_; }
     size_type size() const { return buf_.size() - nReadPos_; }
 
@@ -170,7 +171,7 @@ private:
         for (size_type i = 0, j = readPos % obfuscate_key_.size(); i != bufSize; i++)
         {
             // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-            buf[i] ^= obfuscate_key_[j++];
+            buf[i] ^= obfuscate_key_[j++]; //NOLINT(*-narrowing-conversions)
 
             // This potentially acts on very many bytes of data, so it's
             // important that we calculate `j`, i.e. the `key` index in this way

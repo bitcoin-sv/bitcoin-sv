@@ -16,7 +16,7 @@ runs:
     - run: |
         ./test/functional/test_runner.py --failfast \
                                          --extended \
-                                         --jobs=5 \
+                                         --jobs=10 \
                                          --output-type=0 \
                                          --exclude=rpcbind_test # IPv6 not detected reliably
                                                                 # on GitHub runners

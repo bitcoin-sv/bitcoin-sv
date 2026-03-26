@@ -20,7 +20,7 @@ T power_binary(T t, Op op, N n)
 // requires I models concept of InputIterator
 // requires R models concept of Semiring
 template<typename I, typename R>
-inline R polynomial_value(I first, I last, R x) // See Note 1.
+inline R polynomial_value(I first, I last, const R& x) // See Note 1.
 {
     if(first == last)
         return R{0};

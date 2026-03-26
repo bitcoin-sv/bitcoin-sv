@@ -429,7 +429,7 @@ public:
         ,validationState(state)
     {}
 
-    ~CScopedInvalidTxSenderBlock()
+    ~CScopedInvalidTxSenderBlock() //NOLINT(bugprone-exception-escape)
     {
         if (validationState.IsValid() || !publisher)
         {

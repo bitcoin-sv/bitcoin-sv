@@ -23,12 +23,13 @@
 
 from time import sleep
 
-from test_framework.mininode import msg_ping, NetworkThread, NodeConn, NodeConnCB
+from test_framework.mininode import msg_ping, P2PHandler, P2PEventHandler
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import p2p_port
 
 
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
     def on_version(self, conn, message):
         # Don't send a verack in response
         pass
@@ -46,14 +47,18 @@ class TimeoutsTest(BitcoinTestFramework):
         self.no_send_node = TestNode()  # never send anything
 
         connections = []
-        connections.append(
-            NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], self.no_verack_node))
-        connections.append(
-            NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], self.no_version_node, send_version=False))
-        connections.append(
-            NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], self.no_send_node, send_version=False))
+        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(0), self.no_verack_node),
+                                      self.nodes[0]))
         self.no_verack_node.add_connection(connections[0])
+
+        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(0), self.no_version_node),
+                                      self.nodes[0],
+                                      send_version=False))
         self.no_version_node.add_connection(connections[1])
+
+        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(0), self.no_send_node),
+                                      self.nodes[0],
+                                      send_version=False))
         self.no_send_node.add_connection(connections[2])
 
         NetworkThread().start()  # Start up network handling in another thread

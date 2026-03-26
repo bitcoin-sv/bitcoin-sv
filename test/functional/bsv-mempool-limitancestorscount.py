@@ -101,7 +101,7 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
 
             def on_reject(conn, msg):
                 rejected_txs.append(msg)
-            conn.cb.on_reject = on_reject
+            conn.transport.cb.on_reject = on_reject
 
             # create oversized primary mempool chain, the last tx in the chain will be over the limit
             last_outpoint = outpoint1
@@ -180,7 +180,7 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
 
             def on_reject(conn, msg):
                 rejected_txs.append(msg)
-            conn.cb.on_reject = on_reject
+            conn.transport.cb.on_reject = on_reject
 
             mining_fee = 1.001 # in satoshi per byte
             relayfee = 0.501  # in satoshi per byte

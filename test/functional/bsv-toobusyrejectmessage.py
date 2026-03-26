@@ -59,11 +59,11 @@ class TooBusyRejectMsgTest(BitcoinTestFramework):
             block = self.prepareBlock()
 
             for connection in connections:
-                connection.cb.on_getdata = on_getdata
+                connection.transport.cb.on_getdata = on_getdata
                 headers_message = msg_headers()
                 headers_message.headers = [CBlockHeader(block)]
-                connection.cb.send_message(headers_message)
-                wait_until(lambda: self.getDataLambda(connection.cb, block.sha256), lock=mininode_lock)
+                connection.transport.cb.send_message(headers_message)
+                wait_until(lambda: self.getDataLambda(connection.transport.cb, block.sha256), lock=mininode_lock)
 
             for key, value in askedFor.items():
                 assert_equal(value, 1)
@@ -77,20 +77,20 @@ class TooBusyRejectMsgTest(BitcoinTestFramework):
             block = self.prepareBlock()
 
             connection = connections[0]
-            connection.cb.on_getdata = on_getdata
+            connection.transport.cb.on_getdata = on_getdata
 
             headers_message = msg_headers()
             headers_message.headers = [CBlockHeader(block)]
 
             begin_test = datetime.datetime.now()
-            connection.cb.send_message(headers_message)
+            connection.transport.cb.send_message(headers_message)
 
-            wait_until(lambda: self.getDataLambda(connection.cb, block.sha256), lock=mininode_lock)
+            wait_until(lambda: self.getDataLambda(connection.transport.cb, block.sha256), lock=mininode_lock)
 
-            connection.cb.last_message["getdata"] = []
+            connection.transport.cb.last_message["getdata"] = []
 
             # Bitcoind asks again after 5 seconds.
-            wait_until(lambda: self.getDataLambda(connection.cb, block.sha256), lock=mininode_lock)
+            wait_until(lambda: self.getDataLambda(connection.transport.cb, block.sha256), lock=mininode_lock)
 
             end_test = datetime.datetime.now()
             assert (end_test - begin_test > datetime.timedelta(seconds=5))

@@ -28,7 +28,8 @@
 #define ARRAYLEN(array) (sizeof(array) / sizeof((array)[0]))
 
 /** Used by SanitizeString() */
-enum SafeChars {
+enum SafeChars // NOLINT(cppcoreguidelines-use-enum-class)
+{
     //!< The full set of allowed chars
     SAFE_CHARS_DEFAULT,
     //!< BIP-0014 subset

@@ -19,13 +19,15 @@ Test the mock double-spend notification endpoint server.
 class CallBackServiceTest():
     def start_server(self):
         self.serverThread = threading.Thread(target=self.server.serve_forever)
-        self.serverThread.deamon = True
+        self.serverThread.daemon = True
         self.serverThread.start()
 
     def kill_server(self):
         self.server.shutdown()
         self.server.server_close()
-        self.serverThread.join()
+        self.serverThread.join(timeout=10)
+        if self.serverThread.is_alive():
+            raise Exception("Server thread did not terminate")
 
     def send_query(self, txid):
         self.conn.request(
@@ -73,7 +75,7 @@ class CallBackServiceTest():
         self.callback_service = "localhost:8080"
 
         #turn on server
-        handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.YES)
+        handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.YES, 0, 0)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
         self.conn = httplib.HTTPConnection(self.callback_service)
@@ -148,7 +150,7 @@ class CallBackServiceTest():
 
         self.kill_server()
 
-        handler = partial(CallbackService, RECEIVE.YES, STATUS.SERVER_ERROR, RESPONSE_TIME.FAST, FLAG.YES)
+        handler = partial(CallbackService, RECEIVE.YES, STATUS.SERVER_ERROR, RESPONSE_TIME.FAST, FLAG.YES, 0, 0)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
 
@@ -163,7 +165,7 @@ class CallBackServiceTest():
 
         self.kill_server()
 
-        handler = partial(CallbackService, RECEIVE.YES, STATUS.CLIENT_ERROR, RESPONSE_TIME.FAST, FLAG.YES)
+        handler = partial(CallbackService, RECEIVE.YES, STATUS.CLIENT_ERROR, RESPONSE_TIME.FAST, FLAG.YES, 0, 0)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
 

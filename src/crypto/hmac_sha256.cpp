@@ -15,6 +15,7 @@ CHMAC_SHA256::CHMAC_SHA256(const uint8_t* key, const size_t keylen)
     if(keylen <= rkey.size())
     {
         memcpy(rkey.data(), key, keylen);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         memset(rkey.data() + keylen, 0, rkey.size() - keylen);
     }
     else
@@ -22,6 +23,7 @@ CHMAC_SHA256::CHMAC_SHA256(const uint8_t* key, const size_t keylen)
         CSHA256()
             .Write(key, keylen)
             .Finalize(CSHA256::span{rkey.data(), CSHA256::OUTPUT_SIZE});
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         memset(rkey.data() + 32, 0, 32);
     }
 

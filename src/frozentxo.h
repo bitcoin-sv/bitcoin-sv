@@ -129,6 +129,7 @@ public:
 private:
     std::int32_t mHeight;
     std::string mSource;
+    //NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const uint256& mPreviousActiveBlockHash;
     std::int64_t mReceivedTime{0};
 

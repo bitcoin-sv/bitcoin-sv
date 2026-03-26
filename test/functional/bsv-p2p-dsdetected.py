@@ -7,7 +7,9 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from io import BytesIO
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.blocktools import make_block, create_tx, send_by_headers, wait_for_tip
-from test_framework.mininode import NodeConnCB, NodeConn, NetworkThread, CTxOut, COIN, msg_dsdetected, CBlockHeader, BlockDetails, DSMerkleProof, MerkleProofNode, FromHex, CBlock
+from test_framework.mininode import P2PEventHandler, P2PHandler, CTxOut, COIN, msg_dsdetected, \
+    CBlockHeader, BlockDetails, DSMerkleProof, MerkleProofNode, FromHex, CBlock
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import p2p_port, assert_equal
 from test_framework.script import CScript, OP_TRUE
 import http.client as httplib
@@ -80,14 +82,16 @@ class DSDetectedTests(BitcoinTestFramework):
     def start_webhook_server(self):
         self.server = HTTPServer(('localhost', 8888), partial(WebHookService))
         self.serverThread = threading.Thread(target=self.server.serve_forever)
-        self.serverThread.deamon = True
+        self.serverThread.daemon = True
         self.serverThread.start()
         self.conn = httplib.HTTPConnection("localhost:8888")
 
     def stop_webhook_server(self):
         self.server.shutdown()
         self.server.server_close()
-        self.serverThread.join()
+        self.serverThread.join(timeout=10)
+        if self.serverThread.is_alive():
+            raise Exception("Server thread did not terminate")
 
     def get_JSON_notification(self):
         # Query webhook server for the JSON notification
@@ -188,8 +192,9 @@ class DSDetectedTests(BitcoinTestFramework):
 
         # Create a P2P connection
         node = self.nodes[0]
-        peer = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), node, peer)
+        peer = P2PEventHandler()
+        connection = P2PHandler(Connection('127.0.0.1', p2p_port(0), peer),
+                                node)
         peer.add_connection(connection)
         NetworkThread().start()
         peer.wait_for_verack()

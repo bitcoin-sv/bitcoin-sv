@@ -26,6 +26,5 @@ public:
     size_t read(size_t read_pos, std::span<uint8_t>);
     size_t size() const;
     [[nodiscard]] size_t readable_size() const { return size(); }
-    void clear(); 
 };
 

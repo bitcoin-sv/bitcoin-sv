@@ -48,7 +48,7 @@ public:
             // Clean up on failure
             if(!m_path.empty())
             {
-                try { fs::remove_all(m_path); } catch (...) {}
+                try { fs::remove_all(m_path); } catch (...) {} // NOLINT(bugprone-empty-catch)
             }
             throw;
         }
@@ -63,9 +63,10 @@ public:
         }
         catch(const std::exception& e)
         {
-            std::cerr << "Warning: failed to remove temporary benchmark datadir " << m_path << ": " << e.what() << std::endl;
+            std::cerr << "Warning: failed to remove temporary benchmark datadir " << m_path << ": " << e.what() << '\n';
         }
-        catch(...) {}
+        catch(...) // NOLINT(bugprone-empty-catch)
+        {}
     }
 
     // Non-copyable, non-movable
@@ -77,7 +78,7 @@ public:
 
 } // namespace
 
-int main(int /*argc*/, char** /*argv*/)
+int main(int /*argc*/, char** /*argv*/) // NOLINT(bugprone-exception-escape)
 {
     SHA256AutoDetect();
     RandomInit();

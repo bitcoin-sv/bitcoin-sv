@@ -16,17 +16,17 @@ on:
 jobs:
   # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
   copilot-setup-steps:
-    runs-on: [ self-hosted, docker, large ]
+    runs-on: arc-runner-svnode
     container:
       image: nchain/svn_dev:ubuntu_22.04
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Benchmark
         uses: ./.github/actions/benchmark/ 
       - name: Select toolset version
         uses: ./.github/actions/select_toolset_version
         with: 
           toolset: clang 
-          version: 19
+          version: 21

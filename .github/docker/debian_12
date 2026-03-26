@@ -18,6 +18,7 @@ RUN set -xeu \
     python3-ecdsa python3-zmq python3-bip32utils \
     git \
     libgoogle-perftools-dev \
+    librocksdb-dev \
     gcc g++
 
 RUN set -xeu \

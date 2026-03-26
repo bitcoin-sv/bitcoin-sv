@@ -64,8 +64,6 @@ void GlobalConfig::Reset()
 
     data->mPTVTaskScheduleStrategy = DEFAULT_PTV_TASK_SCHEDULE_STRATEGY;
 
-    data->mAcceptNonStandardOutput = true;
-
     data->mMaxCoinsViewCacheSize = 0;
     data->mMaxCoinsProviderCacheSize = DEFAULT_COINS_PROVIDER_CACHE_SIZE;
     data->mMaxCoinsDBFileSize = CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE;
@@ -126,6 +124,8 @@ void GlobalConfig::Reset()
 
     // RPC parameters
     data->webhookClientNumThreads = rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS;
+    data->webhookClientMaxResponseBodySize = rpc::client::WebhookClientDefaults::DEFAULT_MAX_RESPONSE_BODY_SIZE_BYTES;
+    data->webhookClientMaxResponseHeadersSize = rpc::client::WebhookClientDefaults::DEFAULT_MAX_RESPONSE_HEADERS_SIZE_BYTES;
 
     // Double-Spend parameters
     data->dsNotificationLevel = DSAttemptHandler::DEFAULT_NOTIFY_LEVEL;
@@ -394,6 +394,9 @@ bool GlobalConfig::GetDataCarrier() const {
     return data->scriptPolicysettings.GetDataCarrier();
 }
 
+void GlobalConfig::SetPermitBareMultisig(bool permit) {
+    data->scriptPolicysettings.SetPermitBareMultisig(permit);
+}
 
 bool  GlobalConfig::SetLimitAncestorCount(int64_t limitAncestorCountIn, std::string* err) {
     if (limitAncestorCountIn <= 0)
@@ -843,12 +846,17 @@ uint64_t GlobalConfig::GetMaxScriptNumLength(ProtocolEra era, bool isConsensus) 
 
 void GlobalConfig::SetAcceptNonStandardOutput(bool accept)
 {
-    data->mAcceptNonStandardOutput = accept;
+    data->scriptPolicysettings.SetAcceptNonStandardOutput(accept);
 }
 
 bool GlobalConfig::GetAcceptNonStandardOutput(ProtocolEra era) const
 {
-    return IsProtocolActive(era, ProtocolName::Genesis) ? data->mAcceptNonStandardOutput : !fRequireStandard;
+    return data->scriptPolicysettings.GetAcceptNonStandardOutput(era);
+}
+
+void GlobalConfig::SetRequireStandard(bool require)
+{
+    data->scriptPolicysettings.SetRequireStandard(require);
 }
 
 bool GlobalConfig::SetMaxCoinsViewCacheSize(int64_t max, std::string* err)
@@ -1548,6 +1556,46 @@ bool GlobalConfig::SetWebhookClientNumThreads(int64_t num, std::string* err)
 uint64_t GlobalConfig::GetWebhookClientNumThreads() const
 {
     return data->webhookClientNumThreads;
+}
+
+bool GlobalConfig::SetWebhookClientMaxResponseBodySize(int64_t size, std::string* err)
+{
+    if(size < 0)
+    {
+        if(err)
+        {
+            *err = "Webhook client maximum response body size must be greater than or equal to 0 (0 = unlimited).";
+        }
+        return false;
+    }
+
+    data->webhookClientMaxResponseBodySize = size;
+    return true;
+}
+
+int64_t GlobalConfig::GetWebhookClientMaxResponseBodySize() const
+{
+    return data->webhookClientMaxResponseBodySize;
+}
+
+bool GlobalConfig::SetWebhookClientMaxResponseHeadersSize(int64_t size, std::string* err)
+{
+    if(size < 0)
+    {
+        if(err)
+        {
+            *err = "Webhook client maximum response headers size must be greater than or equal to 0 (0 = unlimited).";
+        }
+        return false;
+    }
+
+    data->webhookClientMaxResponseHeadersSize = size;
+    return true;
+}
+
+int64_t GlobalConfig::GetWebhookClientMaxResponseHeadersSize() const
+{
+    return data->webhookClientMaxResponseHeadersSize;
 }
 
 // Double-Spend Parameters

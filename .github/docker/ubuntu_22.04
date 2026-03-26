@@ -6,9 +6,9 @@ FROM ubuntu:22.04
 ENV TZ=Europe/London \
     DEBIAN_FRONTEND=noninteractive
 
-ARG clang_version=19
+ARG clang_version=21
 
-# Install packages, build Boost, and install Python packages in one layer
+# Install core packages
 RUN set -xeu \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -32,14 +32,20 @@ RUN set -xeu \
         sysbench \
         zstd \
         ca-certificates \
-    && pip install --no-cache-dir flake8 \
+    && pip install --no-cache-dir flake8
+
+# Build Boost
+RUN set -xeu \
     && wget -O boost.tar.gz https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.gz \
     && tar -xzf boost.tar.gz \
     && cd boost_1_86_0 \
     && ./bootstrap.sh \
     && ./b2 install \
     && cd .. \
-    && rm -rf boost_1_86_0 boost.tar.gz \
+    && rm -rf boost_1_86_0 boost.tar.gz
+
+# Clang and clang-tidy
+RUN set -xeu \
     && wget -O llvm.sh https://apt.llvm.org/llvm.sh \
     && chmod +x llvm.sh \
     && ./llvm.sh $clang_version \
@@ -52,7 +58,10 @@ RUN set -xeu \
         --install /usr/bin/clang-tidy clang-tidy \
         /usr/bin/clang-tidy-$clang_version $clang_version \
     && git clone --depth=1 https://github.com/brendangregg/FlameGraph.git \
-    && rm -rf FlameGraph/.git \
+    && rm -rf FlameGraph/.git
+
+# GitHub CLI
+RUN set -xeu \
     && mkdir -p -m 755 /etc/apt/keyrings \
     && wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg \
         | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
@@ -62,7 +71,17 @@ RUN set -xeu \
              https://cli.github.com/packages stable main" \
         | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
     && apt-get update \
-    && apt-get install -y --no-install-recommends gh \
+    && apt-get install -y --no-install-recommends gh
+
+# Noble RocksDB
+RUN set -xeu \
+    && echo "deb http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse" \
+        | tee /etc/apt/sources.list.d/noble-rocksdb.list > /dev/null \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends -t noble librocksdb-dev
+
+# Tidy up
+RUN set -xeu \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && find /usr/local -name "*.pyc" -delete \

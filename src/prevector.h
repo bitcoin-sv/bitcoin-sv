@@ -45,6 +45,7 @@
  * The data type T must be movable by memmove/realloc(). Once we switch to C++,
  * move constructors can be used instead.
  */
+// NOLINTBEGIN(bugprone-multi-level-implicit-pointer-conversion)
 // NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
 // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 template <unsigned int N, typename T, typename Size = uint64_t,
@@ -282,6 +283,7 @@ private:
                 T *indirect = indirect_ptr(0);
                 T *src = indirect;
                 T *dst = direct_ptr(0);
+                //NOLINTNEXTLINE(bugprone-bitwise-pointer-cast)
                 memcpy(dst, src, size() * sizeof(T));
                 // NOLINTNEXTLINE(cppcoreguidelines-no-malloc, cppcoreguidelines-owning-memory)
                 free(indirect);
@@ -308,6 +310,7 @@ private:
                 T *src = direct_ptr(0);
                 // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                 T *dst = reinterpret_cast<T *>(new_indirect);
+                //NOLINTNEXTLINE(bugprone-bitwise-pointer-cast)
                 memcpy(dst, src, size() * sizeof(T));
                 _union.other.indirect = new_indirect;
                 _union.other.capacity = new_capacity;
@@ -603,5 +606,6 @@ public:
 };
 // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 // NOLINTEND(cppcoreguidelines-pro-type-union-access)
+// NOLINTEND(bugprone-multi-level-implicit-pointer-conversion)
 
 #endif

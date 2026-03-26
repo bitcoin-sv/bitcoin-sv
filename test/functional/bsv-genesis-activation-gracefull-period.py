@@ -77,7 +77,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
             if msg.message == b'tx':
                 rejected_txs.append(msg)
 
-        self.test.connections[0].cb.on_reject = on_reject
+        self.test.connections[0].transport.cb.on_reject = on_reject
 
         # shorthand for functions
         block = self.chain.next_block
@@ -113,7 +113,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         self.restart_network()
         # TODO: This sleep needs to be replaced with a proper wait_until function
         sleep(3)
-        self.test.connections[0].cb.on_reject = on_reject
+        self.test.connections[0].transport.cb.on_reject = on_reject
 
         # generate a block, height is genesis gracefull height - 2
         block(1)
@@ -365,7 +365,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         self.restart_network()
         # TODO: This sleep needs to be replaced with a proper wait_until function
         sleep(3)
-        self.test.connections[0].cb.on_reject = on_reject
+        self.test.connections[0].transport.cb.on_reject = on_reject
 
         # Create transaction with OP_NOP that exceeds policy limits to check that node does not get banned for exceeding our policy limit
         txPubKeys = create_transaction(out[16].tx, out[16].n, b'', 100004, CScript([OP_TRUE] + [OP_NOP] * 1001))

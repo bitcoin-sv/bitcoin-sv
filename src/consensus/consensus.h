@@ -82,7 +82,8 @@ static const int CONFISCATION_MATURITY = 1000;
 static const uint64_t DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS = INT64_MAX;
 
 /** Flags for nSequence and nLockTime locks */
-enum {
+enum // NOLINT(cppcoreguidelines-use-enum-class)
+{
     /* Interpret sequence numbers as relative lock-time constraints. */
     LOCKTIME_VERIFY_SEQUENCE = (1 << 0),
 

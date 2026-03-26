@@ -2,6 +2,7 @@ Checks: '-clang-analyzer-*,
 
          -bugprone-empty-catch,
          -bugprone-implicit-widening-of-multiplication-result,
+         -bugprone-unchecked-optional-access,
 
          -cert-err58-cpp,
 

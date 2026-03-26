@@ -66,7 +66,7 @@ class CMerkleTreeIndexDBIterator
 private:
 
     std::unique_ptr<CDBIterator> iterator;
-    const char recordPrefix;
+    const char recordPrefix; //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 
 public:
     /**

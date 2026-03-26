@@ -9,6 +9,7 @@
 #include "crypto/sha256.h"
 
 #include "miner_id/miner_info_error.h"
+#include "utilstrencodings.h"
 #include "miner_info.h"
 #include "pubkey.h"
 #include "script/instruction_iterator.h"
@@ -357,7 +358,9 @@ std::variant<miner_info_doc, miner_info_error> ParseMinerInfoDoc(
     if(version != "0.3")
         return miner_info_error::doc_parse_error_unsupported_version;
     
-    const auto height = doc["height"].get_int();
+    int32_t height{};
+    if(!ParseInt32(doc["height"].getValStr(), &height))
+        return miner_info_error::doc_parse_error_invalid_height;
     if(height <= 0)
         return miner_info_error::doc_parse_error_invalid_height;
 

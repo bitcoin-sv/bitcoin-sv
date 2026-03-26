@@ -452,7 +452,7 @@ class ReorgTests(BitcoinTestFramework):
         actual_tip = get_tip(conn)
         assert expected_tip["hash"] == actual_tip["hash"]
 
-        conn.cb.sync_with_ping()
+        conn.transport.cb.sync_with_ping()
         mempool_txs = []
         # make sure that JBA has catched up
         for i in range(5):

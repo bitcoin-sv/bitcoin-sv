@@ -26,7 +26,7 @@ static void DeserializeBlockTest(benchmark::State &state) {
                            block_bench::block413567)],
                        SER_NETWORK, PROTOCOL_VERSION);
     // NOLINTEND(cppcoreguidelines-pro-type-cstyle-cast)
-    char a; // NOLINT(cppcoreguidelines-init-variables)
+    char a{};
     stream.write(&a, 1); // Prevent compaction
 
     while (state.KeepRunning()) {
@@ -43,7 +43,7 @@ static void DeserializeAndCheckBlockTest(benchmark::State &state) {
                            block_bench::block413567)],
                        SER_NETWORK, PROTOCOL_VERSION);
     // NOLINTEND(cppcoreguidelines-pro-type-cstyle-cast)
-    char a; // NOLINT(cppcoreguidelines-init-variables)
+    char a{};
     stream.write(&a, 1); // Prevent compaction
 
     SelectParams(CBaseChainParams::MAIN);

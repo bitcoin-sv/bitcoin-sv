@@ -97,9 +97,13 @@ static inline void DeleteLock(void* /*cs*/) {}
  * TODO: We should move away from using the recursive lock by default.
  */
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
-class CCriticalSection : public AnnotatedMixin<boost::recursive_mutex> {
+class CCriticalSection : public AnnotatedMixin<boost::recursive_mutex>
+{
 public:
-    ~CCriticalSection() { DeleteLock((void *)this); }
+    ~CCriticalSection() //NOLINT(bugprone-exception-escape)
+    {
+        DeleteLock((void*)this);
+    }
 };
 
 typedef CCriticalSection CDynamicCriticalSection;

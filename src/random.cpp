@@ -59,6 +59,9 @@
     std::abort();
 }
 
+// NOLINTBEGIN(cppcoreguidelines-init-variables)
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
 static inline int64_t GetPerformanceCounter() {
 // Read the hardware time stamp counter when available.
 // See https://en.wikipedia.org/wiki/Time_Stamp_Counter for more information.
@@ -75,7 +78,7 @@ static inline int64_t GetPerformanceCounter() {
     __asm__ volatile("rdtsc"
                      : "=a"(r1),
                        "=d"(r2)); // Constrain r1 to rax and r2 to rdx.
-    return (r2 << 32) | r1;
+    return (r2 << 32) | r1;  // NOLINT(*-narrowing-conversions)
 #else
     // Fall back to using C++11 clock (usually microsecond or nanosecond
     // precision)
@@ -197,7 +200,7 @@ static void RandAddSeedPerfmon() {
 void GetDevURandom(uint8_t *ent32) {
     assert(ent32 != nullptr);
     #ifndef __EMSCRIPTEN__
-        int f = open("/dev/urandom", O_RDONLY);
+        int f = open("/dev/urandom", O_RDONLY);  // NOLINT(cppcoreguidelines-pro-type-vararg)
         if (f == -1) {
             RandFailure();
         }
@@ -208,7 +211,7 @@ void GetDevURandom(uint8_t *ent32) {
                 close(f);
                 RandFailure();
             }
-            have += n;
+            have += n; //NOLINT(*narrowing-conversions)
         } while (have < NUM_OS_RANDOM_BYTES);
         close(f);
     #else
@@ -316,57 +319,61 @@ void RandAddSeedSleep() {
 }
 
 static std::mutex cs_rng_state;
-static uint8_t rng_state[32] = {0};
+static std::array<uint8_t, 32> rng_state{0};
 static uint64_t rng_counter = 0;
 
-static void AddDataToRng(void *data, size_t len) {
+static void AddDataToRng(void* data, size_t len)
+{
     CSHA512 hasher;
-    hasher.Write((const uint8_t *)&len, sizeof(len));
-    hasher.Write((const uint8_t *)data, len);
-    uint8_t buf[64];
+    hasher.Write((const uint8_t *)&len, sizeof(len)); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+    hasher.Write((const uint8_t *)data, len);         // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+    std::array<uint8_t, 64> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
     {
         std::unique_lock<std::mutex> lock(cs_rng_state);
-        hasher.Write(rng_state, sizeof(rng_state));
+        hasher.Write(rng_state.data(), sizeof(rng_state));
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         hasher.Write((const uint8_t *)&rng_counter, sizeof(rng_counter));
         ++rng_counter;
         hasher.Finalize(buf);
-        memcpy(rng_state, buf + 32, 32);
+        memcpy(rng_state.data(), buf.data() + 32, 32);
     }
-    memory_cleanse(buf, 64);
+    memory_cleanse(buf.data(), sizeof(buf));
 }
 
-void GetStrongRandBytes(uint8_t *out, int num) {
+void GetStrongRandBytes(uint8_t *out, int num)
+{
     assert(num <= 32);
     CSHA512 hasher;
-    uint8_t buf[64];
+    std::array<uint8_t, 64> buf; // NOLINT(cppcoreguidelines-pro-type-member-init)
 
     // First source: OpenSSL's RNG
     RandAddSeedPerfmon();
-    GetRandBytes(buf, 32);
-    hasher.Write(buf, 32);
+    GetRandBytes(buf.data(), 32);
+    hasher.Write(buf.data(), 32);
 
     // Second source: OS RNG
-    GetOSRand(buf);
-    hasher.Write(buf, 32);
+    GetOSRand(buf.data());
+    hasher.Write(buf.data(), 32);
 
     // Third source: HW RNG, if available.
-    if (GetHWRand(buf)) {
-        hasher.Write(buf, 32);
+    if (GetHWRand(buf.data())) {
+        hasher.Write(buf.data(), 32);
     }
 
     // Combine with and update state
     {
         std::unique_lock<std::mutex> lock(cs_rng_state);
-        hasher.Write(rng_state, sizeof(rng_state));
+        hasher.Write(rng_state.data(), sizeof(rng_state));
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         hasher.Write((const uint8_t *)&rng_counter, sizeof(rng_counter));
         ++rng_counter;
         hasher.Finalize(buf);
-        memcpy(rng_state, buf + 32, 32);
+        memcpy(rng_state.data(), buf.data() + 32, 32);
     }
 
     // Produce output
-    memcpy(out, buf, num);
-    memory_cleanse(buf, 64);
+    memcpy(out, buf.data(), num);
+    memory_cleanse(buf.data(), sizeof(buf));
 }
 
 uint64_t GetRand(uint64_t nMax) {
@@ -378,18 +385,23 @@ uint64_t GetRand(uint64_t nMax) {
     // every possible output value an equal possibility
     uint64_t nRange = (std::numeric_limits<uint64_t>::max() / nMax) * nMax;
     uint64_t nRand = 0;
-    do {
+    do
+    {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         GetRandBytes((uint8_t *)&nRand, sizeof(nRand));
     } while (nRand >= nRange);
     return (nRand % nMax);
 }
 
-int GetRandInt(int nMax) {
-    return GetRand(nMax);
+int GetRandInt(int nMax)
+{
+    return GetRand(nMax); // NOLINT(*-narrowing-conversions)
 }
 
-uint256 GetRandHash() {
+uint256 GetRandHash()
+{
     uint256 hash;
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     GetRandBytes((uint8_t *)&hash, sizeof(hash));
     return hash;
 }
@@ -405,7 +417,7 @@ uint256 FastRandomContext::rand256() {
         FillByteBuffer();
     }
     uint256 ret;
-    memcpy(ret.begin(), bytebuf + 64 - bytebuf_size, 32);
+    memcpy(ret.begin(), bytebuf.data() + sizeof(bytebuf) - bytebuf_size, 32);
     bytebuf_size -= 32;
     return ret;
 }
@@ -418,10 +430,8 @@ std::vector<uint8_t> FastRandomContext::randbytes(size_t len) {
     return ret;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 FastRandomContext::FastRandomContext(const uint256& seed)
-    : requires_seed(false),
-      bytebuf_size(0),
-      bitbuf_size(0)
 {
     rng.SetKey(std::span{seed.begin(), 32});
 }
@@ -434,22 +444,25 @@ bool Random_SanityCheck() {
      * of tries.
      */
     static const ssize_t MAX_TRIES = 1024;
-    uint8_t data[NUM_OS_RANDOM_BYTES];
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+    std::array<uint8_t, NUM_OS_RANDOM_BYTES> data;
     /* Tracks which bytes have been overwritten at least once */
-    bool overwritten[NUM_OS_RANDOM_BYTES] = {};
+    std::array<bool, NUM_OS_RANDOM_BYTES> overwritten{};
     int num_overwritten;
     int tries = 0;
     /* Loop until all bytes have been overwritten at least once, or max number
      * tries reached */
     do {
-        memset(data, 0, NUM_OS_RANDOM_BYTES);
-        GetOSRand(data);
-        for (int x = 0; x < NUM_OS_RANDOM_BYTES; ++x) {
+        memset(data.data(), 0, sizeof(data));
+        GetOSRand(data.data());
+        for (int x = 0; x < ssize(data); ++x) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             overwritten[x] |= (data[x] != 0);
         }
 
         num_overwritten = 0;
-        for (int x = 0; x < NUM_OS_RANDOM_BYTES; ++x) {
+        for (int x = 0; x < ssize(overwritten); ++x) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
             if (overwritten[x]) {
                 num_overwritten += 1;
             }
@@ -469,14 +482,18 @@ bool Random_SanityCheck() {
     if (stop == start) return false;
 
     // We called GetPerformanceCounter. Use it as entropy.
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-cstyle-cast)
     RAND_add((const uint8_t *)&start, sizeof(start), 1);
     RAND_add((const uint8_t *)&stop, sizeof(stop), 1);
+    // NOLINTEND(cppcoreguidelines-pro-type-cstyle-cast)
 
     return true;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 FastRandomContext::FastRandomContext(bool fDeterministic)
-    : requires_seed(!fDeterministic), bytebuf_size(0), bitbuf_size(0) {
+    : requires_seed(!fDeterministic)
+{
     if (!fDeterministic) {
         return;
     }
@@ -484,6 +501,10 @@ FastRandomContext::FastRandomContext(bool fDeterministic)
     rng.SetKey(std::span{seed.begin(), 32});
 }
 
+// NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+// NOLINTEND(cppcoreguidelines-init-variables)
+
 void RandomInit() {
     RDRandInit();
 }
+

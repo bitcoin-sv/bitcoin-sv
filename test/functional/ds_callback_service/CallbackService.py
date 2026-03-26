@@ -39,11 +39,13 @@ receivedProofs = []
 
 class CallbackService(BaseHTTPRequestHandler):
 
-    def __init__(self, receive, status, response_time, add_flag, *args, **kwargs):
+    def __init__(self, receive, status, response_time, add_flag, response_body_size, response_header_size, *args, **kwargs):
         self.receive = receive
         self.status = status
         self.response_time = response_time
         self.add_flag = add_flag
+        self.response_body_size = response_body_size
+        self.response_header_size = response_header_size
         super().__init__(*args, **kwargs)
 
     def do_GET(self):
@@ -164,7 +166,21 @@ class CallbackService(BaseHTTPRequestHandler):
                     if (txid in expectedProofs):
                         self.send_response(200)
                         self.send_header('x-bsv-dsnt', 1)
-                        self.end_headers()
+                        if (self.response_body_size > 0):
+                            self.send_header('Content-Type', 'application/octet-stream')
+                            self.send_header('Content-Length', str(self.response_body_size))
+
+                        try:
+                            if (self.response_header_size > 0):
+                                self.send_header('bsv-junk', 'a' * self.response_header_size)
+                            self.end_headers()
+
+                            if (self.response_body_size > 0):
+                                junk = b'\x00' * self.response_body_size
+                                self.wfile.write(junk)
+                        except (BrokenPipeError, ConnectionResetError):
+                            print("*** Client closed the connection before receiving the full response.")
+
                         expectedProofs.remove(txid)
                         receivedProofs.append(txid)
                         return

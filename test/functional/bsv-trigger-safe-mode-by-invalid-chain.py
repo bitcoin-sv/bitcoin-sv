@@ -98,7 +98,7 @@ class TriggerSafeModeByIvalidChain(BitcoinTestFramework):
 
             # make sure that block is processed before doing any aserts by waiting for reject
             # we cannot use sync_with_ping here because we sent invalid block and connection will be banned and closed
-            conn2.cb.wait_for_reject()
+            conn2.transport.cb.wait_for_reject()
 
             # active tip should still be from branch 1 and branch 2 should be invalid
             wait_for_tip(conn1, branch_1_blocks[-1].hash)

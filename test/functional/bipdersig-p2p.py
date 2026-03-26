@@ -9,7 +9,7 @@ Test that the DERSIG soft-fork activates at (regtest) height 1251.
 
 from test_framework.blocktools import create_coinbase, create_block
 from test_framework.mininode import CTransaction, mininode_lock, msg_block, \
-    NetworkThread, NodeConn, NodeConnCB, hex_str_to_bytes
+    P2PHandler, hex_str_to_bytes
 from test_framework.script import CScript
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, p2p_port, wait_until
@@ -61,15 +61,7 @@ class BIP66Test(BitcoinTestFramework):
         self.setup_clean_chain = True
 
     def run_test(self):
-        node0 = NodeConnCB()
-        connections = []
-        connections.append(
-            NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node0))
-        node0.add_connection(connections[0])
-        NetworkThread().start()  # Start up network handling in another thread
-
-        # wait_for_verack ensures that the P2P connection is fully up.
-        node0.wait_for_verack()
+        node0 = P2PHandler.connect('127.0.0.1', p2p_port(0), self.nodes[0])
 
         self.log.info("Mining %d blocks", DERSIG_HEIGHT - 1)
         self.coinbase_blocks = self.nodes[0].generate(DERSIG_HEIGHT - 1)

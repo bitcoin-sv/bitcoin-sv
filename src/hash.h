@@ -31,6 +31,7 @@ public:
     using span = std::span<uint8_t, OUTPUT_SIZE>;
     void Finalize(span hash)
     {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
         std::array<uint8_t, CSHA256::OUTPUT_SIZE> buf;
         sha.Finalize(buf);
         sha.Reset().Write(buf.data(), CSHA256::OUTPUT_SIZE)
@@ -59,6 +60,7 @@ public:
 
     void Finalize(span hash)
     {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
         std::array<uint8_t, CSHA256::OUTPUT_SIZE> buf;
         sha.Finalize(buf);
         CRIPEMD160().Write(buf.data(), CSHA256::OUTPUT_SIZE).Finalize(hash);
@@ -82,9 +84,11 @@ inline uint256 Hash(const T1 pbegin, const T1 pend)
     static const std::array<uint8_t, 1> pblank{};
     uint256 result;
     CHash256()
+        //NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         .Write(pbegin == pend ? pblank.data() : (const uint8_t*)&pbegin[0],
                static_cast<size_t>(pend - pbegin) * sizeof(pbegin[0]))
         .Finalize(CHash256::span{result});
+        //NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     return result;
 }
 
@@ -95,11 +99,13 @@ inline uint256 Hash(const T1 p1begin, const T1 p1end, const T2 p2begin, const T2
     static const std::array<uint8_t, 1> pblank{};
     uint256 result;
     CHash256()
+        //NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         .Write(p1begin == p1end ? pblank.data() : (const uint8_t *)&p1begin[0],
                static_cast<size_t>(p1end - p1begin) * sizeof(p1begin[0]))
         .Write(p2begin == p2end ? pblank.data() : (const uint8_t *)&p2begin[0],
                static_cast<size_t>(p2end - p2begin) * sizeof(p2begin[0]))
         .Finalize(CHash256::span{result.begin(), CHash256::OUTPUT_SIZE});
+        //NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     return result;
 }
 
@@ -133,9 +139,11 @@ inline uint160 Hash160(const T1 pbegin, const T1 pend)
     static std::array<uint8_t, 1> pblank{};
     uint160 result;
     CHash160()
+        //NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         .Write(pbegin == pend ? pblank.data() : (const uint8_t*)&pbegin[0],
                static_cast<size_t>(pend - pbegin) * sizeof(pbegin[0]))
         .Finalize(CHash160::span{result});
+        //NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     return result;
 }
 
@@ -207,6 +215,7 @@ public:
 
     void ignore(size_t nSize)
     {
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
         std::array<char, 1024> data;
         while(nSize > 0)
         {

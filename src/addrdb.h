@@ -17,7 +17,8 @@ class CAddrMan;
 class CDataStream;
 class CChainParams;
 
-typedef enum BanReason {
+typedef enum BanReason //NOLINT(cppcoreguidelines-use-enum-class)
+{
     BanReasonUnknown = 0,
     BanReasonNodeMisbehaving = 1,
     BanReasonManuallyAdded = 2

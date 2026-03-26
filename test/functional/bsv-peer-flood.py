@@ -8,7 +8,8 @@ Test node handling for a peer that floods it with small msgs while not
 reading our responses.
 '''
 
-from test_framework.mininode import NodeConn, NodeConnCB, NetworkThread, mininode_lock, READ_BUFFER_SIZE, ser_uint256
+from test_framework.transport import NetworkThread, Connection
+from test_framework.mininode import P2PHandler, P2PEventHandler, ser_uint256
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import p2p_port, wait_until, check_for_log_msg
 
@@ -29,30 +30,20 @@ class msg_badblocktxn():
         return r
 
 
-class TestConn(NodeConn):
-
-    def __init__(self, dstaddr, dstport, rpc, callback):
-        super().__init__(dstaddr, dstport, rpc, callback)
+# Custom Connection that allows pausing reads
+class PausableConnection(Connection):
+    def __init__(self, dstaddr, dstport, callback):
+        super().__init__(dstaddr, dstport, callback)
         self.do_reading = True
 
     def drain_buffer(self):
-        with mininode_lock:
-            t = self.recv(READ_BUFFER_SIZE)
-            if len(t) > 0:
-                self.recvbuf += t
-
-        while True:
-            msg = self.got_data()
-            if msg is None:
-                break
-
         self.do_reading = True
-        super().handle_read()
+        super().read()
 
     # Override read method so we can ignore incoming responses
-    def handle_read(self):
+    def read(self):
         if self.do_reading:
-            super().handle_read()
+            super().read()
 
 
 class PeerFlood(BitcoinTestFramework):
@@ -68,16 +59,16 @@ class PeerFlood(BitcoinTestFramework):
         self.nodes[0].generate(1)
 
         # Create P2P connections to node
-        test_node = NodeConnCB()
-        connection = TestConn('127.0.0.1', p2p_port(0), self.nodes[0], test_node)
-        test_node.add_connection(connection)
+        test_node = P2PEventHandler()
+        pausable_conn = PausableConnection('127.0.0.1', p2p_port(0), test_node)
+        test_node.add_connection(P2PHandler(pausable_conn, self.nodes[0]))
 
         # Start up network handling in another thread
         NetworkThread().start()
         test_node.wait_for_verack()
 
         # Tell connection to start ignoring incoming data
-        connection.do_reading = False
+        pausable_conn.do_reading = False
 
         # Send message flood to node in another thread
         bad_msg = msg_badblocktxn()
@@ -96,7 +87,7 @@ class PeerFlood(BitcoinTestFramework):
         send_thread.join()
 
         # Once we stop flooding and if we re-start reading, node will clear its backlog
-        connection.drain_buffer()
+        pausable_conn.drain_buffer()
 
         def send_recv_done():
             pi0 = self.nodes[0].getpeerinfo()[0]

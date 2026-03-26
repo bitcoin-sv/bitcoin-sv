@@ -318,6 +318,7 @@ bool CPubKey::Derive(CPubKey &pubkeyChild, ChainCode &ccChild,
 void CExtPubKey::Encode(const std::span<uint8_t, BIP32_EXTKEY_SIZE> code) const
 {
     code[0] = nDepth;
+    //NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     memcpy(code.data() + 1, vchFingerprint.data(), 4);
     code[5] = (nChild >> 24) & 0xFF;
     code[6] = (nChild >> 16) & 0xFF;
@@ -326,16 +327,19 @@ void CExtPubKey::Encode(const std::span<uint8_t, BIP32_EXTKEY_SIZE> code) const
     memcpy(code.data() + 9, chaincode.begin(), 32);
     assert(pubkey.size() == 33);
     memcpy(code.data() + 41, pubkey.data(), 33);
+    //NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 }
 
 void CExtPubKey::Decode(const std::span<const uint8_t, BIP32_EXTKEY_SIZE> code)
 {
     nDepth = code[0];
+    //NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     memcpy(vchFingerprint.data(), code.data() + 1, 4);
     nChild = (code[5] << 24) | (code[6] << 16) | (code[7] << 8) | code[8];
     memcpy(chaincode.begin(), code.data() + 9, 32);
     pubkey.Set(code.data() + 41,
                code.data() + BIP32_EXTKEY_SIZE);
+    //NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 }
 
 bool CExtPubKey::Derive(CExtPubKey &out, unsigned int _nChild) const {

@@ -27,11 +27,17 @@ Test badly behaving double-spend endpoints:
 3) Endpoint that is always slow.
 4) Server is too slow to work with.
 5) Server doesn't contain x-bsv-dsnt in header.
+6) Server sends oversized message body.
+7) Server sends oversized headers section.
 '''
 
 # 127.0.0.1 as network-order bytes
 LOCAL_HOST_IP = 0x7F000001
 WRONG_IP = 0x7F000002
+
+# Maximum webhook response message body & header size
+MAX_BODY_SIZE = 1024
+MAX_HEADER_SIZE = 1024
 
 
 class DoubleSpendHandlerErrors(BitcoinTestFramework):
@@ -42,20 +48,18 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.callback_service = "localhost:8080"
-        self.extra_args = [['-dsendpointport=8080',
-                            '-banscore=100000',
-                            '-genesisactivationheight=1'
-                            ]]
 
     def start_server(self):
         self.serverThread = threading.Thread(target=self.server.serve_forever)
-        self.serverThread.deamon = True
+        self.serverThread.daemon = True
         self.serverThread.start()
 
     def kill_server(self):
         self.server.shutdown()
         self.server.server_close()
-        self.serverThread.join()
+        self.serverThread.join(timeout=10)
+        if self.serverThread.is_alive():
+            raise Exception("Server thread did not terminate")
 
     def create_and_send_transaction(self, inputs, outputs):
         tx = CTransaction()
@@ -125,9 +129,10 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
         utxo = self.nodes[0].listunspent()
 
         self.stop_node(0)
-        with self.run_node_with_connections("Server returning 400", 0, ['-dsendpointport=8080'], 1) as p2p_connections:
+        extra_args = ['-dsendpointport=8080', '-dsnotifylevel=1']
+        with self.run_node_with_connections("Server returning 400", 0, extra_args, 1) as p2p_connections:
             # Turn on CallbackService.
-            handler = partial(CallbackService, RECEIVE.YES, STATUS.CLIENT_ERROR, RESPONSE_TIME.FAST, FLAG.YES)
+            handler = partial(CallbackService, RECEIVE.YES, STATUS.CLIENT_ERROR, RESPONSE_TIME.FAST, FLAG.YES, 0, 0)
             self.server = HTTPServer(('localhost', 8080), handler)
             self.start_server()
             self.conn = httplib.HTTPConnection(self.callback_service)
@@ -137,9 +142,10 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
 
             self.kill_server()
 
-        with self.run_node_with_connections("Server returning 500", 0, ['-dsendpointport=8080'], 1) as p2p_connections:
+        extra_args = ['-dsendpointport=8080', '-dsnotifylevel=1']
+        with self.run_node_with_connections("Server returning 500", 0, extra_args, 1) as p2p_connections:
             # Turn on CallbackService.
-            handler = partial(CallbackService, RECEIVE.YES, STATUS.SERVER_ERROR, RESPONSE_TIME.FAST, FLAG.YES)
+            handler = partial(CallbackService, RECEIVE.YES, STATUS.SERVER_ERROR, RESPONSE_TIME.FAST, FLAG.YES, 0, 0)
             self.server = HTTPServer(('localhost', 8080), handler)
             self.start_server()
             self.conn = httplib.HTTPConnection(self.callback_service)
@@ -150,9 +156,10 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
 
             self.kill_server()
 
-        with self.run_node_with_connections("Server is slow, but functional", 0, ['-dsendpointport=8080'], 1) as p2p_connections:
+        extra_args = ['-dsendpointport=8080', '-dsnotifylevel=1']
+        with self.run_node_with_connections("Server is slow, but functional", 0, extra_args, 1) as p2p_connections:
             # Turn on CallbackService.
-            handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.SLOW, FLAG.YES)
+            handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.SLOW, FLAG.YES, 0, 0)
             self.server = HTTPServer(('localhost', 8080), handler)
             self.start_server()
             self.conn = httplib.HTTPConnection(self.callback_service)
@@ -164,9 +171,10 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
 
             self.kill_server()
 
-        with self.run_node_with_connections("Server is consistently slow, but functional", 0, ['-dsendpointport=8080', '-dsendpointslowrateperhour=2'], 1) as p2p_connections:
+        extra_args = ['-dsendpointport=8080', '-dsnotifylevel=1', '-dsendpointslowrateperhour=2']
+        with self.run_node_with_connections("Server is consistently slow, but functional", 0, extra_args, 1) as p2p_connections:
             # Turn on CallbackService.
-            handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.SLOW, FLAG.YES)
+            handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.SLOW, FLAG.YES, 0, 0)
             self.server = HTTPServer(('localhost', 8080), handler)
             self.start_server()
             self.conn = httplib.HTTPConnection(self.callback_service)
@@ -187,9 +195,10 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
 
             self.kill_server()
 
-        with self.run_node_with_connections("Server is too slow, bitcoind ignores it", 0, ['-dsendpointport=8080'], 1) as p2p_connections:
+        extra_args = ['-dsendpointport=8080', '-dsnotifylevel=1']
+        with self.run_node_with_connections("Server is too slow, bitcoind ignores it", 0, extra_args, 1) as p2p_connections:
             # Turn on CallbackService.
-            handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.SLOWEST, FLAG.YES)
+            handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.SLOWEST, FLAG.YES, 0, 0)
             self.server = HTTPServer(('localhost', 8080), handler)
             self.start_server()
             self.conn = httplib.HTTPConnection(self.callback_service)
@@ -197,13 +206,14 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
             self.node0 = p2p_connections[0]
             tx_hash = self.check_ds_enabled_error_msg(utxo[4], "Timeout sending slow-queue notification to endpoint 127.0.0.1")
 
-            self.check_tx_not_received(tx_hash)
+            assert self.check_tx_not_received(tx_hash)
 
             self.kill_server()
 
-        with self.run_node_with_connections("Server has no x-bsv-dsnt in header", 0, ['-dsendpointport=8080'], 1) as p2p_connections:
+        extra_args = ['-dsendpointport=8080', '-dsnotifylevel=1']
+        with self.run_node_with_connections("Server has no x-bsv-dsnt in header", 0, extra_args, 1) as p2p_connections:
             # Turn on CallbackService.
-            handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.NO)
+            handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.NO, 0, 0)
             self.server = HTTPServer(('localhost', 8080), handler)
             self.start_server()
             self.conn = httplib.HTTPConnection(self.callback_service)
@@ -211,7 +221,39 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
             self.node0 = p2p_connections[0]
             tx_hash = self.check_ds_enabled_error_msg(utxo[5], "Missing x-bsv-dsnt header in response from endpoint 127.0.0.1")
 
-            self.check_tx_not_received(tx_hash)
+            assert self.check_tx_not_received(tx_hash)
+
+            self.kill_server()
+
+        extra_args = ['-dsendpointport=8080', '-dsnotifylevel=1', '-rpcwebhookclientmaxresponsebodysize={}'.format(MAX_BODY_SIZE)]
+        with self.run_node_with_connections("Server sends excessively large payload", 0, extra_args, 1) as p2p_connections:
+            # Turn on CallbackService.
+            handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.YES, MAX_BODY_SIZE + 1, 0)
+            self.server = HTTPServer(('localhost', 8080), handler)
+            self.start_server()
+            self.conn = httplib.HTTPConnection(self.callback_service)
+
+            self.node0 = p2p_connections[0]
+            tx_hash = self.check_ds_enabled_error_msg(utxo[6], "response body is larger than allowed")
+
+            # Server DID receive the notification and processed it, just the POST response was invalid
+            wait_until(lambda: self.check_tx_received(tx_hash))
+
+            self.kill_server()
+
+        extra_args = ['-dsendpointport=8080', '-dsnotifylevel=1', '-rpcwebhookclientmaxresponseheaderssize={}'.format(MAX_HEADER_SIZE)]
+        with self.run_node_with_connections("Server sends excessively large headers", 0, extra_args, 1) as p2p_connections:
+            # Turn on CallbackService.
+            handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.YES, 0, MAX_HEADER_SIZE + 1)
+            self.server = HTTPServer(('localhost', 8080), handler)
+            self.start_server()
+            self.conn = httplib.HTTPConnection(self.callback_service)
+
+            self.node0 = p2p_connections[0]
+            tx_hash = self.check_ds_enabled_error_msg(utxo[7], "error while reading header, or invalid header")
+
+            # Server DID receive the notification and processed it, just the POST response was invalid
+            wait_until(lambda: self.check_tx_received(tx_hash))
 
             self.kill_server()
 

@@ -111,7 +111,8 @@ std::unique_ptr<CZMQNotificationInterface> pzmqNotificationInterface;
 #endif
 
 /** Used to pass flags to the Bind() function */
-enum BindFlags {
+enum BindFlags // NOLINT(cppcoreguidelines-use-enum-class)
+{
     BF_NONE = 0,
     BF_EXPLICIT = (1U << 0),
     BF_REPORT_ERROR = (1U << 1),
@@ -466,6 +467,12 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                        strprintf(_("Whether to save the mempool on shutdown "
                                    "and load on restart (default: %u)"),
                                  DEFAULT_PERSIST_MEMPOOL));
+    if (showDebug) {
+        strUsage +=
+            HelpMessageOpt("-importsync",
+                           strprintf(_("If true, import of data from disk will be done synchronously "
+                                       "to avoid races (useful for testing) (default: 0)")));
+    }
     strUsage += HelpMessageOpt(
         "-threadsperblock=<n>",
         strprintf(_("Set the number of script verification threads used when "
@@ -1343,6 +1350,14 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt("-rpcwebhookclientnumthreads=<n>",
         strprintf(_("Number of threads available for submitting HTTP requests to webhook endpoints. (default: %u, maximum: %u)"),
             rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS, rpc::client::WebhookClientDefaults::MAX_NUM_THREADS));
+    strUsage += HelpMessageOpt("-rpcwebhookclientmaxresponsebodysize=<n>",
+        strprintf(_("Maximum size of HTTP response body from webhook endpoints in bytes. "
+                    "(default: %ukB, 0 = unlimited). The value may be given with unit (B, kB, MB, GB)."),
+            rpc::client::WebhookClientDefaults::DEFAULT_MAX_RESPONSE_BODY_SIZE));
+    strUsage += HelpMessageOpt("-rpcwebhookclientmaxresponseheaderssize=<n>",
+        strprintf(_("Maximum size of HTTP response headers from webhook endpoints in bytes. "
+                    "(default: %ukB, 0 = unlimited). The value may be given with unit (B, kB, MB, GB)."),
+            rpc::client::WebhookClientDefaults::DEFAULT_MAX_RESPONSE_HEADERS_SIZE));
     if (showDebug) {
         strUsage += HelpMessageOpt(
             "-rpcworkqueue=<n>", strprintf("Set the depth of the work queue to "
@@ -1760,12 +1775,15 @@ void CleanupBlockRevFiles() {
  * "import_files" thread can have longer life span than shutdownToken presented with a reference.
  */
 void ThreadImport(const Config& config,
+                  bool inThread,
                   // NOLINTBEGIN(performance-unnecessary-value-param)
                   std::vector<fs::path> vImportFiles,
                   const task::CCancellationToken shutdownToken)
                   // NOLINTEND(performance-unnecessary-value-param)
 {
-    RenameThread("loadblk");
+    if(inThread) {
+        RenameThread("loadblk");
+    }
 
     {
         CImportingNow imp;
@@ -2578,6 +2596,18 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if(std::string err; !config.SetWebhookClientNumThreads(gArgs.GetArg("-rpcwebhookclientnumthreads", rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS), &err)) {
         return InitError(err);
     }
+    if(std::string err; !config.SetWebhookClientMaxResponseBodySize(
+        gArgs.GetArgAsBytes("-rpcwebhookclientmaxresponsebodysize",
+                            rpc::client::WebhookClientDefaults::DEFAULT_MAX_RESPONSE_BODY_SIZE_BYTES), &err))
+    {
+        return InitError(err);
+    }
+    if(std::string err; !config.SetWebhookClientMaxResponseHeadersSize(
+        gArgs.GetArgAsBytes("-rpcwebhookclientmaxresponseheaderssize",
+                            rpc::client::WebhookClientDefaults::DEFAULT_MAX_RESPONSE_HEADERS_SIZE_BYTES), &err))
+    {
+        return InitError(err);
+    }
 
 #if ENABLE_ZMQ
     bool zmqSinkSpecified = (config.GetInvalidTxSinks().count("ZMQ") != 0);
@@ -2959,12 +2989,13 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     // TODO: remove dust settings
     config.SetDustRelayFee(DUST_RELAY_TX_FEE);
 
-    fRequireStandard =
+    bool requireStandard =
         !gArgs.GetBoolArg("-acceptnonstdtxn", !chainparams.RequireStandard());
-    if (chainparams.RequireStandard() && !fRequireStandard)
+    if (chainparams.RequireStandard() && !requireStandard)
         return InitError(
             strprintf("acceptnonstdtxn is not currently supported for %s chain",
                       chainparams.NetworkIDString()));
+    config.SetRequireStandard(requireStandard);
 
     config.SetAcceptNonStandardOutput(
         gArgs.GetBoolArg("-acceptnonstdoutputs", config.GetAcceptNonStandardOutput(ProtocolEra::PostGenesis)));
@@ -2998,8 +3029,8 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if (!CWallet::ParameterInteraction()) return false;
 #endif
 
-    fIsBareMultisigStd =
-        gArgs.GetBoolArg("-permitbaremultisig", DEFAULT_PERMIT_BAREMULTISIG);
+    config.SetPermitBareMultisig(
+        gArgs.GetBoolArg("-permitbaremultisig", DEFAULT_PERMIT_BAREMULTISIG));
     config.SetDataCarrier(gArgs.GetBoolArg("-datacarrier", DEFAULT_ACCEPT_DATACARRIER));
 
     // Option to startup with mocktime set (used for regression testing):
@@ -3865,13 +3896,18 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
         }
     }
 
-    threadGroup.create_thread(
-        [&config, vImportFiles, shutdownToken]
-        {
-            TraceThread(
-                "import_files",
-                [&config, &vImportFiles, shutdownToken]{ThreadImport(config, vImportFiles, shutdownToken);});
-        });
+    if(gArgs.GetBoolArg("-importsync", false)) {
+        ThreadImport(config, false, vImportFiles, shutdownToken);
+    }
+    else {
+        threadGroup.create_thread(
+            [&config, vImportFiles, shutdownToken]
+            {
+                TraceThread(
+                    "import_files",
+                    [&config, &vImportFiles, shutdownToken]{ThreadImport(config, true, vImportFiles, shutdownToken);});
+            });
+    }
 
     // Wait for genesis block to be processed
     {

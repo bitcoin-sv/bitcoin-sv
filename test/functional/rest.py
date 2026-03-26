@@ -271,6 +271,12 @@ class RESTTest (BitcoinTestFramework):
         assert_equal(response.status, 206)
         assert_equal(int(response.getheader('content-length')), 20)
 
+        response = http_get_call_with_headers(
+            url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': 'bytes=10 - 29'}, True)
+        assert_equal(response_str[10:30], response.read())
+        assert_equal(response.status, 206)
+        assert_equal(int(response.getheader('content-length')), 20)
+
         # get binary block with invalid range parameters
 
         # range overlapping
@@ -284,6 +290,23 @@ class RESTTest (BitcoinTestFramework):
         assert_equal(response.status, 404)
         response = http_get_call_with_headers(
             url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': 'bytes=10'}, True)
+        assert_equal(response.status, 404)
+        response = http_get_call_with_headers(
+            url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': 'bytes=10-'}, True)
+        assert_equal(response.status, 404)
+        response = http_get_call_with_headers(
+            url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': 'bytes=-10'}, True)
+        assert_equal(response.status, 404)
+        response = http_get_call_with_headers(
+            url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': 'bytes=abc-def'}, True)
+        assert_equal(response.status, 404)
+
+        # negative range
+        response = http_get_call_with_headers(
+            url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': 'bytes=-10-20'}, True)
+        assert_equal(response.status, 404)
+        response = http_get_call_with_headers(
+            url.hostname, url.port, '/rest/block/' + bb_hash + self.FORMAT_SEPARATOR + "bin", {'Range': 'bytes=10--20'}, True)
         assert_equal(response.status, 404)
 
         # compare with block header

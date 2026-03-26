@@ -76,12 +76,12 @@ static const bool DEFAULT_REJECTMEMPOOLREQUEST = true;
 /** Default for -minrelaytxfee, minimum relay fee for transactions */
 static constexpr Amount DEFAULT_MIN_RELAY_TX_FEE(250);
 //! -maxtxfee default
-static const Amount DEFAULT_TRANSACTION_MAXFEE{COIN / 10};
+static const Amount DEFAULT_TRANSACTION_MAXFEE{COIN / 10}; //NOLINT(cert-err58-cpp)
 //! Discourage users to set fees higher than this amount (in satoshis) per kB
-static const Amount HIGH_TX_FEE_PER_KB{COIN / 100};
+static const Amount HIGH_TX_FEE_PER_KB{COIN / 100}; //NOLINT(cert-err58-cpp)
 /** -maxtxfee will warn if called with a higher fee than this amount (in
  * satoshis */
-static const Amount HIGH_MAX_TX_FEE{100 * HIGH_TX_FEE_PER_KB};
+static const Amount HIGH_MAX_TX_FEE{100 * HIGH_TX_FEE_PER_KB}; //NOLINT(cert-err58-cpp)
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
 static const uint64_t DEFAULT_ANCESTOR_LIMIT = 10000;
 /** Default for -limitancestorcount, max number of secondary mempool ancestors */
@@ -186,8 +186,6 @@ static const int64_t DEFAULT_BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 50; // percent
 
 static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
 
-/** Default for -permitbaremultisig */
-static const bool DEFAULT_PERMIT_BAREMULTISIG = true;
 static const bool DEFAULT_CHECKPOINTS_ENABLED = true;
 static const bool DEFAULT_TXINDEX = false;
 static const unsigned int DEFAULT_BANSCORE_THRESHOLD = 100;
@@ -234,7 +232,6 @@ extern CConditionVariable cvBlockChange;
 extern std::atomic_bool fImporting;
 extern std::atomic_bool fReindex;
 extern bool fTxIndex;
-extern bool fIsBareMultisigStd;
 extern bool fCheckBlockIndex;
 extern bool fCheckpointsEnabled;
 extern size_t nCoinCacheUsage;
@@ -281,7 +278,8 @@ static const signed int DEFAULT_CHECKBLOCKS = 6;
 static const unsigned int DEFAULT_CHECKLEVEL = 3;
 
 // Flush modes to update on-disk chain state
-enum FlushStateMode {
+enum FlushStateMode //NOLINT(cppcoreguidelines-use-enum-class)
+{
     FLUSH_STATE_NONE,
     FLUSH_STATE_IF_NEEDED,
     FLUSH_STATE_PERIODIC,

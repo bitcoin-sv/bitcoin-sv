@@ -27,7 +27,7 @@ private:
         CCoinsViewCache& view,
         const task::CCancellationToken& shutdownToken) const;
 
-    CBlockIndex& mIndex;
+    CBlockIndex& mIndex; //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 };
 
 #endif

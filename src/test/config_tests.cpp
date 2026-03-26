@@ -538,6 +538,28 @@ BOOST_AUTO_TEST_CASE(rpc_config)
     BOOST_CHECK_EQUAL(config.GetWebhookClientNumThreads(), 2 * rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS);
     BOOST_CHECK(!config.SetWebhookClientNumThreads(0, &err));
     BOOST_CHECK(!config.SetWebhookClientNumThreads(-1, &err));
+
+    // Test webhook client max response body size
+    BOOST_CHECK_EQUAL(config.GetWebhookClientMaxResponseBodySize(), rpc::client::WebhookClientDefaults::DEFAULT_MAX_RESPONSE_BODY_SIZE_BYTES);
+    BOOST_CHECK(config.SetWebhookClientMaxResponseBodySize(64 * ONE_KILOBYTE, &err));
+    BOOST_CHECK_EQUAL(config.GetWebhookClientMaxResponseBodySize(), 64 * ONE_KILOBYTE);
+    BOOST_CHECK(config.SetWebhookClientMaxResponseBodySize(0, &err));  // 0 = unlimited
+    BOOST_CHECK_EQUAL(config.GetWebhookClientMaxResponseBodySize(), 0);
+    BOOST_CHECK(!config.SetWebhookClientMaxResponseBodySize(-1, &err));
+    BOOST_CHECK_EQUAL(config.GetWebhookClientMaxResponseBodySize(), 0);  // unchanged after failed set
+    BOOST_CHECK(config.SetWebhookClientMaxResponseBodySize(1, &err));   // minimum positive limit
+    BOOST_CHECK_EQUAL(config.GetWebhookClientMaxResponseBodySize(), 1);
+
+    // Test webhook client max response headers size
+    BOOST_CHECK_EQUAL(config.GetWebhookClientMaxResponseHeadersSize(), rpc::client::WebhookClientDefaults::DEFAULT_MAX_RESPONSE_HEADERS_SIZE_BYTES);
+    BOOST_CHECK(config.SetWebhookClientMaxResponseHeadersSize(64 * ONE_KILOBYTE, &err));
+    BOOST_CHECK_EQUAL(config.GetWebhookClientMaxResponseHeadersSize(), 64 * ONE_KILOBYTE);
+    BOOST_CHECK(config.SetWebhookClientMaxResponseHeadersSize(0, &err));  // 0 = unlimited
+    BOOST_CHECK_EQUAL(config.GetWebhookClientMaxResponseHeadersSize(), 0);
+    BOOST_CHECK(!config.SetWebhookClientMaxResponseHeadersSize(-1, &err));
+    BOOST_CHECK_EQUAL(config.GetWebhookClientMaxResponseHeadersSize(), 0);  // unchanged after failed set
+    BOOST_CHECK(config.SetWebhookClientMaxResponseHeadersSize(1, &err));    // minimum positive limit
+    BOOST_CHECK_EQUAL(config.GetWebhookClientMaxResponseHeadersSize(), 1);
 }
 
 BOOST_AUTO_TEST_CASE(dsattempt_config)

@@ -84,7 +84,7 @@ int CommandLineRPC(int argc, char *argv[]) {
         // Skip switches
         while (argc > 1 && IsSwitchChar(argv[1][0])) { // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             argc--;
-            argv++;
+            argv++; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         }
         std::string rpcPass;
         if (gArgs.GetBoolArg("-stdinrpcpass", false)) {

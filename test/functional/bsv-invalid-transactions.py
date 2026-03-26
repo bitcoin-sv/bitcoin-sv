@@ -143,7 +143,7 @@ class InvalidTx(BitcoinTestFramework):
 
         def on_reject(conn, msg):
             rejected_txs.append(msg)
-        conn_sending.cb.on_reject = on_reject
+        conn_sending.transport.cb.on_reject = on_reject
 
         relayed_txs = []
 
@@ -152,7 +152,7 @@ class InvalidTx(BitcoinTestFramework):
                 if i.type == 1:
                     relayed_txs.append(i.hash)
 
-        conn_receiving.cb.on_inv = on_inv
+        conn_receiving.transport.cb.on_inv = on_inv
 
         tx, keys = create_parent_tx(coinbase_tx, coinbase_key, n_outputs=1, invalidity=invalidity)
 
@@ -165,7 +165,7 @@ class InvalidTx(BitcoinTestFramework):
         def on_reject(conn, msg):
             rejected_txs.append(msg)
 
-        conn.cb.on_reject = on_reject
+        conn.transport.cb.on_reject = on_reject
 
         coinbase_tx1, coinbase_key1 = make_coinbase(conn)
         coinbase_tx2, coinbase_key2 = make_coinbase(conn)
@@ -227,7 +227,7 @@ class InvalidTx(BitcoinTestFramework):
             self.check_rejected(rejected_txs, [tx])
 
             # we will be banned
-            sending_conn.cb.wait_for_disconnect(timeout=20)
+            sending_conn.transport.cb.wait_for_disconnect(timeout=20)
             assert len(sending_conn.rpc.listbanned()) == 1  # and banned
             sending_conn.rpc.clearbanned()
             assert len(relayed_txs) == 0, "No tx should be relayed."
@@ -307,7 +307,7 @@ class InvalidTx(BitcoinTestFramework):
             check_mempool_equals(conn.rpc, [parent_tx1, parent_tx2]) # Only parent_tx1 and parent_tx2 should be in the mempool
 
             # we must be banned
-            conn.cb.wait_for_disconnect(timeout=20) # will be disconnected
+            conn.transport.cb.wait_for_disconnect(timeout=20) # will be disconnected
             assert len(conn.rpc.listbanned()) == 1 # and banned
             conn.rpc.clearbanned()
 

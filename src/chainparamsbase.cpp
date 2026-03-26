@@ -8,10 +8,12 @@
 #include "tinyformat.h"
 #include <cassert>
 
+//NOLINTBEGIN(cert-err58-cpp)
 const std::string CBaseChainParams::MAIN = "main";
 const std::string CBaseChainParams::TESTNET = "test";
 const std::string CBaseChainParams::REGTEST = "regtest";
 const std::string CBaseChainParams::STN = "stn";
+//NOLINTEND(cert-err58-cpp)
 
 static std::unique_ptr<CBaseChainParams> globalChainBaseParams;
 

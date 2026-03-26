@@ -256,7 +256,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         def on_reject(conn, msg):
             rejects.append(msg)
 
-        with connection.cb.temporary_override_callback(on_reject=on_reject):
+        with connection.transport.cb.temporary_override_callback(on_reject=on_reject):
             for tx, reason in zip(txs, reasons):
                 del rejects[:]
                 block, _ = self._new_block(connection, tip_hash=tip["hash"], tip_height=tip["height"], txs=block_txs + [tx])
@@ -332,7 +332,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         def on_reject(_, msg):
             rejects.append(msg)
 
-        with connection.cb.temporary_override_callback(on_reject=on_reject):
+        with connection.transport.cb.temporary_override_callback(on_reject=on_reject):
             for tx, reason in zip(to_reject, reasons):
                 self.log.info(f"Sending and processing the reject tx {loghash(tx.hash)} for expecting reason {reason}")
                 del rejects[:]
@@ -356,7 +356,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
 
         wait_until(tt,
                    timeout=(p2p_accept_timeout * self.options.timeoutfactor), check_interval=0.2,
-                   label=f"Waiting txs to be accepted. At {test_label} {height_label} tx:{','.join(tx.hash[:8]+'...' for tx in to_accept)}")
+                   label=f"Waiting txs to be accepted. At {test_label} {height_label} tx:{','.join(tx.hash[:8] + '...' for tx in to_accept)}")
         self.check_mp()
 
     def _assert_height(self, connection, desired_height):
@@ -442,7 +442,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                 if len(new_maxnonstdtxvalidationduration) > 0:
                     new_maxnonstdtxvalidationduration = new_maxnonstdtxvalidationduration[0]
                     if (DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION * 1000 <= new_maxnonstdtxvalidationduration):
-                        self.log.info(f"Setting -maxtxnvalidatorasynctasksrunduration to {new_maxnonstdtxvalidationduration+1} ms.")
+                        self.log.info(f"Setting -maxtxnvalidatorasynctasksrunduration to {new_maxnonstdtxvalidationduration + 1} ms.")
                         test.ARGS.append("-maxtxnvalidatorasynctasksrunduration={}".format(new_maxnonstdtxvalidationduration + 1))
 
             with self.run_node_with_connections(title=test.NAME,

@@ -2,14 +2,15 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.mininode import NetworkThread, NodeConn, NodeConnCB, ser_uint256_vector
+from test_framework.mininode import P2PHandler, P2PEventHandler, ser_uint256_vector
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import p2p_port
 import time
 import os
 
 
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
     def __init__(self):
         super().__init__()
 
@@ -36,9 +37,8 @@ class SpamLog(BitcoinTestFramework):
 
     def run_test(self):
         self.test_node = TestNode()
-        connections = []
-        connections.append(NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], self.test_node))
-        self.test_node.add_connection(connections[0])
+        self.test_node.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), self.test_node),
+                                                 self.nodes[0]))
 
         NetworkThread().start()
 

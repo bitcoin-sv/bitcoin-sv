@@ -19,6 +19,7 @@ RUN set -xeu \
     git \
     sysbench \
     gperftools-devel \
+    rocksdb-devel \
     && dnf clean all -y
 
 RUN set -xeu && pip install bip32utils

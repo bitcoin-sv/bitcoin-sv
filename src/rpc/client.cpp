@@ -12,6 +12,7 @@
 #include <event2/buffer.h>
 
 static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
+static_assert(sizeof(ev_ssize_t) >= sizeof(int64_t), "ev_ssize_t too narrow to hold configured response size limits");
 
 namespace
 {
@@ -108,6 +109,14 @@ void RPCClient::SubmitRequest(HTTPRequest& request, HTTPResponse* response) cons
     // Synchronously look up hostname
     raii_evhttp_connection evcon { obtain_evhttp_connection_base(base.get(), mConfig.GetServerIP(), mConfig.GetServerPort()) };
     evhttp_connection_set_timeout(evcon.get(), mConfig.GetConnectionTimeout());
+    if(mConfig.GetMaxResponseBodySize() > 0)
+    {
+        evhttp_connection_set_max_body_size(evcon.get(), static_cast<ev_ssize_t>(mConfig.GetMaxResponseBodySize()));
+    }
+    if(mConfig.GetMaxResponseHeadersSize() > 0)
+    {
+        evhttp_connection_set_max_headers_size(evcon.get(), static_cast<ev_ssize_t>(mConfig.GetMaxResponseHeadersSize()));
+    }
 
     // Create request
     raii_evhttp_request req { obtain_evhttp_request(HTTPRequestDoneCallback, static_cast<void*>(response)) };

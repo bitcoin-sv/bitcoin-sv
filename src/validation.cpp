@@ -96,7 +96,6 @@ std::atomic_bool fReindex{ false };
 bool fTxIndex = false;
 bool fHavePruned = false;
 bool fPruneMode = false;
-bool fIsBareMultisigStd = DEFAULT_PERMIT_BAREMULTISIG;
 bool fCheckBlockIndex = false;
 bool fCheckpointsEnabled = DEFAULT_CHECKPOINTS_ENABLED;
 size_t nCoinCacheUsage = 5000 * 300;
@@ -1072,7 +1071,7 @@ CTxnValResult TxnValidation(
     //          but we will mine it nevertheless. Anyone can collect such
     //          coin by providing OP_1 unlock script
     std::string reason;
-    bool fStandard = IsStandardTx(config, tx, chainActive.Height() + 1, reason);
+    bool fStandard = IsStandardTx(config.GetConfigScriptPolicy(), tx, chainActive.Height() + 1, reason);
     if (fStandard) {
         state.SetStandardTx();
     }
@@ -1083,7 +1082,7 @@ CTxnValResult TxnValidation(
     if(!fStandard)
     {
         if (!acceptNonStandardOutput ||
-            (IsProtocolActive(era, ProtocolName::Genesis) && fRequireStandard && reason != "scriptpubkey"))
+            (IsProtocolActive(era, ProtocolName::Genesis) && config.GetConfigScriptPolicy().GetRequireStandard() && reason != "scriptpubkey"))
         {
             state.DoS(0, false, REJECT_NONSTANDARD, reason);
             return Result{state, pTxInputData};
@@ -1209,7 +1208,7 @@ CTxnValResult TxnValidation(
     if (!acceptNonStandardOutput)
     {
         auto res =
-            AreInputsStandard(source->GetToken(), config, tx, view, chainActive.Height() + 1);
+            AreInputsStandard(source->GetToken(), config.GetConfigScriptPolicy(), tx, view, chainActive.Height() + 1);
 
         if (!res.has_value())
         {
@@ -1227,7 +1226,7 @@ CTxnValResult TxnValidation(
     else if (fUseLimits && (TxValidationPriority::low != pTxInputData->GetTxValidationPriority()))
     {
         auto res =
-            AreInputsStandard(source->GetToken(), config, tx, view, chainActive.Height() + 1);
+            AreInputsStandard(source->GetToken(), config.GetConfigScriptPolicy(), tx, view, chainActive.Height() + 1);
         if (!res.has_value() || !res.value()) {
             state.SetValidationTimeoutExceeded();
             state.DoS(0, false, REJECT_NONSTANDARD, "too-long-validation-time");

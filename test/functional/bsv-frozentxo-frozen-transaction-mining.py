@@ -33,9 +33,7 @@ from test_framework.util import (
     sync_mempools
 )
 from test_framework.mininode import (
-    NetworkThread,
-    NodeConn,
-    NodeConnCB,
+    P2PHandler,
     msg_block,
     msg_tx
 )
@@ -55,20 +53,11 @@ class FrozenTXOTransactionMining(BitcoinTestFramework):
         self.block_count = 0
 
     def init_(self, nodes_count):
-        nodes = []
-
-        for no in range(0, nodes_count):
-            # Create a P2P connections
-            node = NodeConnCB()
-            connection = NodeConn('127.0.0.1', p2p_port(no), self.nodes[no], node)
-            node.add_connection(connection)
-            nodes.append(node)
-
-        NetworkThread().start()
-
-        for no in range(0, nodes_count):
-            # wait_for_verack ensures that the P2P connection is fully up.
-            nodes[no].wait_for_verack()
+        # Create P2P connections to each node
+        nodes = P2PHandler.connect_multiple([
+            ('127.0.0.1', p2p_port(no), self.nodes[no])
+            for no in range(nodes_count)
+        ])
 
         self.init_chain_(nodes[0], nodes_count)
 
@@ -189,7 +178,7 @@ class FrozenTXOTransactionMining(BitcoinTestFramework):
                     }]
             })
 
-        self.log.info(f"Generating blocks so that mempool reaches height {enforce_stop_height+1}")
+        self.log.info(f"Generating blocks so that mempool reaches height {enforce_stop_height + 1}")
         while self.nodes[0].getblockcount() < enforce_stop_height:
             self.nodes[0].generate(1)
         sync_blocks(self.nodes)

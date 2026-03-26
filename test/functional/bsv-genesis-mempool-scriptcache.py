@@ -106,7 +106,7 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
             if msg.message == b'tx':
                 rejected_txs.append(msg)
 
-        self.test.connections[0].cb.on_reject = on_reject
+        self.test.connections[0].transport.cb.on_reject = on_reject
         self.test.connections[0].send_message(msg_block(block))
 
         wait_until(lambda: len(rejected_blocks) > 0, timeout=5, lock=mininode_lock)

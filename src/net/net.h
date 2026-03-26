@@ -153,7 +153,7 @@ static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24;
 // Multiple streams enabled by default
 static const bool DEFAULT_STREAMS_ENABLED = true;
 // Default prioritised list of stream policies to use
-static const std::string DEFAULT_STREAM_POLICY_LIST =
+static const std::string DEFAULT_STREAM_POLICY_LIST = //NOLINT(cert-err58-cpp)
     std::string{BlockPriorityStreamPolicy::POLICY_NAME} + "," +
     std::string{DefaultStreamPolicy::POLICY_NAME};
 
@@ -304,7 +304,8 @@ public:
 
 class CConnman {
 public:
-    enum NumConnections {
+    enum NumConnections //NOLINT(cppcoreguidelines-use-enum-class)
+    {
         CONNECTIONS_NONE = 0,
         CONNECTIONS_IN = (1U << 0),
         CONNECTIONS_OUT = (1U << 1),
@@ -371,11 +372,14 @@ public:
     DSAttemptHandler& GetDSAttemptHandler() { return mDSHandler; }
 
     /** Call the specified function for each node */
-    template <typename Callable> void ForEachNode(Callable&& func) const { 
+    template<typename Callable>
+    void ForEachNode(const Callable& func) const
+    { 
         LOCK(cs_vNodes);
-        for(const CNodePtr& node : vNodes) {
+        for(const CNodePtr& node : vNodes)
+        {
             if(NodeFullyConnected(node))
-                std::forward<Callable>(func)(node);
+                func(node);
         }
     }
 
@@ -847,7 +851,8 @@ struct CNodeSignals {
 
 CNodeSignals &GetNodeSignals();
 
-enum {
+enum // NOLINT(cppcoreguidelines-use-enum-class)
+{
     // unknown
     LOCAL_NONE,
     // address a local interface listens on

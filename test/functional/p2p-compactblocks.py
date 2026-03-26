@@ -10,11 +10,12 @@ from test_framework.mininode import BlockTransactions, \
     COutPoint, CTransaction, CTxIn, CTxOut, FromHex, HeaderAndShortIDs, \
     mininode_lock, msg_block, msg_blocktxn, msg_cmpctblock, msg_getblocktxn, \
     msg_getdata, msg_headers, msg_getheaders, msg_inv, msg_sendcmpct, \
-    msg_sendheaders, msg_tx, NetworkThread, NodeConn, NodeConnCB, \
+    msg_sendheaders, msg_tx, P2PHandler, P2PEventHandler, \
     NODE_NETWORK, P2PHeaderAndShortIDs, PrefilledTransaction, ToHex
 
 from test_framework.script import CScript, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import assert_equal, p2p_port, sync_blocks, wait_until
 
 import random
@@ -28,7 +29,7 @@ Only testing Version 1 compact blocks (txids)
 # TestNode: A peer we use to send messages to bitcoind, and store responses.
 
 
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
     def __init__(self):
         super().__init__()
         self.last_sendcmpct = []
@@ -796,12 +797,13 @@ class CompactBlocksTest(BitcoinTestFramework):
         self.old_node = TestNode()  # version 1 peer
 
         connections = []
-        connections.append(
-            NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], self.test_node))
-        connections.append(NodeConn('127.0.0.1', p2p_port(1), self.nodes[1],
-                                    self.ex_softfork_node, services=NODE_NETWORK))
-        connections.append(NodeConn('127.0.0.1', p2p_port(1), self.nodes[1],
-                                    self.old_node, services=NODE_NETWORK))
+        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(0), self.test_node),
+                                      self.nodes[0]))
+        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(1), self.ex_softfork_node),
+                                      self.nodes[1], services=NODE_NETWORK))
+        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(1), self.old_node),
+                                      self.nodes[1], services=NODE_NETWORK))
+
         self.test_node.add_connection(connections[0])
         self.ex_softfork_node.add_connection(connections[1])
         self.old_node.add_connection(connections[2])

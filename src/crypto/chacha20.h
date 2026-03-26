@@ -16,8 +16,13 @@ class ChaCha20
     std::array<uint32_t, 16> input;
 
 public:
+    using const_iterator = std::array<uint32_t, 16>::const_iterator;
+
     ChaCha20();
     ChaCha20(std::span<const uint8_t> key);
+
+    const_iterator begin() const noexcept { return input.begin(); }
+    const_iterator end() const noexcept { return input.end(); }
 
     void SetKey(std::span<const uint8_t> key);
     void SetIV(uint64_t iv);

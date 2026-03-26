@@ -26,8 +26,6 @@
 class CChainParams;
 struct DefaultBlockSizeParams;
 
-inline bool fRequireStandard{true};
-
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions, cppcoreguidelines-virtual-class-destructor)
 class Config : public boost::noncopyable
 {
@@ -142,6 +140,8 @@ public:
 
     // RPC parameters
     virtual uint64_t GetWebhookClientNumThreads() const = 0;
+    virtual int64_t GetWebhookClientMaxResponseBodySize() const = 0;
+    virtual int64_t GetWebhookClientMaxResponseHeadersSize() const = 0;
 
 #if ENABLE_ZMQ
     virtual int64_t GetInvalidTxZMQMaxMessageSize() const = 0;
@@ -237,6 +237,7 @@ public:
     virtual void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) = 0;
     virtual void SetDataCarrierSize(uint64_t dataCarrierSize) = 0;
     virtual void SetDataCarrier(bool dataCarrier) = 0;
+    virtual void SetPermitBareMultisig(bool permit) = 0;
     virtual bool SetLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr) = 0;
     virtual void SetTestBlockCandidateValidity(bool test) = 0;
     virtual void SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytes) = 0;
@@ -262,6 +263,7 @@ public:
     virtual bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) = 0;
     virtual bool SetChronicleGracefulPeriod(int64_t chronicleGracefulPeriodIn, std::string* err = nullptr) = 0;
     virtual void SetAcceptNonStandardOutput(bool accept) = 0;
+    virtual void SetRequireStandard(bool require) = 0;
     virtual bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) = 0;
     virtual bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) = 0;
     virtual bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) = 0;
@@ -318,6 +320,8 @@ public:
 
     // RPC parameters
     virtual bool SetWebhookClientNumThreads(int64_t num, std::string* err) = 0;
+    virtual bool SetWebhookClientMaxResponseBodySize(int64_t size, std::string* err = nullptr) = 0;
+    virtual bool SetWebhookClientMaxResponseHeadersSize(int64_t size, std::string* err = nullptr) = 0;
 
     virtual bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) = 0;
 
@@ -540,6 +544,8 @@ public:
 
     void SetAcceptNonStandardOutput(bool accept) override;
     bool GetAcceptNonStandardOutput(ProtocolEra era) const override;
+    void SetRequireStandard(bool require) override;
+    void SetPermitBareMultisig(bool permit) override;
 
     bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) override;
     uint64_t GetMaxCoinsViewCacheSize() const override {return data->mMaxCoinsViewCacheSize;}
@@ -667,6 +673,10 @@ public:
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t num, std::string* err) override;
     uint64_t GetWebhookClientNumThreads() const override;
+    bool SetWebhookClientMaxResponseBodySize(int64_t size, std::string* err = nullptr) override;
+    int64_t GetWebhookClientMaxResponseBodySize() const override;
+    bool SetWebhookClientMaxResponseHeadersSize(int64_t size, std::string* err = nullptr) override;
+    int64_t GetWebhookClientMaxResponseHeadersSize() const override;
 
     bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) override;
     bool GetDisableBIP30Checks() const override;
@@ -776,7 +786,8 @@ public:
 private:
     void  CheckSetDefaultCalled() const;
 
-    struct GlobalConfigData {
+    struct GlobalConfigData  //NOLINT(clang-analyzer-optin.performance.Padding)
+    {
     private: friend class GlobalConfig;
         // All fields are initialized in Reset()    
         CFeeRate feePerKB;
@@ -824,10 +835,8 @@ private:
         std::chrono::milliseconds mMaxTxnChainValidationBudget;
 
         bool mValidationClockCPU;
-    
-        PTVTaskScheduleStrategy mPTVTaskScheduleStrategy;
 
-        bool mAcceptNonStandardOutput;
+        PTVTaskScheduleStrategy mPTVTaskScheduleStrategy;
 
         uint64_t mMaxCoinsViewCacheSize;
         uint64_t mMaxCoinsProviderCacheSize;
@@ -895,6 +904,8 @@ private:
 
         // RPC parameters
         uint64_t webhookClientNumThreads;
+        int64_t webhookClientMaxResponseBodySize;
+        int64_t webhookClientMaxResponseHeadersSize;
 
         // Double-Spend parameters
         DSAttemptHandler::NotificationLevel dsNotificationLevel;

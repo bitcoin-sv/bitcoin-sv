@@ -564,6 +564,7 @@ libbitcoin_common_a_SOURCES = \
   scheduler.cpp \
   script/sign.cpp \
   script/standard.cpp \
+  streams.cpp \
   transaction_specific_config.cpp \
   txhasher.cpp \
   write_preferring_upgradable_mutex.cpp \

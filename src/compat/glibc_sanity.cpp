@@ -6,6 +6,7 @@
 #include "config/bitcoin-config.h"
 #endif
 
+#include <array>
 #include <cstddef>
 
 #if defined(HAVE_SYS_SELECT_H)
@@ -23,16 +24,20 @@ namespace {
 // test: Fill an array with a sequence of integers. memcpy to a new empty array.
 //   Verify that the arrays are equal. Use an odd size to decrease the odds of
 //   the call being optimized away.
-template <unsigned int T> bool sanity_test_memcpy() {
-    unsigned int memcpy_test[T];
-    unsigned int memcpy_verify[T] = {};
-    for (unsigned int i = 0; i != T; ++i)
-        memcpy_test[i] = i;
+template <unsigned int T>
+bool sanity_test_memcpy()
+{
+    std::array<unsigned int, T> memcpy_test{};
+    std::array<unsigned int, T> memcpy_verify{};
+    for(unsigned int i{}; i != T; ++i)
+        memcpy_test[i] = i;  // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
 
-    memcpy_int(memcpy_verify, memcpy_test, sizeof(memcpy_test));
+    memcpy_int(memcpy_verify.data(), memcpy_test.data(), sizeof(memcpy_test));
 
-    for (unsigned int i = 0; i != T; ++i) {
-        if (memcpy_verify[i] != i) return false;
+    for(unsigned int i{}; i != T; ++i)
+    {
+        if(memcpy_verify[i] != i)  // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+            return false;
     }
     return true;
 }

@@ -9,7 +9,6 @@
 #include "zmq_publisher.h"
 
 #include <list>
-#include <map>
 #include <memory>
 
 class CBlockIndex;
@@ -21,12 +20,13 @@ struct ActiveZMQNotifier
     std::string notifierAddress;
 };
 
+
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class CZMQNotificationInterface final : public CValidationInterface
 {
 public:
     CZMQNotificationInterface();
-    virtual ~CZMQNotificationInterface();
+    ~CZMQNotificationInterface();
 
     static std::unique_ptr<CZMQNotificationInterface> Create();
     std::vector<ActiveZMQNotifier> ActiveZMQNotifiers();

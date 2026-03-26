@@ -75,6 +75,8 @@ LARGE_BLOCK_TESTS = [
 # - A test is vulnerable to CPU/RAM availability fluctuations
 
 SOLO_TESTS = {
+    "bsv-4gb-plus-block.py",
+    "bsv-genesis-large-blockfile-max-32-bit.py",
     "bsv-rpc-verifyscript.py",
     "wallet-encryption.py",
     "bsv-ptv-txn-chains.py",
@@ -86,7 +88,8 @@ SOLO_TESTS = {
     "bsv-dsattack-with-mocked-dsdetector.py",
     "bsv-p2p-dsdetected.py",
     "bsv-safe-mode.py",
-    "bsv-safe-mode-reorg-notification.py"
+    "bsv-safe-mode-reorg-notification.py",
+    "bsv-p2p-max-pending-responses.py"
 }
 
 ENVIRONMENT_TYPE = {
@@ -573,7 +576,9 @@ class TestHandler:
                             log_job.terminate()
                             log_job = None
                         log_out.seek(0), log_err.seek(0)
-                        [stdout, stderr] = [x.read().decode('utf-8')
+                        # Decode logs robustly: some tests may emit non-UTF-8 bytes.
+                        # Use UTF-8 with replacement to prevent the runner from crashing.
+                        [stdout, stderr] = [x.read().decode('utf-8', errors='replace')
                                             for x in (log_out, log_err)]
                         log_out.close(), log_err.close()
                         if proc.returncode == TEST_EXIT_PASSED and (stderr == "" or name in TESTS_WITH_DISABLED_STDERROR_CHECK):

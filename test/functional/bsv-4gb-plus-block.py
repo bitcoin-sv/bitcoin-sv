@@ -26,7 +26,7 @@ Mine a >4GB block on the node.
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.comptool import logger
-from test_framework.mininode import MY_VERSION, NodeConnCB, CTxOut, msg_tx, msg_block
+from test_framework.mininode import MY_VERSION, P2PEventHandler, CTxOut, msg_tx, msg_block
 from test_framework.util import wait_until, check_for_log_msg, connect_nodes, disconnect_nodes_bi, sync_blocks
 from test_framework.script import CScript, OP_TRUE, OP_FALSE, OP_RETURN, OP_DROP, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID
 from test_framework.cdefs import ONE_MEGABYTE, ONE_GIGABYTE
@@ -36,7 +36,7 @@ from test_framework.blocktools import create_block, create_coinbase, create_tx
 from operator import itemgetter
 
 
-class MyConnCB(NodeConnCB):
+class MyConnCB(P2PEventHandler):
 
     def __init__(self):
         super().__init__()
@@ -139,8 +139,8 @@ class BigBlockTests(BitcoinTestFramework):
 
             # Generate small block, verify we get it over both connections
             self.nodes[0].generate(1)
-            wait_until(lambda: newVerConn.cb.block_count == 1, timeout=int(30 * self.options.timeoutfactor))
-            wait_until(lambda: oldVerConn.cb.block_count == 1, timeout=int(30 * self.options.timeoutfactor))
+            wait_until(lambda: newVerConn.transport.cb.block_count == 1, timeout=int(30 * self.options.timeoutfactor))
+            wait_until(lambda: oldVerConn.transport.cb.block_count == 1, timeout=int(30 * self.options.timeoutfactor))
 
             # Get us a spendable output
             coinbase_tx = self.make_coinbase(newVerConn)
@@ -155,12 +155,12 @@ class BigBlockTests(BitcoinTestFramework):
             sync_blocks(itemgetter(0, 2)(self.nodes))
 
             # Mine a >4GB block, verify we only get it over the new connection
-            old_block_count = newVerConn.cb.block_count
+            old_block_count = newVerConn.transport.cb.block_count
             logger.info("Mining a big block")
             self.nodes[0].generate(1)
             assert (self.nodes[0].getmempoolinfo()['size'] == 0)
             logger.info("Waiting for block to arrive at test")
-            wait_until(lambda: newVerConn.cb.block_count == old_block_count + 1, timeout=int(1200 * self.options.timeoutfactor))
+            wait_until(lambda: newVerConn.transport.cb.block_count == old_block_count + 1, timeout=int(1200 * self.options.timeoutfactor))
 
             # Look for log message saying we won't send to old peer
             wait_until(lambda: check_for_log_msg(self, "cannot be sent because it exceeds max P2P message limit", "/node0"))

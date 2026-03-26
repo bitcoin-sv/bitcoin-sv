@@ -9,9 +9,6 @@
 #include <iterator>
 #include <string_view>
 
-#include "boost/algorithm/hex.hpp"
-
-#include "hash.h"
 #include "logging.h"
 #include "miner_id/miner_info.h"
 #include "miner_id/miner_info_error.h"
@@ -21,8 +18,6 @@
 #include "script/instruction.h"
 #include "script/instruction_iterator.h"
 #include "utilstrencodings.h"
-
-namespace ba = boost::algorithm;
 
 using namespace std;
 
@@ -68,11 +63,11 @@ namespace
                     }
                     brfcIds.push_back(refs[i]["brfcIds"][brfcIdx].get_str());
                 }
-                    
+
                 string compress;
                 if(refs[i].exists("compress") && refs[i]["compress"].isStr())
                     compress = refs[i]["compress"].get_str();
-               
+
                 dataRefs.push_back(CoinbaseDocument::DataRef{
                     brfcIds,
                     TxId { uint256S(refs[i]["txid"].get_str()) },
@@ -135,15 +130,7 @@ bool MinerId::SetStaticCoinbaseDocument(
 
     auto& height = document["height"];
     int32_t block_height{};
-    if(height.isNum())
-    {
-        block_height = height.get_int();
-    }
-    else if(height.isStr())
-    {
-        block_height = std::stoi(height.get_str());
-    }
-    else
+    if(!ParseInt32(height.getValStr(), &block_height))
     {
         LogInvalidDoc();
         return false;

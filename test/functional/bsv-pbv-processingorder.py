@@ -56,9 +56,7 @@ at the same time.
 """
 from test_framework.blocktools import prepare_init_chain
 from test_framework.mininode import (
-    NetworkThread,
-    NodeConn,
-    NodeConnCB,
+    P2PHandler,
     msg_block,
 )
 from test_framework.test_framework import BitcoinTestFramework, ChainManager
@@ -81,14 +79,8 @@ class PBVProcessingOrder(BitcoinTestFramework):
     def run_test(self):
         block_count = 0
 
-        # Create a P2P connections
-        node0 = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node0)
-        node0.add_connection(connection)
-
-        NetworkThread().start()
-        # wait_for_verack ensures that the P2P connection is fully up.
-        node0.wait_for_verack()
+        # Create a P2P connection
+        node0 = P2PHandler.connect('127.0.0.1', p2p_port(0), self.nodes[0])
 
         self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))
 

@@ -6,6 +6,7 @@
 from test_framework import mininode
 from test_framework.comptool import logger
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import assert_equal, p2p_port
 
 import contextlib
@@ -84,20 +85,18 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
         @contextlib.contextmanager
         def run_connection(test_node, title):
             logger.debug("setup %s", title)
-            connections = []
-            connections.append(
-                mininode.NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], test_node))
+            connection = mininode.P2PHandler(Connection('127.0.0.1', p2p_port(0), test_node),
+                                             self.nodes[0])
 
-            test_node.add_connection(connections[0])
-            thr = mininode.NetworkThread()
+            test_node.add_connection(connection)
+            thr = NetworkThread()
             thr.start()  # Start up network handling in another thread
 
             logger.debug("before %s", title)
             yield
             logger.debug("after %s", title)
 
-            connections[0].close()
-            del connections
+            connection.close()
             thr.join()
 
             logger.debug("finished %s", title)
@@ -106,7 +105,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
 
         # 1. test
         # Send protoconf with 0 fields. Bitcoind should disconnect the node, since minimum number of fields is 1
-        test_node = mininode.NodeConnCB()
+        test_node = mininode.P2PEventHandler()
 
         def send_protoconf(conn):
             conn.send_message(mininode.msg_protoconf(CProtoconfWithZeroFields()))
@@ -120,7 +119,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
 
         # 2. test
         # Send protoconf with 1B of max_recv_payload_length. Node should be disconnected, since minimum message size is 1MiB
-        test_node = mininode.NodeConnCB()
+        test_node = mininode.P2PEventHandler()
 
         def send_protoconf_1B(conn):
             conn.send_message(mininode.msg_protoconf(mininode.CProtoconf(1, 1)))
@@ -134,7 +133,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
 
         # 3. test
         # Send protoconf with numberOfFields=2. max_recv_payload_length should be parsed correctly.
-        test_node = mininode.NodeConnCB()
+        test_node = mininode.P2PEventHandler()
 
         def send_protoconf_2Fields(conn):
             conn.send_message(mininode.msg_protoconf(CProtoconfWithNewField(2, MESSAGE_LENGTH_1MiB_PLUS_1_ELEMENT, 5)))
@@ -180,7 +179,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
         ########
         # 4.test
         # Send protoconf that is LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH of size
-        test_node = mininode.NodeConnCB()
+        test_node = mininode.P2PEventHandler()
 
         def send_largest_protoconf(conn):
             # send protoconf of size LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH
@@ -194,7 +193,7 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
 
         # 5.test
         # Send protoconf that is larger that LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH
-        test_node = mininode.NodeConnCB()
+        test_node = mininode.P2PEventHandler()
 
         def send_oversized_protoconf(conn):
             # send protoconf of size LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH + 1

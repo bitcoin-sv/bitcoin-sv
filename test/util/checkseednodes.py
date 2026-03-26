@@ -10,8 +10,8 @@ import socket
 import sys
 
 from test_framework.mininode import (
-    NodeConn,
-    NodeConnCB,
+    P2PHandler,
+    P2PEventHandler,
     msg_verack,
     MY_VERSION,
     NetworkThread,
@@ -38,13 +38,13 @@ dnsseed_map = {
 }
 
 
-class SeedNodeConn(NodeConn):
+class SeedNodeConn(P2PHandler):
 
     def handle_error(self):
         pass
 
 
-class SeedNode(NodeConnCB):
+class SeedNode(P2PEventHandler):
     def __init__(self):
         super().__init__()
         self.log = False

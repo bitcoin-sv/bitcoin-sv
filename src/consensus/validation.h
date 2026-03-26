@@ -26,7 +26,8 @@ static const uint8_t REJECT_RATE_EXCEEDED = 0x45;
 /** Capture information about block/transaction validation */
 class CValidationState {
 private:
-    enum mode_state {
+    enum mode_state //NOLINT(cppcoreguidelines-use-enum-class)
+    {
         MODE_VALID,   //!< everything ok
         MODE_INVALID, //!< network rule violation (DoS value may be set)
         MODE_ERROR,   //!< run-time error

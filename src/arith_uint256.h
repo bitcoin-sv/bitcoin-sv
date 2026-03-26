@@ -23,6 +23,7 @@ public:
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 template <unsigned int BITS> class base_uint {
 protected:
+    // NOLINTNEXTLINE(cppcoreguidelines-use-enum-class)
     enum { WIDTH = BITS / 32 };
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     uint32_t pn[WIDTH];
@@ -70,14 +71,14 @@ public:
     const base_uint operator~() const {
         base_uint ret;
         for (int i = 0; i < WIDTH; i++)
-            ret.pn[i] = ~pn[i];
+            ret.pn[i] = ~pn[i]; //NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         return ret;
     }
 
     const base_uint operator-() const {
         base_uint ret;
         for (int i = 0; i < WIDTH; i++)
-            ret.pn[i] = ~pn[i];
+            ret.pn[i] = ~pn[i]; //NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         ret++;
         return ret;
     }
@@ -88,7 +89,7 @@ public:
         pn[0] = (unsigned int)b;
         pn[1] = (unsigned int)(b >> 32);
         for (int i = 2; i < WIDTH; i++)
-            pn[i] = 0;
+            pn[i] = 0; //NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         return *this;
     }
 
@@ -163,6 +164,7 @@ public:
     base_uint &operator++() {
         // prefix operator
         int i = 0;
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         while (++pn[i] == 0 && i < WIDTH - 1)
             i++;
         return *this;
@@ -231,6 +233,7 @@ public:
         return base_uint(a) *= b;
     }
     friend inline bool operator==(const base_uint &a, const base_uint &b) {
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
         return memcmp(a.pn, b.pn, sizeof(a.pn)) == 0;
     }
     friend inline bool operator>(const base_uint &a, const base_uint &b) {

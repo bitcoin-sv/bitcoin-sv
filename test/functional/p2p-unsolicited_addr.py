@@ -6,16 +6,16 @@
 Check that unsolicted ADDR messages don't get accepted and relayed.
 """
 
-from test_framework.mininode import CAddress, msg_addr, NetworkThread, \
-    NodeConn, NodeConnCB
+from test_framework.mininode import CAddress, msg_addr, P2PHandler, P2PEventHandler
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import connect_nodes_mesh, p2p_port
 
 import time
 
 
 # A connection handler that records recieved ADDR messages
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
     def __init__(self, id):
         super().__init__()
         self.id = id
@@ -45,7 +45,8 @@ class UnsolictedAddr(BitcoinTestFramework):
         connections = []
         for i in range(self.num_nodes):
             node = TestNode(i)
-            connection = NodeConn('127.0.0.1', p2p_port(i), self.nodes[i], node)
+            connection = P2PHandler(Connection('127.0.0.1', p2p_port(i), node),
+                                    self.nodes[i])
             node.add_connection(connection)
             connections.append(connection)
             test_nodes.append(node)

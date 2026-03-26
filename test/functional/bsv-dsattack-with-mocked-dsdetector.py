@@ -13,7 +13,10 @@ from test_framework.util import assert_equal, connect_nodes_bi, connect_nodes, s
 from test_framework.key import CECKey
 from test_framework.blocktools import create_block, create_coinbase
 from test_framework.script import hash160, CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, SignatureHash, SIGHASH_ALL, SIGHASH_FORKID
-from test_framework.mininode import CTransaction, CTxOut, CTxIn, COutPoint, ToHex, NetworkThread, NodeConn, NodeConnCB, msg_dsdetected, BlockDetails, CBlockHeader, DSMerkleProof, MerkleProofNode, FromHex, CBlock
+from test_framework.mininode import CTransaction, CTxOut, CTxIn, COutPoint, ToHex, \
+    P2PHandler, P2PEventHandler, msg_dsdetected, BlockDetails, CBlockHeader, DSMerkleProof, \
+    MerkleProofNode, FromHex, CBlock
+from test_framework.transport import NetworkThread, Connection
 from test_framework.authproxy import JSONRPCException
 
 ### BEGIN MOCKING CLASSES
@@ -30,8 +33,9 @@ from functools import partial
 
 class MockDsdetector():
     def __init__(self, testRig, node):
-        self.peer = NodeConnCB()
-        self.peer.add_connection(NodeConn('127.0.0.1', p2p_port(0), node, self.peer))
+        self.peer = P2PEventHandler()
+        self.peer.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), self.peer),
+                                            node))
         NetworkThread().start()
         self.peer.wait_for_verack()
         testRig.dsdetector = self
@@ -114,14 +118,16 @@ class Exchange():
     def start_webhook_server(self):
         self.server = HTTPServer(('localhost', 8888), partial(WebHookService))
         self.serverThread = threading.Thread(target=self.server.serve_forever)
-        self.serverThread.deamon = True
+        self.serverThread.daemon = True
         self.serverThread.start()
         self.conn = httplib.HTTPConnection("localhost:8888")
 
     def stop_webhook_server(self):
         self.server.shutdown()
         self.server.server_close()
-        self.serverThread.join()
+        self.serverThread.join(timeout=10)
+        if self.serverThread.is_alive():
+            raise Exception("Server thread did not terminate")
 
     def get_JSON_notification(self):
         # Query webhook server for the JSON notification

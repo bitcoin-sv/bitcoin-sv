@@ -23,8 +23,3 @@ size_t single_seg_parser::size() const
     return segment_.size();
 }
 
-void single_seg_parser::clear()
-{
-    segment_.clear();
-}
-

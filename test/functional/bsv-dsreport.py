@@ -7,7 +7,7 @@ from ds_callback_service.CallbackService import CallbackService, RECEIVE, \
     STATUS, RESPONSE_TIME, FLAG
 from test_framework.comptool import logger
 from test_framework.mininode import CallbackMessage, COutPoint, CTransaction, \
-    CTxIn, CTxOut, FromHex, msg_tx, NetworkThread, NodeConn, NodeConnCB, ToHex
+    CTxIn, CTxOut, FromHex, msg_tx, P2PHandler, ToHex
 from test_framework.script import CScript, OP_ADD, OP_DROP, OP_FALSE, OP_MUL, \
     OP_RETURN, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
@@ -100,21 +100,18 @@ class DoubleSpendReport(BitcoinTestFramework):
 
     def start_server(self):
         self.serverThread = threading.Thread(target=self.server.serve_forever)
-        self.serverThread.deamon = True
+        self.serverThread.daemon = True
         self.serverThread.start()
 
     def kill_server(self):
         self.server.shutdown()
         self.server.server_close()
-        self.serverThread.join()
+        self.serverThread.join(timeout=10)
+        if self.serverThread.is_alive():
+            raise Exception("Server thread did not terminate")
 
     def createConnection(self):
-        self.node0 = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], self.node0)
-        self.node0.add_connection(connection)
-
-        NetworkThread().start()
-        self.node0.wait_for_verack()
+        self.node0 = P2PHandler.connect('127.0.0.1', p2p_port(0), self.nodes[0])
 
     def create_and_send_transaction(self, inputs, outputs):
         tx = CTransaction()
@@ -567,7 +564,7 @@ class DoubleSpendReport(BitcoinTestFramework):
     def run_test(self):
 
         # Turn on CallbackService.
-        handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.YES)
+        handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.YES, 0, 0)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
         self.conn = httplib.HTTPConnection(self.callback_serviceIPv4)
@@ -601,7 +598,7 @@ class DoubleSpendReport(BitcoinTestFramework):
         self.kill_server()
 
         # Turn on CallbackService.
-        handler = partial(CallbackService, RECEIVE.NO, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.YES)
+        handler = partial(CallbackService, RECEIVE.NO, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.YES, 0, 0)
         self.server = HTTPServer(('localhost', 8080), handler)
         self.start_server()
         self.conn = httplib.HTTPConnection(self.callback_serviceIPv4)
@@ -617,7 +614,7 @@ class DoubleSpendReport(BitcoinTestFramework):
 
         if ping6("::1"):
             # Turn on CallbackService that runs on IPv6 address.
-            handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.YES)
+            handler = partial(CallbackService, RECEIVE.YES, STATUS.SUCCESS, RESPONSE_TIME.FAST, FLAG.YES, 0, 0)
             self.server = HTTPServerV6(('::', 8080), handler)
             self.start_server()
             self.conn = httplib.HTTPConnection(self.callback_serviceIPv6)

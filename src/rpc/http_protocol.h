@@ -6,7 +6,8 @@
 #pragma once
 
 // HTTP status codes
-enum HTTPStatusCode {
+enum HTTPStatusCode //NOLINT(cppcoreguidelines-use-enum-class)
+{
     HTTP_OK = 200,
     HTTP_PARTIAL_CONTENT = 206,
     HTTP_BAD_REQUEST = 400,

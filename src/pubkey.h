@@ -62,34 +62,40 @@ class CPubKey
 
 public:
     //! Construct an invalid public key.
-    CPubKey() { Invalidate(); }
+    CPubKey() { Invalidate(); } //NOLINT(cppcoreguidelines-pro-type-member-init)
 
     //! Initialize a public key using begin/end iterators to byte data.
     template<typename T>
     void Set(const T pbegin, const T pend)
     {
+        //NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         auto len = pend == pbegin ? 0u : GetLen(pbegin[0]);
         if(len && len == (pend - pbegin))
             memcpy(vch.data(), (uint8_t*)&pbegin[0], len);
         else
             Invalidate();
+        //NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     //! Construct a public key using begin/end iterators to byte data.
     template <typename T> 
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CPubKey(const T pbegin, const T pend) {
         Set(pbegin, pend);
     }
 
     //! Construct a public key from a byte vector.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CPubKey(const std::vector<uint8_t> &_vch) { Set(_vch.begin(), _vch.end()); }
 
     //! Simple read-only vector-like interface to the pubkey data.
     unsigned int size() const { return GetLen(vch[0]); }
     const_iterator begin() const noexcept { return vch.begin(); }
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     const_iterator end() const noexcept { return vch.begin() + size(); }
     pointer data() noexcept { return vch.data(); }
     const_pointer data() const noexcept { return vch.data(); }
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
     const uint8_t& operator[](unsigned int pos) const { return vch[pos]; }
 
     friend auto operator<=>(const CPubKey& a, const CPubKey& b)
@@ -134,11 +140,13 @@ public:
     //! Get the KeyID of this public key (hash of its serialization)
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-*)
     CKeyID GetID() const { return CKeyID(Hash160(vch.data(),
+                           // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                                                  vch.data() + size())); }
 
     //! Get the 256-bit hash of this public key.
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-*)
     uint256 GetHash() const { return Hash(vch.data(),
+                           // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                                           vch.data() + size()); }
 
     /*

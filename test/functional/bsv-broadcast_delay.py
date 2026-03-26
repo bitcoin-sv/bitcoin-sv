@@ -4,9 +4,10 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.mininode import CInv, COutPoint, CTransaction, CTxIn, \
-    CTxOut, FromHex, NetworkThread, msg_ping, msg_tx, ToHex
+    CTxOut, FromHex, msg_ping, msg_tx, ToHex
 from test_framework.script import CScript, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import NetworkThread
 
 from threading import Thread
 
@@ -89,10 +90,10 @@ class BroadcastDelayTest(BitcoinTestFramework):
             begin_test = datetime.datetime.now()
 
             # node1 sends transaction to bitcoind
-            connection1.cb.send_message(msg_tx(tx))
+            connection1.transport.cb.send_message(msg_tx(tx))
             # assert that node2 gets INV with previously sent transaction
             msg = [CInv(CInv.TX, tx.sha256)]
-            connection2.cb.wait_for_inv(msg, check_interval=0.001) # Use small check interval to minimize errors in elapsed time measurement
+            connection2.transport.cb.wait_for_inv(msg, check_interval=0.001) # Use small check interval to minimize errors in elapsed time measurement
 
             end_test = datetime.datetime.now()
             elapsed_test = end_test - begin_test

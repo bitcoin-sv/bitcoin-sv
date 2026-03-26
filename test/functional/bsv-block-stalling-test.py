@@ -56,8 +56,8 @@ class StallingTest(ComparisonTestFramework):
         block(1, spend=out[0], block_size=1 * ONE_GIGABYTE)
         yield self.accepted(420) # larger timeout is needed to prevent timeouts on busy machine and debug builds
 
-        # Create long chain of smaller blocks
-        test = TestInstance(sync_every_block=False)
+        # Create long chain of smaller blocks (larger timeout is needed to prevent timeouts on busy machine and debug builds)
+        test = TestInstance(sync_every_block=False, timeout_to_requested_block=120 * self.options.timeoutfactor)
         for i in range(self.num_blocks):
             block(6000 + i, spend=out[i + 1], block_size=64 * ONE_KILOBYTE)
             test.blocks_and_transactions.append([self.chain.tip, True])

@@ -4,13 +4,13 @@
 
 # Check detection of too many pending responses for getheaders/gethdrsen requests
 
-from test_framework.mininode import NodeConnCB, mininode_lock
+from test_framework.mininode import P2PEventHandler, mininode_lock
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, count_log_msg, wait_until
 import types
 
 
-class NodeConnCBWithHeadersCount(NodeConnCB):
+class P2PEventHandlerWithHeadersCount(P2PEventHandler):
     def __init__(self):
         super().__init__()
         self.num_headers_msgs_received = 0
@@ -30,6 +30,7 @@ class P2PPendingResponses(BitcoinTestFramework):
     def send_requests_without_reading_responses(self, node_args, request_command, num_requests, expect_disconnect):
         # Helper to create GETHEADERS/GETHDRSEN P2P message with locator which specifies a block that is not on node's active chain.
         # After sending this message to the node, node will respond with HEADERS/HDRSEN P2P message that contains up to 2000 headers from the start of the active chain.
+
         class msg_raw():
             def __init__(self, request_command):
                 self.command = request_command.encode("ascii")
@@ -42,7 +43,7 @@ class P2PPendingResponses(BitcoinTestFramework):
                     + b'\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11\x11' \
                     + b'\x11\x11\x11\x11\x11'
 
-        with self.run_node_with_connections("P2PPendingResponses", node_index=0, cb_class=NodeConnCBWithHeadersCount, args=node_args, number_of_connections=1) as conns:
+        with self.run_node_with_connections("P2PPendingResponses", node_index=0, cb_class=P2PEventHandlerWithHeadersCount, args=node_args, number_of_connections=1) as conns:
             conn = conns[0]
             log_msg_request_received = f"received: {request_command}"
 
@@ -52,12 +53,12 @@ class P2PPendingResponses(BitcoinTestFramework):
                 initial_request_cnt = count_log_msg(conn.rpc, log_msg_request_received)
 
             self.log.info("Disable reading from socket in mininode")
-            conn.orig_conn_readable = conn.readable
+            conn.transport.orig_conn_readable = conn.transport.readable
 
             def conn_readable_false(self):
                 return False
 
-            conn.readable = types.MethodType(conn_readable_false, conn)
+            conn.transport.readable = types.MethodType(conn_readable_false, conn)
 
             num_sent_before_disconnect = 0
             self.log.info(f"Sending {num_requests} {request_command} requests, expect_disconnect: {expect_disconnect}")
@@ -88,15 +89,15 @@ class P2PPendingResponses(BitcoinTestFramework):
                 assert_equal(len(conn.rpc.getpeerinfo()), 1)
 
             self.log.info("Enable reading from socket in mininode")
-            conn.readable = conn.orig_conn_readable
+            conn.transport.readable = conn.transport.orig_conn_readable
 
             if expect_disconnect:
                 # NOTE: mininode will only report disconnect if reading is enabled
-                conn.cb.wait_for_disconnect()
+                conn.transport.cb.wait_for_disconnect()
             else:
                 # If no disconnect is expected, we should receive all responses
                 self.log.info(f"Waiting until {num_requests} responses are received")
-                wait_until(lambda: conn.cb.num_headers_msgs_received == num_requests, check_interval=1, lock=mininode_lock)
+                wait_until(lambda: conn.transport.cb.num_headers_msgs_received == num_requests, check_interval=1, lock=mininode_lock)
 
     def run_test(self):
         # Mine some blocks so that HEADERS response returned by GETHEADERS will be as large as possible.

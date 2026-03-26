@@ -87,8 +87,9 @@ std::string DateTimeStrFormat(const char* pszFormat, int64_t nTime)
     return ss.str();
 }
 
-std::string DateTimeFormatISO8601(int64_t nTime) {
-    struct tm ts;
+std::string DateTimeFormatISO8601(int64_t nTime)
+{
+    struct tm ts; //NOLINT(cppcoreguidelines-pro-type-member-init)
     time_t time_val = nTime;
 #ifdef WIN32
     // On windows gmtime_s must be used because gmtime_r is not available

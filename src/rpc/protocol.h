@@ -16,7 +16,8 @@
 #include <univalue.h>
 
 //! Bitcoin RPC error codes
-enum RPCErrorCode {
+enum RPCErrorCode //NOLINT(cppcoreguidelines-use-enum-class)
+{
     //! Standard JSON-RPC 2.0 errors
     // RPC_INVALID_REQUEST is internally mapped to HTTP_BAD_REQUEST (400).
     // It should not be used for application-layer errors.

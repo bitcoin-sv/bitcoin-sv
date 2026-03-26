@@ -61,7 +61,8 @@ struct DefaultBlockSizeParams {
  */
 class CChainParams {
 public:
-    enum Base58Type {
+    enum Base58Type //NOLINT(cppcoreguidelines-use-enum-class)
+    {
         PUBKEY_ADDRESS,
         SCRIPT_ADDRESS,
         SECRET_KEY,

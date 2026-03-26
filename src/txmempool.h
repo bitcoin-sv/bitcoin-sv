@@ -964,10 +964,10 @@ public:
     std::vector<TxMempoolInfo> InfoMatching(F&& func) const
     {
         std::vector<TxMempoolInfo> ret {};
-        ret.reserve(mapTx.size());
 
         {
             std::shared_lock lock {smtx};
+            ret.reserve(mapTx.size());
             for(const auto& entry : mapTx.get<insertion_order>())
             {
                 if(std::forward<F>(func)(entry))

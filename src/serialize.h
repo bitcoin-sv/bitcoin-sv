@@ -166,7 +166,8 @@ inline float ser_uint32_to_float(uint32_t y) {
 //
 class CSizeComputer;
 
-enum {
+enum  //NOLINT(cppcoreguidelines-use-enum-class)
+{
     // primary actions
     SER_NETWORK = (1 << 0),
     SER_DISK = (1 << 1),
@@ -380,7 +381,7 @@ void WriteVarInt(Stream &os, I n) {
     uint8_t tmp[(sizeof(n) * 8 + 6) / 7];
     int len = 0;
     while (true) {
-        tmp[len] = (n & 0x7F) | (len ? 0x80 : 0x00);
+        tmp[len] = (n & 0x7F) | (len ? 0x80 : 0x00); //NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
         if (n <= 0x7F) {
             break;
         }
@@ -388,7 +389,7 @@ void WriteVarInt(Stream &os, I n) {
         len++;
     }
     do {
-        ser_writedata8(os, tmp[len]);
+        ser_writedata8(os, tmp[len]); //NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
     } while (len--);
 }
 
@@ -444,13 +445,13 @@ public:
     template<class T, class TAl>
     explicit CFlatData(std::vector<T, TAl>& v):
         pbegin{(char *)v.data()},
-        pend{(char *)(v.data() + v.size())}
+        pend{(char *)(v.data() + v.size())} //NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     {}
 
     template <unsigned int N, typename T, typename S, typename D>
     explicit CFlatData(prevector<N, T, S, D>& v):
         pbegin{(char *)v.data()},
-        pend{(char *)(v.data() + v.size())}
+        pend{(char *)(v.data() + v.size())} //NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     {}
 
     char *begin() { return pbegin; }

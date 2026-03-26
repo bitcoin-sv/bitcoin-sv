@@ -13,17 +13,18 @@ this one can be extended, to cover the checks done for bigger blocks
 
 from test_framework.blocktools import prepare_init_chain
 from test_framework.cdefs import ONE_MEGABYTE
+from test_framework.transport import Connection
 from test_framework.mininode import CTxOut, HeaderAndShortIDs, mininode_lock, \
-    msg_cmpctblock, msg_sendcmpct, NodeConn, NodeConnCB
-from test_framework.test_framework import ComparisonTestFramework
+    msg_cmpctblock, msg_sendcmpct, P2PHandler, P2PEventHandler
 from test_framework.script import CScript, OP_RETURN
+from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import p2p_port, wait_until
 
 import random
 
 
 # TestNode: A peer we use to send messages to bitcoind, and store responses.
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
 
     def __init__(self):
         self.last_sendcmpct = None
@@ -102,7 +103,7 @@ class FullBlockTest(ComparisonTestFramework):
         # Check that compact block also work for big blocks
         node = self.nodes[0]
         peer = TestNode()
-        peer.add_connection(NodeConn('127.0.0.1', p2p_port(0), node, peer))
+        peer.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), peer), node))
 
         # Wait for connection to be etablished
         peer.wait_for_verack()

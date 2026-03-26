@@ -15,6 +15,7 @@ CHMAC_SHA512::CHMAC_SHA512(const uint8_t *key, size_t keylen)
     if(keylen <= rkey.size())
     {
         memcpy(rkey.data(), key, keylen);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         memset(rkey.data() + keylen, 0, 128 - keylen);
     }
     else
@@ -22,6 +23,7 @@ CHMAC_SHA512::CHMAC_SHA512(const uint8_t *key, size_t keylen)
         CSHA512()
             .Write(key, keylen)
             .Finalize(CSHA512::span{rkey.data(), CSHA512::OUTPUT_SIZE});
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         memset(rkey.data() + 64, 0, 64);
     }
 

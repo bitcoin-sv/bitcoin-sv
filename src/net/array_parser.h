@@ -27,7 +27,7 @@ public:
     using size_type = std::vector<value_type>::size_type;
 
     std::pair<size_t, size_t> operator()(std::span<const uint8_t> s);
-    
+
     size_t size() const;
     [[nodiscard]] size_t readable_size() const;
     bool empty() const { return size() == 0; }
@@ -48,13 +48,11 @@ public:
 
     void reset(size_t segment);
 
-    void clear() { segments_.clear(); size_ = 0;}
-
 private:
     std::pair<size_t, size_t> parse_seg_count(std::span<const uint8_t>);
 
     void init_cum_lengths() const;
-    
+
     T parser_;
     std::optional<uint64_t> n_{};
     uint64_t current_{};
@@ -119,7 +117,7 @@ inline std::pair<size_t, size_t> array_parser<T>::operator()(std::span<const uin
         segments_.push_back(std::move(parser_).buffer());
         ++current_;
     }
-    
+
     return make_pair(total_bytes_read, 0);
 }
 
@@ -159,7 +157,7 @@ inline void array_parser<T>::init_cum_lengths() const
                    {
                        return a.size();
                    });
-    
+
     cum_lengths_.reserve(seg_lengths.size());
     std::partial_sum(seg_lengths.cbegin(), seg_lengths.cend(), 
                     back_inserter(cum_lengths_));

@@ -254,13 +254,13 @@ bool SelfTest(TransformType tr)
         return false;
 
     // Process the padded empty string (unaligned)
-    tr(buf.data(), in1.data() + 1, 1);
+    tr(buf.data(), in1.data() + 1, 1); //NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     if(memcmp(buf.data(), out1.data(), sizeof(buf)) != 0)
         return false;
 
     // Process 64 spaces (unaligned)
     memcpy(buf.data(), init.data(), sizeof(buf));
-    tr(buf.data(), in2.data() + 1, 2);
+    tr(buf.data(), in2.data() + 1, 2); //NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     if(memcmp(buf.data(), out2.data(), sizeof(buf)) != 0)
         return false;
 
@@ -324,6 +324,7 @@ CSHA256& CSHA256::Write(const uint8_t* data, size_t len)
     if(end > data)
     {
         // Fill the buffer with what remains.
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         memcpy(buf.data() + bufsize, data, end - data);
         bytes += end - data;
     }
@@ -339,6 +340,7 @@ void CSHA256::Finalize(const span hash)
     Write(pad.data(), 1 + ((119 - (bytes % 64)) % 64));
     Write(sizedesc.data(), 8);
     WriteBE32(hash.data(), s[0]);
+    //NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     WriteBE32(hash.data() + 4, s[1]);
     WriteBE32(hash.data() + 8, s[2]);
     WriteBE32(hash.data() + 12, s[3]);
@@ -346,6 +348,7 @@ void CSHA256::Finalize(const span hash)
     WriteBE32(hash.data() + 20, s[5]);
     WriteBE32(hash.data() + 24, s[6]);
     WriteBE32(hash.data() + 28, s[7]);
+    //NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 }
 
 CSHA256& CSHA256::Reset()

@@ -6,8 +6,9 @@
 from test_framework.authproxy import JSONRPCException
 from test_framework.blocktools import create_block, create_coinbase
 from test_framework.mininode import CBlockHeader, CInv, mininode_lock, \
-    msg_block, msg_headers, msg_inv, NetworkThread, NodeConn, NodeConnCB
+    msg_block, msg_headers, msg_inv, P2PHandler, P2PEventHandler
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import assert_raises_rpc_error, assert_equal, \
     p2p_port
 
@@ -25,7 +26,7 @@ Setup: two nodes, node0 and node1, not connected to each other.  Node0 does not
 whitelist localhost, but node1 does. They will each be on their own chain for
 this test.
 
-We have one NodeConn connection to each, test_node and white_node respectively.
+We have one P2PHandler connection to each, test_node and white_node respectively.
 
 The test:
 1. Generate one block on each node, to leave IBD.
@@ -82,15 +83,17 @@ class AcceptBlockTest(BitcoinTestFramework):
 
     def run_test(self):
         # Setup the p2p connections and start up the network thread.
-        test_node = NodeConnCB()   # connects to node0 (not whitelisted)
-        white_node = NodeConnCB()  # connects to node1 (whitelisted)
+        test_node = P2PEventHandler()   # connects to node0 (not whitelisted)
+        white_node = P2PEventHandler()  # connects to node1 (whitelisted)
 
         connections = []
-        connections.append(
-            NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], test_node))
-        connections.append(
-            NodeConn('127.0.0.1', p2p_port(1), self.nodes[1], white_node))
+
+        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(0), test_node),
+                                      self.nodes[0]))
         test_node.add_connection(connections[0])
+
+        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(1), white_node),
+                                      self.nodes[1]))
         white_node.add_connection(connections[1])
 
         NetworkThread().start()  # Start up network handling in another thread

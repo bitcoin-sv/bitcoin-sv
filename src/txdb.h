@@ -301,8 +301,10 @@ private:
 class CoinsDBView : public ICoinsView
 {
 public:
+    // NOLINTBEGIN(cppcoreguidelines-virtual-class-destructor)
     friend class CoinsViewLockedMemPoolNL;
-    friend class CCoinsViewMemPool; // NOLINT(cppcoreguidelines-virtual-class-destructor)
+    friend class CCoinsViewMemPool; 
+    // NOLINTEND(cppcoreguidelines-virtual-class-destructor)
 
     CoinsDBView(const CoinsDB& db)
         : mDB{db}

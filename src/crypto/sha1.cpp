@@ -193,6 +193,7 @@ CSHA1& CSHA1::Write(const uint8_t* data, size_t len)
     if(end > data)
     {
         // Fill the buffer with what remains.
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         memcpy(buf.data() + bufsize, data, end - data);
         bytes += end - data;
     }
@@ -208,10 +209,12 @@ void CSHA1::Finalize(const span hash)
     Write(pad.data(), 1 + ((119 - (bytes % 64)) % 64));
     Write(sizedesc.data(), 8);
     WriteBE32(hash.data(), s[0]);
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     WriteBE32(hash.data() + 4, s[1]);
     WriteBE32(hash.data() + 8, s[2]);
     WriteBE32(hash.data() + 12, s[3]);
     WriteBE32(hash.data() + 16, s[4]);
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 }
 
 CSHA1& CSHA1::Reset()

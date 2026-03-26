@@ -7,7 +7,7 @@ Verify that a large reorg across the Genesis boundary does not result in any
 journal errors.
 '''
 
-from test_framework.mininode import NetworkThread, NodeConn, NodeConnCB, \
+from test_framework.mininode import P2PHandler, \
     COutPoint, CTransaction, CTxIn, CTxOut
 from test_framework.script import CScript, OP_TRUE, OP_ADD, OP_DROP, OP_4, \
     OP_CHECKSIG
@@ -95,16 +95,7 @@ class JournalReorg(BitcoinTestFramework):
 
     def run_test(self):
         # Create a P2P connection to one of the nodes
-        node0 = NodeConnCB()
-        connections = []
-        connections.append(NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node0))
-        node0.add_connection(connections[0])
-
-        # Start up network handling in another thread. This needs to be called
-        # after the P2P connections have been created.
-        NetworkThread().start()
-        # wait_for_verack ensures that the P2P connection is fully up.
-        node0.wait_for_verack()
+        P2PHandler.connect('127.0.0.1', p2p_port(0), self.nodes[0])
 
         # Generate blocks on each node to get us out of IBD and have some funds to spend
         for node in self.nodes:

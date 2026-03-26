@@ -78,6 +78,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
                  CScheduler &scheduler, const task::CCancellationToken& shutdownToken);
 
 /** The help message mode determines what help message to show */
+//NOLINTNEXTLINE(cppcoreguidelines-use-enum-class)
 enum HelpMessageMode { HMM_BITCOIND };
 
 /** Help for options shared between UI and daemon (for -help) */

@@ -27,7 +27,8 @@ class WebhookHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         content_length = int(self.headers['Content-Length'])
         body = self.rfile.read(content_length).decode("utf-8")
-        self.test.webhook_messages.append(loads(body))
+        with self.test.webhook_lock:
+            self.test.webhook_messages.append(loads(body))
 
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
@@ -40,15 +41,21 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
 class SafeModeIBDTest(BitcoinTestFramework):
 
+    def __init__(self):
+        super().__init__()
+        self.webhook_lock = threading.Lock()  # Protect webhook_messages access
+
     def start_server(self):
         self.serverThread = threading.Thread(target=self.server.serve_forever)
-        self.serverThread.deamon = True
+        self.serverThread.daemon = True
         self.serverThread.start()
 
     def kill_server(self):
         self.server.shutdown()
         self.server.server_close()
-        self.serverThread.join()
+        self.serverThread.join(timeout=10)
+        if self.serverThread.is_alive():
+            raise Exception("Server thread did not terminate")
 
     def make_handler(self, *a, **kw):
         return WebhookHandler(self, *a, **kw)
@@ -71,7 +78,8 @@ class SafeModeIBDTest(BitcoinTestFramework):
 
         # setting up webhook http server
         self.PORT = 8999
-        self.webhook_messages = []
+        with self.webhook_lock:
+            self.webhook_messages = []
         self.server = HTTPServer(('', self.PORT), self.make_handler)
         self.start_server()
 
@@ -86,10 +94,11 @@ class SafeModeIBDTest(BitcoinTestFramework):
         # give time for messages to arrive
         sleep(5)
         # we should not receive receive messages
-        assert len(self.webhook_messages) == 0
+        with self.webhook_lock:
+            assert len(self.webhook_messages) == 0
 
         # start second node with 48 hours in the furture. this will trigger initial block download mode
-        self.start_node(1, extra_args=[f"-mocktime={int(time.time()) + 48*60*60}", f"-safemodewebhookurl=http://127.0.0.1:{self.PORT}/safemode", ])
+        self.start_node(1, extra_args=[f"-mocktime={int(time.time()) + 48 * 60 * 60}", f"-safemodewebhookurl=http://127.0.0.1:{self.PORT}/safemode", ])
         connect_nodes(self.nodes, 0, 1)
 
         # wait until nodes sync themselves
@@ -102,7 +111,8 @@ class SafeModeIBDTest(BitcoinTestFramework):
         self.nodes[1].generate(1)
 
         # still we should not receive receive messages
-        assert len(self.webhook_messages) == 0
+        with self.webhook_lock:
+            assert len(self.webhook_messages) == 0
 
         self.kill_server()
 

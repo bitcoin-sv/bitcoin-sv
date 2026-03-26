@@ -23,11 +23,10 @@ from time import sleep
 import re
 
 from test_framework.cdefs import ONE_MEGABYTE, ELEMENT_OVERHEAD
-from test_framework.mininode import NodeConn, FromHex
+from test_framework.mininode import FromHex
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.test_node import TestNode
 from test_framework.util import hex_str_to_bytes, assert_raises_rpc_error, assert_equal, \
-    wait_until, p2p_port, bytes_to_hex_str, connect_nodes_bi, hashToHex, satoshi_round, sync_blocks
+    wait_until, bytes_to_hex_str, connect_nodes_bi, hashToHex, satoshi_round, sync_blocks
 from test_framework.script import OP_1, OP_FALSE, OP_RETURN, OP_TRUE, OP_CHECKSIG, OP_DROP, OP_DUP, OP_HASH160, \
     OP_EQUALVERIFY, OP_ADD, OP_CAT
 from test_framework.blocktools import COIN, CScript, CTransaction, CTxOut, CTxIn, COutPoint, uint256_from_str, ToHex, \
@@ -328,12 +327,6 @@ class SendrawtransactionsSkipFlags(BitcoinTestFramework):
         ftx.rehash()
         tx = self.nodes[0].signrawtransaction(ToHex(ftx))['hex']
         return tx
-
-    def run_test_node(self, node_index=0, dstaddr='127.0.0.1', dstportno=0, num_of_connections=1):
-        test_node = TestNode()
-        conn = NodeConn(dstaddr, p2p_port(dstportno), self.nodes[node_index], test_node)
-        test_node.add_connection(conn)
-        return test_node, conn
 
     def run_test(self):
         #generate 500 utxos

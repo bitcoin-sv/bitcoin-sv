@@ -36,9 +36,9 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
             assert_equal(msg.reason, b'mandatory-script-verify-flag-failed (Only non-push operators allowed in signatures)')
 
         transaction_op_add = create_transaction(out.tx, out.n, CScript([1, 1, OP_ADD, OP_DROP]), 100000, CScript([OP_TRUE]))
-        self.test.connections[0].cb.on_reject = on_reject
+        self.test.connections[0].transport.cb.on_reject = on_reject
         self.test.connections[0].send_message(msg_tx(transaction_op_add))
-        self.test.connections[0].cb.wait_for_reject()
+        self.test.connections[0].transport.cb.wait_for_reject()
 
     def get_tests(self):
 

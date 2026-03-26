@@ -717,7 +717,7 @@ public:
         return GetHeaderReceivedTime() - GetBlockTime();
     }
 
-    enum { nMedianTimeSpan = 11 };
+    enum { nMedianTimeSpan = 11 }; //NOLINT(cppcoreguidelines-use-enum-class)
 
     int64_t GetMedianTimePast() const
     {
@@ -1225,8 +1225,8 @@ const CBlockIndex *LastCommonAncestor(const CBlockIndex *pa,
 struct CBlockIndexWorkComparator {
     bool operator()(const CBlockIndex *pa, const CBlockIndex *pb) const {
         // First sort by most total work, ...
-        auto paChainWork = pa->GetChainWork();
-        auto pbChainWork = pb->GetChainWork();
+        const auto& paChainWork = pa->GetChainWork();
+        const auto& pbChainWork = pb->GetChainWork();
         if (paChainWork > pbChainWork)
         {
             return false;

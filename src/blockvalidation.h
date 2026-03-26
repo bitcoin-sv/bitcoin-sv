@@ -119,15 +119,11 @@ public:
     {
         std::lock_guard lockGuard{mMutexCurrentlyValidatingBlocks};
 
-        int count =
-            std::count_if(
-                mCurrentlyValidatingBlocks.begin(),
-                mCurrentlyValidatingBlocks.end(),
-                [&index](const CBlockIndex* other)
-                {
-                    return index.GetHeight() == other->GetHeight();
-                });
-
+        // NOLINTNEXTLINE(*-narrowing-conversions)
+        int count = std::count_if(mCurrentlyValidatingBlocks.begin(),
+                                  mCurrentlyValidatingBlocks.end(),
+                                  [&index](const CBlockIndex* other)
+                                  { return index.GetHeight() == other->GetHeight(); });
         return count >= thresholdNumber;
     }
 

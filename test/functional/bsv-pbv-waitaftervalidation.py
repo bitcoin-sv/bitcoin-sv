@@ -21,12 +21,12 @@ We are artificially extending validation time by calling waitaftervalidatingbloc
 """
 from test_framework.blocktools import prepare_init_chain
 from test_framework.mininode import (
-    NetworkThread,
-    NodeConn,
-    NodeConnCB,
+    P2PHandler,
+    P2PEventHandler,
     msg_block,
 )
 from test_framework.test_framework import BitcoinTestFramework, ChainManager
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import p2p_port, assert_equal
 from bsv_pbv_common import (
     wait_for_waiting_blocks,
@@ -46,17 +46,17 @@ class PBVWaitAfterValidation(BitcoinTestFramework):
         block_count = 0
 
         # Create a P2P connections
-        node0 = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node0)
-        node0.add_connection(connection)
+        node0 = P2PEventHandler()
+        node0.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), node0),
+                                        self.nodes[0]))
 
-        node1 = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node1)
-        node1.add_connection(connection)
+        node1 = P2PEventHandler()
+        node1.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), node1),
+                                        self.nodes[0]))
 
-        node2 = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node2)
-        node2.add_connection(connection)
+        node2 = P2PEventHandler()
+        node2.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), node2),
+                                        self.nodes[0]))
 
         NetworkThread().start()
         # wait_for_verack ensures that the P2P connection is fully up.

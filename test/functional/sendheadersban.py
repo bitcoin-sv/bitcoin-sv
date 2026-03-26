@@ -2,15 +2,15 @@
 # Copyright (c) 2018-2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.mininode import msg_sendheaders, NetworkThread, \
-    NodeConn, NodeConnCB
+from test_framework.mininode import msg_sendheaders, P2PHandler, P2PEventHandler
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import assert_greater_than, p2p_port
 
 import time
 
 
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
     def __init__(self):
         super().__init__()
         self.block_announced = False
@@ -35,10 +35,17 @@ class TestSendHeadersBanScore(BitcoinTestFramework):
         self.p2p_connections = [inv_node, test_node]
 
         connections = []
-        connections.append(NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], inv_node))
+
+        connection1 = P2PHandler(Connection('127.0.0.1', p2p_port(0), inv_node),
+                                 self.nodes[0])
+        connections.append(connection1)
+
         # Set nServices to 0 for test_node, so no block download will occur outside of
         # direct fetching
-        connections.append(NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], test_node, services=0))
+        connection2 = P2PHandler(Connection('127.0.0.1', p2p_port(0), test_node),
+                                 self.nodes[0])
+        connections.append(connection2)
+
         inv_node.add_connection(connections[0])
         test_node.add_connection(connections[1])
 

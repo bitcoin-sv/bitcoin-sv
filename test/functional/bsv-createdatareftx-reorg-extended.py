@@ -37,8 +37,13 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         self.num_nodes = 2
         self.setup_clean_chain = True
         self.miner_names = ["miner name 0", "miner name 1"]
-        args = ['-disablesafemode=1', '-mindebugrejectionfee=0', '-paytxfee=0.00003', '-txindex=1']
+        args = ['-disablesafemode=1', '-mindebugrejectionfee=0', '-paytxfee=0.00003', '-txindex=1', '-minerid=1']
         self.extra_args = [args, args]
+
+    def add_node(self, i, extra_args, rpchost=None, timewait=None, binary=None, init_data_dir=False):
+        # RPC timeout needs to be high because invalidateblock can take >90s to complete
+        timewait = 150
+        return super().add_node(i, extra_args, rpchost, timewait, binary, init_data_dir)
 
     def make_block_with_coinbase(self, conn_rpc):
         tip = conn_rpc.getblock(conn_rpc.getbestblockhash())
@@ -249,7 +254,7 @@ class CreateMinerInfoTest(BitcoinTestFramework):
         # connect nodes. All nodes should now mine on the longer chain
         # mined by the second node
         connect_nodes_bi(self.nodes, 0, 1)
-        sync_blocks(self.nodes)
+        sync_blocks(self.nodes, timeout=180) # Extended timeout for long reorg on slow machines
 
         # no change for the second node which has the longer chain
         assert (last_block1 == self.nodes[1].getbestblockhash())

@@ -2,14 +2,12 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "locked_ref.h"
+
+#include <mutex>
+#include <shared_mutex>
+
 #include <boost/test/unit_test.hpp>
-#include <locked_ref.h>
-
-#include <iostream>
-
-namespace
-{
-}
 
 BOOST_AUTO_TEST_SUITE(LockedRef)
 

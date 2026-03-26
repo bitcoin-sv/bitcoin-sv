@@ -19,13 +19,13 @@ TestNode behaves as follows:
 
 from .mininode import CBlock, CBlockHeader, CInv, CTransaction, \
     mininode_lock, msg_block, msg_inv, msg_getheaders, msg_headers, \
-    msg_mempool, msg_ping, NodeConn, NodeConnCB
+    msg_mempool, msg_ping, P2PHandler, P2PEventHandler
 from .blockstore import BlockStore, TxStore
+from .transport import Connection
 from .util import p2p_port, wait_until
 
 from time import sleep
 import logging
-
 
 logger = logging.getLogger("TestFramework.comptool")
 
@@ -53,7 +53,7 @@ class DiscardResult():
     pass
 
 
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
 
     def __init__(self, block_store, tx_store):
         super().__init__()
@@ -203,10 +203,10 @@ class TestManager():
             # Create a p2p connection to each node
             test_node = TestNode(self.block_store, self.tx_store)
             self.test_nodes.append(test_node)
-            self.connections.append(
-                NodeConn(self.destAddr, p2p_port(i), nodes[i], test_node))
+            self.connections.append(P2PHandler(Connection(self.destAddr, p2p_port(i), test_node),
+                                               nodes[i]))
             # Make sure the TestNode (callback class) has a reference to its
-            # associated NodeConn
+            # associated P2PHandler
             test_node.add_connection(self.connections[-1])
 
     def clear_all_connections(self):
@@ -257,15 +257,15 @@ class TestManager():
         wait_until(blocks_requested, timeout=timeout_to_requested_block, lock=mininode_lock)
 
         # Wait for all the blocks to finish processing
-        [c.cb.send_ping(self.ping_counter) for c in self.connections]
+        [c.transport.cb.send_ping(self.ping_counter) for c in self.connections]
         self.wait_for_pings(self.ping_counter, timeout=timeout)
         self.ping_counter += 1
 
         # Send getheaders message
-        [c.cb.send_getheaders() for c in self.connections]
+        [c.transport.cb.send_getheaders() for c in self.connections]
 
         # Send ping and wait for response -- synchronization hack
-        [c.cb.send_ping(self.ping_counter) for c in self.connections]
+        [c.transport.cb.send_ping(self.ping_counter) for c in self.connections]
         self.wait_for_pings(self.ping_counter, timeout=timeout)
         self.ping_counter += 1
 
@@ -284,26 +284,26 @@ class TestManager():
         wait_until(transaction_requested, timeout=3 * num_events + 30, lock=mininode_lock)
 
         # We must wait for node to finish processing transactions before 'mempool' p2p message is sent
-        [c.cb.send_ping(self.ping_counter) for c in self.connections]
+        [c.transport.cb.send_ping(self.ping_counter) for c in self.connections]
         self.wait_for_pings(self.ping_counter)
         self.ping_counter += 1
 
         # Get the mempool
-        [c.cb.send_mempool() for c in self.connections]
+        [c.transport.cb.send_mempool() for c in self.connections]
 
         # Send ping and wait for response -- synchronization hack
-        [c.cb.send_ping(self.ping_counter) for c in self.connections]
+        [c.transport.cb.send_ping(self.ping_counter) for c in self.connections]
         self.wait_for_pings(self.ping_counter)
         self.ping_counter += 1
 
         # Sort inv responses from each node
         with mininode_lock:
-            [c.cb.lastInv.sort() for c in self.connections]
+            [c.transport.cb.lastInv.sort() for c in self.connections]
 
     def __check_results_outcome_none(self):
         with mininode_lock:
             for c in self.connections:
-                if c.cb.bestblockhash != self.connections[0].cb.bestblockhash:
+                if c.transport.cb.bestblockhash != self.connections[0].transport.cb.bestblockhash:
                     return False
         return True
 
@@ -311,21 +311,21 @@ class TestManager():
         # Check that block was rejected w/ code
         with mininode_lock:
             for c in self.connections:
-                if c.cb.bestblockhash == blockhash:
+                if c.transport.cb.bestblockhash == blockhash:
                     return ('Block was not rejected: %064x' % (blockhash), False)
 
-                if blockhash not in c.cb.block_reject_map:
+                if blockhash not in c.transport.cb.block_reject_map:
                     return ('Block not in reject map: %064x' % (blockhash), True)
 
-                if not outcome.match(c.cb.block_reject_map[blockhash]):
+                if not outcome.match(c.transport.cb.block_reject_map[blockhash]):
                     return ('Block rejected with %s instead of expected %s: %064x' % (
-                        c.cb.block_reject_map[blockhash], outcome, blockhash), False)
+                        c.transport.cb.block_reject_map[blockhash], outcome, blockhash), False)
         return ('', False)
 
     def __check_results_else(self, blockhash, outcome):
         with mininode_lock:
             for c in self.connections:
-                if ((c.cb.bestblockhash == blockhash) != outcome):
+                if ((c.transport.cb.bestblockhash == blockhash) != outcome):
                     return False
         return True
 
@@ -365,25 +365,25 @@ class TestManager():
             for c in self.connections:
                 if outcome is None:
                     # Make sure the mempools agree with each other
-                    if c.cb.lastInv != self.connections[0].cb.lastInv:
+                    if c.transport.cb.lastInv != self.connections[0].transport.cb.lastInv:
                         return False
                 # Check that tx was rejected w/ code
                 elif isinstance(outcome, RejectResult):
-                    if txhash in c.cb.lastInv:
+                    if txhash in c.transport.cb.lastInv:
                         return False
-                    if txhash not in c.cb.tx_reject_map:
+                    if txhash not in c.transport.cb.tx_reject_map:
                         logger.error('Tx not in reject map: %064x' % (txhash))
                         return False
-                    if not outcome.match(c.cb.tx_reject_map[txhash]):
+                    if not outcome.match(c.transport.cb.tx_reject_map[txhash]):
                         logger.error('Tx rejected with %s instead of expected %s: %064x' % (
-                            c.cb.tx_reject_map[txhash], outcome, txhash))
+                            c.transport.cb.tx_reject_map[txhash], outcome, txhash))
                         return False
                 elif isinstance(outcome, DiscardResult):
-                    if txhash in c.cb.tx_reject_map:
+                    if txhash in c.transport.cb.tx_reject_map:
                         logger.error('Tx in reject map: %064x' % (txhash))
                         return False
-                    return txhash not in c.cb.lastInv
-                elif ((txhash in c.cb.lastInv) != outcome):
+                    return txhash not in c.transport.cb.lastInv
+                elif ((txhash in c.transport.cb.lastInv) != outcome):
                     return False
             return True
 
@@ -426,25 +426,25 @@ class TestManager():
                     with mininode_lock:
                         self.block_store.add_block(block)
                         for c in self.connections:
-                            if first_block_with_hash and block.sha256 in c.cb.block_request_map and c.cb.block_request_map[block.sha256] is True:
+                            if first_block_with_hash and block.sha256 in c.transport.cb.block_request_map and c.transport.cb.block_request_map[block.sha256] is True:
                                 # There was a previous request for this block hash
                                 # Most likely, we delivered a header for this block
                                 # but never had the block to respond to the getdata
                                 c.send_message(msg_block(block))
                             else:
-                                c.cb.block_request_map[block.sha256] = False
+                                c.transport.cb.block_request_map[block.sha256] = False
                     # Either send inv's to each node and sync, or add
                     # to invqueue for later inv'ing.
                     if (test_instance.sync_every_block):
                         # if we expect success, send inv and sync every block
                         # if we expect failure, just push the block and see what happens.
                         if outcome is True:
-                            [c.cb.send_inv(block) for c in self.connections]
+                            [c.transport.cb.send_inv(block) for c in self.connections]
                             self.sync_blocks(block.sha256, 1, timeout=test_instance.sync_timeout, timeout_to_requested_block=test_instance.timeout_to_requested_block)
                         else:
                             [c.send_message(msg_block(block))
                              for c in self.connections]
-                            [c.cb.send_ping(self.ping_counter)
+                            [c.transport.cb.send_ping(self.ping_counter)
                              for c in self.connections]
                             self.wait_for_pings(self.ping_counter, self.waitForPingTimeout)
                             self.ping_counter += 1
@@ -456,7 +456,7 @@ class TestManager():
                 elif isinstance(b_or_t, CBlockHeader):
                     block_header = b_or_t
                     self.block_store.add_header(block_header)
-                    [c.cb.send_header(block_header) for c in self.connections]
+                    [c.transport.cb.send_header(block_header) for c in self.connections]
 
                 else:  # Tx test runner
                     assert (isinstance(b_or_t, CTransaction))
@@ -466,10 +466,10 @@ class TestManager():
                     with mininode_lock:
                         self.tx_store.add_transaction(tx)
                         for c in self.connections:
-                            c.cb.tx_request_map[tx.sha256] = False
+                            c.transport.cb.tx_request_map[tx.sha256] = False
                     # Again, either inv to all nodes or save for later
                     if (test_instance.sync_every_tx):
-                        [c.cb.send_inv(tx) for c in self.connections]
+                        [c.transport.cb.send_inv(tx) for c in self.connections]
                         self.sync_transaction(tx.sha256, 1)
                         if (not self.check_mempool(tx.sha256, outcome)):
                             raise AssertionError(

@@ -38,17 +38,17 @@ from test_framework.mininode import (CBlockHeader,
                                      CTransaction,
                                      CTxIn,
                                      CTxOut,
-                                     NetworkThread,
-                                     NodeConn,
-                                     NodeConnCB,
+                                     P2PHandler,
+                                     P2PEventHandler,
                                      msg_block,
                                      msg_headers)
 from test_framework.script import (CScript, OP_TRUE)
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import (p2p_port, assert_equal)
 
 
-class BaseNode(NodeConnCB):
+class BaseNode(P2PEventHandler):
     def send_header_for_blocks(self, new_blocks):
         headers_message = msg_headers()
         headers_message.headers = [CBlockHeader(b) for b in new_blocks]
@@ -100,10 +100,8 @@ class AssumeValidTest(BitcoinTestFramework):
 
         # Connect to node0
         node0 = BaseNode()
-        connections = []
-        connections.append(
-            NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node0))
-        node0.add_connection(connections[0])
+        node0.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), node0),
+                                        self.nodes[0]))
 
         NetworkThread().start()  # Start up network handling in another thread
         node0.wait_for_verack()
@@ -175,16 +173,14 @@ class AssumeValidTest(BitcoinTestFramework):
         # Start node1 and node2 with assumevalid so they accept a block with a bad signature.
         self.start_node(1, extra_args=["-assumevalid=" + hex(block102.sha256)])
         node1 = BaseNode()  # connects to node1
-        connections.append(
-            NodeConn('127.0.0.1', p2p_port(1), self.nodes[1], node1))
-        node1.add_connection(connections[1])
+        node1.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(1), node1),
+                                        self.nodes[1]))
         node1.wait_for_verack()
 
         self.start_node(2, extra_args=["-assumevalid=" + hex(block102.sha256)])
         node2 = BaseNode()  # connects to node2
-        connections.append(
-            NodeConn('127.0.0.1', p2p_port(2), self.nodes[2], node2))
-        node2.add_connection(connections[2])
+        node2.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(2), node2),
+                                        self.nodes[2]))
         node2.wait_for_verack()
 
         # send header lists to all three nodes

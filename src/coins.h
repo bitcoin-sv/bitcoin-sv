@@ -83,7 +83,7 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
     CoinImpl(CoinImpl&& other) // NOLINT(bugprone-exception-escape)
         : storage{std::move(other.storage)}
-        , out{storage.has_value() ? &storage.value() : other.out}
+        , out{storage.has_value() ? &*storage : other.out}
         , nHeightAndIsCoinBase{other.nHeightAndIsCoinBase}
         , isConfiscation(other.isConfiscation)
         , mScriptSize{other.mScriptSize}
@@ -97,7 +97,7 @@ public:
     CoinImpl& operator=(CoinImpl&& other) // NOLINT(bugprone-exception-escape)
     {
         storage = std::move(other.storage);
-        out = (storage.has_value() ? &storage.value() : other.out);
+        out = (storage.has_value() ? &*storage : other.out);
         nHeightAndIsCoinBase = other.nHeightAndIsCoinBase;
         isConfiscation = other.isConfiscation;
         mScriptSize = other.mScriptSize;
@@ -191,7 +191,7 @@ private:
     void Clear()
     {
         storage = CTxOut{};
-        out = &storage.value();
+        out = &*storage;
         nHeightAndIsCoinBase = 0;
         isConfiscation = false;
     }
@@ -347,7 +347,8 @@ class CCoinsCacheEntry {
 public:
     uint8_t flags;
 
-    enum Flags : uint8_t{
+    enum Flags : uint8_t //NOLINT(cppcoreguidelines-use-enum-class)
+    {
         // This cache entry is potentially different from the version in the
         // parent view.
         DIRTY = (1 << 0),
@@ -841,6 +842,7 @@ public:
             // Run Callable using thread pool
             CThreadPool<CQueueAdaptor> pool { false, "RunSharded", num };
             std::vector<std::future<ResultType>> threadResults {};
+            threadResults.reserve(num);
             for(uint16_t i = 0; i < num; ++i)
             {
                 threadResults.push_back(make_task(pool, call, i, std::ref(mShards[i]), std::forward<Args>(args)...));

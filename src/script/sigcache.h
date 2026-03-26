@@ -39,8 +39,9 @@ public:
     uint32_t operator()(const uint256 &key) const {
         static_assert(hash_select < 8,
                       "SignatureCacheHasher only has 8 hashes available.");
-        uint32_t u;
-        std::memcpy(&u, key.begin() + 4 * hash_select, 4);
+        uint32_t u; //NOLINT(cppcoreguidelines-init-variables)
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        std::memcpy(&u, key.begin() + 4 * hash_select, 4); //NOLINT(bugprone-implicit-widening-of-multiplication-result)
         return u;
     }
 };

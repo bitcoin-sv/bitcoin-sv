@@ -23,6 +23,17 @@ option(ENABLE_CLANG_TIDY "Use ClangTidy" OFF)
 
 option(CMAKE_UNITY_BUILD "Enable Unity build")
 
+# Ensure clang-tidy and unity builds are not enabled together
+if(ENABLE_CLANG_TIDY AND CMAKE_UNITY_BUILD)
+    message(FATAL_ERROR
+        "ENABLE_CLANG_TIDY and CMAKE_UNITY_BUILD cannot be enabled together. "
+        "Unity builds merge multiple source files into single compilation units, "
+        "which prevents clang-tidy from performing accurate per-file analysis. "
+        "Please disable one of these options:\n"
+        "  -DENABLE_CLANG_TIDY=OFF (default)\n"
+        "  -DCMAKE_UNITY_BUILD=OFF")
+endif()
+
 # Ensure that WINDRES_PREPROC is enabled when using windres.
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	list(APPEND CMAKE_RC_FLAGS "-DWINDRES_PREPROC")
@@ -165,6 +176,9 @@ target_compile_options(leveldb
                        -Wno-suggest-override
                        -Wno-unused-parameter)
 
+# Suppress Clang 21+ warning for intentionally non-null-terminated string in testrand_impl.h
+set(SECP256K1_APPEND_CFLAGS "${SECP256K1_APPEND_CFLAGS} -Wno-unterminated-string-initialization"
+    CACHE STRING "Extra flags appended to secp256k1 compile commands" FORCE)
 add_subdirectory(secp256k1)
 add_subdirectory(univalue)
 
@@ -411,6 +425,7 @@ add_library(common
 	script/sign.h
 	script/standard.cpp
 	script/standard.h
+	streams.cpp
 	streams.h
 	support/allocators/secure.h
 	support/allocators/zeroafterfree.h
@@ -813,6 +828,7 @@ endif()
 
 if(ENABLE_CLANG_TIDY)
     include(ClangTidy)
+    AddClangTidy(util)
     AddClangTidy(server)
     AddClangTidy(bitcoinconsensus)
     AddClangTidy(bitcoind)

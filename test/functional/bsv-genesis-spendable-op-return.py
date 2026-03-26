@@ -66,7 +66,7 @@ class SpendingOpReturnTx(BitcoinTestFramework):
             tx_data = spend_tx_to_data(coinbase_tx, coinbase_key)
             conn.send_message(msg_tx(tx_data))
 
-            conn.cb.sync_with_ping()
+            conn.transport.cb.sync_with_ping()
 
             url = urllib.parse.urlparse(self.nodes[0].url)
             json_mempool = json.loads(http_get_call(url.hostname,

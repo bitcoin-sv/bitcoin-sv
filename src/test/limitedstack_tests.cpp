@@ -281,7 +281,7 @@ BOOST_AUTO_TEST_CASE(limitedvector_shrink_tests)
                                         {1, 1, {1}},
                                         {1, 2, {1, 2}},
                                         {1, 3, {0, 1, 2}},
-        
+
                                         {2, 0, {}},
                                         {2, 1, {2}},
                                         {2, 2, {0, 1, 2}},
@@ -301,6 +301,8 @@ BOOST_AUTO_TEST_CASE(limitedvector_shrink_tests)
         v.shrink(start, len);
         BOOST_CHECK_EQUAL_COLLECTIONS(exp.begin(), exp.end(),
                                       v.begin(), v.end());
+        const auto new_stack_size{stack.getCombinedStackSize()};
+        BOOST_CHECK_EQUAL(new_stack_size, exp.size() + LimitedVector::ELEMENT_OVERHEAD);
     }
 }
 

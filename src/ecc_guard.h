@@ -38,7 +38,7 @@ public:
             assert(ctx_);
             secp256k1_context_destroy(ctx_);
         }
-        catch(...)
+        catch(...) //NOLINT(bugprone-empty-catch)
         {
         }
     }

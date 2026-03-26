@@ -38,7 +38,7 @@ class StayInSafeMode(BitcoinTestFramework):
         send_by_headers(first_branch['conn'], first_branch['blocks'], first_branch['do_send_blocks'])
 
         if wait:
-            first_branch['conn'].cb.sync_with_ping()
+            first_branch['conn'].transport.cb.sync_with_ping()
 
         send_by_headers(second_branch['conn'], second_branch['blocks'], second_branch['do_send_blocks'])
 
@@ -92,11 +92,11 @@ class StayInSafeMode(BitcoinTestFramework):
             wait_until(wait_for_log)
 
             conn2.send_message(msg_block(branch_2_blocks[0]))
-            conn2.cb.sync_with_ping()
+            conn2.transport.cb.sync_with_ping()
 
             # send block from the third branch
             conn3.send_message(msg_block(branch_3_root))
-            conn3.cb.sync_with_ping()
+            conn3.transport.cb.sync_with_ping()
 
             # we should still be in safe mode
             assert conn1.rpc.getsafemodeinfo()["safemodeenabled"], "We should be in the safe mode"

@@ -19,6 +19,7 @@
 #include "primitives/transaction.h"
 #include "univalue.h"
 
+//NOLINTNEXTLINE(cert-err58-cpp)
 static const std::set<std::string> SUPPORTED_VERSIONS = {"0.1", "0.2", "0.3"};
 
 /**

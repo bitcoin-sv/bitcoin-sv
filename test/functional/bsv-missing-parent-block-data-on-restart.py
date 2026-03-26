@@ -16,14 +16,14 @@ accepted before the parent which shouldn't cause any issues during restart.
 """
 
 from test_framework.mininode import (
-    NetworkThread,
-    NodeConn,
-    NodeConnCB,
+    P2PHandler,
+    P2PEventHandler,
     msg_block,
     msg_headers,
     CBlockHeader
 )
 from test_framework.test_framework import BitcoinTestFramework, ChainManager
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import p2p_port, assert_equal
 
 
@@ -39,8 +39,9 @@ class PBVSameBlock(BitcoinTestFramework):
         block_count = 0
 
         # Create a P2P connections
-        node0 = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node0)
+        node0 = P2PEventHandler()
+        connection = P2PHandler(Connection('127.0.0.1', p2p_port(0), node0),
+                                self.nodes[0])
         node0.add_connection(connection)
 
         NetworkThread().start()
@@ -57,7 +58,7 @@ class PBVSameBlock(BitcoinTestFramework):
 
         headers_message = msg_headers()
         headers_message.headers = [CBlockHeader(parent_block)]
-        connection.cb.send_message(headers_message)
+        connection.transport.cb.send_message(headers_message)
 
         child_block = self.chain.next_block(block_count)
         node0.send_message(msg_block(child_block))
@@ -71,9 +72,9 @@ class PBVSameBlock(BitcoinTestFramework):
         self.start_node(0)
 
         # Create a P2P connections
-        node0 = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node0)
-        node0.add_connection(connection)
+        node0 = P2PEventHandler()
+        node0.add_connection(P2PHandler(Connection('127.0.0.1', p2p_port(0), node0),
+                                        self.nodes[0]))
 
         NetworkThread().start()
         # wait_for_verack ensures that the P2P connection is fully up.

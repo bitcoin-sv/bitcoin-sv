@@ -21,7 +21,7 @@ std::pair<size_t, size_t> cmpctblock_parser::operator()(span<const uint8_t> s)
     total_bytes_read += hbytes_read;
     if(hbytes_reqd)
         return make_pair(total_bytes_read, hbytes_reqd);
-    
+
     s = s.subspan(hbytes_read);
 
     const auto [sid_bytes_read, sid_bytes_reqd]{shortid_parser_(s)};
@@ -61,9 +61,8 @@ size_t cmpctblock_parser::read(size_t read_pos, span<uint8_t> s)
         }
         else if(read_pos < header_parser_.size() + shortid_parser_.size())
         {
-            const size_t bytes_read = ::read(shortid_parser_, 
-                                             read_pos - header_parser_.size(),
-                                             s);
+            const size_t bytes_read{shortid_parser_.read(read_pos - header_parser_.size(),
+                                                         s)};
             read_pos += bytes_read;
             total_bytes_read += bytes_read;
             s = s.subspan(bytes_read);
@@ -96,12 +95,5 @@ size_t cmpctblock_parser::readable_size() const
     return header_parser_.size() +
            shortid_parser_.readable_size() +
            pftxs_parser_.readable_size();
-}
-
-void cmpctblock_parser::clear()
-{
-    header_parser_.clear();
-    shortid_parser_.clear();
-    pftxs_parser_.clear();
 }
 

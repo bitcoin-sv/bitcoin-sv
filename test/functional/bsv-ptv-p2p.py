@@ -150,7 +150,7 @@ class PTVP2PTest(ComparisonTestFramework):
             rejected_txs.append(msg)
             # A double spend reject message is the expected one to occur.
             assert_equal(msg.reason, b'txn-double-spend-detected')
-        conn.cb.on_reject = on_reject
+        conn.transport.cb.on_reject = on_reject
 
         # Create and send tx chains with non-std outputs.
         # - one tx with vout_size=num_txs_to_create outpoints will be created

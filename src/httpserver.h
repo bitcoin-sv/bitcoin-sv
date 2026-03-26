@@ -58,7 +58,7 @@ struct event_base *EventBase();
 class HTTPRequest {
 private:
     struct evhttp_request *req;
-    bool replySent;
+    bool replySent{false};
 
 public:
     HTTPRequest(const HTTPRequest&) = delete;
@@ -68,6 +68,7 @@ public:
     explicit HTTPRequest(struct evhttp_request *req);
     ~HTTPRequest();
 
+    //NOLINTNEXTLINE(cppcoreguidelines-use-enum-class)
     enum RequestMethod { UNKNOWN, GET, POST, HEAD, PUT, OPTIONS };
 
     /** Get requested URI.

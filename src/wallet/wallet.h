@@ -54,7 +54,7 @@ static const Amount DEFAULT_TRANSACTION_MINFEE{1'000};
 //! target minimum change amount
 static const Amount MIN_CHANGE{CENT};
 //! final minimum change amount after paying for fees
-static const Amount MIN_FINAL_CHANGE{MIN_CHANGE / 2};
+static const Amount MIN_FINAL_CHANGE{MIN_CHANGE / 2};// NOLINT(cert-err58-cpp)
 
 //! Default for -spendzeroconfchange
 static const bool DEFAULT_SPEND_ZEROCONF_CHANGE = true;
@@ -81,7 +81,8 @@ class CTxMemPool;
 class CWalletTx;
 
 /** (client) version numbers for particular wallet features */
-enum WalletFeature {
+enum WalletFeature //NOLINT(cppcoreguidelines-use-enum-class)
+{
     // the earliest version new wallets supports (only useful for getinfo's
     // clientversion output)
     FEATURE_BASE = 10500,
@@ -150,6 +151,7 @@ public:
     StringMap destdata;
 };
 
+//NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 struct CRecipient {
     CScript scriptPubKey;
     Amount nAmount;
@@ -326,7 +328,7 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CWalletTx() { Init(nullptr); }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     CWalletTx(const CWallet *pwalletIn, CTransactionRef arg)
         : CMerkleTx(std::move(arg)) {
         Init(pwalletIn);

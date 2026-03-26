@@ -146,6 +146,18 @@ This applies to ALL file types:
 **Your scope:** Implementation quality (bugs, performance, safety, maintainability)
 **Not your scope:** What to implement or why
 
+## Do NOT Flag Hypothetical Future Risks
+
+**The principle:** Review the code as it is, not as it might become after imaginary future changes.
+
+**Do NOT post comments like:**
+- "If someone later removes X, this would break" — that is a problem for the future change's review
+- "This pattern is fragile if refactored" — code review and CI exist to catch refactoring errors
+- "Consider adding a comment explaining why X is needed" — competent developers can read the code
+- "This depends on [obvious language feature] for correctness" — stating how C++ works is not a review finding
+
+**Why:** These comments assume future developers will make naive mistakes AND that code review and CI will simultaneously fail to catch them. That chain of failures is too unlikely to be actionable. Real issues in future changes will be caught by their own review cycle and test suite.
+
 ## Focus on What CI Can't Catch
 
 **The principle:** If CI would catch it, let CI catch it. Focus on what requires human judgment.
@@ -203,6 +215,26 @@ This applies to ALL file types:
 - ❌ "This looks unusual" (not actionable)
 - ❌ "I would do this differently" (opinion, not issue)
 - ❌ "Consider refactoring" (no specific problem identified)
+
+## Tool Usage Rules
+
+To ensure reviews complete successfully, follow these tool constraints:
+
+**USE these tools:**
+- `Read` - Read any file content
+- `Grep` - Search for code patterns
+- `Glob` - Find files by name/pattern
+- `gh pr diff $PR_NUMBER` - Get the PR diff
+- `mcp__github_inline_comment__create_inline_comment` - Post comments
+
+**NEVER use (will be BLOCKED):**
+- Shell redirects: `>`, `>>`, `<`
+- Command chaining: `&&`, `||`, `;`
+- Pipes: `|`
+- The `--jq` flag with gh commands
+- Bash commands: `cat`, `grep`, `find`, `wc`
+
+These patterns will be BLOCKED by the permission system. Use the dedicated tools instead.
 
 ## Summary
 

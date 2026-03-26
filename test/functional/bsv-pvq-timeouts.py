@@ -157,7 +157,7 @@ class PVQTimeoutTest(ComparisonTestFramework):
         def on_reject(conn, msg):
             assert_equal(msg.reason, b'too-long-validation-time')
             rejected_txs.append(msg)
-        conn.cb.on_reject = on_reject
+        conn.transport.cb.on_reject = on_reject
 
         # Create and send tx chains with non-std outputs.
         # - one tx with vout_size=num_txs_to_create outpoints will be created

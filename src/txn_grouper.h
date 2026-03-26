@@ -54,6 +54,7 @@ class TxnGrouper
         }
 
         // Get transaction index (requires caller to have checked HasTransaction())
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         size_t GetTransaction() const { return mTxnIndex.value(); }
 
         // Do we contain a transaction from the block?

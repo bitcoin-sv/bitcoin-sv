@@ -101,6 +101,9 @@ std::optional<miner_info_error> verify(const CBlock& block,
                                        const block_bind& bb,
                                        const string& key)
 {
+    if(block.vtx.empty() || block.vtx[0]->vin.empty() || block.vtx[0]->vout.size() < 2)
+        return miner_info_error::block_bind_bad_format;
+
     const auto mm_root = modify_merkle_root(block);
 
     vector<uint8_t> buffer{mm_root.begin(), mm_root.end()};

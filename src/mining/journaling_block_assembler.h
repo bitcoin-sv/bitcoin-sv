@@ -16,6 +16,7 @@ namespace mining
 /**
 * A mining candidate builder that utilises the mempool journal.
 */
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class JournalingBlockAssembler : public BlockAssembler
 {
   public:
@@ -135,6 +136,7 @@ class JournalingBlockAssembler : public BlockAssembler
     // When adding transaction group we optimize for the happy case
     // and do serious extra work only when we need to rollback() when
     // the group would push the block over the limit
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
     class GroupCheckpoint {
 
     private:
@@ -149,7 +151,7 @@ class JournalingBlockAssembler : public BlockAssembler
 
         template<class T> class VectorCheckpoint {
         private:
-            std::vector<T> &mVector;
+            std::vector<T> &mVector; //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
             size_t mVectorSize {0};
         public:
             VectorCheckpoint(std::vector<T> &vector)

@@ -10,9 +10,9 @@
 This python code was modified from ArtForz' public domain  half-a-node, as
 found in the mini-node branch of http://github.com/jgarzik/pynode.
 
-NodeConn: an object which manages p2p connectivity to a bitcoin node
-NodeConnCB: a base class that describes the interface for receiving
-            callbacks with network messages from a NodeConn
+P2PHandler: an object which manages p2p connectivity to a bitcoin node
+P2PEventHandler: a base class that describes the interface for receiving
+            callbacks with network messages from a P2PHandler
 CBlock, CTransaction, CBlockHeader, CTxIn, CTxOut, etc....:
     data structures that should map to corresponding structures in
     bitcoin/primitives
@@ -21,7 +21,10 @@ msg_block, msg_tx, msg_headers, etc.:
 ser_*, deser_*: functions that handle serialization/deserialization
 """
 
-import asyncore
+from .transport import mininode_lock, NetworkThread, \
+    network_thread_loop_lock, network_thread_loop_intent_lock, logger, \
+    Connection, ConnectionCallback, MessageHandler
+
 from codecs import encode
 from collections import defaultdict
 import copy
@@ -29,15 +32,12 @@ import hashlib
 from contextlib import contextmanager
 import ecdsa
 from io import BytesIO
-import logging
 import random
 import socket
 import struct
 import sys
 import time
 from itertools import chain
-from math import ceil
-from threading import RLock, Thread
 import uuid
 
 from test_framework.siphash import siphash256
@@ -63,38 +63,6 @@ NODE_WITNESS = (1 << 3)
 NODE_XTHIN = (1 << 4)
 NODE_BITCOIN_CASH = (1 << 5)
 
-# Howmuch data will be read from the network at once
-READ_BUFFER_SIZE = 1024 * 256
-
-logger = logging.getLogger("TestFramework.mininode")
-
-# Keep our own socket map for asyncore, so that we can track disconnects
-# ourselves (to workaround an issue with closing an asyncore socket when
-# using select)
-mininode_socket_map = dict()
-
-# One lock for synchronizing all data access between the networking thread (see
-# NetworkThread below) and the thread running the test logic.  For simplicity,
-# NodeConn acquires this lock whenever delivering a message to a NodeConnCB,
-# and whenever adding anything to the send buffer (in send_message()).  This
-# lock should be acquired in the thread running the test logic to synchronize
-# access to any data shared with the NodeConnCB or NodeConn.
-mininode_lock = RLock()
-
-# Lock used to synchronize access to data required by loop running in NetworkThread.
-# It must be locked, for example, when adding new NodeConn object, otherwise loop in
-# NetworkThread may try to access partially constructed object.
-network_thread_loop_lock = RLock()
-
-# Network thread acquires network_thread_loop_lock at start of each iteration and releases
-# it at the end. Since the next iteration is run immediately after that, lock is acquired
-# almost all of the time making it difficult for other threads to also acquire this lock.
-# To work around this problem, NetworkThread first acquires network_thread_loop_intent_lock
-# and immediately releases it before acquiring network_thread_loop_lock.
-# Other threads (e.g. the ones calling NodeConn constructor) acquire both locks before
-# proceeding. The end result is that other threads wait at most one iteration of loop in
-# NetworkThread.
-network_thread_loop_intent_lock = RLock()
 
 # ports used by chain type
 NETWORK_PORTS = {
@@ -2147,7 +2115,7 @@ class msg_datareftx():
         return "msg_datareftx(tx=%s proof=%s)" % (repr(self.tx), repr(self.proof))
 
 
-class NodeConnCB():
+class P2PEventHandler(ConnectionCallback):
     """Callback and helper functions for P2P connection to a bitcoind node.
 
     Individual testcases should subclass this and override the on_* methods
@@ -2452,55 +2420,9 @@ class NodeConnCB():
             setattr(self, cb_name, cb)
 
 
-class RateLimiter:
-    """ A class that can rate limit processing. Currently used to limit speed of reading and writing to socket."""
-
-    MEASURING_PERIOD = 1.0  # seconds
-    MAX_FRACTION_TO_PROCESS_IN_ONE_GO = 0.1
-
-    def __init__(self, rate_limit):
-        self.rate_limit = rate_limit  # in amount per second
-        self.history = []
-        self.processed_in_last_measuring_period = 0
-        self.max_chunk = ceil(self.rate_limit * RateLimiter.MAX_FRACTION_TO_PROCESS_IN_ONE_GO * RateLimiter.MEASURING_PERIOD)
-        self.amount_per_measuring_period = ceil(self.rate_limit * self.MEASURING_PERIOD)
-
-    def calculate_next_chunk(self, time_now):
-
-        # ignore history older than one measuring period
-        prune_to_ndx = None
-        for ndx, (time_processed, amount_processed) in enumerate(self.history):
-            if time_now - time_processed > self.MEASURING_PERIOD:
-                prune_to_ndx = ndx
-                self.processed_in_last_measuring_period -= amount_processed
-            else:
-                break
-        if prune_to_ndx is not None:
-            del self.history[:prune_to_ndx + 1]
-
-        if self.processed_in_last_measuring_period == 0:
-            assert len(self.history) == 0, "History not empty when processed data is 0"
-        else:
-            assert len(self.history) != 0, "History empty when processed data is not 0"
-        assert self.processed_in_last_measuring_period <= self.amount_per_measuring_period, "Too much of processed data"
-
-        # max amount of data that can still be processed in this time period
-        can_be_processed = self.amount_per_measuring_period - self.processed_in_last_measuring_period
-
-        return min(can_be_processed, self.max_chunk)
-
-    def update_amount_processed(self, time_processed, amount_processed, sleep_expected_fraction=0):
-        if amount_processed:
-            self.history.append((time_processed, amount_processed))
-            self.processed_in_last_measuring_period += amount_processed
-        if sleep_expected_fraction:
-            expected_time_to_send = amount_processed / self.rate_limit
-            time.sleep(sleep_expected_fraction * expected_time_to_send)
-
-
-# The actual NodeConn class
+# The actual P2PHandler class
 # This class provides an interface for a p2p connection to a specified node
-class NodeConn(asyncore.dispatcher):
+class P2PHandler(MessageHandler):
     messagemap = {
         b"version": msg_version,
         b"protoconf": msg_protoconf,
@@ -2548,30 +2470,67 @@ class NodeConn(asyncore.dispatcher):
     EXTMSG_COMMAND = b'extmsg\x00\x00\x00\x00\x00\x00'
     assert (len(EXTMSG_COMMAND) == 12)
 
-    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=NODE_NETWORK, send_version=True,
-                 versionNum=MY_VERSION, strSubVer=None, assocID=None, nullAssocID=False):
+    @classmethod
+    def connect(cls,
+                dstaddr,
+                dstport,
+                rpc):
+        event_handler = P2PEventHandler()
+        connection = Connection(dstaddr, dstport, event_handler)
+        p2p_handler = cls(connection, rpc)
+        event_handler.add_connection(p2p_handler)
+        NetworkThread().start()
+        event_handler.wait_for_verack()
+        return event_handler
+
+    @classmethod
+    def connect_multiple(cls, connections):
+        """
+        Create multiple P2P connections with automatic network startup.
+
+        connections: list of (dstaddr, dstport, rpc) tuples
+
+        Starts a single NetworkThread and waits for verack on all connections.
+
+        Returns: list of P2PEventHandler instances
+        """
+        event_handlers = []
+        for dstaddr, dstport, rpc in connections:
+            event_handler = P2PEventHandler()
+            connection = Connection(dstaddr, dstport, event_handler)
+            p2p_handler = cls(connection, rpc)
+            event_handler.add_connection(p2p_handler)
+            event_handlers.append(event_handler)
+
+        NetworkThread().start()
+        for event_handler in event_handlers:
+            event_handler.wait_for_verack()
+
+        return event_handlers
+
+    def __init__(self,
+                 transport,
+                 rpc,
+                 net="regtest",
+                 services=NODE_NETWORK,
+                 send_version=True,
+                 versionNum=MY_VERSION,
+                 strSubVer=None,
+                 assocID=None,
+                 nullAssocID=False):
+
+        self.transport = transport
+        transport.node_conn = self
+
         # Lock must be acquired when new object is added to prevent NetworkThread from trying
         # to access partially constructed object or trying to call callbacks before the connection
         # is established.
 
-        self.send_data_rate_limiter = None
-        self.receive_data_rate_limiter = None
-
         with network_thread_loop_intent_lock, network_thread_loop_lock:
-            asyncore.dispatcher.__init__(self, map=mininode_socket_map)
-            self.dstaddr = dstaddr
-            self.dstport = dstport
-            self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sendbuf = bytearray()
-            self.recvbuf = bytearray()
             self.ver_send = 209
             self.ver_recv = 209
             self.protoVersion = versionNum
-            self.last_sent = 0
-            self.state = "connecting"
             self.network = net
-            self.cb = callback
-            self.disconnect = False
             self.nServices = 0
             self.maxInvElements = CInv.estimateMaxInvElements(LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)
             self.strSubVer = strSubVer
@@ -2584,8 +2543,8 @@ class NodeConn(asyncore.dispatcher):
                 # stuff version msg into sendbuf
                 vt = msg_version(self.protoVersion)
                 vt.nServices = services
-                vt.addrTo.ip = self.dstaddr
-                vt.addrTo.port = self.dstport
+                vt.addrTo.ip = self.transport.dstaddr
+                vt.addrTo.port = self.transport.dstport
                 vt.addrFrom.ip = "0.0.0.0"
                 vt.addrFrom.port = 0
                 if strSubVer:
@@ -2596,164 +2555,84 @@ class NodeConn(asyncore.dispatcher):
                 self.assocID = vt.assocID
 
             logger.info('Connecting to Bitcoin Node: %s:%d' %
-                        (self.dstaddr, self.dstport))
+                        (self.transport.dstaddr, self.transport.dstport))
 
             try:
-                self.connect((dstaddr, dstport))
+                self.transport.connect()
             except Exception:
-                self.handle_close()
+                self.transport.close()
+
             self.rpc = rpc
 
-    def rate_limit_sending(self, limit):
-        """The maximal rate of sending data in bytes/second, send rate will never exceed the limit while it will be somewhat slower.
-         If None there will be no limit."""
-        with mininode_lock:
-            self.send_data_rate_limiter = RateLimiter(limit) if limit else None
-
-    def rate_limit_receiving(self, limit):
-        """The maximal rate of receiving in bytes/second, receive rate will never exceed the limit while it will be somewhat slower.
-         If None there will be no limit."""
-        with mininode_lock:
-            self.receive_data_rate_limiter = RateLimiter(limit) if limit else None
-
-    def handle_connect(self):
-        if self.state != "connected":
-            logger.debug("Connected & Listening: %s:%d" %
-                         (self.dstaddr, self.dstport))
-            self.state = "connected"
-            self.cb.on_open(self)
-
-    def handle_close(self):
-        logger.debug("Closing connection to: %s:%d" %
-                     (self.dstaddr, self.dstport))
-        self.state = "closed"
-        self.recvbuf = bytearray()
-        self.sendbuf = bytearray()
-        try:
-            self.close()
-        except Exception:
-            pass
-        self.cb.on_close(self)
-
-    def handle_read(self):
-        with mininode_lock:
-            if self.receive_data_rate_limiter is None:
-                t = self.recv(READ_BUFFER_SIZE)
-            else:
-                time_now = time.time()
-                read_chunk = self.receive_data_rate_limiter.calculate_next_chunk(time_now)
-                max_read = min(READ_BUFFER_SIZE, read_chunk)
-                t = self.recv(max_read)
-                self.receive_data_rate_limiter.update_amount_processed(time_now, len(t), 0.1)
-            if len(t) > 0:
-                self.recvbuf += t
-
-        while True:
-            msg = self.got_data()
-            if msg is None:
-                break
-            self.got_message(msg)
-
-    def readable(self):
-        return True
-
-    def writable(self):
-        with mininode_lock:
-            pre_connection = self.state == "connecting"
-            length = len(self.sendbuf)
-        return (length > 0 or pre_connection)
-
-    def handle_write(self):
-        with mininode_lock:
-            # asyncore does not expose socket connection, only the first read/write
-            # event, thus we must check connection manually here to know when we
-            # actually connect
-            if self.state == "connecting":
-                self.handle_connect()
-            if not self.writable():
-                return
-
-            try:
-                if self.send_data_rate_limiter is None:
-                    sent = self.send(self.sendbuf)
-                else:
-                    time_now = time.time()
-                    next_chunk = self.send_data_rate_limiter.calculate_next_chunk(time_now)
-                    next_chunk = min(next_chunk, len(self.sendbuf))
-                    sent = self.send(self.sendbuf[:next_chunk])
-                    self.send_data_rate_limiter.update_amount_processed(time_now, sent, 0.1)
-            except Exception:
-                self.handle_close()
-                return
-            del self.sendbuf[:sent]
-
-    def got_data(self):
+    def got_data(self, data):
         try:
             with mininode_lock:
-                if len(self.recvbuf) < 4:
-                    return None
-                if self.recvbuf[:4] != self.MAGIC_BYTES[self.network]:
-                    raise ValueError("got garbage %s" % repr(self.recvbuf))
+                if len(data) < 4:
+                    return (None, 0)
+                if data[:4] != self.MAGIC_BYTES[self.network]:
+                    raise ValueError("got garbage %s" % repr(data))
                 if self.ver_recv < 209:
-                    if len(self.recvbuf) < 4 + 12 + 4:
-                        return None
-                    command = self.recvbuf[4:4 + 12].split(b"\x00", 1)[0]
+                    if len(data) < 4 + 12 + 4:
+                        return (None, 0)
+                    command = data[4:4 + 12].split(b"\x00", 1)[0]
                     payloadlen = struct.unpack(
-                        "<i", self.recvbuf[4 + 12:4 + 12 + 4])[0]
+                        "<i", data[4 + 12:4 + 12 + 4])[0]
                     checksum = None
-                    if len(self.recvbuf) < 4 + 12 + 4 + payloadlen:
-                        return None
-                    msg = self.recvbuf[4 + 12 + 4:4 + 12 + 4 + payloadlen]
-                    self.recvbuf = self.recvbuf[4 + 12 + 4 + payloadlen:]
+                    if len(data) < 4 + 12 + 4 + payloadlen:
+                        return (None, 0)
+                    msg = data[4 + 12 + 4:4 + 12 + 4 + payloadlen]
+                    data = data[4 + 12 + 4 + payloadlen:]
                 else:
                     hdrsize = 4 + 12 + 4 + 4
-                    if len(self.recvbuf) < hdrsize:
-                        return None
-                    extended = self.recvbuf[4:4 + 12] == self.EXTMSG_COMMAND
+                    if len(data) < hdrsize:
+                        return (None, 0)
+                    extended = data[4:4 + 12] == self.EXTMSG_COMMAND
 
                     command = ''
                     payloadlen = 0
                     if extended:
                         hdrsize_ext = hdrsize + 12 + 8
-                        if len(self.recvbuf) < hdrsize_ext:
-                            return None
-                        command = self.recvbuf[hdrsize:hdrsize + 12].split(b"\x00", 1)[0]
-                        payloadlen = struct.unpack("<Q", self.recvbuf[hdrsize + 12:hdrsize + 12 + 8])[0]
+                        if len(data) < hdrsize_ext:
+                            return (None, 0)
+                        command = data[hdrsize:hdrsize + 12].split(b"\x00", 1)[0]
+                        payloadlen = struct.unpack("<Q", data[hdrsize + 12:hdrsize + 12 + 8])[0]
                         hdrsize = hdrsize_ext
                     else:
-                        command = self.recvbuf[4:4 + 12].split(b"\x00", 1)[0]
-                        payloadlen = struct.unpack("<L", self.recvbuf[4 + 12:4 + 12 + 4])[0]
+                        command = data[4:4 + 12].split(b"\x00", 1)[0]
+                        payloadlen = struct.unpack("<L", data[4 + 12:4 + 12 + 4])[0]
 
-                    if len(self.recvbuf) < hdrsize + payloadlen:
-                        return None
+                    if len(data) < hdrsize + payloadlen:
+                        return (None, 0)
 
-                    msg = self.recvbuf[hdrsize:hdrsize + payloadlen]
+                    msg = data[hdrsize:hdrsize + payloadlen]
                     h = sha256(sha256(msg))
-                    checksum = self.recvbuf[4 + 12 + 4:4 + 12 + 4 + 4]
+                    checksum = data[4 + 12 + 4:4 + 12 + 4 + 4]
                     if extended:
                         if checksum != b'\x00\x00\x00\x00':
                             raise ValueError("extended format msg checksum should be 0: {}".format(checksum))
                     elif checksum != h[:4]:
                         raise ValueError(
-                            "got bad checksum " + repr(self.recvbuf))
-                    self.recvbuf = self.recvbuf[hdrsize + payloadlen:]
+                            "got bad checksum " + repr(data))
+                    data = data[hdrsize + payloadlen:]
                 command = bytes(command)
                 if command not in self.messagemap:
                     logger.warning("Received unknown command from %s:%d: '%s' %s" % (
-                        self.dstaddr, self.dstport, command, repr(msg)))
+                        self.transport.dstaddr, self.transport.dstport, command, repr(msg)))
                     raise ValueError("Unknown command: '%s'" % (command))
                 f = BytesIO(msg)
                 m = self.messagemap[command]()
                 m.deserialize(f)
-                return m
+                return (m, hdrsize + payloadlen)
 
         except Exception as e:
             logger.exception('got_data:', repr(e))
             raise
 
     def send_message(self, message, pushbuf=False):
+
         if self.state != "connected" and not pushbuf:
             raise IOError('Not connected, no pushbuf')
+
         self._log_message("send", message)
         command = message.command
         data = message.serialize()
@@ -2766,73 +2645,53 @@ class NodeConn(asyncore.dispatcher):
             h = sha256(th)
             tmsg += h[:4]
         tmsg += data
-        with mininode_lock:
-            self.sendbuf += tmsg
-            self.last_sent = time.time()
+        self.transport.send_message(tmsg)
 
     def got_message(self, message):
+
         if message.command == b"version":
             if message.nVersion <= BIP0031_VERSION:
                 self.messagemap[b'ping'] = msg_ping_prebip31
-        if self.last_sent + 30 * 60 < time.time():
-            self.send_message(self.messagemap[b'ping']())
+        if self.transport.last_sent + 30 * 60 < time.time():
+            self.transport.send_message(self.messagemap[b'ping']())
         self._log_message("receive", message)
-        self.cb.deliver(self, message)
+
+        self.transport.cb.deliver(self, message)
 
     def _log_message(self, direction, msg):
         if direction == "send":
             log_message = "Send message to "
         elif direction == "receive":
             log_message = "Received message from "
-        log_message += "%s:%d: %s" % (self.dstaddr,
-                                      self.dstport, repr(msg)[:500])
+        log_message += "%s:%d: %s" % (self.transport.dstaddr,
+                                      self.transport.dstport, repr(msg)[:500])
         if len(log_message) > 500:
             log_message += "... (msg truncated)"
         logger.debug(log_message)
 
     def disconnect_node(self):
-        self.disconnect = True
+        self.transport.disconnect = True
 
+    @property
+    def connected(self):
+        return self.transport.connected
 
-NetworkThread_should_stop = False
+    @property
+    def disconnect(self):
+        return self.transport.disconnect
 
+    @property
+    def state(self):
+        return self.transport.state
 
-def StopNetworkThread():
-    global NetworkThread_should_stop
-    NetworkThread_should_stop = True
+    def close(self):
+        return self.transport.close()
 
+    def rate_limit_sending(self, limit):
+        self.transport.rate_limit_sending(limit)
 
-class NetworkThread(Thread):
-
-    poll_timeout = 0.1
-
-    def run(self):
-        while mininode_socket_map and not NetworkThread_should_stop:
-            with network_thread_loop_intent_lock:
-                # Acquire and immediately release lock.
-                # This allows other threads to more easily acquire network_thread_loop_lock by
-                # acquiring (and holding) network_thread_loop_intent_lock first since NetworkThread
-                # will block on trying to acquire network_thread_loop_intent_lock in the line above.
-                # If this was not done, other threads would need to wait for a long time (>10s) for
-                # network_thread_loop_lock since it is released only briefly between two loop iterations.
-                pass
-            with network_thread_loop_lock:
-                # We check for whether to disconnect outside of the asyncore
-                # loop to workaround the behavior of asyncore when using
-                # select
-                disconnected = []
-                for fd, obj in mininode_socket_map.items():
-                    if obj.disconnect:
-                        disconnected.append(obj)
-                [obj.handle_close() for obj in disconnected]
-                try:
-                    asyncore.loop(NetworkThread.poll_timeout, use_poll=True, map=mininode_socket_map, count=1)
-                except Exception as e:
-                    # All exceptions are caught to prevent them from taking down the network thread.
-                    # Since the error cannot be easily reported, it is just logged assuming that if
-                    # the error is relevant, the test will detect it in some other way.
-                    logger.warning("mininode NetworkThread: asyncore.loop() failed! " + str(e))
-        logger.debug("Network thread closing")
+    def readable(self):
+        return self.transport.readable()
 
 
 # An exception we can raise if we detect a potential disconnect

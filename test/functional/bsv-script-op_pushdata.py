@@ -5,7 +5,7 @@
 from test_framework.blocktools import TxCreator
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.mininode import COIN, COutPoint, CTxIn, CTxOut, \
-    CTransaction, ToHex, FromHex, NetworkThread, NodeConnCB, NodeConn, \
+    CTransaction, ToHex, FromHex, P2PHandler, \
     msg_tx
 from test_framework.script import CScript, OP_DROP, OP_2DROP, OP_EQUALVERIFY, \
     OP_FALSE, OP_SIZE, OP_TRUE
@@ -36,16 +36,7 @@ class TestOP_PUSHDATA(BitcoinTestFramework):
                             '-txnvalidationqueuesmaxmemory=3000MB']]
 
     def add_node_connections(self):
-        connections = []
-        self.node0 = NodeConnCB()
-        connections.append(NodeConn('127.0.0.1',
-                                    p2p_port(0),
-                                    self.nodes[0],
-                                    self.node0))
-        self.node0.add_connection(connections[0])
-
-        NetworkThread().start()
-        self.node0.wait_for_verack()
+        self.node0 = P2PHandler.connect('127.0.0.1', p2p_port(0), self.nodes[0])
 
     def make_and_send_tx(self, inputs, outputs):
         tx = CTransaction()

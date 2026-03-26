@@ -13,46 +13,11 @@
 #include "script/interpreter.h"
 #include "script/script_flags.h"
 #include "script/script_num.h"
+#include "script/standard.h"
 #include "taskcancellation.h"
 
 #include <cstdint>
 
-/**
- * Check transaction inputs to mitigate two potential denial-of-service attacks:
- *
- * 1. scriptSigs with extra data stuffed into them, not consumed by scriptPubKey
- * (or P2SH script)
- * 2. P2SH scripts with a crazy number of expensive CHECKSIG/CHECKMULTISIG
- * operations
- *
- * Why bother? To avoid denial-of-service attacks; an attacker can submit a
- * standard HASH... OP_EQUAL transaction, which will get accepted into blocks.
- * The redemption script can be anything; an attacker could use a very
- * expensive-to-check-upon-redemption script like:
- *   DUP CHECKSIG DROP ... repeated 100 times... OP_1
- */
-bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScriptPubKeyHeight, txnouttype &whichType)
-{
-    std::vector<std::vector<uint8_t>> vSolutions;
-    if (!Solver(scriptPubKey, GetProtocolEra(config.GetConfigScriptPolicy(), nScriptPubKeyHeight), whichType, vSolutions)) {
-        return false;
-    }
-
-    if (whichType == TX_MULTISIG) {
-        // we don't require minimal encoding here because Solver method is already checking minimal encoding
-        int m = CScriptNum(vSolutions.front(), min_encoding_check::no).getint();
-        int n = CScriptNum(vSolutions.back(), min_encoding_check::no).getint();
-        // Support up to x-of-3 multisig txns as standard
-        if (n < 1 || n > 3) return false;
-        if (m < 1 || m > n) return false;
-    } else if (whichType == TX_NULL_DATA) {
-        if (!config.GetDataCarrier()) {
-            return false;
-        }
-    }
-
-    return whichType != TX_NONSTANDARD;
-}
 
 bool IsDustReturnTxn (const CTransaction &tx)
 {
@@ -155,7 +120,7 @@ AnnotatedType<bool>  IsFreeConsolidationTxn(const Config &config, const CTransac
         // if not acceptnonstdconsolidationinput then check if inputs are standard
         // and fail otherwise
         txnouttype dummyType;
-        if (stdInputOnly  && !IsStandard(config, coin->GetTxOut().scriptPubKey, coinHeight, dummyType)) {
+        if (stdInputOnly  && !IsStandardOutput(config.GetConfigScriptPolicy(), coin->GetTxOut().scriptPubKey, coinHeight, dummyType)) {
             return {false,
                  strprintf(
                      "Consolidation transaction %s has non-standard input from transaction %s and cannot be free."
@@ -194,79 +159,9 @@ AnnotatedType<bool>  IsFreeConsolidationTxn(const Config &config, const CTransac
         return {true, strprintf("free consolidation transaction: %s", tx.GetId().ToString())};
 }
 
-bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight, std::string &reason)
-{
-    if (tx.nVersion > CTransaction::MAX_STANDARD_VERSION || tx.nVersion < 1) {
-        reason = "version";
-        return false;
-    }
-
-    ProtocolEra era { GetProtocolEra(config.GetConfigScriptPolicy(), nHeight) };
-
-    // Extremely large transactions with lots of inputs can cost the network
-    // almost as much to process as they cost the sender in fees, because
-    // computing signature hashes is O(ninputs*txsize). Limiting transactions
-    // mitigates CPU exhaustion attacks.
-    unsigned int sz = tx.GetTotalSize();
-    if (sz > config.GetMaxTxSize(era, false)) {
-        reason = "tx-size";
-        return false;
-    }
-
-    for (const CTxIn &txin : tx.vin) {
-        // Biggest 'standard' txin is a 15-of-15 P2SH multisig with compressed
-        // keys (remember the 520 byte limit on redeemScript size). That works
-        // out to a (15*(33+1))+3=513 byte redeemScript, 513+1+15*(73+1)+3=1627
-        // bytes of scriptSig, which we round off to 1650 bytes for some minor
-        // future-proofing. That's also enough to spend a 20-of-20 CHECKMULTISIG
-        // scriptPubKey, though such a scriptPubKey is not considered standard.
-        if (!IsProtocolActive(era, ProtocolName::Genesis) && txin.scriptSig.size() > 1650) {
-            reason = "scriptsig-size";
-            return false;
-        }
-        if (!txin.scriptSig.IsPushOnly()) {
-            reason = "scriptsig-not-pushonly";
-            return false;
-        }
-    }
-
-    unsigned int nDataSize = 0;
-    txnouttype whichType;
-    bool scriptpubkey = false;
-    for (const CTxOut &txout : tx.vout) {
-        if (!::IsStandard(config, txout.scriptPubKey, nHeight, whichType)) {
-            scriptpubkey = true;
-        }
-
-        if (whichType == TX_NULL_DATA) {
-            nDataSize += txout.scriptPubKey.size();
-        } else if ((whichType == TX_MULTISIG) && (!fIsBareMultisigStd)) {
-            reason = "bare-multisig";
-            return false;
-        } else if (txout.IsDust(era)) {
-            reason = "dust";
-            return false;
-        }
-    }
-
-    // cumulative size of all OP_RETURN txout should be smaller than -datacarriersize
-    if (nDataSize > config.GetDataCarrierSize()) {
-        reason = "datacarrier-size-exceeded";
-        return false;
-    }
-    
-    if(scriptpubkey)
-    {
-        reason = "scriptpubkey";
-        return false;
-    }
-
-    return true;
-}
-
 std::optional<bool> AreInputsStandard(
     const task::CCancellationToken& token,
-    const Config& config,
+    const ConfigScriptPolicy& scriptPolicy,
     const CTransaction& tx,
     const CCoinsViewCache &mapInputs,
     const int32_t mempoolHeight)
@@ -278,52 +173,20 @@ std::optional<bool> AreInputsStandard(
 
     constexpr bool consensus{};
     constexpr uint32_t flags{SCRIPT_VERIFY_NONE};
-    const auto params{make_eval_script_params(config.GetConfigScriptPolicy(), flags, consensus)};
+    const auto params{make_eval_script_params(scriptPolicy, flags, consensus)};
 
     for (size_t i = 0; i < tx.vin.size(); i++) {
         auto prev = mapInputs.GetCoinWithScript( tx.vin[i].prevout );
         assert(prev.has_value());
         assert(!prev->IsSpent());
 
-        std::vector<std::vector<uint8_t>> vSolutions;
-        txnouttype whichType;
         // get the scriptPubKey corresponding to this input:
         const CScript &prevScript = prev->GetTxOut().scriptPubKey;
+        const ProtocolEra utxoEra = prev.value().GetProtocolEra(scriptPolicy, mempoolHeight);
 
-        if (!Solver(prevScript, prev.value().GetProtocolEra(config.GetConfigScriptPolicy(), mempoolHeight), whichType, vSolutions)) {
-            return false;
-        }
-
-        if (whichType == TX_SCRIPTHASH) {
-            // Pre-genesis limitations are stricter than post-genesis, so LimitedStack can use UINT32_MAX as max size.
-            LimitedStack stack(UINT32_MAX);
-            // convert the scriptSig into a stack, so we can inspect the
-            // redeemScript
-            if(const auto o = EvalScript(params,
-                                         token,
-                                         stack,
-                                         tx.vin[i].scriptSig,
-                                         flags,
-                                         BaseSignatureChecker());
-                !o.has_value())
-            {
-                return {};
-            }
-            else if(o.value() != SCRIPT_ERR_OK)
-            {
-                return false;
-            }
-
-            if(stack.empty())
-                return false;
-
-            // Active release is set to PreGenesis, because TX_SCRIPTHASH is not supported after genesis
-            bool sigOpCountError;
-            CScript subscript(stack.back().begin(), stack.back().end());
-            uint64_t nSigOpCount = subscript.GetSigOpCount(true, ProtocolEra::PreGenesis, sigOpCountError);
-            if (sigOpCountError || nSigOpCount > MAX_P2SH_SIGOPS) {
-                return false;
-            }
+        auto result = IsInputStandard(token, params, tx.vin[i].scriptSig, prevScript, utxoEra, flags);
+        if (!result.has_value() || !result.value()) {
+            return result;
         }
     }
 

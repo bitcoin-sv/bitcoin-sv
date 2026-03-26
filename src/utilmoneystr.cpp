@@ -18,6 +18,7 @@ std::string FormatMoney(const Amount &amt) {
 
     // Right-trim excess zeros before the decimal point:
     int nTrim = 0;
+    // NOLINTNEXTLINE(*-narrowing-conversions)
     for (int i = str.size() - 1; (str[i] == '0' && isdigit(str[i - 2])); --i)
         ++nTrim;
     if (nTrim) str.erase(str.size() - nTrim, nTrim);
@@ -29,6 +30,8 @@ std::string FormatMoney(const Amount &amt) {
 bool ParseMoney(const std::string &str, Amount &nRet) {
     return ParseMoney(str.c_str(), nRet);
 }
+
+//  NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
 bool ParseMoney(const char *pszIn, Amount &nRet) {
     std::string strWhole;
@@ -61,3 +64,5 @@ bool ParseMoney(const char *pszIn, Amount &nRet) {
     nRet = nValue;
     return true;
 }
+
+//  NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)

@@ -16,7 +16,7 @@ std::pair<size_t, size_t> blocktxn_parser::operator()(
     const auto [hbytes_read, hbytes_reqd]{header_parser_(s)};
     if(hbytes_reqd)
         return make_pair(hbytes_read, hbytes_reqd);
-    
+
     size_t total_bytes_read{hbytes_read};
 
     const auto [bytes_read, bytes_reqd]{txs_parser_(s.subspan(hbytes_read))};
@@ -31,7 +31,7 @@ size_t blocktxn_parser::read(size_t read_pos, span<uint8_t> s)
         throw std::ios_base::failure("blocktxn_parser::read(): end of data");
 
     const size_t max_readable{min(s.size(), readable_size())};
-    
+
     size_t total_bytes_read{};
     while(total_bytes_read < max_readable)
     {
@@ -69,11 +69,5 @@ size_t blocktxn_parser::size() const
 size_t blocktxn_parser::readable_size() const 
 {
     return header_parser_.size() + txs_parser_.readable_size();
-}
-
-void blocktxn_parser::clear()
-{
-    header_parser_.clear();
-    txs_parser_.clear();
 }
 

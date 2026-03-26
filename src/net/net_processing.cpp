@@ -1965,6 +1965,11 @@ static bool ProcessAuthChMessage(const Config& config,
                                  msg_buffer& vRecv,
                                  CConnman& connman)
 {
+    if(!g_minerIDs) {
+        LogPrint(BCLog::MINERID, "MinerID database not initialized, cannot process authch message from peer=%d\n", pfrom->id);
+        return false;
+    }
+
     // Skip the message if the AuthConn has already been established.
     if (pfrom->fAuthConnEstablished) {
         return true;
@@ -2445,7 +2450,11 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
         {
             LogPrint(BCLog::NETMSG, "got block inv: %s %s peer=%d\n", inv.hash.ToString(),
                 fAlreadyHave ? "have" : "new", pfrom->id);
-            UpdateBlockAvailability(inv.hash, GetState(pfrom->GetId()).get());
+            const CNodeStateRef stateRef { GetState(pfrom->GetId()) };
+            const auto& nodeState{stateRef.get()};
+            if(nodeState)
+                UpdateBlockAvailability(inv.hash, nodeState);
+
             if(!fAlreadyHave && !fImporting && !fReindex && !blockDownloadTracker.IsInFlight(inv.hash)) {
                 const auto& bestHeader = mapBlockIndex.GetBestHeader();
                 // We used to request the full block here, but since
@@ -3737,24 +3746,30 @@ static bool ProcessCompactBlockMessage(
     CValidationState state;
     if(!ProcessNewBlockHeaders(config, {cmpctblock.header}, state, &pindex))
     {
+        const CNodeStateRef stateRef{GetState(pfrom->id)};
+        const auto& nodeState{stateRef.get()};
         int nDoS;
         if(state.IsInvalid(nDoS))
         {
             LogPrint(BCLog::NETMSG, "Peer %d sent us invalid header via cmpctblock\n", pfrom->id);
-            blockDownloadTracker.MarkBlockAsFailed(blockSource, GetState(pfrom->id).get());
+            if(nodeState)
+                blockDownloadTracker.MarkBlockAsFailed(blockSource, nodeState);
+
             if(nDoS > 0)
             {
                 Misbehaving(pfrom, nDoS, state.GetRejectReason());
             }
             return true;
         }
-        
+
         // safety net: if the first block header is not accepted but the state is not marked
         // as invalid pindexLast will stay null
         // in that case we have nothing to do...
         if(pindex == nullptr)
         {
-            blockDownloadTracker.MarkBlockAsFailed(blockSource, GetState(pfrom->id).get());
+            if(nodeState)
+                blockDownloadTracker.MarkBlockAsFailed(blockSource, nodeState);
+
             return error("header is not accepted");
         }
     }

@@ -57,7 +57,8 @@ extern const char *const BITCOIN_PID_FILENAME;
  * returned, and simply return the input.
  */
 // NOLINTNEXTLINE(bugprone-reserved-identifier)
-inline std::string _(const char *psz) {
+inline std::string _(const char *psz) //NOLINT(cert-dcl*)
+{
     boost::optional<std::string> rv = translationInterface.Translate(psz);
     return rv ? (*rv) : psz;
 }
@@ -75,7 +76,7 @@ void FileCommit(FILE *file);
 bool TruncateFile(FILE *file, uint64_t length);
 int RaiseFileDescriptorLimit(int nMinFD);
 void AllocateFileRange(FILE *file, unsigned int offset, uint64_t length);
-bool RenameOver(fs::path src, fs::path dest);
+bool RenameOver(const fs::path& src, const fs::path& dest);
 bool TryCreateDirectories(const fs::path &p);
 fs::path GetDefaultDataDir();
 const fs::path &GetDataDir(bool fNetSpecific = true);
@@ -124,7 +125,7 @@ inline bool IsSwitchChar(char c) {
 
 class ArgsManager {
 private:
-    int64_t parseUnit(std::string argValue, int64_t nMultiples);
+    int64_t parseUnit(const std::string& argValue, int64_t nMultiples);
 
 protected:
     CCriticalSection cs_args;
@@ -132,6 +133,7 @@ protected:
     std::map<std::string, std::vector<std::string>> mapMultiArgs;
 
 public:
+    //NOLINTNEXTLINE(cert-err58-cpp)
     static inline const std::array<std::string, 3> sensitiveArgs{"-rpcuser", "-rpcpassword", "-rpcauth"};
 
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)

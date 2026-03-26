@@ -76,7 +76,6 @@ CTxInputData::CTxInputData(
     }
 }
 
-
 const Config& CTxInputData::GetConfig( const Config& defaultConfig ) const
 {
     return mConfig ?  *mConfig : defaultConfig;

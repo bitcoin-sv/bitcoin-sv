@@ -19,9 +19,7 @@ We send one block to test RPC functionalities
 import time
 
 from test_framework.mininode import (
-    NetworkThread,
-    NodeConn,
-    NodeConnCB,
+    P2PHandler,
     msg_block,
 )
 from test_framework.test_framework import BitcoinTestFramework, ChainManager
@@ -43,13 +41,8 @@ class WaitAfterValidation(BitcoinTestFramework):
     def run_test(self):
         block_count = 0
 
-        # Create a P2P connections
-        node0 = NodeConnCB()
-        connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], node0)
-        node0.add_connection(connection)
-
-        NetworkThread().start()
-        node0.wait_for_verack()
+        # Create a P2P connection
+        node0 = P2PHandler.connect('127.0.0.1', p2p_port(0), self.nodes[0])
 
         self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))
         block = self.chain.next_block(block_count)

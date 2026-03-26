@@ -25,9 +25,3 @@ std::pair<size_t, size_t> fixed_len_parser::operator()(
     }
 }
 
-void fixed_len_parser::reset()
-{
-    value_type v;
-    buffer_.swap(v);
-}
-

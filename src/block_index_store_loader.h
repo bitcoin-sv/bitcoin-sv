@@ -17,5 +17,5 @@ public:
     bool ForceLoad( const Config& config, std::unique_ptr<CDBIterator> cursor );
 
 private:
-    BlockIndexStore& mBlockIndexStore;
+    BlockIndexStore& mBlockIndexStore; //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 };

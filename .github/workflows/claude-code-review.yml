@@ -53,76 +53,70 @@ jobs:
     runs-on: ubuntu-latest
     if: '!github.event.pull_request.draft'
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
       issues: read
       id-token: write
       actions: read  # Required for github_ci MCP server to read CI results
       statuses: write
-    
-    timeout-minutes: 20 
+
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
 
+      - name: Classifying Issues
+        id: classify_issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: .github/workflows/claude-code-review-classify-issues.sh >> "$GITHUB_OUTPUT"
+
+      - name: Re-review
+        id: rereview
+        if: steps.classify_issues.outputs.mode == 'rereview'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: .github/workflows/claude-code-review-rereview.sh
+
       - name: Load code review guidelines
         id: code-review-guidelines
+        if: steps.classify_issues.outputs.blocking_count == '0'
+          && (steps.rereview.outcome == 'skipped'
+           || steps.rereview.outputs.outstanding_count == '0')
         run: |
           echo "content<<EOF" >> $GITHUB_OUTPUT
           cat .claude/prompts/code-review-guidelines.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Load subagent instructions
-        id: subagent-instructions
-        run: |
-          echo "cpp<<EOF" >> $GITHUB_OUTPUT
-          cat .claude/prompts/claude-code-review-cpp-instructions.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          echo "python<<EOF" >> $GITHUB_OUTPUT
-          cat .claude/prompts/claude-code-review-python-instructions.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Detect Review Mode
-        id: detect-mode
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: .github/workflows/claude-code-review-detect-mode.sh
-
-      - name: Filter Threads for Verification
-        id: filter-threads
-        if: steps.detect-mode.outputs.mode == 'rereview'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        run: .github/workflows/claude-code-review-verify-threads.sh
-
-      - name: Load initial review prompt
-        id: initial-prompt
-        if: steps.detect-mode.outputs.mode == 'initial'
+      - name: Load review prompt
+        id: review-prompt
+        if: steps.classify_issues.outputs.blocking_count == '0'
+          && (steps.rereview.outcome == 'skipped'
+           || steps.rereview.outputs.outstanding_count == '0')
         run: |
           echo "content<<EOF" >> $GITHUB_OUTPUT
-          cat .claude/prompts/claude-code-review-initial-prompt.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Load re-review prompt
-        id: rereview-prompt
-        if: steps.detect-mode.outputs.mode == 'rereview'
-        run: |
-          echo "content<<EOF" >> $GITHUB_OUTPUT
-          cat .claude/prompts/claude-code-review-rereview-prompt.md >> $GITHUB_OUTPUT
+          cat .claude/prompts/claude-code-review-prompt.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Run Claude Code Review
         id: claude-review
-        uses: anthropics/claude-code-action@v1
+        if: steps.classify_issues.outputs.blocking_count == '0'
+          && (steps.rereview.outcome == 'skipped'
+           || steps.rereview.outputs.outstanding_count == '0')
+        # v1.0.27 - Pinned to specific commit for security
+        uses: anthropics/claude-code-action@7145c3e0510bcdbdd29f67cc4a8c1958f1acfa2f
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          use_sticky_comment: true
+          github_token: ${{ github.token }}
+          track_progress: true
           prompt: |
             ${{ steps.code-review-guidelines.outputs.content }}
 
@@ -136,13 +130,12 @@ jobs:
 
             You are coordinating a comprehensive multi-language code review for this PR.
 
-            ═══════════════════════════════════════════════════════════════════════
-            MODE: ${{ steps.detect-mode.outputs.mode }}
-            ═══════════════════════════════════════════════════════════════════════
+            ${{ steps.review-prompt.outputs.content }}
 
-            ${{ steps.detect-mode.outputs.mode == 'initial' && steps.initial-prompt.outputs.content || steps.rereview-prompt.outputs.content }}
-
-            ═══════════════════════════════════════════════════════════════════════
+            **EXISTING ISSUES (do NOT re-post):**
+            The following file:line locations already have review comments.
+            Do NOT post new comments on these locations.
+            ${{ steps.classify_issues.outputs.existing_issues }}
 
             Use repository CLAUDE.md for guidance.
 
@@ -151,19 +144,30 @@ jobs:
           # https://docs.claude.com/en/docs/claude-code/cli-reference
           claude_args: >-
             --allowed-tools
-            "Task,mcp__github_inline_comment__create_inline_comment,
-            Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),
-            Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),
-            Bash(gh api /repos/*/pulls/*/comments:*),
-            Bash(gh api POST /repos/*/pulls/*/comments/*:*),
-            Bash(gh api POST /repos/*/pulls/*/comments/*/replies:*),
-            Bash(gh api graphql:*)"
+            "mcp__github_inline_comment__create_inline_comment,
+            Glob,
+            Grep,
+            Read,
+            Task,
+            Bash(gh issue view *),
+            Bash(gh issue list *),
+            Bash(gh search *),
+            Bash(gh pr diff *),
+            Bash(gh pr view *),
+            Bash(gh pr list *),
+            Bash(gh api /repos/${{ github.repository }}/pulls/*),
+            Bash(gh api graphql *),
+            Bash(.github/workflows/resolve-review-issue.sh *)"
 
-      - name: Enforce Zero-Tolerance Policy
+      - name: Evaluate Review Outcome
+        if: success()
         env:
-          GH_TOKEN: ${{ github.token }}
-          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+          CLASSIFY_MODE: ${{ steps.classify_issues.outputs.mode }}
+          BLOCKING_COUNT: ${{ steps.classify_issues.outputs.blocking_count }}
+          REVIEW_OUTCOME: ${{ steps.claude-review.outcome == 'skipped' && steps.rereview.outcome || steps.claude-review.outcome }}
+          EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
         run: .github/workflows/claude-code-review-enforcement.sh
-

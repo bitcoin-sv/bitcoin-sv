@@ -11,8 +11,9 @@ This test connects to a node and sends it a few messages, trying to intice it
 into sending us something it shouldn't."""
 
 from test_framework.mininode import mininode_lock, msg_getaddr, msg_ping, \
-    msg_verack, NetworkThread, NodeConn, NodeConnCB
+    msg_verack, P2PHandler, P2PEventHandler
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import p2p_port, wait_until
 
 import time
@@ -20,7 +21,7 @@ import time
 banscore = 10
 
 
-class CLazyNode(NodeConnCB):
+class CLazyNode(P2PEventHandler):
     def __init__(self):
         super().__init__()
         self.unexpected_msg = False
@@ -157,12 +158,17 @@ class P2PLeakTest(BitcoinTestFramework):
         no_verack_idlenode = CNodeNoVerackIdle()
 
         connections = []
-        connections.append(NodeConn('127.0.0.1', p2p_port(
-            0), self.nodes[0], no_version_bannode, send_version=False))
-        connections.append(NodeConn('127.0.0.1', p2p_port(
-            0), self.nodes[0], no_version_idlenode, send_version=False))
-        connections.append(NodeConn('127.0.0.1', p2p_port(0),
-                                    self.nodes[0], no_verack_idlenode))
+        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(0), no_version_bannode),
+                                      self.nodes[0],
+                                      send_version=False))
+
+        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(0), no_version_idlenode),
+                                      self.nodes[0],
+                                      send_version=False))
+
+        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(0), no_verack_idlenode),
+                                      self.nodes[0]))
+
         no_version_bannode.add_connection(connections[0])
         no_version_idlenode.add_connection(connections[1])
         no_verack_idlenode.add_connection(connections[2])

@@ -35,14 +35,14 @@ class InvalidInv(BitcoinTestFramework):
             wait_until(lambda: check_for_log_msg(self, "got txn inv", "/node0"))
 
             time.sleep(2)
-            assert conn.cb.connected
+            assert conn.transport.cb.connected
 
             # Send invalid Inv type
             conn.send_message(msg_inv([CInv(CInv.ERROR, 2)]))
             wait_until(lambda: check_for_log_msg(self, "Got invalid inv", "/node0"))
 
             # We will be disconnected
-            conn.cb.wait_for_disconnect()
+            conn.transport.cb.wait_for_disconnect()
 
 
 if __name__ == '__main__':

@@ -835,6 +835,74 @@ BOOST_AUTO_TEST_CASE(tx_uniqueness)
     BOOST_CHECK(!AreTxsUnique(msg));
 }
 
+BOOST_AUTO_TEST_CASE(header_hash)
+{
+    using OutPoints = vector<pair<string, uint32_t>>;
+
+    CBlockHeader h1;
+    h1.nVersion = 1;
+    h1.hashPrevBlock = uint256S("abcd");
+    h1.hashMerkleRoot = uint256S("1111");
+    h1.nTime = 1000;
+    h1.nBits = 0x1d00ffff;
+    h1.nNonce = 42;
+
+    DSDetected msg1;
+    UnitTestAccess::SetBlockList(msg1, {{{h1}, CreateMerkleProof(OutPoints{{"42", 0}})}});
+
+    // Check hash of equal DSDetected msgs
+    {
+        CBlockHeader h2 {h1};
+        DSDetected msg2;
+        UnitTestAccess::SetBlockList(msg2, {{{h2}, CreateMerkleProof(OutPoints{{"42", 0}})}});
+        BOOST_CHECK_EQUAL(sort_hasher(msg1), sort_hasher(msg2));
+    }
+
+    // Check hashes differ when each field from header are different
+    {
+        CBlockHeader h2 {h1};
+        h2.nVersion = 2;
+        DSDetected msg2;
+        UnitTestAccess::SetBlockList(msg2, {{{h2}, CreateMerkleProof(OutPoints{{"42", 0}})}});
+        BOOST_CHECK_NE(sort_hasher(msg1), sort_hasher(msg2));
+    }
+    {
+        CBlockHeader h2 {h1};
+        h2.hashPrevBlock = uint256S("abcde");
+        DSDetected msg2;
+        UnitTestAccess::SetBlockList(msg2, {{{h2}, CreateMerkleProof(OutPoints{{"42", 0}})}});
+        BOOST_CHECK_NE(sort_hasher(msg1), sort_hasher(msg2));
+    }
+    {
+        CBlockHeader h2 {h1};
+        h2.hashMerkleRoot = uint256S("2222");
+        DSDetected msg2;
+        UnitTestAccess::SetBlockList(msg2, {{{h2}, CreateMerkleProof(OutPoints{{"42", 0}})}});
+        BOOST_CHECK_NE(sort_hasher(msg1), sort_hasher(msg2));
+    }
+    {
+        CBlockHeader h2 {h1};
+        h2.nTime = 1001;
+        DSDetected msg2;
+        UnitTestAccess::SetBlockList(msg2, {{{h2}, CreateMerkleProof(OutPoints{{"42", 0}})}});
+        BOOST_CHECK_NE(sort_hasher(msg1), sort_hasher(msg2));
+    }
+    {
+        CBlockHeader h2 {h1};
+        h2.nBits = 0x1d00fffe;
+        DSDetected msg2;
+        UnitTestAccess::SetBlockList(msg2, {{{h2}, CreateMerkleProof(OutPoints{{"42", 0}})}});
+        BOOST_CHECK_NE(sort_hasher(msg1), sort_hasher(msg2));
+    }
+    {
+        CBlockHeader h2 {h1};
+        h2.nNonce = 43;
+        DSDetected msg2;
+        UnitTestAccess::SetBlockList(msg2, {{{h2}, CreateMerkleProof(OutPoints{{"42", 0}})}});
+        BOOST_CHECK_NE(sort_hasher(msg1), sort_hasher(msg2));
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(limited_cache_tests)

@@ -40,6 +40,8 @@ static inline size_t align_up(size_t x, size_t align) {
     return (x + align - 1) & ~(align - 1);
 }
 
+//NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
 /*******************************************************************************/
 // Implementation: Arena
 
@@ -72,9 +74,10 @@ void *Arena::alloc(size_t size)
 
     // Create the used-chunk, taking its space from the end of the free-chunk
     auto alloced = chunks_used_.emplace(it->first + it->second - size, size).first;
-    if(!(it->second -= size))
+    if(!(it->second -= size)) // NOLINT(bugprone-assignment-in-if-condition)
         chunks_free_.erase(it);
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     return reinterpret_cast<void*>(alloced->first);
 }
 
@@ -87,6 +90,7 @@ bool extend(Iterator it, const Pair &other) {
     }
     return false;
 }
+//NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
 void Arena::free(void* ptr)
 {
@@ -216,7 +220,7 @@ PosixLockedPageAllocator::PosixLockedPageAllocator() {
 #if defined(PAGESIZE) // defined in climits
     page_size = PAGESIZE;
 #else // assume some POSIX OS
-    page_size = sysconf(_SC_PAGESIZE);
+    page_size = sysconf(_SC_PAGESIZE); // NOLINT(cppcoreguidelines-prefer-member-initializer)
 #endif
 }
 
@@ -226,11 +230,10 @@ PosixLockedPageAllocator::PosixLockedPageAllocator() {
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
-void *PosixLockedPageAllocator::AllocateLocked(size_t len,
+void* PosixLockedPageAllocator::AllocateLocked(size_t len,
                                                bool *lockingSuccess) {
-    void *addr;
     len = align_up(len, page_size);
-    addr = mmap(nullptr, len, PROT_READ | PROT_WRITE,
+    void* addr = mmap(nullptr, len, PROT_READ | PROT_WRITE,
                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (addr) {
         *lockingSuccess = mlock(addr, len) == 0;
@@ -245,7 +248,7 @@ void PosixLockedPageAllocator::FreeLocked(void *addr, size_t len) {
 }
 size_t PosixLockedPageAllocator::GetLimit() {
 #ifdef RLIMIT_MEMLOCK
-    struct rlimit rlim;
+    struct rlimit rlim;  // NOLINT(cppcoreguidelines-pro-type-member-init)
     if (getrlimit(RLIMIT_MEMLOCK, &rlim) == 0) {
         if (rlim.rlim_cur != RLIM_INFINITY) {
             return rlim.rlim_cur;
@@ -325,7 +328,6 @@ LockedPool::Stats LockedPool::stats() const
 
 bool LockedPool::new_arena(size_t size, size_t align)
 {
-    bool locked;
     // If this is the first arena, handle this specially: Cap the upper size by
     // the process limit. This makes sure that the first arena will at least be
     // locked. An exception to this is if the process limit is 0: in this case
@@ -338,6 +340,7 @@ bool LockedPool::new_arena(size_t size, size_t align)
         }
     }
 
+    bool locked{};
     void* addr = allocator_->AllocateLocked(size, &locked);
     if(!addr)
     {

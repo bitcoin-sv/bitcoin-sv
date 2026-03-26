@@ -11,7 +11,7 @@
 #include "utiltime.h"
 
 constexpr auto LOGFILE = "bitcoind.log";
-bool fLogIPs = DEFAULT_LOGIPS;
+bool fLogIPs = DEFAULT_LOGIPS; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 
 /**
@@ -27,7 +27,9 @@ bool fLogIPs = DEFAULT_LOGIPS;
  * This method of initialization was originally introduced in
  * ee3374234c60aba2cc4c5cd5cac1c0aefc2d817c.
  */
-BCLog::Logger &GetLogger() {
+BCLog::Logger &GetLogger()
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     static BCLog::Logger *const logger = new BCLog::Logger(LOGFILE);
     return *logger;
 }
@@ -44,7 +46,9 @@ struct CLogCategoryDesc {
     std::string category;
 };
 
-const CLogCategoryDesc LogCategories[] = {
+// NOLINTNEXTLINE(cert-err58-cpp)
+const std::array<CLogCategoryDesc, 32> LogCategories
+{{
     {BCLog::NONE, "0"},
     {BCLog::MEMPOOL, "mempool"},
     {BCLog::HTTP, "http"},
@@ -77,7 +81,7 @@ const CLogCategoryDesc LogCategories[] = {
     {BCLog::BLOCKSRC, "blocksrc"},
     {BCLog::ALL, "1"},
     {BCLog::ALL, "all"},
-};
+}};
 
 bool GetLogCategory(BCLog::LogFlags &flag, const std::string &str) {
     if (str == "") {

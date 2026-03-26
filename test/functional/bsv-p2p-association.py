@@ -8,12 +8,13 @@ Test association and stream handling within P2P.
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.mininode import (create_association_id, msg_createstream, mininode_lock,
-                                     NetworkThread, NodeConn, NodeConnCB, wait_until)
+                                     P2PHandler, P2PEventHandler, wait_until)
+from test_framework.transport import NetworkThread, Connection
 from test_framework.util import assert_equal, connect_nodes, p2p_port
 from test_framework.streams import StreamType
 
 
-class TestNode(NodeConnCB):
+class TestNode(P2PEventHandler):
     def __init__(self):
         super().__init__()
         self.recvAssocID = None
@@ -106,49 +107,78 @@ class P2PAssociation(BitcoinTestFramework):
 
         # Create a P2P connection with no association ID (old style)
         oldStyleConnCB = TestNode()
-        oldStyleConn = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], oldStyleConnCB, nullAssocID=True)
+        oldStyleConn = P2PHandler(Connection('127.0.0.1', p2p_port(0), oldStyleConnCB),
+                                  self.nodes[0],
+                                  nullAssocID=True)
         oldStyleConnCB.add_connection(oldStyleConn)
 
         # Create a P2P connection with a new association ID
         newStyleConnCB = TestNode()
-        newStyleConn = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleConnCB)
+        newStyleConn = P2PHandler(Connection('127.0.0.1', p2p_port(0), newStyleConnCB),
+                                  self.nodes[0])
         newStyleConnCB.add_connection(newStyleConn)
 
         # Create a P2P connection with a new association ID and another connection that uses the same ID
         newStyleFirstConnCB = TestNode()
-        newStyleFirstConn = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleFirstConnCB)
+        newStyleFirstConn = P2PHandler(Connection('127.0.0.1', p2p_port(0), newStyleFirstConnCB),
+                                       self.nodes[0])
         newStyleFirstConnCB.add_connection(newStyleFirstConn)
-        # By setting the assocID on this second NodeConn we prevent it sending a version message
+
+        # By setting the assocID on this second P2PHandler we prevent it sending a version message
         newStyleSecondConnCB = TestNode()
-        newStyleSecondConn = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleSecondConnCB, assocID=newStyleFirstConn.assocID)
+        newStyleSecondConn = P2PHandler(Connection('127.0.0.1', p2p_port(0), newStyleSecondConnCB),
+                                        self.nodes[0],
+                                        assocID=newStyleFirstConn.assocID)
         newStyleSecondConnCB.add_connection(newStyleSecondConn)
 
         # Some connections we will use to test setup of DATA2, DATA3, DATA4 streams
         newStyleSecondConnCB_Data2 = TestNode()
-        newStyleSecondConn_Data2 = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleSecondConnCB_Data2, assocID=newStyleFirstConn.assocID)
+        newStyleSecondConn_Data2 = P2PHandler(Connection('127.0.0.1', p2p_port(0), newStyleSecondConnCB),
+                                              self.nodes[0],
+                                              assocID=newStyleFirstConn.assocID)
         newStyleSecondConnCB_Data2.add_connection(newStyleSecondConn_Data2)
+
         newStyleSecondConnCB_Data3 = TestNode()
-        newStyleSecondConn_Data3 = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleSecondConnCB_Data3, assocID=newStyleFirstConn.assocID)
+        newStyleSecondConn_Data3 = P2PHandler(Connection('127.0.0.1', p2p_port(0), newStyleSecondConnCB_Data3),
+                                              self.nodes[0],
+                                              assocID=newStyleFirstConn.assocID)
         newStyleSecondConnCB_Data3.add_connection(newStyleSecondConn_Data3)
+
         newStyleSecondConnCB_Data4 = TestNode()
-        newStyleSecondConn_Data4 = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleSecondConnCB_Data4, assocID=newStyleFirstConn.assocID)
+        newStyleSecondConn_Data4 = P2PHandler(Connection('127.0.0.1', p2p_port(0), newStyleSecondConnCB_Data4),
+                                              self.nodes[0],
+                                              assocID=newStyleFirstConn.assocID)
         newStyleSecondConnCB_Data4.add_connection(newStyleSecondConn_Data4)
 
         # Some connections we will use to test error scenarios
         newStyleThirdConnCB = TestNode()
-        badStreamConn1 = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleThirdConnCB, assocID=create_association_id())
+        badStreamConn1 = P2PHandler(Connection('127.0.0.1', p2p_port(0), newStyleThirdConnCB),
+                                    self.nodes[0],
+                                    assocID=create_association_id())
         newStyleThirdConnCB.add_connection(badStreamConn1)
+
         newStyleFourthConnCB = TestNode()
-        badStreamConn2 = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleFourthConnCB, assocID=newStyleFirstConn.assocID)
+        badStreamConn2 = P2PHandler(Connection('127.0.0.1', p2p_port(0), newStyleFourthConnCB),
+                                    self.nodes[0],
+                                    assocID=newStyleFirstConn.assocID)
         newStyleFourthConnCB.add_connection(badStreamConn2)
+
         newStyleFifthConnCB = TestNode()
-        badStreamConn3 = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleFifthConnCB, assocID=newStyleFirstConn.assocID)
+        badStreamConn3 = P2PHandler(Connection('127.0.0.1', p2p_port(0), newStyleFifthConnCB),
+                                    self.nodes[0],
+                                    assocID=newStyleFirstConn.assocID)
         newStyleFifthConnCB.add_connection(badStreamConn3)
+
         newStyleSixthConnCB = TestNode()
-        badStreamConn4 = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleSixthConnCB, assocID=newStyleFirstConn.assocID)
+        badStreamConn4 = P2PHandler(Connection('127.0.0.1', p2p_port(0), newStyleSixthConnCB),
+                                    self.nodes[0],
+                                    assocID=newStyleFirstConn.assocID)
         newStyleSixthConnCB.add_connection(badStreamConn4)
+
         newStyleSeventhConnCB = TestNode()
-        badStreamConn5 = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleSeventhConnCB, assocID=newStyleFirstConn.assocID)
+        badStreamConn5 = P2PHandler(Connection('127.0.0.1', p2p_port(0), newStyleSeventhConnCB),
+                                    self.nodes[0],
+                                    assocID=newStyleFirstConn.assocID)
         newStyleSeventhConnCB.add_connection(badStreamConn5)
 
         # Start up network handling in another thread. This needs to be called
