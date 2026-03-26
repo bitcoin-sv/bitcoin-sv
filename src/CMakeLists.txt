@@ -410,6 +410,7 @@ add_library(common
 	rpc/jsonwriter.h
 	scheduler.cpp
 	scheduler.h
+	script/conditional_tracker.h
 	script/int_serialization.h
 	script/interpreter.h
 	script/limitedstack.h
@@ -472,6 +473,7 @@ add_library(bitcoinconsensus
 	script/bitcoinconsensus.h
 	script/instruction.h
 	script/instruction_iterator.h
+	script/conditional_tracker.cpp
 	script/interpreter.cpp
 	script/limitedstack.cpp
 	script/opcodes.cpp

@@ -64,6 +64,7 @@ BITCOIN_TESTS =\
   test/write_preferring_upgradable_mutex_tests.cpp \
   test/compress_tests.cpp \
   test/config_tests.cpp \
+  test/conditional_tracker_tests.cpp \
   test/configscriptpolicy_tests.cpp \
   test/coinbase_doc_tests.cpp \
   test/core_io_tests.cpp \

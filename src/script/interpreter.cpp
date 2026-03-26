@@ -392,8 +392,7 @@ std::optional<ScriptError> EvalScript(
     const BaseSignatureChecker& checker,
     LimitedStack& altstack,
     long& ipc,
-    std::vector<bool>& vfExec,
-    std::vector<bool>& vfElse)
+    conditional_tracker& conditionals)
 {
     static const CScriptNum bnZero(0);
     static const CScriptNum bnOne(1);
@@ -454,7 +453,7 @@ std::optional<ScriptError> EvalScript(
                 return SCRIPT_ERR_PUSH_SIZE;
 
             // Do not execute instructions if Genesis OP_RETURN was found in executed branches.
-            bool fExec = !count(vfExec.begin(), vfExec.end(), false) && (!nonTopLevelReturnAfterGenesis || opcode == OP_RETURN);
+            bool fExec = conditionals.is_active() && (!nonTopLevelReturnAfterGenesis || opcode == OP_RETURN);
 
             //
             // Check opcode limits.
@@ -777,7 +776,7 @@ std::optional<ScriptError> EvalScript(
                             else
                                 return SCRIPT_ERR_BAD_OPCODE;
                         }
-                            
+
                         [[fallthrough]];
                     case OP_IF:
                     case OP_NOTIF:
@@ -800,7 +799,7 @@ std::optional<ScriptError> EvalScript(
                                         return SCRIPT_ERR_MINIMALIF;
                                 }
                             }
-                           
+
                             if(opcode == OP_VERIF || opcode == OP_VERNOTIF)
                             {
                                 if(vch.size() == 4)
@@ -812,32 +811,29 @@ std::optional<ScriptError> EvalScript(
                             }
                             else
                                 fValue = CastToBool(vch.GetElement());
-            
+
                             if(opcode == OP_NOTIF || opcode == OP_VERNOTIF)
                                 fValue = !fValue;
 
                             stack.pop_back();
                         }
-                        vfExec.push_back(fValue);
-                        vfElse.push_back(false);
+                        conditionals.op_if(fValue);
                     }
                     break;
 
                     case OP_ELSE: {
                         // Only one ELSE is allowed in IF after genesis.
-                        if (vfExec.empty() || (vfElse.back() && utxo_after_genesis))
+                        if(conditionals.empty() || (conditionals.has_op_else() && utxo_after_genesis))
                             return SCRIPT_ERR_UNBALANCED_CONDITIONAL;
 
-                        vfExec.back() = !vfExec.back();
-                        vfElse.back() = true;
+                        conditionals.op_else();
                     } break;
 
                     case OP_ENDIF: {
-                        if (vfExec.empty())
+                        if (conditionals.empty())
                             return SCRIPT_ERR_UNBALANCED_CONDITIONAL;
 
-                        vfExec.pop_back();
-                        vfElse.pop_back();
+                        conditionals.op_endif();
                     } break;
 
                     case OP_VERIFY: {
@@ -856,7 +852,7 @@ std::optional<ScriptError> EvalScript(
 
                     case OP_RETURN: {
                         if (utxo_after_genesis) {
-                            if (vfExec.empty()) {
+                            if (conditionals.empty()) {
                                 // Terminate the execution as successful. The remaining of the script does not affect the validity (even in
                                 // presence of unbalanced IFs, invalid opcodes etc)
                                 return SCRIPT_ERR_OK;
@@ -1820,7 +1816,7 @@ std::optional<ScriptError> EvalScript(
         return SCRIPT_ERR_UNKNOWN_ERROR;
     }
 
-    if (!vfExec.empty()) {
+    if (!conditionals.empty()) {
         return SCRIPT_ERR_UNBALANCED_CONDITIONAL;
     }
 
@@ -1977,7 +1973,7 @@ std::optional<ScriptError> EvalScript(
 {
     LimitedStack altstack {stack.makeChildStack()};
     long ipc{0};
-    std::vector<bool> vfExec, vfElse;
+    conditional_tracker conditionals;
     return EvalScript(params,
                       token,
                       stack,
@@ -1987,8 +1983,7 @@ std::optional<ScriptError> EvalScript(
                       checker,
                       altstack,
                       ipc,
-                      vfExec,
-                      vfElse);
+                      conditionals);
 }
 
 } // namespace

@@ -6,6 +6,7 @@
 #ifndef BITCOIN_SCRIPT_INTERPRETER_H
 #define BITCOIN_SCRIPT_INTERPRETER_H
 
+#include "conditional_tracker.h"
 #include "configscriptpolicy.h"
 #include "limitedstack.h"
 #include "primitives/transaction.h"
@@ -213,8 +214,7 @@ std::optional<ScriptError> EvalScript(
     const BaseSignatureChecker& checker,
     LimitedStack& altstack,
     long& ipc,
-    std::vector<bool>& vfExec,
-    std::vector<bool>& vfElse);
+    conditional_tracker& conditions);
 
 std::optional<ScriptError> EvalScript(
     const eval_script_params&,

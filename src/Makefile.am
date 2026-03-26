@@ -512,6 +512,8 @@ libbitcoin_consensus_a_SOURCES = \
   script/sighashtype.h \
   script/instruction.h \
   script/instruction_iterator.h \
+  script/conditional_tracker.cpp \
+  script/conditional_tracker.h \
   script/interpreter.cpp \
   script/interpreter.h \
   script/int_serialization.h \
