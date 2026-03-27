@@ -30,7 +30,7 @@ jobs:
     timeout-minutes: 5 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           clean: ''
       - name: Check functional tests are executable
@@ -58,7 +58,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           clean: ''
       - name: Benchmark
@@ -93,7 +93,7 @@ jobs:
     timeout-minutes: 120 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           clean: ''
       - name: Benchmark
@@ -126,7 +126,7 @@ jobs:
         shell: bash
       - name: Upload test_bitcoin coverage
         if: ${{ matrix.build_type == 'Debug' && matrix.options == 'cov' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: test_bitcoin_cov-${{ env.now }}
           path: ./src/test/test_bitcoin_cov

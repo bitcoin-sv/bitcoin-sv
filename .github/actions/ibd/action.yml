@@ -89,7 +89,7 @@ runs:
         echo "prefix=ibd-${now}-${{ inputs.duration }}s-${begin_height}-${end_height}" >> $GITHUB_ENV
       shell: bash
     - name: Upload bitcoind files
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
       with:
        name: ${{ env.prefix }}-.bitcoin
        path: |
@@ -105,7 +105,7 @@ runs:
         > ${{ env.prefix }}-flamegraph.svg
       shell: bash
     - name: Upload flamegraph
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
       with:
        name: ${{ env.prefix }}-flamegraph.svg
        path: ${{ env.prefix }}-flamegraph.svg
