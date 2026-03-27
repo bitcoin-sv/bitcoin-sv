@@ -31,7 +31,7 @@ runs:
       shell: bash
     - name: restore cache
       if: inputs.restore == 'true'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5
       with:
        key: ibd-
        restore-keys: |
@@ -111,7 +111,7 @@ runs:
        path: ${{ env.prefix }}-flamegraph.svg
     - name: cache save
       if: inputs.save == 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5
       with:
        path: |
          ~/.bitcoin/
