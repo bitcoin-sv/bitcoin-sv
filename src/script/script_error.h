@@ -8,6 +8,7 @@
 
 #include <iosfwd>
 
+//NOLINTNEXTLINE(performance-enum-size)
 typedef enum ScriptError_t //NOLINT(cppcoreguidelines-use-enum-class)
 {
     SCRIPT_ERR_OK = 0,

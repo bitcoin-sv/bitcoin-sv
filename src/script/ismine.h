@@ -14,7 +14,8 @@ class CKeyStore;
 class CScript;
 
 /** IsMine() return codes */
-enum isminetype {
+enum isminetype //NOLINT(performance-enum-size)
+{
     ISMINE_NO = 0,
     //! Indicates that we don't know how to create a scriptSig that would solve
     //! this if we were given the appropriate private keys

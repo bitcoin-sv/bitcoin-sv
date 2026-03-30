@@ -37,7 +37,9 @@ class Config;
 
 #define BITCOINCONSENSUS_API_VER 1
 
-typedef enum bitcoinconsensus_error_t {
+//NOLINTNEXTLINE(performance-enum-size)
+typedef enum bitcoinconsensus_error_t
+{
     bitcoinconsensus_ERR_OK = 0,
     bitcoinconsensus_ERR_TX_INDEX,
     bitcoinconsensus_ERR_TX_SIZE_MISMATCH,

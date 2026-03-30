@@ -33,7 +33,7 @@ public:
     }
 };
 
-enum class min_encoding_check
+enum class min_encoding_check : uint8_t
 {
     no,
     yes

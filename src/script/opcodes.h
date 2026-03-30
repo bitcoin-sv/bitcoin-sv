@@ -7,7 +7,7 @@
 
 /** Script opcodes */
 //NOLINTNEXTLINE(cert-int09-c)
-enum opcodetype 
+enum opcodetype //NOLINT(performance-enum-size)
 {
     // push value
     OP_0 = 0x00,
