@@ -49,15 +49,17 @@ namespace
     static_assert(!EnforceNonMalleability(SCRIPT_CHRONICLE, 2));
 } // namespace
 
-inline uint8_t make_rshift_mask(size_t n) {
-    static uint8_t mask[] = {0xFF, 0xFE, 0xFC, 0xF8, 0xF0, 0xE0, 0xC0, 0x80}; 
-    return mask[n]; 
-} 
+inline uint8_t make_rshift_mask(size_t n)
+{
+    static std::array<uint8_t, 8> mask{0xFF, 0xFE, 0xFC, 0xF8, 0xF0, 0xE0, 0xC0, 0x80};
+    return mask[n]; //NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+}
 
-inline uint8_t make_lshift_mask(size_t n) {
-    static uint8_t mask[] = {0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01}; 
-    return mask[n]; 
-} 
+inline uint8_t make_lshift_mask(size_t n)
+{
+    static std::array<uint8_t, 8> mask{0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01};
+    return mask[n]; //NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+}
 
 // shift x right by n bits, implements OP_RSHIFT
 static valtype RShift(const valtype &x, int n) {
@@ -403,7 +405,7 @@ std::optional<ScriptError> EvalScript(
     CScript::const_iterator pc = script.begin();
     CScript::const_iterator pend = script.end();
     CScript::const_iterator pbegincodehash = script.begin();
-    opcodetype opcode;
+    opcodetype opcode; //NOLINT(cppcoreguidelines-init-variables)
     valtype vchPushValue;
 
     const bool utxo_after_genesis{IsUtxoAfterGenesis(flags)};
@@ -1836,8 +1838,9 @@ namespace {
  * Wrapper that serializes like CTransaction, but with the modifications
  *  required for the signature hash done in-place
  */
-class CTransactionSignatureSerializer {
-private:
+class CTransactionSignatureSerializer
+{
+    // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
     //!< reference to the spending transaction (the one being serialized)
     const CTransaction &txTo;
     //!< output script being consumed
@@ -1846,6 +1849,7 @@ private:
     const unsigned int nIn;
     //!< container for hashtype flags
     const SigHashType sigHashType;
+    // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
 
 public:
     CTransactionSignatureSerializer(const CTransaction &txToIn,
@@ -1856,10 +1860,12 @@ public:
           sigHashType(sigHashTypeIn) {}
 
     /** Serialize the passed scriptCode, skipping OP_CODESEPARATORs */
-    template <typename S> void SerializeScriptCode(S &s) const {
+    template<typename S>
+    void SerializeScriptCode(S& s) const
+    {
         CScript::const_iterator it = scriptCode.begin();
         CScript::const_iterator itBegin = it;
-        opcodetype opcode;
+        opcodetype opcode; //NOLINT(cppcoreguidelines-init-variables)
         unsigned int nCodeSeparators = 0;
         while (scriptCode.GetOp(it, opcode)) {
             if (opcode == OP_CODESEPARATOR) {
@@ -1868,14 +1874,20 @@ public:
         }
         ::WriteCompactSize(s, scriptCode.size() - nCodeSeparators);
         it = itBegin;
-        while (scriptCode.GetOp(it, opcode)) {
-            if (opcode == OP_CODESEPARATOR) {
-                s.write((char *)&itBegin[0], it - itBegin - 1);
+        while(scriptCode.GetOp(it, opcode))
+        {
+            if(opcode == OP_CODESEPARATOR)
+            {
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
+                s.write((char*)&itBegin[0], it - itBegin - 1);
                 itBegin = it;
             }
         }
-        if (itBegin != scriptCode.end()) {
-            s.write((char *)&itBegin[0], it - itBegin);
+
+        if(itBegin != scriptCode.end())
+        {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
+            s.write((char*)&itBegin[0], it - itBegin);
         }
     }
 

@@ -43,7 +43,7 @@ public:
 
         memcpy(pch, m_data, nSize);
         m_remaining -= nSize;
-        m_data += nSize;
+        m_data += nSize; //NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     template <typename T> TxInputStream &operator>>(T &obj) {
@@ -55,9 +55,9 @@ public:
     int GetType() const { return m_type; }
 
 private:
-    const int m_type;
-    const int m_version;
-    const uint8_t *m_data;
+    const int m_type;    //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+    const int m_version; //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+    const uint8_t* m_data;
     size_t m_remaining;
 };
 
@@ -108,6 +108,7 @@ static int verify_script(const Config& config,
             res = VerifyScript(params,
                                source->GetToken(),
                                tx.vin[nIn].scriptSig,
+                               //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                                CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen),
                                flags,
                                TransactionSignatureChecker(&tx, nIn, amount, txdata));

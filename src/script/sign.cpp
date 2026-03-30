@@ -128,14 +128,21 @@ static bool SignStep(const BaseSignatureCreator &creator,
     }
 }
 
-static CScript PushAll(const std::vector<valtype> &values) {
+static CScript PushAll(const std::vector<valtype>& values)
+{
     CScript result;
-    for (const valtype &v : values) {
-        if (v.size() == 0) {
+    for(const valtype& v : values)
+    {
+        if(v.size() == 0)
+        {
             result << OP_0;
-        } else if (v.size() == 1 && v[0] >= 1 && v[0] <= 16) {
+        }
+        else if(v.size() == 1 && v[0] >= 1 && v[0] <= 16)
+        {
             result << EncodeOP_N(v[0]);
-        } else {
+        }
+        else
+        {
             result << v;
         }
     }
@@ -151,7 +158,7 @@ static bool ProduceSignature(const BaseSignatureCreator& creator,
     CScript script = fromPubKey;
     bool solved = true;
     std::vector<valtype> result;
-    txnouttype whichType;
+    txnouttype whichType; //NOLINT(cppcoreguidelines-init-variables)
     solved = SignStep(creator, utxoEra, script, result, whichType);
     CScript subscript;
 
@@ -381,7 +388,7 @@ static Stacks CombineSignatures(const CScript &scriptPubKey,
             valtype spk = sigs1.script.back();
             CScript pubKey2(spk.begin(), spk.end());
 
-            txnouttype txType2;
+            txnouttype txType2; //NOLINT(cppcoreguidelines-init-variables)
             std::vector<std::vector<uint8_t>> vSolutions2;
 
             Solver(pubKey2, ProtocolEra::PreGenesis, txType2, vSolutions2); // if we are here than genesis is not enabled
@@ -409,7 +416,7 @@ SignatureData CombineSignatures(const eval_script_params& params,
                                 ProtocolEra era,
                                 ProtocolEra utxoEra)
 {
-    txnouttype txType;
+    txnouttype txType; //NOLINT(cppcoreguidelines-init-variables)
     std::vector<std::vector<uint8_t>> vSolutions;
     Solver(scriptPubKey, utxoEra, txType, vSolutions);
 

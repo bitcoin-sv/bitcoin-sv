@@ -85,6 +85,7 @@ namespace bsv
         constexpr std::tuple<bool, instruction> next(span<const uint8_t> s)
         {
             const auto [status, opcode, offset, len]{decode_instruction(s)};
+            //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             return {status, instruction{opcode, offset, s.data() + 1 + offset, len}};
         }
 
@@ -153,6 +154,7 @@ namespace bsv
 
     inline std::string_view to_sv(std::span<const uint8_t> s)
     {
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
         return std::string_view{reinterpret_cast<const char*>(s.data()),
                                 s.size()};
     }

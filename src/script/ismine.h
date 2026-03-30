@@ -14,6 +14,7 @@ class CKeyStore;
 class CScript;
 
 /** IsMine() return codes */
+//NOLINTNEXTLINE(cppcoreguidelines-use-enum-class)
 enum isminetype //NOLINT(performance-enum-size)
 {
     ISMINE_NO = 0,

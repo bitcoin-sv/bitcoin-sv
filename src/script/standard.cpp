@@ -111,7 +111,7 @@ bool Solver(
         const CScript &script2 = tp_script;
         vSolutionsRet.clear();
 
-        opcodetype opcode1, opcode2;
+        opcodetype opcode1, opcode2; //NOLINT(cppcoreguidelines-init-variables)
         std::vector<uint8_t> vch1, vch2;
 
         // Compare
@@ -201,7 +201,7 @@ bool Solver(
 bool ExtractDestination(const CScript &scriptPubKey, ProtocolEra era, CTxDestination &addressRet)
 {
     std::vector<valtype> vSolutions;
-    txnouttype whichType;
+    txnouttype whichType; //NOLINT(cppcoreguidelines-init-variables)
     if (!Solver(scriptPubKey, era, whichType, vSolutions)) {
         return false;
     }
@@ -269,13 +269,16 @@ bool ExtractDestinations(const CScript &scriptPubKey, ProtocolEra era, txnouttyp
     return true;
 }
 
-namespace {
-class CScriptVisitor : public boost::static_visitor<bool> {
-private:
+namespace
+{
+
+class CScriptVisitor : public boost::static_visitor<bool>
+{
     CScript *script;
 
 public:
-    CScriptVisitor(CScript *scriptin) { script = scriptin; }
+    CScriptVisitor(CScript* scriptin):script{scriptin}
+    {}
 
     bool operator()(const CNoDestination& /*dest*/) const {
         script->clear();
@@ -380,7 +383,7 @@ std::optional<bool> IsInputStandard(
     uint32_t flags)
 {
     std::vector<std::vector<uint8_t>> vSolutions;
-    txnouttype whichType;
+    txnouttype whichType; //NOLINT(cppcoreguidelines-init-variables)
 
     if (!Solver(prevScript, utxoEra, whichType, vSolutions)) {
         return false;
@@ -410,8 +413,8 @@ std::optional<bool> IsInputStandard(
             return false;
 
         // Active release is set to PreGenesis, because TX_SCRIPTHASH is not supported after genesis
-        bool sigOpCountError;
         CScript subscript(stack.back().begin(), stack.back().end());
+        bool sigOpCountError; //NOLINT(cppcoreguidelines-init-variables)
         uint64_t nSigOpCount = subscript.GetSigOpCount(true, ProtocolEra::PreGenesis, sigOpCountError);
         if (sigOpCountError || nSigOpCount > MAX_P2SH_SIGOPS) {
             return false;
@@ -458,7 +461,7 @@ bool IsStandardTx(const ConfigScriptPolicy &scriptPolicy, const CTransaction &tx
     }
 
     unsigned int nDataSize = 0;
-    txnouttype whichType;
+    txnouttype whichType; //NOLINT(cppcoreguidelines-init-variables)
     bool scriptpubkey = false;
     for (const CTxOut &txout : tx.vout) {
         if (!::IsStandardOutput(scriptPolicy, txout.scriptPubKey, nHeight, whichType)) {

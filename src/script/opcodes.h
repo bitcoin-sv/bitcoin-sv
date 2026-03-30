@@ -6,7 +6,7 @@
 #include <iosfwd>
 
 /** Script opcodes */
-//NOLINTNEXTLINE(cert-int09-c)
+//NOLINTNEXTLINE(cert-int09-c, cppcoreguidelines-use-enum-class)
 enum opcodetype //NOLINT(performance-enum-size)
 {
     // push value

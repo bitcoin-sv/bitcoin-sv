@@ -99,28 +99,32 @@ public:
 
     CScript &operator<<(const CScriptNum &);
 
-    CScript &operator<<(const std::vector<uint8_t> &b) {
-        if (b.size() < OP_PUSHDATA1) {
+    CScript& operator<<(const std::vector<uint8_t>& b)
+    {
+        if(b.size() < OP_PUSHDATA1)
+        {
             insert(end(), uint8_t(b.size()));
-        } else if (b.size() <= 0xff) {
+        }
+        else if(b.size() <= 0xff)
+        {
             insert(end(), OP_PUSHDATA1);
             insert(end(), uint8_t(b.size()));
-        } else if (b.size() <= 0xffff) {
+        }
+        else if(b.size() <= 0xffff)
+        {
             insert(end(), OP_PUSHDATA2);
-            // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-            uint8_t data[2];
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-            WriteLE16(data, b.size());
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-            insert(end(), data, data + sizeof(data));
-        } else {
+            std::array<uint8_t, 2> data; //NOLINT(cppcoreguidelines-pro-type-member-init)
+            WriteLE16(data.data(), b.size());
+            //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            insert(end(), data.data(), data.data() + sizeof(data));
+        }
+        else
+        {
             insert(end(), OP_PUSHDATA4);
-            // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-            uint8_t data[4];
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-            WriteLE32(data, b.size());
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-            insert(end(), data, data + sizeof(data));
+            std::array<uint8_t, 4> data; //NOLINT(cppcoreguidelines-pro-type-member-init)
+            WriteLE32(data.data(), b.size());
+            //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            insert(end(), data.data(), data.data() + sizeof(data));
         }
         insert(end(), b.begin(), b.end());
         return *this;
