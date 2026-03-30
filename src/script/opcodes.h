@@ -6,6 +6,7 @@
 #include <iosfwd>
 
 /** Script opcodes */
+//NOLINTNEXTLINE(cert-int09-c)
 enum opcodetype 
 {
     // push value

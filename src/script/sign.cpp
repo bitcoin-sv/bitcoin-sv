@@ -433,7 +433,9 @@ public:
         return true;
     }
 };
-const DummySignatureChecker dummyChecker;
+
+const DummySignatureChecker dummyChecker; //NOLINT(cert-err58-cpp)
+
 } // namespace
 
 const BaseSignatureChecker &DummySignatureCreator::Checker() const {

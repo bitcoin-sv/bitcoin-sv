@@ -78,7 +78,7 @@ public:
  * call overhead associated with local static variables even though
  * signatureCache could be made local to VerifySignature.
  */
-static CSignatureCache signatureCache;
+static CSignatureCache signatureCache; //NOLINT(cert-err58-cpp)
 } // namespace
 
 // To be called once in AppInit2/TestingSetup to initialize the signatureCache

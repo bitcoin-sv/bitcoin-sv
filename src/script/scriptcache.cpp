@@ -12,9 +12,11 @@
 #include <mutex>
 
 std::mutex cs_script_cache;
+//NOLINTBEGIN(cert-err58-cpp)
 static auto scriptExecutionCache =
     std::make_unique<CuckooCache::cache<uint256, SignatureCacheHasher>>();
 static uint256 scriptExecutionCacheNonce(GetRandHash());
+//NOLINTEND(cert-err58-cpp)
 
 static void InitScriptExecutionCacheUnlocked() 
 {
