@@ -406,7 +406,7 @@ int CScriptNum::getint() const
                                    else if(n < bn_int_min)
                                        return std::numeric_limits<int>::min();
                                    else
-                                       return bsv::to_long(n);
+                                       return bsv::to_long(n); //NOLINT(*-narrowing-conversions)
                                },
                                [](const int64_t n) {
                                    if(n > std::numeric_limits<int>::max())

@@ -1011,14 +1011,14 @@ std::optional<ScriptError> EvalScript(
                         const auto& top{stack.stacktop(-1).GetElement()};
                         const CScriptNum sn{top, requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis};
                         stack.pop_back();
-                        if(sn < 0 || sn >= stack.size())
+                        if(sn < 0 || sn >= stack.size()) //NOLINT(*-narrowing-conversions)
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         const auto n{sn.to_size_t_limited()};
-                        LimitedVector vch = stack.stacktop(-n - 1);
+                        LimitedVector vch = stack.stacktop(-n - 1); //NOLINT(*-narrowing-conversions)
 
                         if (opcode == OP_ROLL) {
-                            stack.erase(- n - 1);
+                            stack.erase(- n - 1); //NOLINT(*-narrowing-conversions)
                         }
                         stack.push_back(std::move(vch));
                     } break;
@@ -1131,7 +1131,7 @@ std::optional<ScriptError> EvalScript(
                         stack.pop_back();
                         auto values{vch1.GetElement()};
 
-                        if(n >= values.size() * bits_per_byte)
+                        if(n >= values.size() * bits_per_byte) //NOLINT(*-narrowing-conversions)
                             fill(begin(values), end(values), 0);
                         else
                         {
@@ -1165,7 +1165,7 @@ std::optional<ScriptError> EvalScript(
                         stack.pop_back();
                         auto values{vch1.GetElement()};
 
-                        if(n >= values.size() * bits_per_byte)
+                        if(n >= values.size() * bits_per_byte) //NOLINT(*-narrowing-conversions)
                             fill(begin(values), end(values), 0);
                         else
                         {
@@ -1518,6 +1518,7 @@ std::optional<ScriptError> EvalScript(
                         // initialize to max size of CScriptNum::MAXIMUM_ELEMENT_SIZE (4 bytes)
                         // because only 4 byte integers are supported by  OP_CHECKMULTISIG / OP_CHECKMULTISIGVERIFY
                         const int64_t
+                            //NOLINTNEXTLINE(*-narrowing-conversions)
                             nKeysCountSigned = CScriptNum(stack.stacktop(-i).GetElement(),
                                                           requireMinimal,
                                                           CScriptNum::MAXIMUM_ELEMENT_SIZE)
@@ -1544,6 +1545,7 @@ std::optional<ScriptError> EvalScript(
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         const int64_t
+                            //NOLINTNEXTLINE(*-narrowing-conversions)
                             nSigsCountSigned = CScriptNum(stack.stacktop(-i).GetElement(),
                                                           requireMinimal,
                                                           CScriptNum::MAXIMUM_ELEMENT_SIZE)
@@ -1574,7 +1576,9 @@ std::optional<ScriptError> EvalScript(
                         }
 
                         // Remove signature for pre-fork scripts
-                        for (uint64_t k = 0; k < nSigsCount; k++) {
+                        for (uint64_t k = 0; k < nSigsCount; k++)
+                        {
+                            //NOLINTNEXTLINE(*-narrowing-conversions)
                             LimitedVector &vchSig = stack.stacktop(-isig - k);
                             CleanupScriptCode(scriptCode, vchSig.GetElement(), flags);
                         }
@@ -1586,8 +1590,10 @@ std::optional<ScriptError> EvalScript(
                                 return {};
                             }
 
+                            //NOLINTBEGIN(*-narrowing-conversions)
                             LimitedVector &vchSig = stack.stacktop(-isig);
                             LimitedVector &vchPubKey = stack.stacktop(-ikey);
+                            //NOLINTEND(*-narrowing-conversions)
 
                             // Note how this makes the exact order of
                             // pubkey/signature evaluation distinguishable by
@@ -1708,15 +1714,17 @@ std::optional<ScriptError> EvalScript(
                         // Make sure the split point is apropriate.
                         const auto& top{stack.stacktop(-1).GetElement()};
                         const CScriptNum n{top, requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis};
-                        if(n < 0 || n > data.size())
+                        if(n < 0 || n > data.size()) //NOLINT(*-narrowing-conversions)
                             return SCRIPT_ERR_INVALID_SPLIT_RANGE;
 
                         const auto position{n.to_size_t_limited()};
 
                         // Prepare the results in their own buffer as `data`
                         // will be invalidated.
+                        //NOLINTBEGIN(*-narrowing-conversions)
                         valtype n1(data.begin(), data.begin() + position);
                         valtype n2(data.begin() + position, data.end());
+                        //NOLINTEND(*-narrowing-conversions)
 
                         stack.pop_back();
                         stack.pop_back();
