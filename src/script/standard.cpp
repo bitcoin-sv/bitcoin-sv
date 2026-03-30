@@ -373,6 +373,7 @@ bool IsStandardOutput(const ConfigScriptPolicy &scriptPolicy, const CScript &scr
 std::optional<bool> IsInputStandard(
     const task::CCancellationToken& token,
     const eval_script_params& params,
+    //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     const CScript& scriptSig,
     const CScript& prevScript,
     ProtocolEra utxoEra,

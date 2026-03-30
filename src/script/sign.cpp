@@ -254,10 +254,13 @@ bool SignSignature(const ConfigScriptPolicy& policySettings, const CKeyStore &ke
                          sigHashType);
 }
 
-static std::vector<valtype> CombineMultisig(
-    const CScript &scriptPubKey, const BaseSignatureChecker &checker,
-    const std::vector<valtype> &vSolutions, const std::vector<valtype> &sigs1,
-    const std::vector<valtype> &sigs2) {
+static std::vector<valtype> CombineMultisig(const CScript& scriptPubKey,
+                                            const BaseSignatureChecker& checker,
+                                            //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                            const std::vector<valtype>& vSolutions,
+                                            const std::vector<valtype>& sigs1,
+                                            const std::vector<valtype>& sigs2)
+{
     // Combine all the signatures we've got:
     std::set<valtype> allsigs;
     for (const valtype &v : sigs1) {
@@ -402,6 +405,7 @@ SignatureData CombineSignatures(const eval_script_params& params,
                                 const BaseSignatureChecker& checker,
                                 const SignatureData& scriptSig1,
                                 const SignatureData& scriptSig2,
+                                //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                 ProtocolEra era,
                                 ProtocolEra utxoEra)
 {

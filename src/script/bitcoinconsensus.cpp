@@ -16,12 +16,17 @@
 namespace {
 
 /** A class that deserializes a single CTransaction one time. */
-class TxInputStream {
+class TxInputStream
+{
 public:
-    TxInputStream(int nTypeIn, int nVersionIn, const uint8_t *txTo,
-                  size_t txToLen)
-        : m_type(nTypeIn), m_version(nVersionIn), m_data(txTo),
-          m_remaining(txToLen) {}
+    //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    TxInputStream(int nTypeIn, int nVersionIn, const uint8_t* txTo, size_t txToLen)
+        : m_type(nTypeIn),
+          m_version(nVersionIn),
+          m_data(txTo),
+          m_remaining(txToLen)
+    {
+    }
 
     void read(char *pch, size_t nSize) {
         if (nSize > m_remaining)
@@ -74,6 +79,7 @@ static int verify_script(const Config& config,
                          unsigned int scriptPubKeyLen,
                          Amount amount,
                          const uint8_t* txTo,
+                         //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                          unsigned int txToLen,
                          unsigned int nIn,
                          unsigned int flags,
@@ -116,6 +122,7 @@ static int verify_script(const Config& config,
 
 int bitcoinconsensus_verify_script_with_amount(const Config& config,
                                                const uint8_t* scriptPubKey,
+                                               //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                                unsigned int scriptPubKeyLen,
                                                int64_t amount,
                                                const uint8_t* txTo,

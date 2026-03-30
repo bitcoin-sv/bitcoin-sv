@@ -1,6 +1,6 @@
 Checks: '-*,
+         bugprone-*,
          -clang-analyzer-*,
-         bugprone-narrowing-conversions,
          cppcoreguidelines-narrowing-conversions,
       '
 

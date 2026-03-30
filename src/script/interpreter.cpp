@@ -208,6 +208,7 @@ static bool IsValidSignatureEncoding(const std::vector<uint8_t> &sig) {
 
     // Verify that the length of the signature matches the sum of the length
     // of the elements.
+    //NOLINTNEXTLINE(bugprone-misplaced-widening-cast)
     if ((size_t)(lenR + lenS + 7) != sig.size()) return false;
 
     // Check whether the R element is an integer.
@@ -1333,8 +1334,6 @@ std::optional<ScriptError> EvalScript(
                                 bn = (bn1 != bnZero || bn2 != bnZero);
                                 break;
                             case OP_NUMEQUAL:
-                                bn = (bn1 == bn2);
-                                break;
                             case OP_NUMEQUALVERIFY:
                                 bn = (bn1 == bn2);
                                 break;
@@ -1372,7 +1371,7 @@ std::optional<ScriptError> EvalScript(
                                 stack.pop_back();
                             else
                                 return SCRIPT_ERR_NUMEQUALVERIFY;
-                            
+
                         }
                     } break;
 
@@ -2118,6 +2117,7 @@ bool TransactionSignatureChecker::VerifySignature(
     return pubkey.Verify(sighash, vchSig);
 }
 
+//NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 bool TransactionSignatureChecker::CheckSig(const std::vector<uint8_t>& vchSigIn,
                                            const std::vector<uint8_t>& vchPubKey,
                                            const CScript& scriptCode,

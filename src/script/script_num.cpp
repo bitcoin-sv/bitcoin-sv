@@ -115,7 +115,7 @@ bool CScriptNum::equal_index(const CScriptNum& other) const
 
 bool operator==(const CScriptNum& a, const CScriptNum& b)
 {
-    return a <=> b == std::strong_ordering::equal;
+    return (a <=> b) == std::strong_ordering::equal;
 }
 
 std::strong_ordering operator<=>(const CScriptNum& a, const CScriptNum& b)
