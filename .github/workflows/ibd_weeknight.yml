@@ -17,7 +17,7 @@ jobs:
   ibd_weeknight:
     env:
       GITHUB_TOKEN: ${{ secrets.ACTIONS_PAT }}
-    runs-on: [ self-hosted, docker, large, perf ]
+    runs-on: [ arc-runner-svnode ]
     container:
       image: nchain/svn_dev:ubuntu_24.04
       options: --cap-add CAP_PERFMON --cap-add CAP_BPF --volume /lib/modules:/lib/modules
