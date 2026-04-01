@@ -676,7 +676,7 @@ CConnman::CAsyncTaskPool::~CAsyncTaskPool()
 
 void CConnman::CAsyncTaskPool::AddToPool(
     const std::shared_ptr<CNode>& node,
-    std::function<void(std::weak_ptr<CNode>)> function,
+    const std::function<void(std::weak_ptr<CNode>)>& function,
     std::shared_ptr<task::CCancellationSource> source)
 {
     mRunningTasks.emplace_back(
@@ -733,13 +733,13 @@ void CNode::MaybeSetAddrName(const std::string &addrNameIn) {
 }
 
 void CNode::RunAsyncProcessing(
-    std::function<void(std::weak_ptr<CNode>)> function,
+    const std::function<void(std::weak_ptr<CNode>)>& function,
     std::shared_ptr<task::CCancellationSource> source)
 {
     mAsyncTaskPool.AddToPool(
         shared_from_this(),
         function,
-        source);
+        std::move(source));
 }
 
 void CNode::copyStats(NodeStats &stats)
@@ -1704,7 +1704,8 @@ void CConnman::ThreadDNSAddressSeed() {
 
         LOCK(cs_vNodes);
         int nRelevant = 0;
-        for (auto pnode : vNodes) {
+        for(const auto& pnode : vNodes)
+        {
             nRelevant +=
                 pnode->fSuccessfullyConnected &&
                 ((pnode->nServices & nRelevantServices) == nRelevantServices);
@@ -3379,8 +3380,10 @@ void CConnman::DequeueTransactions(const std::vector<CTransactionRef>& txns)
     mTxnPropagator->removeTransactions(txns);
 }
 
-bool CConnman::ForNode(NodeId id, std::function<bool(const CNodePtr& pnode)> func) {
-    CNodePtr found {nullptr};
+bool CConnman::ForNode(NodeId id,
+                       const std::function<bool(const CNodePtr& pnode)>& func)
+{
+    CNodePtr found{nullptr};
     LOCK(cs_vNodes);
     for (const CNodePtr& pnode : vNodes) {
         if (pnode->id == id) {

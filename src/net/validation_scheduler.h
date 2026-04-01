@@ -13,7 +13,8 @@
 #include <future>
 
 // Schedule status for each transaction in the batch.
-enum class ScheduleStatus {
+enum class ScheduleStatus : uint8_t
+{
     NOT_STARTED = 0,
     IN_PROGRESS,
     DONE

@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 
+// NOLINTNEXTLINE(performance-enum-size) 
 enum Network //NOLINT(cppcoreguidelines-use-enum-class)
 {
     NET_UNROUTABLE = 0,

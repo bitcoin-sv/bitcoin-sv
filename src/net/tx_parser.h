@@ -23,7 +23,7 @@ class tx_parser
 public:
     using value_type = std::vector<uint8_t>;
 
-    enum class state 
+    enum class state : uint8_t
     {
         version,
         ip_count,

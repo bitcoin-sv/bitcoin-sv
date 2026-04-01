@@ -307,8 +307,10 @@ static int GetExtNetwork(const CNetAddr *addr) {
 }
 
 /** Calculates a metric for how reachable (*this) is from a given partner */
-int CNetAddr::GetReachabilityFrom(const CNetAddr *paddrPartner) const {
-    enum Reachability {
+int CNetAddr::GetReachabilityFrom(const CNetAddr* paddrPartner) const
+{
+    enum Reachability : uint8_t
+    {
         REACH_UNREACHABLE,
         REACH_DEFAULT,
         REACH_TEREDO,

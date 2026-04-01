@@ -153,7 +153,7 @@ void Association::MoveStream(StreamType newType, Association& to)
 
     // Give stream to target association
     auto handle { mStreams.extract(mStreams.begin()) };
-    StreamPtr streamToMove { handle.mapped() };
+    const StreamPtr& streamToMove { handle.mapped() };
     streamToMove->SetStreamType(newType);
     streamToMove->SetOwningNode(to.mNode);
     to.mStreams[newType] = streamToMove;

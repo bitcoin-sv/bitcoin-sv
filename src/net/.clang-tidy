@@ -1,8 +1,9 @@
 Checks: '-*,
+         bugprone-*,
          cert-*,
          -clang-analyzer-*,
-         bugprone-*,
          cppcoreguidelines-narrowing-conversions*,
+         performance-*
       '
 
 InheritParentConfig: true

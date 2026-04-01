@@ -346,7 +346,7 @@ public:
                                bool fAddnode = false);
     bool CheckIncomingNonce(uint64_t nonce);
 
-    bool ForNode(NodeId id, std::function<bool(const CNodePtr& pnode)> func);
+    bool ForNode(NodeId id, const std::function<bool(const CNodePtr& pnode)>& func);
 
     void PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg, StreamType stream = StreamType::UNKNOWN);
 
@@ -606,7 +606,7 @@ public:
 
         void AddToPool(
             const std::shared_ptr<CNode>& node,
-            std::function<void(std::weak_ptr<CNode>)> function,
+            const std::function<void(std::weak_ptr<CNode>)>& function,
             std::shared_ptr<task::CCancellationSource> source);
 
         bool HasReachedSoftAsyncTaskLimit(NodeId id)
@@ -1305,7 +1305,7 @@ public:
      *       node instance no longer exists.
      */
     void RunAsyncProcessing(
-        std::function<void(std::weak_ptr<CNode>)> function,
+        const std::function<void(std::weak_ptr<CNode>)>& function,
         std::shared_ptr<task::CCancellationSource> source);
 };
 

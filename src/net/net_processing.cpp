@@ -229,7 +229,7 @@ void FinalizeNode(NodeId nodeid, bool &fUpdateConnectionTime)
     assert(it != mapNodeState.end());
 
     const CNodeStateRef stateRef { it->second, it->second->mMtx };
-    const CNodeStatePtr state { stateRef.get() };
+    const CNodeStatePtr& state { stateRef.get() };
 
     if (state->fSyncStarted) {
         nSyncStarted--;
@@ -704,7 +704,7 @@ namespace
         {
             CCompactBlockMessageData(
                 std::shared_ptr<const std::vector<uint8_t>> inData)
-                : data{inData}
+                : data{std::move(inData)}
                 , hash{::Hash(data->data(), data->data() + data->size())}
                 , size{data->size()}
             {/**/}
@@ -713,7 +713,7 @@ namespace
                 std::shared_ptr<const std::vector<uint8_t>> inData,
                 uint256 inHash,
                 size_t inSize)
-                : data{inData}
+                : data{std::move(inData)}
                 , hash{inHash}
                 , size{inSize}
             {/**/}
@@ -1095,7 +1095,7 @@ static void SendBlock(
 {
     CSerializedNetMsg blockMsg{
             NetMsgType::BLOCK,
-            std::move(data.metaData.diskDataHash),
+            data.metaData.diskDataHash,
             data.metaData.diskDataSize,
             std::move(data.stream)
         };
@@ -3685,8 +3685,9 @@ static void ProcessBlockTxnMessage(const Config& config,
 
         pfrom->RunAsyncProcessing(
             [fNewBlock, bestChainActivation, pblock, scopedBlockOriginReg]
+            //NOLINTNEXTLINE(performance-unnecessary-value-param)
             (std::weak_ptr<CNode> weakFrom)
-            {   
+            {
                 bestChainActivation();
 
                 if(fNewBlock)
@@ -3974,6 +3975,7 @@ static bool ProcessCompactBlockMessage(
         {
             pfrom->RunAsyncProcessing(
                 [pblock, fNewBlock, bestChainActivation, scopedBlockOriginReg]
+                //NOLINTNEXTLINE(performance-unnecessary-value-param)
                 (std::weak_ptr<CNode> weakFrom)
                 {
                     bestChainActivation();
@@ -4051,6 +4053,7 @@ static void ProcessBlockMessage(const Config& config,
 
     pfrom->RunAsyncProcessing(
         [pblock, fNewBlock, bestChainActivation, scopedBlockOriginReg]
+        //NOLINTNEXTLINE(performance-unnecessary-value-param)
         (std::weak_ptr<CNode> weakFrom)
         {
             bestChainActivation();
@@ -5457,7 +5460,7 @@ void SendTxnInventory(const Config &config, const CNodePtr& pto, CConnman &connm
             vRelayExpiration.pop_front();
         }
 
-        auto ret = mapRelay.insert(std::make_pair(std::move(txn.getInv().hash), txn.getTxnRef()));
+        auto ret = mapRelay.insert(std::make_pair(txn.getInv().hash, txn.getTxnRef()));
         if(ret.second)
         {
             vRelayExpiration.push_back(std::make_pair(nNow + 15 * 60 * 1000000, ret.first));
