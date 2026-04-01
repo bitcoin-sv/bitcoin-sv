@@ -19,10 +19,24 @@ runs:
   steps:
     - name: Install Perf
       run: |
-        apt-get update \
-        && apt-get install -y \
-                   linux-tools-$(uname -r) \
-                   linux-headers-$(uname -r)
+        apt-get update
+        if ! apt-get install -y linux-tools-$(uname -r) linux-headers-$(uname -r); then
+          # Host kernel may be from a different Ubuntu release than the container.
+          # Map kernel version to the Ubuntu codename that provides it.
+          case "$(uname -r)" in
+            5.4.*)  codename=focal  ;;
+            5.15.*) codename=jammy  ;;
+            6.5.*)  codename=mantic ;;
+            6.8.*)  codename=noble  ;;
+            *)      echo "Unknown kernel $(uname -r), cannot determine source repo"; exit 1 ;;
+          esac
+          echo "deb http://archive.ubuntu.com/ubuntu ${codename} main universe" \
+            > /etc/apt/sources.list.d/${codename}-kernel-tools.list
+          echo "deb http://archive.ubuntu.com/ubuntu ${codename}-updates main universe" \
+            >> /etc/apt/sources.list.d/${codename}-kernel-tools.list
+          apt-get update
+          apt-get install -y linux-tools-$(uname -r) linux-headers-$(uname -r)
+        fi
       shell: bash
     - name: Configure bitcoind
       run: |
