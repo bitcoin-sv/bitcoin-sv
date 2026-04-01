@@ -7,7 +7,13 @@ BUILD_TYPE=${2,,}
 
 args=()
 args+=(-DCMAKE_BUILD_TYPE="${BUILD_TYPE}")
-args+=(-DCMAKE_CXX_FLAGS=-Werror\ -fno-omit-frame-pointer)
+cxx_extra=""
+if [[ $TOOLSET == gcc ]]; then
+    if c++ -dumpversion 2>/dev/null | grep -q '^13'; then
+        cxx_extra="-Wno-stringop-overread"
+    fi
+fi
+args+=(-DCMAKE_CXX_FLAGS=-Werror\ -fno-omit-frame-pointer\ ${cxx_extra})
 
 # Unity builds default ON, but disable for clang-tidy
 unity_build=ON

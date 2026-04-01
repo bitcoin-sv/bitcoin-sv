@@ -7,7 +7,7 @@ inputs:
   toolset:
     description: Toolset (clang/gcc)
     required: false
-    default: 'clang'
+    default: 'gcc'
   build_type:
     description: Build type (Release/Debug/etc)
     required: false
