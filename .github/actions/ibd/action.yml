@@ -56,7 +56,7 @@ runs:
     - name: delete restored cache
       if: inputs.restore == 'true'
       run: |
-        gh cache delete --all
+        gh cache delete --all -R ${{ github.repository }}
       shell: bash
     - name: Set begin height environment variable
       run: |
