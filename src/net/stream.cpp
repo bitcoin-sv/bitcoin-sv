@@ -25,6 +25,7 @@ const enumTableT<StreamType>& enumTable(StreamType)
 
 namespace
 {
+    //NOLINTNEXTLINE(cert-err58-cpp)
     const std::string NET_MESSAGE_COMMAND_OTHER { "*other*" };
 
     // Estimate memory usage for a message on the receive queue

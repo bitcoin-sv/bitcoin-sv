@@ -90,6 +90,7 @@ typedef std::map<uint256, CTransactionRef> MapRelay;
 MapRelay mapRelay;
 /** Expiration-time ordered list of (expire time, relay map entry) pairs,
  * protected by cs_main). */
+//NOLINTNEXTLINE(cert-err58-cpp)
 std::deque<std::pair<int64_t, MapRelay::iterator>> vRelayExpiration;
 } // namespace
 

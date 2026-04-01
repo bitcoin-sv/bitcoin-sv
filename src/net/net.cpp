@@ -14,8 +14,6 @@
 #include "clientversion.h"
 #include "config.h"
 #include "consensus/consensus.h"
-#include "crypto/common.h"
-#include "crypto/sha256.h"
 #include "hash.h"
 #include "mempool_msg.h"
 #include "miner_id/miner_info_tracker.h"
@@ -86,6 +84,7 @@ static const uint64_t RANDOMIZER_ID_LOCALHOSTNONCE = 0xd93e69e2bbfa5735ULL;
 bool fDiscover = true;
 bool fListen = true;
 bool fRelayTxes = true;
+//NOLINTBEGIN(cert-err58-cpp)
 CCriticalSection cs_mapLocalHost;
 std::map<CNetAddr, LocalServiceInfo> mapLocalHost;
 static bool vfLimited[NET_MAX] = {};
@@ -95,6 +94,8 @@ std::unique_ptr<limitedmap<uint256, int64_t>> mapAlreadyAskedFor;
 
 // Signals for message handling
 static CNodeSignals g_signals;
+//NOLINTEND(cert-err58-cpp)
+
 CNodeSignals &GetNodeSignals() {
     return g_signals;
 }
@@ -2669,7 +2670,7 @@ public:
         WSACleanup();
 #endif
     }
-} instance_of_cnetcleanup;
+} instance_of_cnetcleanup; //NOLINT(cert-err58-cpp)
 
 void CConnman::Interrupt() {
     {

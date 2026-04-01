@@ -28,9 +28,12 @@
 
 // Settings
 // NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variable)
+// NOLINTBEGIN(cert-err58-cpp)
 static proxyType proxyInfo[NET_MAX];
 static proxyType nameProxy;
 static CCriticalSection cs_proxyInfos;
+// NOLINTEND(cert-err58-cpp)
+
 int nConnectTimeout = DEFAULT_CONNECT_TIMEOUT;
 bool fNameLookup = DEFAULT_NAME_LOOKUP;
 
