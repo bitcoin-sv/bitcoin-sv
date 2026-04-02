@@ -72,6 +72,7 @@ std::pair<size_t, size_t> disk_backed_parser::operator()(const std::span<const u
     std::streamsize bytes_to_write = static_cast<std::streamsize>(std::min<uint64_t>(s.size(), payload_len_ - bytes_written_));
 
     // Write to file
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     file_stream_.write(reinterpret_cast<const char*>(s.data()), bytes_to_write);
 
     if(!file_stream_.good())
@@ -143,6 +144,7 @@ size_t disk_backed_parser::read(size_t read_pos, const std::span<uint8_t> s)
     std::streamsize bytes_to_read = std::min(bytes_to_read_max, static_cast<uint64_t>(max_streamsize));
 
     // Read from file
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     file_stream_.read(reinterpret_cast<char*>(s.data()), bytes_to_read);
     std::streamsize bytes_read = file_stream_.gcount();
 

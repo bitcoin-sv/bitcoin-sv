@@ -55,6 +55,7 @@ Stream::Stream(CNode* node,
     mRecvBytesPerMsgCmd[NET_MESSAGE_COMMAND_OTHER] = 0;
 
     // Remember any sending rate limit that's been set
+    // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     mSendRateLimit = GlobalConfig::GetConfig().GetStreamSendRateLimit();
 
     // Fetch the MSS for the underlying socket
@@ -108,7 +109,7 @@ bool Stream::SetSocketForSelect(fd_set& setRecv,
     // * If there is space left in the receive buffer select() for receiving data.
 
     bool select_recv = !mPauseRecv;
-    bool select_send;
+    bool select_send{};
     {   
         LOCK(cs_mSendMsgQueue);
         select_send = !mSendMsgQueue.empty();
@@ -167,7 +168,8 @@ void Stream::ServiceSocket(fd_set& setRecv,
         if (recvSet || errorSet)
         {   
             // typical socket buffer is 8K-64K
-            char pchBuf[0x10000];
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+            std::array<char, 0x1'0000> pchBuf;
             ssize_t nBytes = 0;
 
             {   
@@ -177,13 +179,13 @@ void Stream::ServiceSocket(fd_set& setRecv,
                     return;
                 }
                 // NOLINTNEXTLINE(clang-analyzer-unix.BlockInCriticalSection)
-                nBytes = recv(mSocket, pchBuf, sizeof(pchBuf), MSG_DONTWAIT);
+                nBytes = recv(mSocket, pchBuf.data(), sizeof(pchBuf), MSG_DONTWAIT);
             }
             if (nBytes > 0)
             {
                 // Process received data
                 bytesRecv = static_cast<uint64_t>(nBytes);
-                ReceiveMsgBytes(config, pchBuf, bytesRecv, gotNewMsgs);
+                ReceiveMsgBytes(config, pchBuf.data(), bytesRecv, gotNewMsgs);
             }
             else if (nBytes == 0)
             {   
@@ -226,8 +228,11 @@ void Stream::ServiceSocket(fd_set& setRecv,
     }
 }
 
-uint64_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
-    uint64_t nPayloadLength, uint64_t nTotalSize)
+uint64_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader,
+                             //NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
+                             CSerializedNetMsg&& msg,
+                             uint64_t nPayloadLength,
+                             uint64_t nTotalSize)
 {   
     uint64_t nBytesSent {0};
 
@@ -251,7 +256,10 @@ uint64_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerialize
         while(!payloadStream->EndOfStream())
         {
             const CSpan& data { payloadStream->ReadAsync(msg.Size()) };
-            serialisedHeader.insert(serialisedHeader.end(), data.Begin(), data.Begin() + data.Size());
+            serialisedHeader.insert(serialisedHeader.end(),
+                                    data.Begin(),
+                                    //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                                    data.Begin() + data.Size());
         }
 
         // Queue combined header & data
@@ -422,6 +430,7 @@ void Stream::ReceiveMsgBytes(const Config& config, const char* pch, uint64_t nBy
         // Absorb network data
         uint64_t handled { msg.Read(config, pch, nBytes) };
 
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         pch += handled;
         nBytes -= handled;
 
@@ -555,6 +564,7 @@ Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, uint6
             }
 
             nBytes = send(mSocket,
+                          //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                           reinterpret_cast<const char *>(mSendChunk->Begin()),
                           mSendChunk->Size(),
                           MSG_NOSIGNAL | MSG_DONTWAIT);
@@ -587,6 +597,7 @@ Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, uint6
             // could not send full message; stop sending more
             mSendChunk =
                 CSpan {
+                    //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                     mSendChunk->Begin() + nBytes,
                     mSendChunk->Size() - nBytes
                 };

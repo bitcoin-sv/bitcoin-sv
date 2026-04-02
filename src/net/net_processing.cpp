@@ -67,6 +67,7 @@ using namespace std;
 using namespace mining;
 
 // Used only to inform the wallet of when we last received a block.
+//NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 std::atomic<int64_t> nTimeBestReceived(0);
 
 // SHA256("main address relay")[0:8]
@@ -705,6 +706,7 @@ namespace
             CCompactBlockMessageData(
                 std::shared_ptr<const std::vector<uint8_t>> inData)
                 : data{std::move(inData)}
+                //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                 , hash{::Hash(data->data(), data->data() + data->size())}
                 , size{data->size()}
             {/**/}
@@ -729,9 +731,11 @@ namespace
                     };
             }
 
+            //NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
             const std::shared_ptr<const std::vector<uint8_t>> data;
             const uint256 hash;
             const size_t size;
+            //NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
         };
 
         void SetBlock(
@@ -1009,14 +1013,19 @@ static void RelayAddress(const CAddress &addr, bool fReachable,
     std::array<std::pair<uint64_t, CNodePtr>, 2> best {{{0, nullptr}, {0, nullptr}}};
     assert(nRelayNodes <= best.size());
 
+    //NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
     auto sortfunc = [&best, &hasher, nRelayNodes](const CNodePtr& pnode) {
         if (pnode->fInbound && pnode->nVersion >= CADDR_TIME_VERSION) {
             uint64_t hashKey = CSipHasher(hasher).Write(pnode->id).Finalize();
-            for (unsigned int i = 0; i < nRelayNodes; i++) {
-                if (hashKey > best[i].first) {
+            for(unsigned int i = 0; i < nRelayNodes; i++)
+            {
+                if(hashKey > best[i].first)
+                {
+                    //NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                     std::copy(best.begin() + i, best.begin() + nRelayNodes - 1,
                               best.begin() + i + 1);
                     best[i] = std::make_pair(hashKey, pnode);
+                    //NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                     break;
                 }
             }
@@ -1024,9 +1033,11 @@ static void RelayAddress(const CAddress &addr, bool fReachable,
     };
     connman.ForEachNode(sortfunc);
 
-    for (unsigned int i = 0; i < nRelayNodes && best[i].first != 0; i++) {
+    for(unsigned int i = 0; i < nRelayNodes && best[i].first != 0; i++)
+    {
         best[i].second->PushAddress(addr, insecure_rand);
     }
+    //NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
 }
 
 static bool rejectIfMaxDownloadExceeded(
@@ -1468,7 +1479,7 @@ static void ProcessRejectMessage(msg_buffer& vRecv, const CNodePtr& pfrom)
         try
         {
             std::string strMsg;
-            uint8_t ccode;
+            uint8_t ccode; //NOLINT(cppcoreguidelines-init-variables)
             std::string strReason;
             vRecv >> LIMITED_STRING(strMsg, CMessageFields::COMMAND_SIZE) >>
                 ccode >>
@@ -1663,6 +1674,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom,
         return false;
     }
 
+    //NOLINTBEGIN(cppcoreguidelines-init-variables)
     int64_t nTime;
     CAddress addrMe;
     uint64_t nNonce = 1;
@@ -1670,6 +1682,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom,
     ServiceFlags nServices;
     int nVersion;
     int nSendVersion;
+    //NOLINTEND(cppcoreguidelines-init-variables)
     std::string strSubVer;
     std::string cleanSubVer;
     int32_t nStartingHeight = -1;
@@ -2013,13 +2026,16 @@ static bool ProcessAuthChMessage(const Config& config,
          */
         // Generate our nonce.
         uint64_t nClientNonce {0};
-        while (nClientNonce == 0) {
-            GetRandBytes((uint8_t *)&nClientNonce, sizeof(nClientNonce));
+        while(nClientNonce == 0)
+        {
+            //NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
+            GetRandBytes((uint8_t*)&nClientNonce, sizeof(nClientNonce));
         }
         // Create the message to be signed.
         uint256 hash {};
         CHash256()
             .Write(msg.begin(), msg.size()) // (a)
+            //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
             .Write(reinterpret_cast<uint8_t*>(&nClientNonce), 8) // (b)
             .Finalize(CHash256::span{hash.begin(), CHash256::OUTPUT_SIZE});
 
@@ -2225,6 +2241,7 @@ static bool ProcessAuthRespMessage(const CNodePtr& pfrom,
         uint256 hash;
         CHash256()
             .Write(msgHash.begin(), msgHash.size()) // (a)
+            //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
             .Write(reinterpret_cast<uint8_t*>(&nClientNonce), 8) // (b)
             .Finalize(CHash256::span{hash.begin(), CHash256::OUTPUT_SIZE});
         // Execute verification.
@@ -2289,7 +2306,7 @@ static bool ProcessAddrMessage(const CNodePtr& pfrom,
         for (const CAddress& addr : vAddr)
         {
             // Server listen port will be different. We want to compare IPs and then use provided port
-            if (static_cast<CNetAddr>(addr) == static_cast<CNetAddr>(peerAddr))
+            if(static_cast<const CNetAddr&>(addr) == static_cast<const CNetAddr&>(peerAddr))
             {
                 ownAddr = addr;
                 reportedOwnAddr = true;
@@ -2622,6 +2639,7 @@ namespace
 {
 
 // Interface for classes to fetch BlockTxn transactions
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class BlockTransactionReader
 {
   public:
@@ -2699,6 +2717,7 @@ class CachedBlockTransactionReader : public BlockTransactionReader
 
   private:
 
+    //NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const CBlock& mBlock;
 };
 
@@ -2870,6 +2889,7 @@ public:
 
     std::unique_ptr<CVectorStream> operator()(std::vector<uint8_t>&& serialisedHeader)
     {
+        //NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
         struct CVectorStream_WithPendingResponsesCounting : CVectorStream
         {
             /**
@@ -2950,7 +2970,8 @@ static void ProcessGetHeadersMessage(const CNodePtr& pfrom,
                                      msg_buffer& vRecv,
                                      CConnman& connman)
 {
-    if(unsigned int n; !pfrom->fWhitelisted && !pfrom->pendingResponses.getheaders.IsBelowLimit(n))
+    if(unsigned int n; //NOLINT(cppcoreguidelines-init-variables)
+       !pfrom->fWhitelisted && !pfrom->pendingResponses.getheaders.IsBelowLimit(n))
     {
         // If number of pending responses is too large, the request is ignored and the peer is disconnected.
         // NOTE: Because we check if the number of pending responses is below limit before adding a new response,
@@ -3197,7 +3218,8 @@ static void ProcessGetHeadersEnrichedMessage(const CNodePtr& pfrom,
                                              CConnman& connman,
                                              const Config& config)
 {
-    if(unsigned int n; !pfrom->fWhitelisted && !pfrom->pendingResponses.gethdrsen.IsBelowLimit(n))
+    if(unsigned int n; //NOLINT(cppcoreguidelines-init-variables)
+       !pfrom->fWhitelisted && !pfrom->pendingResponses.gethdrsen.IsBelowLimit(n))
     {
         // Same comment applies as in ProcessGetHeadersMessage().
         LogPrint(BCLog::NETMSG, "Ignoring gethdrsen and disconnecting the peer because there are too many (%d, max=%d) pending responses to previously received gethdrsen from peer=%d.\n",
@@ -3211,9 +3233,9 @@ static void ProcessGetHeadersEnrichedMessage(const CNodePtr& pfrom,
     vRecv >> locator >> hashStop;
 
     // Get block data that must be obtained under lock
-    const CBlockIndex* lastBlockIndex;
+    const CBlockIndex* lastBlockIndex{};
     std::vector<CBlockHeaderEnriched> vHeadersEnriched;
-    int32_t chainActiveHeight;
+    int32_t chainActiveHeight{};
     {
         if(IsInitialBlockDownload() && !pfrom->fWhitelisted) {
             LogPrint(BCLog::NETMSG, "Ignoring gethdrsen from peer=%d because "
@@ -3468,7 +3490,7 @@ static bool ProcessHeadersMessage(const Config& config,
     CValidationState state;
     if(!ProcessNewBlockHeaders(config, headers, state, &pindexLast))
     {
-        int nDoS;
+        int nDoS{};
         if(state.IsInvalid(nDoS)) {
             if(nDoS > 0) {
                 Misbehaving(pfrom, nDoS, state.GetRejectReason());
@@ -3754,7 +3776,7 @@ static bool ProcessCompactBlockMessage(
     {
         const CNodeStateRef stateRef{GetState(pfrom->id)};
         const auto& nodeState{stateRef.get()};
-        int nDoS;
+        int nDoS{};
         if(state.IsInvalid(nDoS))
         {
             LogPrint(BCLog::NETMSG, "Peer %d sent us invalid header via cmpctblock\n", pfrom->id);
@@ -3853,6 +3875,7 @@ static bool ProcessCompactBlockMessage(
                     if(!(*queuedBlockIt)->partialBlock)
                     {
                         (*queuedBlockIt)->partialBlock.reset(
+                                //NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
                                 new PartiallyDownloadedBlock(config, &mempool));
                     }
                     else
@@ -4977,6 +5000,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
             LogPrint(BCLog::NETMSG,
                 "%s(%s, %lu bytes): CHECKSUM ERROR expected %s was %s\n", __func__,
                 SanitizeString(strCommand), nPayloadLength,
+                //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                 HexStr(hash.begin(), hash.begin() + CMessageFields::CHECKSUM_SIZE),
                 HexStr(hdr.GetChecksum()));
             {
@@ -5092,7 +5116,9 @@ void SendPings(const CNodePtr& pto, CConnman &connman, const CNetMsgMaker& msgMa
     }
     if (pingSend) {
         uint64_t nonce = 0;
-        while (nonce == 0) {
+        while (nonce == 0)
+        {
+            //NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
             GetRandBytes((uint8_t *)&nonce, sizeof(nonce));
         }
         pto->fPingQueued = false;

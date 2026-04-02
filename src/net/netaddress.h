@@ -111,8 +111,7 @@ class CSubNet
     /// Network (base) address
     CNetAddr network;
     /// Netmask, in network byte order
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    uint8_t netmask[16];
+    std::array<uint8_t, 16> netmask;
     /// Is this value valid? (only used to signal parse errors)
     bool valid;
 

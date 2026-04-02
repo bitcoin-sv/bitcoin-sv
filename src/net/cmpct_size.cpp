@@ -22,10 +22,13 @@ std::pair<size_t, uint64_t> parse_compact_size(const span<const uint8_t> s)
     case 1:
         return std::make_pair(len, s[0]);
     case 3:
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         return std::make_pair(len, ReadLE16(s.data()+1));
     case 5:
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         return std::make_pair(len, ReadLE32(s.data()+1));
     case 9:
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         return std::make_pair(len, ReadLE64(s.data()+1));
     default:
         assert(false);

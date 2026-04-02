@@ -35,6 +35,7 @@ bool msg_buffer::empty() const
 
 const uint8_t* msg_buffer::data() const
 {
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     return header_.data() + read_pos_; 
 }
 
@@ -98,6 +99,7 @@ void msg_buffer::read(span<uint8_t> s)
         if(end_pos > header_.size())
             throw std::ios_base::failure( "msg_buffer::read(): end of data");
 
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         copy(&header_[read_pos_], &header_[read_pos_] + s.size(), s.begin());
         read_pos_ = end_pos;
     }
@@ -117,11 +119,13 @@ void msg_buffer::read(span<uint8_t> s)
 
 void msg_buffer::read(char* p, size_t n)
 {
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     read(span{reinterpret_cast<uint8_t*>(p), n});
 }
 
 void msg_buffer::write(const char* p, size_t n)
 {
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     write(span{reinterpret_cast<const uint8_t*>(p), n});
 }
 

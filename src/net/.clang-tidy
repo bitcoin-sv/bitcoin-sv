@@ -2,7 +2,12 @@ Checks: '-*,
          bugprone-*,
          cert-*,
          -clang-analyzer-*,
-         cppcoreguidelines-narrowing-conversions*,
+         cppcoreguidelines-*,
+         -cppcoreguidelines-avoid-do-while,
+         -cppcoreguidelines-avoid-magic-numbers,
+         -cppcoreguidelines-macro-to-enum,
+         -cppcoreguidelines-macro-usage,
+         -cppcoreguidelines-non-private-member-variables-in-classes,
          performance-*
       '
 

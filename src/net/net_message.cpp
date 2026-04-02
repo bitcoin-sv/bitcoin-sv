@@ -45,6 +45,7 @@ uint64_t CNetMessage::Read(const Config& config, const char* pch, uint64_t nByte
     // No need to calculate message hash for extended format msgs
     if(! hdr.IsExtended())
     {
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
         hasher.Write(reinterpret_cast<const uint8_t*>(pch), nCopy);
     }
 
@@ -53,6 +54,7 @@ uint64_t CNetMessage::Read(const Config& config, const char* pch, uint64_t nByte
 
 uint64_t CNetMessage::Read(const Config& config, const uint8_t* p, uint64_t nBytes)
 {
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     return Read(config, reinterpret_cast<const char*>(p), nBytes);
 }
 
