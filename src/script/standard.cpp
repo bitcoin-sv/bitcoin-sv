@@ -454,7 +454,7 @@ bool IsStandardTx(const ConfigScriptPolicy &scriptPolicy, const CTransaction &tx
             reason = "scriptsig-size";
             return false;
         }
-        if (!txin.scriptSig.IsPushOnly()) {
+        if (!IsProtocolActive(era, ProtocolName::Chronicle) && !txin.scriptSig.IsPushOnly()) {
             reason = "scriptsig-not-pushonly";
             return false;
         }
