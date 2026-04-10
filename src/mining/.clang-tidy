@@ -1,6 +1,7 @@
 Checks: '-*,
-        -clang-analyzer-*,
-        *-narrowing-conversions,
+         bugprone-*,
+         -clang-analyzer-*,
+         *-narrowing-conversions,
       '
 
 InheritParentConfig: true
