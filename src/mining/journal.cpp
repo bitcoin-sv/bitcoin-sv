@@ -292,7 +292,7 @@ void CJournalTester::dumpJournalContents(std::ostream& str) const
     // Dump out the contents
     for(const auto& txn : index)
     {
-        str << txn.getTxn()->GetId().ToString() << std::endl;
+        str << txn.getTxn()->GetId().ToString() << '\n';
     }
 }
 

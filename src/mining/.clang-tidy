@@ -1,6 +1,8 @@
 Checks: '-*,
          bugprone-*,
+         cert-*,
          -clang-analyzer-*,
+         performance-*,
          *-narrowing-conversions,
       '
 
