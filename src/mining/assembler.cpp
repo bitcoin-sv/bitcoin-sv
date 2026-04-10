@@ -67,6 +67,7 @@ void BlockAssembler::FillBlockHeader(CBlockRef& block, const CBlockIndex* pindex
     {
         // -regtest only: allow overriding block.nVersion with
         // -blockversion=N to test forking scenarios
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         block->nVersion = gArgs.GetArg("-blockversion", block->nVersion);
     }
     block->nTime = GetAdjustedTime();

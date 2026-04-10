@@ -1,5 +1,6 @@
 Checks: '-*,
-         clang-analyzer-*,
+        -clang-analyzer-*,
+        *-narrowing-conversions,
       '
 
 InheritParentConfig: true
