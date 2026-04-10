@@ -426,12 +426,17 @@ std::optional<bool> IsInputStandard(
 
 bool IsStandardTx(const ConfigScriptPolicy &scriptPolicy, const CTransaction &tx, int32_t nHeight, std::string &reason)
 {
-    if (tx.nVersion > CTransaction::MAX_STANDARD_VERSION || tx.nVersion < 1) {
-        reason = "version";
-        return false;
-    }
-
     ProtocolEra era { GetProtocolEra(scriptPolicy, nHeight) };
+
+    if (!IsProtocolActive(era, ProtocolName::Chronicle))
+    {
+        if (tx.nVersion > CTransaction::PRE_CHRONICLE_MAX_STANDARD_VERSION ||
+            tx.nVersion < CTransaction::PRE_CHRONICLE_MIN_STANDARD_VERSION)
+        {
+            reason = "version";
+            return false;
+        }
+    }
 
     // Extremely large transactions with lots of inputs can cost the network
     // almost as much to process as they cost the sender in fees, because

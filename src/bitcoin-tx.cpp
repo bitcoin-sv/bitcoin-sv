@@ -28,6 +28,7 @@
 #include "utilstrencodings.h"
 
 #include <cstdio>
+#include <utility>
 
 #include <boost/algorithm/string.hpp>
 
@@ -217,13 +218,25 @@ static Amount ExtractAndValidateValue(const std::string &strValue) {
 }
 
 static void MutateTxVersion(CMutableTransaction &tx,
-                            const std::string &cmdVal) {
+                            const std::string &cmdVal)
+{
     int64_t newVersion = atoi64(cmdVal);
-    if (newVersion < 1 || newVersion > CTransaction::MAX_STANDARD_VERSION) {
-        throw std::runtime_error("Invalid TX version requested");
+
+    if(! std::in_range<int32_t>(newVersion))
+    {
+        throw std::runtime_error("TX version out of range");
     }
 
-    tx.nVersion = int(newVersion);
+    if(! IsProtocolActive(ActiveEra, ProtocolName::Chronicle))
+    {
+        if(newVersion < CTransaction::PRE_CHRONICLE_MIN_STANDARD_VERSION ||
+           newVersion > CTransaction::PRE_CHRONICLE_MAX_STANDARD_VERSION)
+        {
+            throw std::runtime_error("Invalid TX version requested");
+        }
+    }
+
+    tx.nVersion = static_cast<int32_t>(newVersion);
 }
 
 static void MutateTxLocktime(CMutableTransaction &tx,
