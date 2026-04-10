@@ -17,6 +17,7 @@ CJournal::CJournal(const CJournal& that)
 {
     // Lock journal we are copying from, and copy its contents
     std::shared_lock lock { that.mMtx };
+    //NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer) lock required
     mTransactions = that.mTransactions;
 }
 

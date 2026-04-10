@@ -1,13 +1,12 @@
 // Copyright (c) 2019 Bitcoin Association.
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include "logging.h"
+#include "mining/journal_change_set.h"
 
 #include <boost/iterator/filter_iterator.hpp>
-#include <mining/journal_builder.h>
-#include <mining/journal_change_set.h>
-#include <txmempool.h>
-#include <validation.h>
+
+#include "logging.h"
+#include "mining/journal_builder.h"
 
 using mining::CJournalEntry;
 using mining::CJournalChangeSet;
@@ -16,9 +15,8 @@ using mining::CJournalBuilder;
 
 namespace
 {
-    bool CheckTopoSort(
-        CJournalChangeSet::ChangeSet&& changeSet,
-        JournalUpdateReason updateReason)
+    bool CheckTopoSort(const CJournalChangeSet::ChangeSet& changeSet,
+                       JournalUpdateReason updateReason)
     {
         auto filterAndSort = [&changeSet](auto predicate) {
             std::vector<uint256> transactionIds;
@@ -131,14 +129,14 @@ CJournalChangeSet::~CJournalChangeSet()
 // Add a new operation to the set
 void CJournalChangeSet::addOperation(Operation op, CJournalEntry&& txn)
 {
-    std::scoped_lock lock{ mMtx };
+    std::lock_guard lock{ mMtx };
     mChangeSet.emplace_back(op, std::move(txn));
     addOperationCommon(op);
 }
 
 void CJournalChangeSet::addOperation(Operation op, const CJournalEntry& txn)
 {
-    std::scoped_lock lock{ mMtx };
+    std::lock_guard lock{ mMtx };
     mChangeSet.emplace_back(op, txn);
     addOperationCommon(op);
 }
@@ -163,14 +161,14 @@ bool CJournalChangeSet::isUpdateReasonBasic() const
 // Apply our changes to the journal
 void CJournalChangeSet::apply()
 {
-    std::scoped_lock lock{ mMtx };
+    std::lock_guard lock{ mMtx };
     applyNL();
 }
 
 // Clear the changeset without applying it
 void CJournalChangeSet::clear()
 {
-    std::scoped_lock lock{ mMtx };
+    std::lock_guard lock{ mMtx };
     mChangeSet.clear();
 }
 
@@ -181,12 +179,11 @@ bool CJournalChangeSet::CheckTopoSort() const
 {
     ChangeSet changeSet;
     {
-        std::scoped_lock lock{ mMtx };
-
+        std::lock_guard lock{ mMtx };
         changeSet = mChangeSet;
     }
 
-    return ::CheckTopoSort( std::move(changeSet), getUpdateReason() );
+    return ::CheckTopoSort(changeSet, getUpdateReason() );
 }
 
 // Apply our changes to the journal - Caller holds mutex

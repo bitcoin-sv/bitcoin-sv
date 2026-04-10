@@ -25,6 +25,7 @@ void TxnGroup::AddTxn(const CJournalEntry& txn)
 }
 
 // Move a group of txns
+// NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved) uses move_iterator
 void TxnGroup::AddGroup(TxnGroup&& group)
 {
     mTxns.insert(end(),
