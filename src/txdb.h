@@ -157,6 +157,14 @@ public:
      */
     void Uncache(const std::vector<COutPoint>& vOutpoints);
 
+    /**
+     * Read the best block hash from the on-disk database (DB_BEST_BLOCK).
+     * Unlike GetBestBlock(), which returns the in-memory cached value
+     * (updated on every block connect/disconnect), this returns the value
+     * that was last persisted by Flush().
+     */
+    uint256 DBGetBestBlock() const;
+
 private:
     uint256 GetBestBlock() const;
 
@@ -186,7 +194,6 @@ private:
 
     std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const;
     std::optional<CoinImpl> DBGetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const;
-    uint256 DBGetBestBlock() const;
     std::vector<uint256> GetHeadBlocks() const;
     bool DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock);
 
