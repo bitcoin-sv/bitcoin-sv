@@ -4,6 +4,7 @@ Checks: '-*,
          clang-analyzer-*,
          -clang-analyzer-security.FloatLoopCounter,
          cppcoreguidelines-*,
+         performance-*,
       '
 
 InheritParentConfig: true
