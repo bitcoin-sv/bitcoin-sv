@@ -13,7 +13,7 @@ FeeFilterRounder::FeeFilterRounder(const CFeeRate& minIncrementalFee)
     //NOLINTNEXTLINE(*-narrowing-conversions)
     for(double bucketBoundary = minFeeLimit.GetSatoshis();
         bucketBoundary <= double(MAX_FEERATE.GetSatoshis());
-        bucketBoundary *= FEE_SPACING)
+        bucketBoundary *= FEE_SPACING) //NOLINT(cert-flp30-c)
     {
         feeset.insert(Amount(int64_t(bucketBoundary)));
     }
