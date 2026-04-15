@@ -1,6 +1,7 @@
 Checks: '-*,
          clang-analyzer-*,
          -clang-analyzer-security.FloatLoopCounter,
+         *-narrowing-conversions,
       '
 
 InheritParentConfig: true

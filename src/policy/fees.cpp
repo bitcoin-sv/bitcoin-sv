@@ -6,13 +6,15 @@
 #include "policy/fees.h"
 #include "amount.h"
 
-FeeFilterRounder::FeeFilterRounder(const CFeeRate &minIncrementalFee) {
-    Amount minFeeLimit =
-        std::max(Amount(1), minIncrementalFee.GetFeePerK() / 2);
+FeeFilterRounder::FeeFilterRounder(const CFeeRate& minIncrementalFee)
+{
+    Amount minFeeLimit = std::max(Amount(1), minIncrementalFee.GetFeePerK() / 2);
     feeset.insert(Amount(0));
-    for (double bucketBoundary = minFeeLimit.GetSatoshis();
-         bucketBoundary <= double(MAX_FEERATE.GetSatoshis());
-         bucketBoundary *= FEE_SPACING) {
+    //NOLINTNEXTLINE(*-narrowing-conversions)
+    for(double bucketBoundary = minFeeLimit.GetSatoshis();
+        bucketBoundary <= double(MAX_FEERATE.GetSatoshis());
+        bucketBoundary *= FEE_SPACING)
+    {
         feeset.insert(Amount(int64_t(bucketBoundary)));
     }
 }
