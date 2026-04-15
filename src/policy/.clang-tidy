@@ -3,7 +3,7 @@ Checks: '-*,
          cert-*,
          clang-analyzer-*,
          -clang-analyzer-security.FloatLoopCounter,
-         *-narrowing-conversions,
+         cppcoreguidelines-*,
       '
 
 InheritParentConfig: true

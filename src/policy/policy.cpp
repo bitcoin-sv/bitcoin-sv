@@ -122,6 +122,7 @@ AnnotatedType<bool> IsFreeConsolidationTxn(const Config& config,
 
         // if not acceptnonstdconsolidationinput then check if inputs are standard
         // and fail otherwise
+        // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
         txnouttype dummyType;
         if (stdInputOnly  && !IsStandardOutput(config.GetConfigScriptPolicy(), coin->GetTxOut().scriptPubKey, coinHeight, dummyType)) {
             return {false,
