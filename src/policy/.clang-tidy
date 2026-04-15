@@ -1,4 +1,5 @@
 Checks: '-*,
+         bugprone-*,
          cert-*,
          clang-analyzer-*,
          -clang-analyzer-security.FloatLoopCounter,
