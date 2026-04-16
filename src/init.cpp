@@ -1035,9 +1035,8 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strUsage += HelpMessageOpt(
             "-acceptnonstdtxn",
             strprintf(
-                "Relay and mine \"non-standard\" transactions (%sdefault: %u)",
-                "testnet/regtest only; ",
-                defaultChainParams->RequireStandard()));
+                "Relay and mine \"non-standard\" transactions (default: %u)",
+                !defaultChainParams->RequireStandard()));
         strUsage += HelpMessageOpt(
                 "-mindebugrejectionfee",
                 strprintf(
@@ -3001,10 +3000,6 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     bool requireStandard =
         !gArgs.GetBoolArg("-acceptnonstdtxn", !chainparams.RequireStandard());
-    if (chainparams.RequireStandard() && !requireStandard)
-        return InitError(
-            strprintf("acceptnonstdtxn is not currently supported for %s chain",
-                      chainparams.NetworkIDString()));
     config.SetRequireStandard(requireStandard);
 
     config.SetAcceptNonStandardOutput(
