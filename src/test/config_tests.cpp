@@ -787,6 +787,14 @@ BOOST_AUTO_TEST_CASE(prune_config_test)
     BOOST_CHECK(config.SetMinBlocksToKeep(MIN_MIN_BLOCKS_TO_KEEP));
     BOOST_CHECK_EQUAL(config.GetMinBlocksToKeep(), MIN_MIN_BLOCKS_TO_KEEP);
     BOOST_CHECK(! config.SetMinBlocksToKeep(MIN_MIN_BLOCKS_TO_KEEP - 1));
+
+    BOOST_CHECK_EQUAL(config.GetPruneHysteresis(), DEFAULT_PRUNE_HYSTERESIS);
+    BOOST_CHECK(config.SetPruneHysteresis(0));
+    BOOST_CHECK_EQUAL(config.GetPruneHysteresis(), 0);
+    BOOST_CHECK(config.SetPruneHysteresis(99));
+    BOOST_CHECK_EQUAL(config.GetPruneHysteresis(), 99);
+    BOOST_CHECK(! config.SetPruneHysteresis(-1));
+    BOOST_CHECK(! config.SetPruneHysteresis(100));
 }
 
 BOOST_AUTO_TEST_CASE(tx_validation)

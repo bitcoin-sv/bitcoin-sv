@@ -624,6 +624,11 @@ public:
         return true;
     }
     int32_t GetMinBlocksToKeep() const override { return DEFAULT_MIN_BLOCKS_TO_KEEP; }
+    bool SetPruneHysteresis(int32_t /*hysteresis*/, std::string* /*err*/ = nullptr) override
+    {
+        return true;
+    }
+    int32_t GetPruneHysteresis() const override { return DEFAULT_PRUNE_HYSTERESIS; }
     bool SetBlockValidationTxBatchSize(int64_t /*size*/, std::string* /*err*/ = nullptr) override
     {
         return true;

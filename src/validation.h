@@ -273,6 +273,12 @@ extern uint64_t nPruneTarget;
 static const int32_t DEFAULT_MIN_BLOCKS_TO_KEEP = 288;
 /** Lowest value of MIN_BLOCKS_TO_KEEP */
 static const int32_t MIN_MIN_BLOCKS_TO_KEEP = 6;
+/** Default width of the automatic-prune hysteresis band, as a percentage
+ *  of -prune=<n>. When auto-pruning runs it removes block files until
+ *  on-disk usage falls below nPruneTarget * (100 - hysteresis) / 100,
+ *  creating that much headroom so the next allocation does not
+ *  re-trigger pruning. */
+static const int32_t DEFAULT_PRUNE_HYSTERESIS = 25;
 
 static const signed int DEFAULT_CHECKBLOCKS = 6;
 static const unsigned int DEFAULT_CHECKLEVEL = 3;

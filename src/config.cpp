@@ -93,6 +93,7 @@ void GlobalConfig::Reset()
     data->assumeWhitelistedBlockDepth = DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH;
 
     data->minBlocksToKeep = DEFAULT_MIN_BLOCKS_TO_KEEP;
+    data->pruneHysteresis = DEFAULT_PRUNE_HYSTERESIS;
     data->blockValidationTxBatchSize = DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE;
 
     // Block download
@@ -1165,6 +1166,25 @@ bool GlobalConfig::SetMinBlocksToKeep(int32_t minblocks, std::string* err)
 int32_t GlobalConfig::GetMinBlocksToKeep() const
 {
     return data->minBlocksToKeep;
+}
+
+bool GlobalConfig::SetPruneHysteresis(int32_t hysteresis, std::string* err)
+{
+    if(hysteresis < 0 || hysteresis > 99)
+    {
+        if(err)
+        {
+            *err = "Prune hysteresis must be in range [0, 99]";
+        }
+        return false;
+    }
+
+    data->pruneHysteresis = hysteresis;
+    return true;
+}
+int32_t GlobalConfig::GetPruneHysteresis() const
+{
+    return data->pruneHysteresis;
 }
 
 // Block download

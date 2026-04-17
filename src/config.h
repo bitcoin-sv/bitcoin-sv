@@ -110,6 +110,7 @@ public:
     virtual int32_t GetAssumeWhitelistedBlockDepth() const = 0;
 
     virtual int32_t GetMinBlocksToKeep() const = 0;
+    virtual int32_t GetPruneHysteresis() const = 0;
 
     // Block download
     virtual uint64_t GetBlockStallingMinDownloadSpeed() const = 0;
@@ -291,6 +292,7 @@ public:
     virtual bool SetAssumeWhitelistedBlockDepth(int64_t depth, std::string* err = nullptr) = 0;
 
     virtual bool SetMinBlocksToKeep(int32_t minblocks, std::string* err = nullptr) = 0;
+    virtual bool SetPruneHysteresis(int32_t hysteresis, std::string* err = nullptr) = 0;
     virtual bool SetBlockValidationTxBatchSize(int64_t size, std::string* err = nullptr) = 0;
 
     // Block download
@@ -620,6 +622,8 @@ public:
 
     bool SetMinBlocksToKeep(int32_t minblocks, std::string* err = nullptr) override;
     int32_t GetMinBlocksToKeep() const override;
+    bool SetPruneHysteresis(int32_t hysteresis, std::string* err = nullptr) override;
+    int32_t GetPruneHysteresis() const override;
     bool SetBlockValidationTxBatchSize(int64_t size, std::string* err = nullptr) override;
     uint64_t GetBlockValidationTxBatchSize() const override;
 
@@ -876,6 +880,7 @@ private:
         InvalidTxEvictionPolicy invalidTxFileSinkEvictionPolicy;
 
         int32_t minBlocksToKeep;
+        int32_t pruneHysteresis;
         uint64_t blockValidationTxBatchSize;
 
         // Block download

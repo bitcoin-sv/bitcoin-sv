@@ -561,6 +561,19 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                   "disk space make progress downloading the blockchain "
                   "(default: %d, minimum value: %d)."), DEFAULT_MIN_BLOCKS_TO_KEEP, MIN_MIN_BLOCKS_TO_KEEP)
         );
+        strUsage += HelpMessageOpt(
+            "-prunehysteresis=<n>",
+            strprintf(
+                _("Width of the automatic-prune hysteresis band, as a percentage of "
+                  "-prune. When pruning runs, block files are removed until on-disk "
+                  "usage is at least this many percent below the target, creating "
+                  "that much headroom before pruning is triggered again. Larger "
+                  "values prune less frequently but more aggressively, which can "
+                  "reduce the frequency of forced UTXO cache flushes triggered by "
+                  "disk pressure. Set to 0 to retain the legacy behaviour of pruning "
+                  "only as far as the target (range: 0..99, default: %d)."),
+                DEFAULT_PRUNE_HYSTERESIS)
+        );
     }
 
     strUsage += HelpMessageOpt(
@@ -2704,6 +2717,11 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     // NOLINTNEXTLINE(*-narrowing-conversions)
     if(std::string err; !config.SetMinBlocksToKeep(gArgs.GetArg("-pruneminblockstokeep", DEFAULT_MIN_BLOCKS_TO_KEEP), &err)) {
+        return InitError(err);
+    }
+
+    // NOLINTNEXTLINE(*-narrowing-conversions)
+    if(std::string err; !config.SetPruneHysteresis(gArgs.GetArg("-prunehysteresis", DEFAULT_PRUNE_HYSTERESIS), &err)) {
         return InitError(err);
     }
 
