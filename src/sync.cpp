@@ -4,13 +4,20 @@
 
 #include "sync.h"
 
-#include "util.h"
+#include "logging.h"
 #include "utilstrencodings.h"
 
+#include <concepts>
 #include <cstdio>
 #include <set>
 
 #include <boost/thread.hpp>
+
+static_assert(!std::movable<bsv::lock_guard<bsv::mutex>>);
+static_assert(!std::copyable<bsv::lock_guard<bsv::mutex>>);
+
+static_assert(!std::copyable<bsv::unique_lock<bsv::mutex>>);
+static_assert(std::movable<bsv::unique_lock<bsv::mutex>>);
 
 #ifdef DEBUG_LOCKCONTENTION
 void PrintLockContention(const char *pszName, const char *pszFile, int nLine) {

@@ -4,14 +4,12 @@
 #pragma once
 
 #include <condition_variable>
-#include <functional>
-#include <future>
 #include <memory>
-#include <mutex>
 #include <queue>
 #include <thread>
 #include <vector>
 
+#include "sync.h"
 #include "task.h"
 #include "threadpriority.h"
 
@@ -213,18 +211,18 @@ class CThreadPool final
     void worker(size_t n, ThreadPriority thrPriority);
 
     // The task queue
-    QueueAdapter mQueue {};
-    mutable std::mutex mQueueMtx {};
-    std::condition_variable mQueueCondVar {};
+    QueueAdapter mQueue GUARDED_BY(mQueueMtx) {};
+    mutable bsv::mutex mQueueMtx {};
+    std::condition_variable_any mQueueCondVar {};
 
     // The worker threads
     std::vector<std::shared_ptr<std::thread>> mThreads {};
 
     // Flag to indicate we are shutting down
-    bool mRunning {true};
+    bool mRunning GUARDED_BY(mQueueMtx) {true};
 
     // Flag to indicate we are paused
-    bool mPaused {false};
+    bool mPaused GUARDED_BY(mQueueMtx) {false};
 
     // Owner string for logging
     const std::string mOwnerStr {};
