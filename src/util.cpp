@@ -97,8 +97,8 @@ CTranslationInterface translationInterface;
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static CCriticalSection **ppmutexOpenSSL;
 
+NO_THREAD_SAFETY_ANALYSIS
 void locking_callback(int mode, int i, const char* /*file*/, int /*line*/)
-    NO_THREAD_SAFETY_ANALYSIS
 {
     if (mode & CRYPTO_LOCK) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
