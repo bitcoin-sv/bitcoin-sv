@@ -10,7 +10,7 @@ FeeFilterRounder::FeeFilterRounder(const CFeeRate& minIncrementalFee)
 {
     Amount minFeeLimit = std::max(Amount(1), minIncrementalFee.GetFeePerK() / 2);
     feeset.insert(Amount(0));
-    //NOLINTNEXTLINE(*-narrowing-conversions)
+    //NOLINTNEXTLINE(*-narrowing-conversions,clang-analyzer-security.FloatLoopCounter)
     for(double bucketBoundary = minFeeLimit.GetSatoshis();
         bucketBoundary <= double(MAX_FEERATE.GetSatoshis());
         bucketBoundary *= FEE_SPACING) //NOLINT(cert-flp30-c)
