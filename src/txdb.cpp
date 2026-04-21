@@ -17,9 +17,12 @@
 #include "uint256.h"
 #include "util.h"
 #include "ui_interface.h"
-#include <boost/thread.hpp>
+
 #include <string>
 #include <vector>
+
+#include <boost/thread.hpp>
+#include <boost/sort/sort.hpp>
 
 static const char DB_COIN = 'C';
 static const char DB_COINS = 'c';
@@ -201,10 +204,9 @@ std::vector<uint256> CoinsDB::GetHeadBlocks() const {
     return vhashHeadBlocks;
 }
 
-bool CoinsDB::DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
+bool CoinsDB::DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock)
+{
     CDBBatch batch(db);
-    size_t count = 0;
-    size_t changed = 0;
     size_t batch_size =
         (size_t)gArgs.GetArgAsBytes("-dbbatchsize", nDefaultDbBatchSize);
     // NOLINTNEXTLINE(*-narrowing-conversions)
@@ -228,25 +230,43 @@ bool CoinsDB::DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
     batch.Erase(DB_BEST_BLOCK);
     batch.Write(DB_HEAD_BLOCKS, std::vector<uint256>{hashBlock, old_tip});
 
+    // Collect iterators for dirty entries; drop non-dirty entries now to free
+    // memory before the sort and batch writes.
+    std::vector<CCoinsMap::iterator> dirtyIts;
+    size_t count = mapCoins.size();
+    dirtyIts.reserve(count);
     for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();) {
         if (it->second.flags & CCoinsCacheEntry::DIRTY) {
-            CoinEntry entry(&it->first);
-            if (it->second.GetCoin().IsSpent()) {
-                batch.Erase(entry);
-            } else {
-                auto coinWithScript = it->second.GetCoinWithScript();
-
-                // coin entries that have DIRTY flag set and are not spent must
-                // always contain the script
-                assert(coinWithScript.has_value());
-
-                batch.Write(entry, coinWithScript.value());
-            }
-            changed++;
+            dirtyIts.push_back(it);
+            ++it;
+        } else {
+            it = mapCoins.erase(it);
         }
-        count++;
-        CCoinsMap::iterator itOld = it++;
-        mapCoins.erase(itOld);
+    }
+    size_t changed = dirtyIts.size();
+
+    // Sort so batch inserts reach LevelDB in on-disk key order (same ordering
+    // as DBCacheAllInputs). LevelDB produces tighter L0 SSTs and cheaper
+    // compactions when batch writes arrive sorted.
+    boost::sort::block_indirect_sort(dirtyIts.begin(), dirtyIts.end(),
+              [](const CCoinsMap::iterator& a, const CCoinsMap::iterator& b) {
+                  return a->first < b->first;
+              });
+
+    for (const CCoinsMap::iterator& it : dirtyIts) {
+        CoinEntry entry(&it->first);
+        if (it->second.GetCoin().IsSpent()) {
+            batch.Erase(entry);
+        } else {
+            auto coinWithScript = it->second.GetCoinWithScript();
+
+            // coin entries that have DIRTY flag set and are not spent must
+            // always contain the script
+            assert(coinWithScript.has_value());
+
+            batch.Write(entry, coinWithScript.value());
+        }
+        mapCoins.erase(it);
         if (batch.SizeEstimate() > batch_size) {
             LogPrint(BCLog::COINDB, "Writing partial batch of %.2f MiB\n",
                      batch.SizeEstimate() * (1.0 / 1048576.0));
