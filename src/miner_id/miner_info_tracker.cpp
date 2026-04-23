@@ -14,6 +14,7 @@
 std::unique_ptr<mining::BlockDatarefTracker> g_BlockDatarefTracker;
 std::unique_ptr<mining::MempoolDatarefTracker> g_MempoolDatarefTracker;
 
+//NOLINTNEXTLINE(cert-err58-cpp)
 static const fs::path fundingPath = fs::path("miner_id") / "Funding";
 
 /*

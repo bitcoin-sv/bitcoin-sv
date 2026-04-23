@@ -151,17 +151,14 @@ bool operator==(const RevokeMid& msg1, const RevokeMid& msg2)
 }
 
 // Specialise std::hash
-namespace std
-{
-    size_t hash<RevokeMid>::operator()(const RevokeMid& rmid) const
-    {   
-        size_t seed {0};
-        boost::hash_combine(seed, rmid.GetVersion());
-        boost::hash_range(seed, rmid.GetEncodedRevocationKey().begin(), rmid.GetEncodedRevocationKey().end());
-        boost::hash_range(seed, rmid.GetEncodedMinerId().begin(), rmid.GetEncodedMinerId().end());
-        boost::hash_range(seed, rmid.GetEncodedRevocationMessage().begin(), rmid.GetEncodedRevocationMessage().end());
-        boost::hash_range(seed, rmid.GetEncodedRevocationMessageSig().begin(), rmid.GetEncodedRevocationMessageSig().end());
-        return seed;
-    };
+size_t std::hash<RevokeMid>::operator()(const RevokeMid& rmid) const
+{   
+    size_t seed {0};
+    boost::hash_combine(seed, rmid.GetVersion());
+    boost::hash_range(seed, rmid.GetEncodedRevocationKey().begin(), rmid.GetEncodedRevocationKey().end());
+    boost::hash_range(seed, rmid.GetEncodedMinerId().begin(), rmid.GetEncodedMinerId().end());
+    boost::hash_range(seed, rmid.GetEncodedRevocationMessage().begin(), rmid.GetEncodedRevocationMessage().end());
+    boost::hash_range(seed, rmid.GetEncodedRevocationMessageSig().begin(), rmid.GetEncodedRevocationMessageSig().end());
+    return seed;
 }
 
