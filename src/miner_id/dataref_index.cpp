@@ -7,6 +7,7 @@
 
 #include <functional>
 
+//NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 std::unique_ptr<DataRefTxnDB> g_dataRefIndex {nullptr};
 
 DataRefTxnDB::DataRefTxnDB(const Config& config)

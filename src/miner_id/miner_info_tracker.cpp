@@ -11,8 +11,10 @@
 #include <memory>
 #include <mutex>
 
+//NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 std::unique_ptr<mining::BlockDatarefTracker> g_BlockDatarefTracker;
 std::unique_ptr<mining::MempoolDatarefTracker> g_MempoolDatarefTracker;
+//NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 //NOLINTNEXTLINE(cert-err58-cpp)
 static const fs::path fundingPath = fs::path("miner_id") / "Funding";
@@ -235,7 +237,7 @@ std::unique_ptr<mining::BlockDatarefTracker> mining::make_from_dir(
         {
             fs::ifstream file(dir / filename, ios::binary | ios::out);
             TxId txid;
-            uint32_t n;
+            uint32_t n{};
             while(file >> txid >> n)
                 tracker->funds_.push_back(COutPoint{txid, n}); }
         return tracker;

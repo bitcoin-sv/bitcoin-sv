@@ -63,8 +63,10 @@ namespace
     uint256 HashRevocationMessage(const RevokeMid& msg)
     {
         const auto& revocationMessage { msg.GetEncodedRevocationMessage() };
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
         std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashRevocationMessage;
         CSHA256()
+            //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
             .Write(reinterpret_cast<const uint8_t *>(revocationMessage.data()),
                    revocationMessage.size())
             .Finalize(hashRevocationMessage);

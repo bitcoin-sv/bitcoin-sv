@@ -34,6 +34,7 @@ static const std::set<std::string> SUPPORTED_VERSIONS = {"0.1", "0.2", "0.3"};
 class CoinbaseDocument
 {
 public:
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     struct DataRef
     {
         // Allow serialisation/deserialisation

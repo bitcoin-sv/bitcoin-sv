@@ -77,6 +77,7 @@ public:
 class miner_info_doc
 {
 public:
+    //NOLINTNEXTLINE(cppcoreguidelines-use-enum-class)
     enum supported_version
     {
         v0_3
