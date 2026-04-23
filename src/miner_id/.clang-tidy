@@ -4,6 +4,8 @@ Checks: '-*,
          clang-analyzer-*,
          cppcoreguidelines-*, 
          -cppcoreguidelines-avoid-magic-numbers,
+         performance-*,
+         -performance-enum-size,
       '
 
 InheritParentConfig: true

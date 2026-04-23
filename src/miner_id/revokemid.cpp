@@ -124,16 +124,16 @@ bool RevokeMid::VerifySignatures() const
 // Stream output
 std::ostream& operator<<(std::ostream& str, const RevokeMid& msg)
 {
-    str << "Version: " << msg.GetVersion() << std::endl;
-    str << "RevocationKey: " << msg.GetRevocationKey().GetHash().ToString() << std::endl;
-    str << "EncodedRevocationKey: " << HexStr(msg.GetEncodedRevocationKey()) << std::endl;
-    str << "MinerId: " << msg.GetMinerId().GetHash().ToString() << std::endl;
-    str << "EncodedMinerId: " << HexStr(msg.GetEncodedMinerId()) << std::endl;
-    str << "RevocationMessage: " << msg.GetRevocationMessage().GetHash().ToString() << std::endl;
-    str << "EncodedRevocationMessage: " << HexStr(msg.GetEncodedRevocationMessage()) << std::endl;
-    str << "Sig1: " << HexStr(msg.GetSig1()) << std::endl;
-    str << "Sig2: " << HexStr(msg.GetSig2()) << std::endl;
-    str << "EncodedRevocationMessageSig: " << HexStr(msg.GetEncodedRevocationMessageSig()) << std::endl;
+    str << "Version: " << msg.GetVersion() << '\n';
+    str << "RevocationKey: " << msg.GetRevocationKey().GetHash().ToString() << '\n';
+    str << "EncodedRevocationKey: " << HexStr(msg.GetEncodedRevocationKey()) << '\n';
+    str << "MinerId: " << msg.GetMinerId().GetHash().ToString() << '\n';
+    str << "EncodedMinerId: " << HexStr(msg.GetEncodedMinerId()) << '\n';
+    str << "RevocationMessage: " << msg.GetRevocationMessage().GetHash().ToString() << '\n';
+    str << "EncodedRevocationMessage: " << HexStr(msg.GetEncodedRevocationMessage()) << '\n';
+    str << "Sig1: " << HexStr(msg.GetSig1()) << '\n';
+    str << "Sig2: " << HexStr(msg.GetSig2()) << '\n';
+    str << "EncodedRevocationMessageSig: " << HexStr(msg.GetEncodedRevocationMessageSig()) << '\n';
     return str;
 }
 

@@ -52,7 +52,7 @@ static bool store_minerinfo_fund_NL(const std::vector<COutPoint>& funds)
                 filepath.string());
 
         for(const auto& fund : funds)
-            file << fund.GetTxId() << ' ' << fund.GetN() << std::endl;
+            file << fund.GetTxId() << ' ' << fund.GetN() << '\n';
     }
     catch(std::exception const& e)
     {
@@ -198,7 +198,7 @@ static std::optional<int> parsestorefile (std::string n)  {
 
 std::optional<std::pair<COutPoint, std::optional<CoinWithScript>>> mining::
     BlockDatarefTracker::find_fund(
-        std::function<std::optional<CoinWithScript>(const COutPoint&)> get_spendable_coin)
+        const std::function<std::optional<CoinWithScript>(const COutPoint&)>& get_spendable_coin)
         const
 {
     std::lock_guard lock(mtx_);
@@ -233,7 +233,7 @@ std::unique_ptr<mining::BlockDatarefTracker> mining::make_from_dir(
         }
 
         sort(files.begin(), files.end());
-        for(string filename : files)
+        for(const string& filename : files)
         {
             fs::ifstream file(dir / filename, ios::binary | ios::out);
             TxId txid;
