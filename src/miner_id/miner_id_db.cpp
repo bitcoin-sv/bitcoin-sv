@@ -1057,6 +1057,7 @@ std::pair<MinerIdDatabase::MinerUUId, uint256> MinerIdDatabase::ProcessRevocatio
             {
                 minerEntry->mReputation.mVoid = false;
                 minerEntry->mReputation.mVoidingId = std::nullopt;
+                //NOLINTNEXTLINE(*-narrowing-conversions)
                 minerEntry->mReputation.mM *= mConfig.GetMinerIdReputationMScale();
                 UpdateMinerUUIdInDatabaseNL(minerUUId, *minerEntry);
 
