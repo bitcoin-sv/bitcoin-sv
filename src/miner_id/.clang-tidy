@@ -1,4 +1,5 @@
 Checks: '-*,
+         bugprone-*,
          clang-analyzer-*,
          *-narrowing-conversions,
       '

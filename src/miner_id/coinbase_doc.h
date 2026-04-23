@@ -81,9 +81,11 @@ public:
 
     CoinbaseDocument() = default;
     CoinbaseDocument(
+        // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
         const std::string& rawJSON,
         const std::string& version,
         const int32_t height,
+        // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
         const std::string& prevMinerId,
         const std::string& prevMinerIdSig,
         const std::string& minerId,

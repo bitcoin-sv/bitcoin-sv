@@ -90,10 +90,17 @@ RevokeMid::RevokeMid(const CKey& revocationKey, const CKey& minerId, const CPubK
     mEncodedRevocationMessageSig = HexEncodeRevocationMessageSig(*this);
 }
 
-RevokeMid::RevokeMid(const CPubKey& revocationKey, const CPubKey& minerId, const CPubKey& idToRevoke,
-    const std::vector<uint8_t>& sig1, const std::vector<uint8_t>& sig2)
-: mRevocationKey{revocationKey}, mMinerId{minerId}, mRevocationMessage{idToRevoke},
-  mSig1{sig1}, mSig2{sig2}
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+RevokeMid::RevokeMid(const CPubKey& revocationKey,
+                     const CPubKey& minerId,
+                     const CPubKey& idToRevoke,
+                     const std::vector<uint8_t>& sig1,
+                     const std::vector<uint8_t>& sig2)
+    : mRevocationKey{revocationKey},
+      mMinerId{minerId},
+      mRevocationMessage{idToRevoke},
+      mSig1{sig1},
+      mSig2{sig2}
 {
     // Hex encode key fields
     EncodeHexKey(mRevocationKey, mEncodedRevocationKey);
