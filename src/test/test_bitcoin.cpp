@@ -25,6 +25,7 @@
 #include "rpc/server.h"
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
+#include "sync.h"
 #include "taskcancellation.h"
 #include "txdb.h"
 #include "txdb_defaults.h"
@@ -165,20 +166,25 @@ TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory:
 
 TestingSetup::~TestingSetup() { // NOLINT(bugprone-exception-escape)
     mining::g_miningFactory.reset();
-    threadGroup.interrupt_all();
-    threadGroup.join_all();
-    UnloadBlockIndex();
-    pcoinsTip.reset();
 
     if (g_connman)
     {
         g_connman->Interrupt();
         // call Stop first as CConnman members are using g_connman global
         // variable and they must be shut down before the variable is reset to
-        // nullptr
+        // nullptr. Stop the validator thread before resetting pcoinsTip to
+        // avoid a data race in FlushStateToDisk.
         g_connman->Stop();
         g_connman.reset();
         connman = nullptr;
+    }
+
+    threadGroup.interrupt_all();
+    threadGroup.join_all();
+    UnloadBlockIndex();
+    {
+        bsv::lock_guard lock{cs_main};
+        pcoinsTip.reset();
     }
 
     ShutdownScriptCheckQueues();
