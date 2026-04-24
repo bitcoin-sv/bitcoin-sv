@@ -87,7 +87,12 @@ namespace
                                         CFrozenTXOCheck& frozenTXOCheckTransaction,
                                         const CCoinsViewCache& tipView)
     {
-        //DummyConfig config(CBaseChainParams::MAIN);
+        // Destroy the mining factory (and its assembler thread) to avoid data
+        // races when mutating global config (SetGenesisActivationHeight etc.).
+        // The assembler thread reads config concurrently; destroying the factory
+        // joins the thread. We recreate it at the end of this function.
+        mining::g_miningFactory.reset();
+
         auto& config = GlobalConfig::GetModifiableGlobalConfig();
         auto genesisActivationHeight = config.GetGenesisActivationHeight();
         const CTransaction tx(mutableTx);
@@ -201,6 +206,9 @@ namespace
             }
         }
         config.SetGenesisActivationHeight(genesisActivationHeight);
+
+        // Recreate the mining factory and its assembler thread
+        mining::g_miningFactory = std::make_unique<mining::CMiningFactory>(config);
     }
 }
 
@@ -326,7 +334,12 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
 
     LOCK(cs_main);
     auto& config = GlobalConfig::GetModifiableGlobalConfig();
-    config.SetGenesisActivationHeight(102);
+    {
+        // Pause mining assembler thread while mutating global config
+        mining::g_miningFactory.reset();
+        config.SetGenesisActivationHeight(102);
+        mining::g_miningFactory = std::make_unique<mining::CMiningFactory>(config);
+    }
 
 
     // Test that invalidity under a set of flags doesn't preclude validity under
