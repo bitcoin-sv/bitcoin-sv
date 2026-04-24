@@ -1,0 +1,21 @@
+# ThreadSanitizer suppression file for SV Node
+#
+# Usage:
+#   TSAN_OPTIONS="suppressions=contrib/tsan.suppressions" ./src/bitcoind ...
+#
+# Running unit tests under TSan:
+#   TSAN_OPTIONS="suppressions=contrib/tsan.suppressions" \
+#     ./src/test/test_bitcoin \
+#     --run_test='!protocol_tests/net_messages:!script_tests/op_pushdata4_op_size'
+#
+# The excluded tests allocate multi-GB buffers (up to 4GB+) to test extended
+# block message and script handling. Under TSan's ~2x memory overhead for
+# shadow memory, these exceed typical RAM limits and trigger the OOM killer.
+#
+# See https://github.com/google/sanitizers/wiki/ThreadSanitizerSuppressions
+
+deadlock:libdb_cxx
+race:libzmq
+deadlock:GetState
+deadlock:CTxMemPool::Expire
+deadlock:FindUndoPos
