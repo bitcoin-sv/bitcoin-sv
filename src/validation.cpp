@@ -3813,6 +3813,11 @@ bool FlushStateToDisk(
     // NOLINTNEXTLINE(*-narrowing-conversions)
     int64_t nMempoolUsage = mempool.DynamicMemoryUsage();
     LOCK(cs_main);
+    // pcoinsTip may be null during startup (before block index is loaded)
+    // or during reinit. Nothing to flush in that case.
+    if(!pcoinsTip)
+        return true;
+
     static int64_t nLastWrite = 0;
     static int64_t nLastFlush = 0;
     static int64_t nLastSetChain = 0;

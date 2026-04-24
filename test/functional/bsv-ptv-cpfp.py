@@ -258,7 +258,7 @@ class PtvCpfp(BitcoinTestFramework):
         self.send_txs(rpcsend, conn, txs, exp_min_mempool_size, timeout)
         txs.append(tx0)
         # All newly submitted txs should be present in the mempool.
-        self.check_mempool_with_subset(conn.rpc, txs)
+        self.check_mempool_with_subset(conn.rpc, txs, timeout=timeout)
         return txs
 
     def test_case1(self, timeout=300):
