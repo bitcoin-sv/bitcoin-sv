@@ -3,9 +3,29 @@
 
 name: 'Unit test Bitcoin'
 description:  'Unit test Bitcoin'
+inputs:
+  options:
+    description: Build options (asan/tsan/usan/cov)
+    required: false
 runs:
   using: "composite"
   steps:
     - run: |
-        ./src/test/test_bitcoin --catch_system_error=yes --log_level=test_suite
+        if [[ "${{ inputs.options }}" == *tsan* ]]; then
+          export TSAN_OPTIONS="suppressions=contrib/tsan.suppressions"
+          TSAN_EXCLUDE=""
+          # OOM: these tests allocate 4GB+ buffers, exceeding RAM under TSan
+          TSAN_EXCLUDE+="!protocol_tests/net_messages"
+          TSAN_EXCLUDE+=":!script_tests/op_pushdata4_op_size"
+          # Config data race: tests mutate GlobalConfig while validator thread reads it
+          TSAN_EXCLUDE+=":!test_txnvalidator/txnvalidator_doublespend_asynch_api"
+          TSAN_EXCLUDE+=":!test_txnvalidator/txnvalidator_nvalueoutofrange_async_api"
+          TSAN_EXCLUDE+=":!test_txnvalidator/txnvalidator_low_priority_chain_async_api"
+          ./src/test/test_bitcoin \
+            --catch_system_error=yes \
+            --log_level=test_suite \
+            --run_test="$TSAN_EXCLUDE"
+        else
+          ./src/test/test_bitcoin --catch_system_error=yes --log_level=test_suite
+        fi
       shell: bash
