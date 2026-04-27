@@ -524,7 +524,7 @@ void CoinsStore::BatchWrite(CCoinsMap& mapCoins)
 // Add a batch of coins to our cache without performing any checks.
 // It is assumed the caller can guarantee there are no collisions between
 // coins already in this cache and the coins being added.
-void CoinsStore::BatchWriteUnchecked(CCoinsMap& mapCoins)
+void CoinsStore::BatchWriteUnchecked(CCoinsMap& mapCoins, size_t addedUsage)
 {
     #ifdef DEBUG
     // Check there are no coins in common
@@ -538,6 +538,10 @@ void CoinsStore::BatchWriteUnchecked(CCoinsMap& mapCoins)
     // hasher and key_equal, so this transfers ownership of each node without
     // allocating a new node or moving the value.
     cacheCoins.merge(mapCoins);
+
+    // The caller supplies the source's tracked usage so we don't have to walk
+    // the spliced entries again to recompute it.
+    cachedCoinsUsage += addedUsage;
 }
 
 // Utility function to add all of a transaction's outputs to a cache

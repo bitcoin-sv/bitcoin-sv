@@ -459,6 +459,8 @@ public:
 
     size_t CachedCoinsCount() const { return cacheCoins.size(); }
 
+    size_t CachedCoinsUsage() const { return cachedCoinsUsage; }
+
     void ReserveCoins(size_t n) { cacheCoins.reserve(n); }
 
     std::optional<CoinImpl> FetchCoin(const COutPoint& outpoint) const;
@@ -479,7 +481,7 @@ public:
     bool SpendCoin(const COutPoint& outpoint);
     void Uncache(const std::vector<COutPoint>& vOutpoints);
     void BatchWrite(CCoinsMap& mapCoins);
-    void BatchWriteUnchecked(CCoinsMap& mapCoins);
+    void BatchWriteUnchecked(CCoinsMap& mapCoins, size_t addedUsage);
 
     const CoinImpl& ReplaceWithCoinWithScript(const COutPoint& outpoint, CoinImpl&& newCoin)
     {
@@ -830,8 +832,12 @@ public:
                     while(mShards.size() > 1)
                     {
                         Shard& shard { mShards.back() };
+                        // Capture the source's tracked usage before
+                        // MoveOutCoins zeroes it, then forward it to the
+                        // destination so cachedCoinsUsage stays accurate.
+                        size_t shardUsage { shard.GetCache().CachedCoinsUsage() };
                         auto shardCache { shard.GetCache().MoveOutCoins() };
-                        mShards[0].GetCache().BatchWriteUnchecked(shardCache);
+                        mShards[0].GetCache().BatchWriteUnchecked(shardCache, shardUsage);
                         mShards.pop_back();
                     }
                     int64_t foldTime { GetTimeMicros() - startFoldTime };
