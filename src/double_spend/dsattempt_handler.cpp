@@ -425,6 +425,7 @@ void DSAttemptHandler::ProcessDoubleSpend()
                 {
                     // Someone sent us an invalid double-spend; ban them
                     LogPrint(BCLog::DOUBLESPEND, "Script verification for double-spend failed\n");
+                    //NOLINTNEXTLINE(*-narrowing-conversions)
                     Misbehaving(doubleSpendTxnDetails.sender, mConfig.GetBanScoreThreshold(), "double-spend-validation-failed");
                     return;
                 }
