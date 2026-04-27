@@ -712,6 +712,8 @@ bool CoinsDB::BatchWrite(
 
 bool CoinsDB::Flush()
 {
+    int64_t startTime { GetTimeMillis() };
+
     WPUSMutex::Lock writeLock = mMutex.WriteLock();
     std::unique_lock lock { mCoinsViewCacheMtx };
 
@@ -722,8 +724,12 @@ bool CoinsDB::Flush()
     }
 
     auto coins = mCache.MoveOutCoins();
+    size_t numCoins { coins.size() };
+    bool res = DBBatchWrite(coins, hashBlock_);
 
-    return DBBatchWrite(coins, hashBlock_);
+    LogPrint(BCLog::BENCH, "    - Flushing %ld coins to database: %.2fms\n",
+        numCoins, GetTimeMillis() - startTime);
+    return res;
 }
 
 void CoinsDB::Uncache(const std::vector<COutPoint>& vOutpoints)
