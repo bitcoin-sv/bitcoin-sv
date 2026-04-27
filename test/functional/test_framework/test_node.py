@@ -45,7 +45,17 @@ class TestNode(metaclass=StaticAttrsMeta):
 
     Note: Uses StaticAttrsMeta to catch attribute typos (e.g., 'proces' instead of 'process')."""
 
-    def __init__(self, i, dirname, extra_args, rpchost, timewait, binary, stderr, mocktime, coverage_dir):
+    def __init__(self,
+                 i,
+                 dirname,
+                 extra_args,
+                 rpchost,
+                 timewait,
+                 binary,
+                 stderr,
+                 mocktime,
+                 coverage_dir,
+                 timeout_factor=1):
         self.index = i
         self.datadir = os.path.join(dirname, "node" + str(i))
         self.rpchost = rpchost
@@ -54,6 +64,7 @@ class TestNode(metaclass=StaticAttrsMeta):
         else:
             # Wait for up to 60 seconds for the RPC server to respond
             self.rpc_timeout = 60
+        self.timeout_factor = timeout_factor
         if binary is None:
             self.binary = [os.getenv("BITCOIND", "bitcoind")]
         else:
@@ -144,7 +155,7 @@ class TestNode(metaclass=StaticAttrsMeta):
         """Sets up an RPC connection to the bitcoind process. Returns False if unable to connect."""
         # Poll at a rate of four times per second
         poll_per_s = 4
-        for _ in range(poll_per_s * self.rpc_timeout):
+        for _ in range(int(poll_per_s * self.rpc_timeout * self.timeout_factor)):
             assert self.process.poll(
             ) is None, "bitcoind exited with status %i during initialization" % self.process.returncode
             try:

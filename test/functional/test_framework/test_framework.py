@@ -286,8 +286,16 @@ class BitcoinTestFramework(metaclass=StaticAttrsMeta):
             self.add_node(i, extra_args[i], rpchost, timewait, binaries[i])
 
     def add_node(self, i, extra_args, rpchost=None, timewait=None, binary=None, init_data_dir=False):
-        self.nodes.append(TestNode(i, self.options.tmpdir, extra_args, rpchost, timewait, binary, stderr=None,
-                                   mocktime=self.mocktime, coverage_dir=self.options.coveragedir))
+        self.nodes.append(TestNode(i,
+                                   self.options.tmpdir,
+                                   extra_args,
+                                   rpchost,
+                                   timewait,
+                                   binary,
+                                   stderr=None,
+                                   mocktime=self.mocktime,
+                                   coverage_dir=self.options.coveragedir,
+                                   timeout_factor=self.options.timeoutfactor))
         if init_data_dir:
             initialize_datadir(self.options.tmpdir, i)
 
@@ -610,8 +618,16 @@ class BitcoinTestFramework(metaclass=StaticAttrsMeta):
                         "-keypool=1", "-datadir=" + datadir, "-discover=0"]
                 if i > 0:
                     args.append("-connect=127.0.0.1:" + str(p2p_port(0)))
-                self.nodes.append(TestNode(i, self.options.cachedir, extra_args=[
-                ], rpchost=None, timewait=None, binary=None, stderr=None, mocktime=self.mocktime, coverage_dir=None))
+                self.nodes.append(TestNode(i,
+                                           self.options.cachedir,
+                                           extra_args=[],
+                                           rpchost=None,
+                                           timewait=None,
+                                           binary=None,
+                                           stderr=None,
+                                           mocktime=self.mocktime,
+                                           coverage_dir=None,
+                                           timeout_factor=self.options.timeoutfactor))
                 self.nodes[i].args = args
                 self.start_node(i)
 
