@@ -441,6 +441,7 @@ void DSAttemptHandler::ProcessDoubleSpend()
                     std::lock_guard lock { mMtx };
                     if(auto it { mSuspensionTracker.find(doubleSpendTxnDetails.sender) }; it != mSuspensionTracker.end())
                     {
+                        //NOLINTNEXTLINE(bugprone-assignment-in-if-condition)
                         if(it->second += SUSPENSION_SCORE_INCREASE)
                         {
                             LogPrint(BCLog::DOUBLESPEND, "Suspension score exceeded for peer=%d\n", doubleSpendTxnDetails.sender);
@@ -700,6 +701,7 @@ bool DSAttemptHandler::QueryAndSubmitProof(
     const NotificationDetails& notificationDetails,
     const DSTxnSerialiser::TxnHandleSPtr& handle,
     int httpTimeout,
+    //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     bool& wantsProof,
     bool& retry)
 {
