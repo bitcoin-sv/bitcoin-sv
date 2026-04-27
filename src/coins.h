@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <unordered_map>
 #include <mutex>
+#include <numeric>
 #include <optional>
 #include <thread>
 #include <type_traits>
@@ -458,6 +459,8 @@ public:
 
     size_t CachedCoinsCount() const { return cacheCoins.size(); }
 
+    void ReserveCoins(size_t n) { cacheCoins.reserve(n); }
+
     std::optional<CoinImpl> FetchCoin(const COutPoint& outpoint) const;
 
     CCoinsMap MoveOutCoins()
@@ -819,6 +822,11 @@ public:
                 {
                     // Re-fold shards back into a single coherent cache
                     int64_t startFoldTime { GetTimeMicros() };
+                    // Pre-size the destination once so that the per-shard merge() calls do
+                    // not trigger incremental rehashes.
+                    const size_t total = std::accumulate(mShards.begin(), mShards.end(), size_t{0},
+                        [](size_t sum, const Shard& shard) { return sum + shard.GetCache().CachedCoinsCount(); });
+                    mShards[0].GetCache().ReserveCoins(total);
                     while(mShards.size() > 1)
                     {
                         Shard& shard { mShards.back() };

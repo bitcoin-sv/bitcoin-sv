@@ -534,7 +534,10 @@ void CoinsStore::BatchWriteUnchecked(CCoinsMap& mapCoins)
     }
     #endif
 
-    cacheCoins.insert(std::make_move_iterator(mapCoins.begin()), std::make_move_iterator(mapCoins.end()));
+    // Splice nodes from mapCoins into cacheCoins. Both maps share the same
+    // hasher and key_equal, so this transfers ownership of each node without
+    // allocating a new node or moving the value.
+    cacheCoins.merge(mapCoins);
 }
 
 // Utility function to add all of a transaction's outputs to a cache
