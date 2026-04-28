@@ -623,22 +623,28 @@ BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_batch_api) {
 /**
  * TxnValidator: Test asynch interface.
  */
-BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_asynch_api) {
+BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_asynch_api)
+{
     CTxMemPool pool;
     // Update config params to prevent the failure of the test case
     // - this could happen - due to runtime conditions - on an inefficient environment.
+    // Use a local config so we don't race with the fixture's running CTxnValidator
+    // thread, which reads the global testConfig.
     gArgs.ForceSetArg("-txnvalidationasynchrunfreq", "0");
-    testConfig.SetMaxStdTxnValidationDuration(1000);
-    testConfig.SetMaxNonStdTxnValidationDuration(5000);
+    GlobalConfig config;
+    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+    config.SetMaxStdTxnValidationDuration(1'000);
+    config.SetMaxNonStdTxnValidationDuration(5'000);
     // Test all sources.
-    for (const auto& txsource: vTxSources) {
-        ProcessTxnsAsynchApi(testConfig, pool, doubleSpend10Txns, txsource);
+    for(const auto& txsource: vTxSources)
+    {
+        ProcessTxnsAsynchApi(config, pool, doubleSpend10Txns, txsource);
         BOOST_CHECK_EQUAL(pool.Size(), 1U);
     }
     // Test: Txns from p2p with a pointer to a dummy node.
     {
-        auto pDummyNode = DummyNode(testConfig);
-        ProcessTxnsAsynchApi(testConfig, pool, doubleSpend10Txns, TxSource::p2p, pDummyNode);
+        auto pDummyNode = DummyNode(config);
+        ProcessTxnsAsynchApi(config, pool, doubleSpend10Txns, TxSource::p2p, pDummyNode);
         BOOST_CHECK_EQUAL(pool.Size(), 1U);
     }
 }
@@ -689,17 +695,22 @@ BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_sync_api) {
     }
 }
 
-BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_async_api) {
+BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_async_api)
+{
     CTxMemPool pool;
     // Update config params to prevent the failure of the test case
     // - this could happen - due to runtime conditions - on an inefficient environment.
+    // Use a local config so we don't race with the fixture's running CTxnValidator
+    // thread, which reads the global testConfig.
     gArgs.ForceSetArg("-txnvalidationasynchrunfreq", "0");
-    testConfig.SetMaxStdTxnValidationDuration(1000);
-    testConfig.SetMaxNonStdTxnValidationDuration(5000);
+    GlobalConfig config;
+    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+    config.SetMaxStdTxnValidationDuration(1'000);
+    config.SetMaxNonStdTxnValidationDuration(5'000);
     // Create txn validator
     std::shared_ptr<CTxnValidator> txnValidator {
         std::make_shared<CTxnValidator>(
-                testConfig,
+                config,
                 pool,
                 std::make_shared<CTxnDoubleSpendDetector>(),
                 g_connman->GetTxIdTracker())
@@ -730,31 +741,36 @@ BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_async_api) {
     }
 }
 
-BOOST_AUTO_TEST_CASE(txnvalidator_low_priority_chain_async_api) {
+BOOST_AUTO_TEST_CASE(txnvalidator_low_priority_chain_async_api)
+{
     // Test that the part of the chain containing a slow transaction will get processed by a low priority thread.
     CTxMemPool pool;
     CTxMemPoolTestAccess{pool}.InitInMemoryMempoolTxDB();
     // Update config params to prevent the failure of the test case
     // - this could happen - due to runtime conditions - on an inefficient environment.
+    // Use a local config so we don't race with the fixture's running CTxnValidator
+    // thread, which reads the global testConfig.
     gArgs.ForceSetArg("-txnvalidationasynchrunfreq", "1");
     gArgs.ForceSetArg("-maxstdtxnsperthreadratio", "100");
     // Disable processing of slow transactions
     gArgs.ForceSetArg("-maxnonstdtxnsperthreadratio", "0");
-    testConfig.SetMaxStdTxnValidationDuration(10);
-    testConfig.SetMaxNonStdTxnValidationDuration(5000);
-    testConfig.SetMaxTxnChainValidationBudget(0);
+    GlobalConfig config;
+    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+    config.SetMaxStdTxnValidationDuration(10);
+    config.SetMaxNonStdTxnValidationDuration(5'000);
+    config.SetMaxTxnChainValidationBudget(0);
     // Create txn validator
     std::shared_ptr<CTxnValidator> txnValidator {
         std::make_shared<CTxnValidator>(
-                testConfig,
+                config,
                 pool,
                 std::make_shared<CTxnDoubleSpendDetector>(),
                 g_connman->GetTxIdTracker())
     };
-    auto dummyNode = DummyNode(testConfig);
+    auto dummyNode = DummyNode(config);
     auto fundTx = std::make_unique<CTransaction>(coinbaseTxns[0]);
 
-    int ridiculousWidth = 100000;
+    int ridiculousWidth = 100'000;
     // autoscale transaction difficulty
     for (int nWidth = 20; nWidth < ridiculousWidth; ) {
         std::vector<CMutableTransaction> spends {};
@@ -789,8 +805,8 @@ BOOST_AUTO_TEST_CASE(txnvalidator_low_priority_chain_async_api) {
 
         if (pool.Size() == oldPoolSize && txnValidator->getOrphanTxnsPtr()->getTxnsNumber() == 2) {
             BOOST_WARN_MESSAGE(false,
-                               "This machine is slow: testConfig.SetMaxStdTxnValidationDuration(" <<
-                               testConfig.GetMaxStdTxnValidationDuration().count() <<
+                               "This machine is slow: SetMaxStdTxnValidationDuration(" <<
+                               config.GetMaxStdTxnValidationDuration().count() <<
                                ") is too small. Skipping the test");
             return;
         }
