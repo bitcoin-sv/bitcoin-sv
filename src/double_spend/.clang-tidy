@@ -2,7 +2,8 @@ Checks: '-*,
          bugprone-*,
          cert-*,
          clang-analyzer-*,
-         *-narrowing-conversions,
+         cppcoreguidelines-*,
+         -cppcoreguidelines-avoid-magic-numbers,
       '
 
 InheritParentConfig: true
