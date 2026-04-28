@@ -16,6 +16,5 @@
 
 deadlock:libdb_cxx
 race:libzmq
-deadlock:GetState
 deadlock:CTxMemPool::Expire
 deadlock:FindUndoPos
