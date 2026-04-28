@@ -10,9 +10,10 @@
 #include "rpc/jsonwriter.h"
 #include "rpc/text_writer.h"
 #include "streams.h"
-#include "util.h"
 #include "validation.h"
 #include "zmq_publisher.h"
+
+#include <array>
 #include <string>
 
 static std::multimap<std::string, CZMQAbstractPublishNotifier *>
@@ -70,8 +71,9 @@ bool CZMQAbstractPublishNotifier::Initialize(void *pcontext, std::shared_ptr<CZM
     }
 }
 
-void CZMQAbstractPublishNotifier::Shutdown() {
-    int count = mapPublishNotifiers.count(address);
+void CZMQAbstractPublishNotifier::Shutdown()
+{
+    const auto count = mapPublishNotifiers.count(address);
 
     // remove this notifier from the list of publishers using this address
     typedef std::multimap<std::string, CZMQAbstractPublishNotifier *>::iterator
@@ -116,12 +118,13 @@ bool CZMQAbstractPublishNotifier::SendZMQMessage(const char *command,
 bool CZMQAbstractPublishNotifier::SendZMQMessage(const char* command, const uint256& hash) 
 {
     LogPrint(BCLog::ZMQ, "zmq: Publish %s %s\n", command, hash.GetHex());
-    char data[32];
-    for (unsigned int i = 0; i < 32; i++) 
+    std::array<char, 32> data; // NOLINT(cppcoreguidelines-pro-type-member-init)
+    for(size_t i = 0; i < data.size(); i++) 
     {
-        data[31 - i] = hash.begin()[i];
+        //NOLINTNEXTLINE(*-narrowing-conversions)
+        data[31 - i] = hash.begin()[i]; // NOLINT(cppcoreguidelines-pro-bounds-*)
     }
-    return SendZMQMessage(command, data, 32);
+    return SendZMQMessage(command, data.data(), sizeof(data));
 }
 
 bool CZMQAbstractPublishNotifier::SendZMQMessage(const char* command, const CBlockIndex* pindex) 

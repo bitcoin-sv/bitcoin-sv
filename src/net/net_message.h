@@ -6,10 +6,10 @@
 
 #pragma once
 
-#include <hash.h>
-#include <protocol.h>
-#include <streams.h>
+#include "hash.h"
 #include "msg_buffer.h"
+#include "protocol.h"
+#include "streams.h"
 
 #include <stdexcept>
 
@@ -28,8 +28,11 @@ private:
     int64_t nTime {0};
 
 public:
-    CNetMessage(const CMessageHeader::MessageMagic& pchMessageStartIn, int nTypeIn, int nVersionIn)
-    : dataBuff { nTypeIn, nVersionIn },
+    CNetMessage(const CMessageHeader::MessageMagic& pchMessageStartIn,
+                int nTypeIn,
+                int nVersionIn,
+                uint64_t maxRecvBuffer)
+    : dataBuff { nTypeIn, nVersionIn, maxRecvBuffer },
       hdr { pchMessageStartIn }
     {
     }

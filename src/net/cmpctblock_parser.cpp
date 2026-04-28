@@ -52,8 +52,8 @@ size_t cmpctblock_parser::read(size_t read_pos, span<uint8_t> s)
         {
             const size_t n{min(s.size(), 
                            header_parser_.size() - read_pos)};
-            copy(header_parser_.cbegin() + read_pos, 
-                 header_parser_.cbegin() + read_pos + n,
+            copy(header_parser_.cbegin() + read_pos,        //NOLINT(*-narrowing-conversions)
+                 header_parser_.cbegin() + read_pos + n,    //NOLINT(*-narrowing-conversions)
                  s.begin());
             read_pos += n;
             total_bytes_read += n;

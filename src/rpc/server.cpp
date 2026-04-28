@@ -24,10 +24,13 @@
 
 static bool fRPCRunning = false;
 static bool fRPCInWarmup = true;
+//NOLINTBEGIN(cert-err58-cpp)
 static std::string rpcWarmupStatus("RPC server started");
 static CCriticalSection cs_rpcWarmup;
 /* Timer-creating functions */
-static RPCTimerInterface *timerInterface = nullptr;
+//NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+static RPCTimerInterface* timerInterface = nullptr;
+
 /* Map of name to timer. */
 static std::map<std::string, std::unique_ptr<RPCTimerBase>> deadlineTimers;
 
@@ -37,21 +40,26 @@ static struct CRPCSignals {
     boost::signals2::signal<void(const CRPCCommand &)> PreCommand;
     boost::signals2::signal<void(const CRPCCommand &)> PostCommand;
 } g_rpcSignals;
+//NOLINTEND(cert-err58-cpp)
 
-void RPCServer::OnStarted(std::function<void()> slot) {
+void RPCServer::OnStarted(const std::function<void()>& slot)
+{
     g_rpcSignals.Started.connect(slot);
 }
 
-void RPCServer::OnStopped(std::function<void()> slot) {
+void RPCServer::OnStopped(const std::function<void()>& slot)
+{
     g_rpcSignals.Stopped.connect(slot);
 }
 
-void RPCServer::OnPreCommand(std::function<void(const CRPCCommand &)> slot) {
+void RPCServer::OnPreCommand(const std::function<void(const CRPCCommand&)>& slot)
+{
     using namespace boost::placeholders;
     g_rpcSignals.PreCommand.connect(boost::bind(slot, _1));
 }
 
-void RPCServer::OnPostCommand(std::function<void(const CRPCCommand &)> slot) {
+void RPCServer::OnPostCommand(const std::function<void(const CRPCCommand&)>& slot)
+{
     using namespace boost::placeholders;
     g_rpcSignals.PostCommand.connect(boost::bind(slot, _1));
 }
@@ -107,11 +115,12 @@ void RPCTypeCheckObj(const UniValue &o,
     }
 }
 
-Amount AmountFromValue(const UniValue &value) {
+Amount AmountFromValue(const UniValue &value)
+{
     if (!value.isNum() && !value.isStr())
         throw JSONRPCError(RPC_TYPE_ERROR, "Amount is not a number or string");
 
-    int64_t n;
+    int64_t n{};
     if (!ParseFixedPoint(value.getValStr(), 8, &n))
         throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount");
 
@@ -131,7 +140,8 @@ UniValue ValueFromAmount(const Amount &amount) {
                                               quotient, remainder));
 }
 
-uint256 ParseHashV(const UniValue &v, std::string strName) {
+uint256 ParseHashV(const UniValue &v, const std::string& strName)
+{
     std::string strHex;
     if (v.isStr()) strHex = v.get_str();
     // Note: IsHex("") is false
@@ -147,10 +157,14 @@ uint256 ParseHashV(const UniValue &v, std::string strName) {
     result.SetHex(strHex);
     return result;
 }
-uint256 ParseHashO(const UniValue &o, std::string strKey) {
+
+uint256 ParseHashO(const UniValue& o, const std::string& strKey)
+{
     return ParseHashV(find_value(o, strKey), strKey);
 }
-std::vector<uint8_t> ParseHexV(const UniValue &v, std::string strName) {
+
+std::vector<uint8_t> ParseHexV(const UniValue &v, const std::string& strName)
+{
     std::string strHex;
     if (v.isStr()) strHex = v.get_str();
     if (!IsHex(strHex))
@@ -159,7 +173,9 @@ std::vector<uint8_t> ParseHexV(const UniValue &v, std::string strName) {
                                strHex + "') and length of it must be divisible by 2");
     return ParseHex(strHex);
 }
-std::vector<uint8_t> ParseHexO(const UniValue &o, std::string strKey) {
+
+std::vector<uint8_t> ParseHexO(const UniValue& o, const std::string& strKey)
+{
     return ParseHexV(find_value(o, strKey), strKey);
 }
 
@@ -277,24 +293,21 @@ static UniValue uptime(const Config&, const JSONRPCRequest& jsonRequest)
     return GetTime() - GetStartupTime();
 }
 
-/**
- * Call Table
- */
-// clang-format off
-static const CRPCCommand vRPCCommands[] = {
+static const std::array<CRPCCommand, 3> vRPCCommands //NOLINT(cert-err58-cpp)
+{{
     //  category            name                      actor (function)        okSafe argNames
     //  ------------------- ------------------------  ----------------------  ------ ----------
     /* Overall control/query calls */
     { "control",            "help",                   help,                   true,  {"command"}  },
     { "control",            "stop",                   stop,                   true,  {}  },
     { "control",            "uptime",                 uptime,                 true,  {}  },
-};
-// clang-format on
+}};
 
-CRPCTable::CRPCTable() {
-    unsigned int vcidx;
-    for (vcidx = 0; vcidx < (sizeof(vRPCCommands) / sizeof(vRPCCommands[0]));
-         vcidx++) {
+CRPCTable::CRPCTable()
+{
+    for(unsigned int vcidx{}; vcidx < vRPCCommands.size(); ++vcidx)
+    {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         const CRPCCommand* pcmd = &vRPCCommands[vcidx];
         mapCommands[pcmd->name] = pcmd;
     }
@@ -485,6 +498,7 @@ UniValue CRPCCommand::call(Config& config,
     UniValue result;
     if (useHTTPRequest)
     {
+        //NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
         (*actor.http_fn)(config, jsonRequest, httpReq, processedInBatch);
         result = NullUniValue;
     }
@@ -492,6 +506,7 @@ UniValue CRPCCommand::call(Config& config,
     {
         result = useConstConfig ? (*actor.cfn)(config, jsonRequest)
                                 : (*actor.fn)(config, jsonRequest);
+        //NOLINTEND(cppcoreguidelines-pro-type-union-access)
         if (httpReq && processedInBatch)
         {
             // Response for this RPC method is written as a single chunk
@@ -592,4 +607,5 @@ int RPCSerializationFlags() {
     return 0;
 }
 
-CRPCTable tableRPC;
+//NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+CRPCTable tableRPC; //NOLINT(cert-err58-cpp)

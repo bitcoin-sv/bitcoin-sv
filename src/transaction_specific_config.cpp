@@ -14,6 +14,7 @@ uint64_t SpecificConfigScriptPolicy::GetMaxScriptNumLength(ProtocolEra era, bool
     // Return value as though it were set in GlobalConfig. This ensures we get the
     // right value for the era if policy is unlimited.
     ConfigScriptPolicy tmp{};
+    //NOLINTNEXTLINE(*-narrowing-conversions)
     if(std::string err; !tmp.SetMaxScriptNumLengthPolicy(*mMaxScriptNumLength, &err))
     {
         // Someone has set the policy limit to a value incompatible with the era they
@@ -337,6 +338,7 @@ bool TransactionSpecificConfig::SetTransactionSpecificDustLimitFactor(int64_t fa
 };
 int64_t TransactionSpecificConfig::GetDustLimitFactor() const
 {
+    //NOLINTNEXTLINE(*-narrowing-conversions)
     return mDustLimitFactor.has_value() ? *mDustLimitFactor : GlobalConfig::GetDustLimitFactor();
 };
 

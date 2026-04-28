@@ -104,17 +104,14 @@ static UniValue setblockmaxsize(Config &config,
 
 void RegisterABCRPCCommands(CRPCTable& table_rpc)
 {
-    // clang-format off
-    static const CRPCCommand commands[] = {
+    static const std::array<CRPCCommand, 3> commands {{
         //  category            name                      actor (function)        okSafeMode
         //  ------------------- ------------------------  ----------------------  ----------
         { "network",            "getexcessiveblock",      getexcessiveblock,      true, {}},
         { "network",            "setexcessiveblock",      setexcessiveblock,      true, {"maxBlockSize"}},
         { "network",            "setblockmaxsize",        setblockmaxsize,        true, {"maxBlockSize"}},
-    };
-    // clang-format on
+    }};
 
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++) {
-        table_rpc.appendCommand(commands[vcidx].name, &commands[vcidx]);
-    }
+    for(const auto& cmd : commands)
+        table_rpc.appendCommand(cmd.name, &cmd);
 }

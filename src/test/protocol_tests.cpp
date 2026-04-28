@@ -278,7 +278,7 @@ BOOST_AUTO_TEST_CASE(net_messages)
         CDataStream serialisedMsg { SerialiseNetMsg(config, msg, hdrMutate) };
         uint64_t serialisedSize { serialisedMsg.size() };
 
-        CNetMessage netMsg { config.GetChainParams().NetMagic(), SER_NETWORK, INIT_PROTO_VERSION };
+        CNetMessage netMsg { config.GetChainParams().NetMagic(), SER_NETWORK, INIT_PROTO_VERSION, ONE_MEGABYTE };
         BOOST_CHECK(! netMsg.Complete());
 
         // Read into NetMessage in small chunks (to simulate data arriving over the netowrk in bits)

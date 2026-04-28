@@ -12,6 +12,7 @@ Selector-based network transport layer.
 """
 
 from .rate_limiter import RateLimiter
+from .static_attributes import StaticAttrsMeta
 from threading import RLock, Thread
 from abc import ABC, abstractmethod
 
@@ -350,9 +351,11 @@ def StopNetworkThread():
     NetworkThread_should_stop = True
 
 
-class NetworkThread(Thread):
+class NetworkThread(Thread, metaclass=StaticAttrsMeta):
     """
     Thread that runs the network event loop using selectors.
+
+    Note: Uses StaticAttrsMeta to catch attribute typos (e.g., 'deamon' instead of 'daemon').
     """
 
     poll_timeout = 0.1

@@ -15,34 +15,45 @@ class CZMQAbstractNotifier;
 
 typedef CZMQAbstractNotifier *(*CZMQNotifierFactory)();
 
-class CZMQAbstractNotifier {
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
+class CZMQAbstractNotifier
+{
 public:
-    CZMQAbstractNotifier() : psocket(0) {}
+    CZMQAbstractNotifier() = default;
+
+    CZMQAbstractNotifier(const CZMQAbstractNotifier&) = delete;
+    CZMQAbstractNotifier& operator=(const CZMQAbstractNotifier&) = delete;
+
     virtual ~CZMQAbstractNotifier();
 
-    template <typename T> static CZMQAbstractNotifier *Create() {
-        return new T();
+    template<typename T>
+    static CZMQAbstractNotifier* Create()
+    {
+        return new T(); // NOLINT(cppcoreguidelines-owning-memory)
     }
 
-    std::string GetType() const { return type; }
-    void SetType(const std::string &t) { type = t; }
-    std::string GetAddress() const { return address; }
-    void SetAddress(const std::string &a) { address = a; }
+    const std::string& GetType() const { return type; }
+    void SetType(std::string t) { type = std::move(t); }
 
-    virtual bool Initialize(void *pcontext, std::shared_ptr<CZMQPublisher>) = 0;
+    const std::string& GetAddress() const { return address; }
+    void SetAddress(std::string a) { address = std::move(a); }
+
+    virtual bool Initialize(void* pcontext, std::shared_ptr<CZMQPublisher>) = 0;
     virtual void Shutdown() = 0;
-    
-    virtual bool NotifyBlock(const CBlockIndex *pindex);
-    virtual bool NotifyBlock2(const CBlockIndex* pindex);
-    virtual bool NotifyTransaction(const CTransaction &transaction);
-    virtual bool NotifyTransaction2(const CTransaction& transaction);
+
+    virtual bool NotifyBlock(const CBlockIndex*);
+    virtual bool NotifyBlock2(const CBlockIndex*);
+    virtual bool NotifyTransaction(const CTransaction&);
+    virtual bool NotifyTransaction2(const CTransaction&);
     virtual bool NotifyTextMessage(const std::string& topic, std::string_view message);
-    virtual bool NotifyRemovedFromMempool(const uint256& txid, const MemPoolRemovalReason reason,
-                                          const CTransactionConflict& conflictedWith);
-    virtual bool NotifyRemovedFromMempoolBlock(const uint256& txid, const MemPoolRemovalReason reason);
+    virtual bool NotifyRemovedFromMempool(const uint256& txid,
+                                          const MemPoolRemovalReason,
+                                          const CTransactionConflict&);
+    virtual bool NotifyRemovedFromMempoolBlock(const uint256& txid,
+                                               const MemPoolRemovalReason);
 
 protected:
-    void *psocket;
+    void* psocket{};
     std::string type;
     std::string address;
 };

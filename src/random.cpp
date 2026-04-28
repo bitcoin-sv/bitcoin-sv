@@ -90,21 +90,24 @@ static inline int64_t GetPerformanceCounter() {
 static std::atomic<bool> hwrand_initialized{false};
 static bool rdrand_supported = false;
 static constexpr uint32_t CPUID_F1_ECX_RDRAND = 0x40000000;
-static void RDRandInit() {
+
+static void RDRandInit()
+{
     uint32_t eax, ebx, ecx, edx;
     if (__get_cpuid(1, &eax, &ebx, &ecx, &edx) && (ecx & CPUID_F1_ECX_RDRAND)) {
         LogPrintf("Using RdRand as an additional entropy source\n");
         rdrand_supported = true;
     }
-    hwrand_initialized.store(true);
+    hwrand_initialized.store(true, std::memory_order_release);
 }
 #else
 static void RDRandInit() {}
 #endif
 
-static bool GetHWRand(uint8_t *ent32) {
+static bool GetHWRand(uint8_t* ent32)
+{
 #if defined(__x86_64__) || defined(__amd64__) || defined(__i386__)
-    assert(hwrand_initialized.load(std::memory_order_relaxed));
+    assert(hwrand_initialized.load(std::memory_order_acquire));
     if (rdrand_supported) {
         uint8_t ok;
 // Not all assemblers support the rdrand instruction, write it in hex.
@@ -406,9 +409,10 @@ uint256 GetRandHash()
     return hash;
 }
 
-void FastRandomContext::RandomSeed() {
+void FastRandomContext::RandomSeed()
+{
     uint256 seed = GetRandHash();
-    rng.SetKey(std::span{seed.begin(), 32});
+    rng.SetKey(seed.span());
     requires_seed = false;
 }
 
@@ -433,7 +437,7 @@ std::vector<uint8_t> FastRandomContext::randbytes(size_t len) {
 // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 FastRandomContext::FastRandomContext(const uint256& seed)
 {
-    rng.SetKey(std::span{seed.begin(), 32});
+    rng.SetKey(seed.span());
 }
 
 bool Random_SanityCheck() {
@@ -498,7 +502,7 @@ FastRandomContext::FastRandomContext(bool fDeterministic)
         return;
     }
     uint256 seed;
-    rng.SetKey(std::span{seed.begin(), 32});
+    rng.SetKey(seed.span());
 }
 
 // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)

@@ -28,23 +28,24 @@
 #include <variant>
 #include <vector>
 
-namespace mining {
-
+namespace mining
+{
+//NOLINTBEGIN(cert-err58-cpp)
 static const fs::path fundingPath = fs::path("miner_id") / "Funding";
 static const std::string fundingKeyFile = ".minerinfotxsigningkey.dat";
 static const std::string fundingSeedFile = "minerinfotxfunding.dat";
-
-
+//NOLINTEND(cert-err58-cpp)
 
 template<typename InitFunc, typename ExitFunc>
-struct MinerInfoClass_ScopeExit {
-	InitFunc initFunc;
-	ExitFunc exitFunc;
-	bool success = false;
+struct MinerInfoClass_ScopeExit //NOLINT(cppcoreguidelines-special-member-functions)
+{
+    InitFunc initFunc;
+    ExitFunc exitFunc;
+    bool success = false;
 
     MinerInfoClass_ScopeExit (InitFunc init_func, ExitFunc exit_func)
-	    : initFunc(init_func)
-	    , exitFunc(exit_func)
+        : initFunc(init_func)
+        , exitFunc(exit_func)
     {
         init_func();
     }
@@ -52,6 +53,7 @@ struct MinerInfoClass_ScopeExit {
     void good() {
         success = true;
     }
+
     ~MinerInfoClass_ScopeExit () {
         if (!success)
             exitFunc();
@@ -68,7 +70,8 @@ static CKey privKeyFromStringBIP32(std::string const & strkey)
     return key;
 }
 
-auto ReadFileToUniValue (fs::path const & path, std::string filename) -> UniValue {
+UniValue ReadFileToUniValue(const fs::path& path, const std::string& filename)
+{
     auto dir = (GetDataDir() / path);
     auto filepath = dir / filename;
 
@@ -105,7 +108,10 @@ std::optional<CoinWithScript> GetSpendableCoin (COutPoint const & outpoint) {
     return std::nullopt;
 };
 
-void WriteUniValueToFile (fs::path const & path, std::string filename, UniValue const & uv) {
+void WriteUniValueToFile(fs::path const & path,
+                         const std::string& filename,
+                         UniValue const & uv)
+{
     auto dir = (GetDataDir() / path);
     auto filepath = dir / filename;
 
@@ -833,9 +839,12 @@ UniValue revokeminerid(const Config&, const JSONRPCRequest& request)
         },
         false, true);
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     std::array<uint8_t, CSHA256::OUTPUT_SIZE> hash_sha256;
     CSHA256()
-        .Write(reinterpret_cast<const uint8_t*>(compromisedMinerId.begin()), compromisedMinerId.size())
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+        .Write(reinterpret_cast<const uint8_t*>(compromisedMinerId.begin()),
+                                                compromisedMinerId.size())
         .Finalize(hash_sha256);
     const uint256 hash { std::vector<uint8_t> {std::begin(hash_sha256), std::end(hash_sha256)} };
     const std::vector<uint8_t> sig1 { ParseHex(revMsgSig["sig1"].get_str()) };
@@ -1043,8 +1052,8 @@ static UniValue getdatareftxid(const Config&, const JSONRPCRequest &request)
 
 void RegisterMinerIdRPCCommands(CRPCTable& t)
 {
-    // clang-format off
-    static const CRPCCommand commands[] = {
+    static const std::array<CRPCCommand, 14> commands
+    {{
         //  category   name                     actor (function)       okSafeMode
         //  ---------- ------------------------ ---------------------- ----------
         {"minerid", "createminerinfotx",                  mining::createminerinfotx,                  true, {"minerinfo"}},
@@ -1061,9 +1070,8 @@ void RegisterMinerIdRPCCommands(CRPCTable& t)
         {"minerid", "revokeminerid",                      mining::revokeminerid,                      true, {"input"} },
         {"minerid", "getmineridinfo",                     mining::getmineridinfo,                     true, {"minerid"} },
         {"minerid", "dumpminerids",                       mining::dumpminerids,                       true, {} },
-    };
-    // clang-format on
+    }};
 
-    for (auto& c: commands)
+    for(const auto& c: commands)
         t.appendCommand(c.name, &c);
 }

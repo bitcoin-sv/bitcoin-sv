@@ -17,7 +17,7 @@ jobs:
   ibd_weeknight:
     env:
       GITHUB_TOKEN: ${{ secrets.ACTIONS_PAT }}
-    runs-on: [ self-hosted, docker, large, perf ]
+    runs-on: [ arc-runner-svnode ]
     container:
       image: nchain/svn_dev:ubuntu_24.04
       options: --cap-add CAP_PERFMON --cap-add CAP_BPF --volume /lib/modules:/lib/modules
@@ -34,7 +34,7 @@ jobs:
         ]
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           clean: ''
       - name: Build Bitcoin

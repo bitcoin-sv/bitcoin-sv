@@ -25,6 +25,7 @@ const enumTableT<StreamType>& enumTable(StreamType)
 
 namespace
 {
+    //NOLINTNEXTLINE(cert-err58-cpp)
     const std::string NET_MESSAGE_COMMAND_OTHER { "*other*" };
 
     // Estimate memory usage for a message on the receive queue
@@ -40,7 +41,10 @@ namespace
     }
 }
 
-Stream::Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRecvBuffSize)
+Stream::Stream(CNode* node,
+               StreamType streamType,
+               SOCKET socket,  //NOLINT(bugprone-easily-swappable-parameters)
+               uint64_t maxRecvBuffSize)
 : mNode{node}, mStreamType{streamType}, mSocket{socket}, mMaxRecvBuffSize{maxRecvBuffSize}
 {
     // Setup bytes count per message type
@@ -51,6 +55,7 @@ Stream::Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRe
     mRecvBytesPerMsgCmd[NET_MESSAGE_COMMAND_OTHER] = 0;
 
     // Remember any sending rate limit that's been set
+    // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     mSendRateLimit = GlobalConfig::GetConfig().GetStreamSendRateLimit();
 
     // Fetch the MSS for the underlying socket
@@ -73,6 +78,7 @@ Stream::Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRe
 #endif
 }
 
+//NOLINTNEXTLINE(bugprone-exception-escape)
 Stream::~Stream()
 {
     Shutdown();
@@ -92,7 +98,10 @@ void Stream::Shutdown()
     }
 }
 
-bool Stream::SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
+//NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+bool Stream::SetSocketForSelect(fd_set& setRecv,
+                                fd_set& setSend,
+                                fd_set& setError,
                                 SOCKET& socketMax) const
 {
     // Implement the following logic:
@@ -100,7 +109,7 @@ bool Stream::SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setErr
     // * If there is space left in the receive buffer select() for receiving data.
 
     bool select_recv = !mPauseRecv;
-    bool select_send;
+    bool select_send{};
     {   
         LOCK(cs_mSendMsgQueue);
         select_send = !mSendMsgQueue.empty();
@@ -127,8 +136,15 @@ bool Stream::SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setErr
     return true;
 }
 
-void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, const Config& config,
-                           bool& gotNewMsgs, uint64_t& bytesRecv, uint64_t& bytesSent)
+//NOLINTBEGIN(bugprone-easily-swappable-parameters)
+void Stream::ServiceSocket(fd_set& setRecv,
+                           fd_set& setSend,
+                           fd_set& setError,
+                           const Config& config,
+                           bool& gotNewMsgs,
+                           uint64_t& bytesRecv,
+                           uint64_t& bytesSent)
+//NOLINTEND(bugprone-easily-swappable-parameters)
 {
     //
     // Receive
@@ -152,7 +168,8 @@ void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, c
         if (recvSet || errorSet)
         {   
             // typical socket buffer is 8K-64K
-            char pchBuf[0x10000];
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+            std::array<char, 0x1'0000> pchBuf;
             ssize_t nBytes = 0;
 
             {   
@@ -162,13 +179,13 @@ void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, c
                     return;
                 }
                 // NOLINTNEXTLINE(clang-analyzer-unix.BlockInCriticalSection)
-                nBytes = recv(mSocket, pchBuf, sizeof(pchBuf), MSG_DONTWAIT);
+                nBytes = recv(mSocket, pchBuf.data(), sizeof(pchBuf), MSG_DONTWAIT);
             }
             if (nBytes > 0)
             {
                 // Process received data
                 bytesRecv = static_cast<uint64_t>(nBytes);
-                ReceiveMsgBytes(config, pchBuf, bytesRecv, gotNewMsgs);
+                ReceiveMsgBytes(config, pchBuf.data(), bytesRecv, gotNewMsgs);
             }
             else if (nBytes == 0)
             {   
@@ -211,8 +228,11 @@ void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, c
     }
 }
 
-uint64_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
-    uint64_t nPayloadLength, uint64_t nTotalSize)
+uint64_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader,
+                             //NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
+                             CSerializedNetMsg&& msg,
+                             uint64_t nPayloadLength,
+                             uint64_t nTotalSize)
 {   
     uint64_t nBytesSent {0};
 
@@ -236,7 +256,10 @@ uint64_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerialize
         while(!payloadStream->EndOfStream())
         {
             const CSpan& data { payloadStream->ReadAsync(msg.Size()) };
-            serialisedHeader.insert(serialisedHeader.end(), data.Begin(), data.Begin() + data.Size());
+            serialisedHeader.insert(serialisedHeader.end(),
+                                    data.Begin(),
+                                    //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                                    data.Begin() + data.Size());
         }
 
         // Queue combined header & data
@@ -323,6 +346,8 @@ void Stream::CopyStats(StreamStats& stats) const
     }
 }
 
+//NOLINTBEGIN(*-narrowing-conversions)
+
 void Stream::AvgBandwithCalc()
 {   
     LOCK(cs_mRecvMsgQueue);
@@ -389,11 +414,15 @@ void Stream::ReceiveMsgBytes(const Config& config, const char* pch, uint64_t nBy
     mBytesRecvThisSpot += nBytes;
 
     while (nBytes > 0)
-    {   
+    {
         // Get current incomplete message, or create a new one.
         if (mRecvMsgQueue.empty() || mRecvMsgQueue.back()->Complete())
         {
-            mRecvMsgQueue.emplace_back(std::make_unique<CNetMessage>(Params().NetMagic(), SER_NETWORK, INIT_PROTO_VERSION));
+            mRecvMsgQueue.emplace_back(std::make_unique<CNetMessage>(
+                Params().NetMagic(),
+                SER_NETWORK,
+                INIT_PROTO_VERSION,
+                mMaxRecvBuffSize));
         }
 
         CNetMessage& msg { *(mRecvMsgQueue.back()) };
@@ -401,6 +430,7 @@ void Stream::ReceiveMsgBytes(const Config& config, const char* pch, uint64_t nBy
         // Absorb network data
         uint64_t handled { msg.Read(config, pch, nBytes) };
 
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         pch += handled;
         nBytes -= handled;
 
@@ -534,6 +564,7 @@ Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, uint6
             }
 
             nBytes = send(mSocket,
+                          //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                           reinterpret_cast<const char *>(mSendChunk->Begin()),
                           mSendChunk->Size(),
                           MSG_NOSIGNAL | MSG_DONTWAIT);
@@ -566,6 +597,7 @@ Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, uint6
             // could not send full message; stop sending more
             mSendChunk =
                 CSpan {
+                    //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                     mSendChunk->Begin() + nBytes,
                     mSendChunk->Size() - nBytes
                 };
@@ -578,3 +610,4 @@ Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, uint6
     return {true, sentSize};
 }
 
+//NOLINTEND(*-narrowing-conversions)

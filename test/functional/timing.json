@@ -384,11 +384,7 @@
   "time": 7
  },
  {
-  "name": "bsv-genesis-pushonly-transactions-acceptnonstd.py",
-  "time": 4
- },
- {
-  "name": "bsv-genesis-pushonly-transactions.py",
+  "name": "bsv-genesis-chronicle-pushonly-nonstd.py",
   "time": 4
  },
  {

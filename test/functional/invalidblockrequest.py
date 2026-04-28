@@ -35,6 +35,7 @@ class InvalidBlockRequestTest(ComparisonTestFramework):
         self.setup_clean_chain = True
         self.tip = None
         self.block_time = None
+        self.block1 = None
 
     def run_test(self):
         self.test.run()

@@ -4,9 +4,7 @@
 
 #include "config.h"
 #include "consensus/validation.h"
-#include "txmempool.h"
 #include "txn_double_spend_detector.h"
-#include "txn_validation_data.h"
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
@@ -44,12 +42,12 @@ BOOST_AUTO_TEST_CASE(test_detector_insert_txn_inputs)
 {
     CTxnDoubleSpendDetector dsDetector;
     CValidationState state;
-    
+
     // tx1 checks
     const auto ptx1 = CreateTxnWithNInputs(10);
     BOOST_REQUIRE(dsDetector.insertTxnInputs(ptx1, mempool, state, true));
     BOOST_REQUIRE(!dsDetector.insertTxnInputs(ptx1, mempool, state, true));
-    
+
     // tx2 checks
     const auto ptx2 = CreateTxnWithNInputs(10);
     BOOST_REQUIRE(dsDetector.insertTxnInputs(ptx2, mempool, state, true));
@@ -134,10 +132,22 @@ BOOST_AUTO_TEST_CASE(test_detector_clear_txn_inputs)
 
     CValidationState state;
     BOOST_REQUIRE(dsDetector.insertTxnInputs(ptx, mempool, state, true));
-    
+
     BOOST_CHECK(dsDetector.getKnownSpendsSize() == ptx->vin.size());
     dsDetector.clear();
     BOOST_CHECK(dsDetector.getKnownSpendsSize() == 0);
+}
+
+BOOST_AUTO_TEST_CASE(test_detector_remove_after_clear)
+{
+    CTxnDoubleSpendDetector dsDetector;
+
+    CValidationState state;
+    const shared_ptr<const CTransaction> ptx = CreateTxnWithNInputs(5);
+    const bool s = dsDetector.insertTxnInputs(ptx, mempool, state, true);
+    BOOST_CHECK(s);
+    dsDetector.clear();
+    dsDetector.removeTxnInputs(*ptx);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

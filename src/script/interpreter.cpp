@@ -49,15 +49,17 @@ namespace
     static_assert(!EnforceNonMalleability(SCRIPT_CHRONICLE, 2));
 } // namespace
 
-inline uint8_t make_rshift_mask(size_t n) {
-    static uint8_t mask[] = {0xFF, 0xFE, 0xFC, 0xF8, 0xF0, 0xE0, 0xC0, 0x80}; 
-    return mask[n]; 
-} 
+inline uint8_t make_rshift_mask(size_t n)
+{
+    static std::array<uint8_t, 8> mask{0xFF, 0xFE, 0xFC, 0xF8, 0xF0, 0xE0, 0xC0, 0x80};
+    return mask[n]; //NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+}
 
-inline uint8_t make_lshift_mask(size_t n) {
-    static uint8_t mask[] = {0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01}; 
-    return mask[n]; 
-} 
+inline uint8_t make_lshift_mask(size_t n)
+{
+    static std::array<uint8_t, 8> mask{0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01};
+    return mask[n]; //NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+}
 
 // shift x right by n bits, implements OP_RSHIFT
 static valtype RShift(const valtype &x, int n) {
@@ -208,6 +210,7 @@ static bool IsValidSignatureEncoding(const std::vector<uint8_t> &sig) {
 
     // Verify that the length of the signature matches the sum of the length
     // of the elements.
+    //NOLINTNEXTLINE(bugprone-misplaced-widening-cast)
     if ((size_t)(lenR + lenS + 7) != sig.size()) return false;
 
     // Check whether the R element is an integer.
@@ -392,8 +395,7 @@ std::optional<ScriptError> EvalScript(
     const BaseSignatureChecker& checker,
     LimitedStack& altstack,
     long& ipc,
-    std::vector<bool>& vfExec,
-    std::vector<bool>& vfElse)
+    conditional_tracker& conditionals)
 {
     static const CScriptNum bnZero(0);
     static const CScriptNum bnOne(1);
@@ -403,7 +405,7 @@ std::optional<ScriptError> EvalScript(
     CScript::const_iterator pc = script.begin();
     CScript::const_iterator pend = script.end();
     CScript::const_iterator pbegincodehash = script.begin();
-    opcodetype opcode;
+    opcodetype opcode; //NOLINT(cppcoreguidelines-init-variables)
     valtype vchPushValue;
 
     const bool utxo_after_genesis{IsUtxoAfterGenesis(flags)};
@@ -454,7 +456,7 @@ std::optional<ScriptError> EvalScript(
                 return SCRIPT_ERR_PUSH_SIZE;
 
             // Do not execute instructions if Genesis OP_RETURN was found in executed branches.
-            bool fExec = !count(vfExec.begin(), vfExec.end(), false) && (!nonTopLevelReturnAfterGenesis || opcode == OP_RETURN);
+            bool fExec = conditionals.is_active() && (!nonTopLevelReturnAfterGenesis || opcode == OP_RETURN);
 
             //
             // Check opcode limits.
@@ -777,7 +779,7 @@ std::optional<ScriptError> EvalScript(
                             else
                                 return SCRIPT_ERR_BAD_OPCODE;
                         }
-                            
+
                         [[fallthrough]];
                     case OP_IF:
                     case OP_NOTIF:
@@ -800,7 +802,7 @@ std::optional<ScriptError> EvalScript(
                                         return SCRIPT_ERR_MINIMALIF;
                                 }
                             }
-                           
+
                             if(opcode == OP_VERIF || opcode == OP_VERNOTIF)
                             {
                                 if(vch.size() == 4)
@@ -812,32 +814,29 @@ std::optional<ScriptError> EvalScript(
                             }
                             else
                                 fValue = CastToBool(vch.GetElement());
-            
+
                             if(opcode == OP_NOTIF || opcode == OP_VERNOTIF)
                                 fValue = !fValue;
 
                             stack.pop_back();
                         }
-                        vfExec.push_back(fValue);
-                        vfElse.push_back(false);
+                        conditionals.op_if(fValue);
                     }
                     break;
 
                     case OP_ELSE: {
                         // Only one ELSE is allowed in IF after genesis.
-                        if (vfExec.empty() || (vfElse.back() && utxo_after_genesis))
+                        if(conditionals.empty() || (conditionals.has_op_else() && utxo_after_genesis))
                             return SCRIPT_ERR_UNBALANCED_CONDITIONAL;
 
-                        vfExec.back() = !vfExec.back();
-                        vfElse.back() = true;
+                        conditionals.op_else();
                     } break;
 
                     case OP_ENDIF: {
-                        if (vfExec.empty())
+                        if (conditionals.empty())
                             return SCRIPT_ERR_UNBALANCED_CONDITIONAL;
 
-                        vfExec.pop_back();
-                        vfElse.pop_back();
+                        conditionals.op_endif();
                     } break;
 
                     case OP_VERIFY: {
@@ -856,7 +855,7 @@ std::optional<ScriptError> EvalScript(
 
                     case OP_RETURN: {
                         if (utxo_after_genesis) {
-                            if (vfExec.empty()) {
+                            if (conditionals.empty()) {
                                 // Terminate the execution as successful. The remaining of the script does not affect the validity (even in
                                 // presence of unbalanced IFs, invalid opcodes etc)
                                 return SCRIPT_ERR_OK;
@@ -1015,14 +1014,14 @@ std::optional<ScriptError> EvalScript(
                         const auto& top{stack.stacktop(-1).GetElement()};
                         const CScriptNum sn{top, requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis};
                         stack.pop_back();
-                        if(sn < 0 || sn >= stack.size())
+                        if(sn < 0 || sn >= stack.size()) //NOLINT(*-narrowing-conversions)
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         const auto n{sn.to_size_t_limited()};
-                        LimitedVector vch = stack.stacktop(-n - 1);
+                        LimitedVector vch = stack.stacktop(-n - 1); //NOLINT(*-narrowing-conversions)
 
                         if (opcode == OP_ROLL) {
-                            stack.erase(- n - 1);
+                            stack.erase(- n - 1); //NOLINT(*-narrowing-conversions)
                         }
                         stack.push_back(std::move(vch));
                     } break;
@@ -1135,7 +1134,7 @@ std::optional<ScriptError> EvalScript(
                         stack.pop_back();
                         auto values{vch1.GetElement()};
 
-                        if(n >= values.size() * bits_per_byte)
+                        if(n >= values.size() * bits_per_byte) //NOLINT(*-narrowing-conversions)
                             fill(begin(values), end(values), 0);
                         else
                         {
@@ -1169,7 +1168,7 @@ std::optional<ScriptError> EvalScript(
                         stack.pop_back();
                         auto values{vch1.GetElement()};
 
-                        if(n >= values.size() * bits_per_byte)
+                        if(n >= values.size() * bits_per_byte) //NOLINT(*-narrowing-conversions)
                             fill(begin(values), end(values), 0);
                         else
                         {
@@ -1337,8 +1336,6 @@ std::optional<ScriptError> EvalScript(
                                 bn = (bn1 != bnZero || bn2 != bnZero);
                                 break;
                             case OP_NUMEQUAL:
-                                bn = (bn1 == bn2);
-                                break;
                             case OP_NUMEQUALVERIFY:
                                 bn = (bn1 == bn2);
                                 break;
@@ -1376,7 +1373,7 @@ std::optional<ScriptError> EvalScript(
                                 stack.pop_back();
                             else
                                 return SCRIPT_ERR_NUMEQUALVERIFY;
-                            
+
                         }
                     } break;
 
@@ -1522,6 +1519,7 @@ std::optional<ScriptError> EvalScript(
                         // initialize to max size of CScriptNum::MAXIMUM_ELEMENT_SIZE (4 bytes)
                         // because only 4 byte integers are supported by  OP_CHECKMULTISIG / OP_CHECKMULTISIGVERIFY
                         const int64_t
+                            //NOLINTNEXTLINE(*-narrowing-conversions)
                             nKeysCountSigned = CScriptNum(stack.stacktop(-i).GetElement(),
                                                           requireMinimal,
                                                           CScriptNum::MAXIMUM_ELEMENT_SIZE)
@@ -1548,6 +1546,7 @@ std::optional<ScriptError> EvalScript(
                             return SCRIPT_ERR_INVALID_STACK_OPERATION;
 
                         const int64_t
+                            //NOLINTNEXTLINE(*-narrowing-conversions)
                             nSigsCountSigned = CScriptNum(stack.stacktop(-i).GetElement(),
                                                           requireMinimal,
                                                           CScriptNum::MAXIMUM_ELEMENT_SIZE)
@@ -1578,7 +1577,9 @@ std::optional<ScriptError> EvalScript(
                         }
 
                         // Remove signature for pre-fork scripts
-                        for (uint64_t k = 0; k < nSigsCount; k++) {
+                        for (uint64_t k = 0; k < nSigsCount; k++)
+                        {
+                            //NOLINTNEXTLINE(*-narrowing-conversions)
                             LimitedVector &vchSig = stack.stacktop(-isig - k);
                             CleanupScriptCode(scriptCode, vchSig.GetElement(), flags);
                         }
@@ -1590,8 +1591,10 @@ std::optional<ScriptError> EvalScript(
                                 return {};
                             }
 
+                            //NOLINTBEGIN(*-narrowing-conversions)
                             LimitedVector &vchSig = stack.stacktop(-isig);
                             LimitedVector &vchPubKey = stack.stacktop(-ikey);
+                            //NOLINTEND(*-narrowing-conversions)
 
                             // Note how this makes the exact order of
                             // pubkey/signature evaluation distinguishable by
@@ -1712,15 +1715,17 @@ std::optional<ScriptError> EvalScript(
                         // Make sure the split point is apropriate.
                         const auto& top{stack.stacktop(-1).GetElement()};
                         const CScriptNum n{top, requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis};
-                        if(n < 0 || n > data.size())
+                        if(n < 0 || n > data.size()) //NOLINT(*-narrowing-conversions)
                             return SCRIPT_ERR_INVALID_SPLIT_RANGE;
 
                         const auto position{n.to_size_t_limited()};
 
                         // Prepare the results in their own buffer as `data`
                         // will be invalidated.
+                        //NOLINTBEGIN(*-narrowing-conversions)
                         valtype n1(data.begin(), data.begin() + position);
                         valtype n2(data.begin() + position, data.end());
+                        //NOLINTEND(*-narrowing-conversions)
 
                         stack.pop_back();
                         stack.pop_back();
@@ -1820,7 +1825,7 @@ std::optional<ScriptError> EvalScript(
         return SCRIPT_ERR_UNKNOWN_ERROR;
     }
 
-    if (!vfExec.empty()) {
+    if (!conditionals.empty()) {
         return SCRIPT_ERR_UNBALANCED_CONDITIONAL;
     }
 
@@ -1833,8 +1838,9 @@ namespace {
  * Wrapper that serializes like CTransaction, but with the modifications
  *  required for the signature hash done in-place
  */
-class CTransactionSignatureSerializer {
-private:
+class CTransactionSignatureSerializer
+{
+    // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
     //!< reference to the spending transaction (the one being serialized)
     const CTransaction &txTo;
     //!< output script being consumed
@@ -1843,6 +1849,7 @@ private:
     const unsigned int nIn;
     //!< container for hashtype flags
     const SigHashType sigHashType;
+    // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
 
 public:
     CTransactionSignatureSerializer(const CTransaction &txToIn,
@@ -1853,10 +1860,12 @@ public:
           sigHashType(sigHashTypeIn) {}
 
     /** Serialize the passed scriptCode, skipping OP_CODESEPARATORs */
-    template <typename S> void SerializeScriptCode(S &s) const {
+    template<typename S>
+    void SerializeScriptCode(S& s) const
+    {
         CScript::const_iterator it = scriptCode.begin();
         CScript::const_iterator itBegin = it;
-        opcodetype opcode;
+        opcodetype opcode; //NOLINT(cppcoreguidelines-init-variables)
         unsigned int nCodeSeparators = 0;
         while (scriptCode.GetOp(it, opcode)) {
             if (opcode == OP_CODESEPARATOR) {
@@ -1865,14 +1874,20 @@ public:
         }
         ::WriteCompactSize(s, scriptCode.size() - nCodeSeparators);
         it = itBegin;
-        while (scriptCode.GetOp(it, opcode)) {
-            if (opcode == OP_CODESEPARATOR) {
-                s.write((char *)&itBegin[0], it - itBegin - 1);
+        while(scriptCode.GetOp(it, opcode))
+        {
+            if(opcode == OP_CODESEPARATOR)
+            {
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
+                s.write((char*)&itBegin[0], it - itBegin - 1);
                 itBegin = it;
             }
         }
-        if (itBegin != scriptCode.end()) {
-            s.write((char *)&itBegin[0], it - itBegin);
+
+        if(itBegin != scriptCode.end())
+        {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
+            s.write((char*)&itBegin[0], it - itBegin);
         }
     }
 
@@ -1977,7 +1992,7 @@ std::optional<ScriptError> EvalScript(
 {
     LimitedStack altstack {stack.makeChildStack()};
     long ipc{0};
-    std::vector<bool> vfExec, vfElse;
+    conditional_tracker conditionals;
     return EvalScript(params,
                       token,
                       stack,
@@ -1987,8 +2002,7 @@ std::optional<ScriptError> EvalScript(
                       checker,
                       altstack,
                       ipc,
-                      vfExec,
-                      vfElse);
+                      conditionals);
 }
 
 } // namespace
@@ -2115,6 +2129,7 @@ bool TransactionSignatureChecker::VerifySignature(
     return pubkey.Verify(sighash, vchSig);
 }
 
+//NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 bool TransactionSignatureChecker::CheckSig(const std::vector<uint8_t>& vchSigIn,
                                            const std::vector<uint8_t>& vchPubKey,
                                            const CScript& scriptCode,

@@ -195,18 +195,17 @@ void getsafemodeinfo(const Config&,
     }
 }
 
-// clang-format off
-static const CRPCCommand commands[] = {
-    //  category            name                   actor (function)            okSafeMode
-    //  ------------ ----------------------------- --------------------------  ----------
-    { "safemode",    "ignoresafemodeforblock",     ignoresafemodeforblock,     true,  {"blockhash"} },
-    { "safemode",    "reconsidersafemodeforblock", reconsidersafemodeforblock, true,  {"blockhash"} },
-    { "safemode",    "getsafemodeinfo",            getsafemodeinfo,            true,  {} },
-};
-// clang-format on
+void RegisterSafeModeRPCCommands(CRPCTable& t)
+{
+    static const std::array<CRPCCommand, 3> commands //NOLINT(cert-err58-cpp)
+    {{
+        //  category            name                   actor (function)            okSafeMode
+        //  ------------ ----------------------------- --------------------------  ----------
+        { "safemode",    "ignoresafemodeforblock",     ignoresafemodeforblock,     true,  {"blockhash"} },
+        { "safemode",    "reconsidersafemodeforblock", reconsidersafemodeforblock, true,  {"blockhash"} },
+        { "safemode",    "getsafemodeinfo",            getsafemodeinfo,            true,  {} },
+    }};
 
-void RegisterSafeModeRPCCommands(CRPCTable &t) {
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++) {
-        t.appendCommand(commands[vcidx].name, &commands[vcidx]);
-    }
+    for(const auto& cmd : commands)
+        t.appendCommand(cmd.name, &cmd);
 }

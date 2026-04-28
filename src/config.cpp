@@ -16,9 +16,11 @@
 
 #include <boost/algorithm/string.hpp>
 #include <limits>
+#include <utility>
 
-GlobalConfig::GlobalConfig() {
-    Reset();
+GlobalConfig::GlobalConfig()
+{
+    GlobalConfig::Reset();
 }
 
 void GlobalConfig::Reset()
@@ -76,6 +78,7 @@ void GlobalConfig::Reset()
     data->mMaxMempool = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE;
     data->mMaxMempoolSizeDisk = data->mMaxMempool * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR;
     data->mMempoolMaxPercentCPFP = DEFAULT_MEMPOOL_MAX_PERCENT_CPFP;
+    //NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
     data->mMemPoolExpiry = DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
     data->mMaxOrphanTxSize = COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE;
     data->mMaxPercentageOfOrphansInMaxBatchSize = COrphanTxns::DEFAULT_MAX_PERCENTAGE_OF_ORPHANS_IN_BATCH;
@@ -117,6 +120,7 @@ void GlobalConfig::Reset()
     data->invalidChecksumFreq = DEFAULT_INVALID_CHECKSUM_FREQUENCY;
     data->feeFilter = DEFAULT_FEEFILTER;
     data->maxAddNodeConnections = DEFAULT_MAX_ADDNODE_CONNECTIONS;
+    data->maxRecvBuffer = DEFAULT_MAXRECEIVEBUFFER * ONE_KILOBYTE;
 
     // banclientua
     data->mBannedUAClients = DEFAULT_CLIENTUA_BAN_PATTERNS;
@@ -278,7 +282,7 @@ uint64_t GlobalConfig::GetMaxGeneratedBlockSize() const {
 uint64_t GlobalConfig::GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const {
     std::shared_lock<std::shared_mutex> lock{data->configMtx};
     CheckSetDefaultCalled();
-    uint64_t maxSize;
+    uint64_t maxSize{};
     if (!data->maxGeneratedBlockSizeOverridden) {
         maxSize = nMedianTimePast >= data->blockSizeActivationTime ? data->maxGeneratedBlockSizeAfter : data->maxGeneratedBlockSizeBefore;
     }
@@ -485,7 +489,7 @@ Config& GlobalConfig::GetConfig()
 ConfigInit& GlobalConfig::GetModifiableGlobalConfig() 
 {
     static Config& config = GlobalConfig::GetConfig();
-    return static_cast<ConfigInit&>(config);
+    return static_cast<ConfigInit&>(config); //NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
 }
 
 void GlobalConfig::SetTestBlockCandidateValidity(bool test) {
@@ -932,12 +936,12 @@ bool GlobalConfig::IsBlockInvalidated(const uint256& hash) const
     return data->mInvalidBlocks.find(hash) != data->mInvalidBlocks.end(); 
 }
 
-void GlobalConfig::SetBanClientUA(const std::set<std::string> uaClients)
+void GlobalConfig::SetBanClientUA(std::set<std::string> uaClients)
 {
     data->mBannedUAClients = std::move(uaClients);
 }
 
-void GlobalConfig::SetAllowClientUA(const std::set<std::string> uaClients)
+void GlobalConfig::SetAllowClientUA(std::set<std::string> uaClients)
 {
     data->mAllowedUAClients = std::move(uaClients);
 }
@@ -1086,7 +1090,7 @@ bool GlobalConfig::SetAssumeWhitelistedBlockDepth(int64_t depth, std::string* er
         return false;
     }
 
-    data->assumeWhitelistedBlockDepth = depth;
+    data->assumeWhitelistedBlockDepth = depth; //NOLINT(*-narrowing-conversions)
     return true;
 }
 
@@ -1117,7 +1121,7 @@ bool GlobalConfig::SetSafeModeWebhookURL(const std::string& url, std::string* er
         }
 
         data->safeModeWebhookAddress = host;
-        data->safeModeWebhookPort = port;
+        data->safeModeWebhookPort = port; //NOLINT(*-narrowing-conversions)
         data->safeModeWebhookPath = endpoint;
     }
     catch(const std::exception&)
@@ -1459,13 +1463,15 @@ bool GlobalConfig::SetDropMessageTest(int64_t val, std::string* err)
     data->dropMessageTest = static_cast<uint64_t>(val);
     return true;
 }
+
 bool GlobalConfig::DoDropMessageTest() const
 {
     return data->dropMessageTest.has_value();
 }
+
 uint64_t GlobalConfig::GetDropMessageTest() const
 {
-    return data->dropMessageTest.value();
+    return data->dropMessageTest.value(); //NOLINT(bugprone-unchecked-optional-access)
 }
 
 bool GlobalConfig::SetInvalidChecksumInterval(int64_t val, std::string* err)
@@ -1516,7 +1522,6 @@ bool GlobalConfig::GetFeeFilter() const
     return data->feeFilter;
 }
 
-
 bool GlobalConfig::SetMaxAddNodeConnections(int16_t max, std::string* err)
 {
     if(max < 0)
@@ -1534,6 +1539,25 @@ bool GlobalConfig::SetMaxAddNodeConnections(int16_t max, std::string* err)
 uint16_t GlobalConfig::GetMaxAddNodeConnections() const
 {
     return data->maxAddNodeConnections;
+}
+
+bool GlobalConfig::SetMaxRecvBuffer(int64_t max, std::string* err)
+{
+    if(max <= 0)
+    {
+        if(err)
+        {
+            *err = "Maximum P2P receive buffer size must be > 0";
+        }
+        return false;
+    }
+
+    data->maxRecvBuffer = static_cast<uint64_t>(max);
+    return true;
+}
+uint64_t GlobalConfig::GetMaxRecvBuffer() const
+{
+    return data->maxRecvBuffer;
 }
 
 
@@ -1737,7 +1761,7 @@ bool GlobalConfig::SetDoubleSpendEndpointSkipList(const std::string& skip, std::
 {
     // Split comma separated list of IPs and trim whitespace
     std::vector<std::string> ips {};
-    boost::split(ips, skip, boost::is_any_of(","));
+    boost::split(ips, skip, [](const char c){ return c == ','; });
     for(auto& ip : ips)
     {
         boost::algorithm::trim(ip);
@@ -1902,7 +1926,7 @@ bool GlobalConfig::SetDoubleSpendDetectedWebhookURL(const std::string& url, std:
         }
 
         data->dsDetectedWebhookAddress = host;
-        data->dsDetectedWebhookPort = port;
+        data->dsDetectedWebhookPort = port; //NOLINT(*-narrowing-conversions)
         data->dsDetectedWebhookPath = endpoint;
     }
     catch(const std::exception&)
@@ -2110,7 +2134,7 @@ bool GlobalConfig::SetMinerIdGeneratorURL(const std::string& url, std::string* e
         }
 
         data->minerIdGeneratorAddress = host;
-        data->minerIdGeneratorPort = port;
+        data->minerIdGeneratorPort = port; //NOLINT(*-narrowing-conversions)
         data->minerIdGeneratorPath = endpoint;
     }
     catch(const std::exception&)
@@ -2336,11 +2360,14 @@ uint64_t GlobalConfig::GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus)
     return data->scriptPolicysettings.GetMaxScriptSize(isGenesisEnabled, isConsensus);
 }
 
-bool GlobalConfig::SetMaxMempool(int64_t maxMempool, std::string* err) {
+bool GlobalConfig::SetMaxMempool(int64_t maxMempool, std::string* err)
+{
     if (LessThanZero(maxMempool, err, "Policy value for maximum resident memory pool must not be less than 0."))
     {
         return false;
     }
+
+    //NOLINTNEXTLINE(*-narrowing-conversions)
     if (maxMempool > 0 && maxMempool < DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE * 0.3)
     {
         if (err)
@@ -2447,7 +2474,9 @@ uint64_t GlobalConfig::GetMaxOrphansInBatchPercentage() const {
     return data->mMaxPercentageOfOrphansInMaxBatchSize;
 }
 
-bool GlobalConfig::SetMaxInputsForSecondLayerOrphan(uint64_t maxInputs, std::string* err) {
+bool GlobalConfig::SetMaxInputsForSecondLayerOrphan(uint64_t maxInputs, std::string* err)
+{
+    //NOLINTNEXTLINE(*-narrowing-conversions)
     if (LessThanZero(maxInputs, err, "Max inputs for out of first layer orphan txs must not be less than 0."))
     {
         return false;
@@ -2493,15 +2522,15 @@ bool GlobalConfig::IsSetPromiscuousMempoolFlags() const {
     return data->mIsSetPromiscuousMempoolFlags;
 }
 
-bool GlobalConfig::SetSoftConsensusFreezeDuration( std::int64_t duration, std::string* err )
+bool GlobalConfig::SetSoftConsensusFreezeDuration(std::int64_t duration, std::string* err)
 {
     if (LessThanZero(duration, err, "Soft consensus freeze cannot be configured with a negative value."))
     {
         return false;
     }
 
-    data->mSoftConsensusFreezeDuration =
-        duration ? duration : std::numeric_limits<std::int32_t>::max();
+    data->mSoftConsensusFreezeDuration = duration ? duration //NOLINT(*-narrowing-conversions)
+                                                  : std::numeric_limits<std::int32_t>::max();
 
     return true;
 }
@@ -2599,6 +2628,6 @@ std::shared_ptr<GlobalConfig::GlobalConfigData> GlobalConfig::getGlobalConfigDat
 }
 
 GlobalConfig::GlobalConfig(std::shared_ptr<GlobalConfigData> dataIn)
-  : data{dataIn}
+  : data{std::move(dataIn)}
 {
 }

@@ -122,6 +122,7 @@ template <typename T>
 void HexStr(const T itbegin, const T itend, CTextWriter& writer, bool fSpaces = false)
 {
     writer.ReserveAdditional((itend - itbegin) * (fSpaces ? 3 : 2));
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     for (T it = itbegin; it < itend; ++it)
     {
         // NOLINTNEXTLINE(clang-analyzer-core.uninitialized.Assign)

@@ -259,8 +259,20 @@ void MinerIdDatabase::ProcessRevokemidMessage(const RevokeMid& msg)
                     " contains wrong revocation key " + HexStr(msg.GetRevocationKey()));
             }
 
+            // Check revocation message from the message exists in the miners history
+            std::vector<MinerIdEntry> minerIds { GetMinerIdsForMinerNL(minerIdEntry->mUUId) };
+            if(const auto it = std::ranges::find_if(minerIds, [&msg](const MinerIdEntry& entry)
+                {
+                    return entry.mPubKey == msg.GetRevocationMessage();
+                });
+                it == minerIds.end())
+            {
+                throw std::runtime_error("Revokemid for miner ID " + HexStr(msg.GetMinerId()) +
+                    " contains unknown revocation message " + HexStr(msg.GetRevocationMessage()));
+            }
+
             // Revoke IDs back to the one given in the revocation message
-            for(auto& minerId : GetMinerIdsForMinerNL(minerIdEntry->mUUId))
+            for(auto& minerId : minerIds)
             {
                 minerId.mState = MinerIdEntry::State::REVOKED;
                 UpdateMinerIdInDatabaseNL(minerId.mPubKey.GetHash(), minerId);

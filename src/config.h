@@ -137,6 +137,7 @@ public:
     virtual unsigned int GetInvalidChecksumFreq() const = 0;
     virtual bool GetFeeFilter() const = 0;
     virtual uint16_t GetMaxAddNodeConnections() const = 0;
+    virtual uint64_t GetMaxRecvBuffer() const = 0;
 
     // RPC parameters
     virtual uint64_t GetWebhookClientNumThreads() const = 0;
@@ -317,6 +318,7 @@ public:
     virtual bool SetInvalidChecksumFreq(int64_t val, std::string* err = nullptr) = 0;
     virtual bool SetFeeFilter(bool feefilter, std::string* err = nullptr) = 0;
     virtual bool SetMaxAddNodeConnections(int16_t max, std::string* err = nullptr) = 0;
+    virtual bool SetMaxRecvBuffer(int64_t max, std::string* err = nullptr) = 0;
 
     // RPC parameters
     virtual bool SetWebhookClientNumThreads(int64_t num, std::string* err) = 0;
@@ -669,6 +671,8 @@ public:
     bool GetFeeFilter() const override;
     bool SetMaxAddNodeConnections(int16_t max, std::string* err = nullptr) override;
     uint16_t GetMaxAddNodeConnections() const override;
+    bool SetMaxRecvBuffer(int64_t max, std::string* err = nullptr) override;
+    uint64_t GetMaxRecvBuffer() const override;
 
     // RPC parameters
     bool SetWebhookClientNumThreads(int64_t num, std::string* err) override;
@@ -786,10 +790,11 @@ public:
 private:
     void  CheckSetDefaultCalled() const;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     struct GlobalConfigData  //NOLINT(clang-analyzer-optin.performance.Padding)
     {
     private: friend class GlobalConfig;
-        // All fields are initialized in Reset()    
+        // All fields are initialized in Reset()
         CFeeRate feePerKB;
         CFeeRate dustRelayFee{DUST_RELAY_TX_FEE};
         int64_t dustLimitFactor;
@@ -901,6 +906,7 @@ private:
         unsigned int invalidChecksumFreq;
         bool feeFilter;
         uint16_t maxAddNodeConnections;
+        uint64_t maxRecvBuffer;
 
         // RPC parameters
         uint64_t webhookClientNumThreads;

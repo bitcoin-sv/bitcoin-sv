@@ -89,6 +89,7 @@ std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const C
         std::unique_lock<std::mutex> lock { mMtx };
 
         // Get our best block even if the background thread hasn't run for a while
+        // NOLINTNEXTLINE(*-narrowing-conversions)
         uint64_t maxTxns { mNewBlockFill? std::numeric_limits<uint64_t>::max() : static_cast<uint64_t>(mMaxSlotTransactions.load() * 1.5) };
         updateBlock(pindexPrevNew, maxTxns);
         // Copy our current transactions into the block
@@ -338,6 +339,7 @@ JournalingBlockAssembler::AddTransactionResult JournalingBlockAssembler::addTran
     // from this group we're about to add to be non-selfish.
     if(mEnteredThrottling)
     {
+        //NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         if(mGroupBuilder.GetGroup(groupID.value()).IsSelfish(mConfig))
         {
             // All txns are selfish in this group, skip it
@@ -347,6 +349,7 @@ JournalingBlockAssembler::AddTransactionResult JournalingBlockAssembler::addTran
 
     // Try to add all txns from the group we have ended up with
     size_t numAdded {0};
+    //NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     for(const auto& txn : mGroupBuilder.GetGroup(groupID.value()))
     {
         AddTransactionResult res { addTransaction(pindex, maxBlockSizeComputed, txn) };
@@ -361,6 +364,7 @@ JournalingBlockAssembler::AddTransactionResult JournalingBlockAssembler::addTran
 
     // Commit group
     checkpoint.commit();
+    //NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     mGroupBuilder.RemoveGroup(groupID.value());
 
     // Return success with number of txns added

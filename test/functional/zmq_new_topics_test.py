@@ -33,6 +33,8 @@ from test_framework.util import (assert_equal,
 class ZMQNewTopicsTest (BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
+        self.zmqContext = None
+        self.zmqSubSocket = None
 
     def setup_nodes(self):
         # Check that bitcoin has been built with ZMQ enabled and we have python zmq package installed.

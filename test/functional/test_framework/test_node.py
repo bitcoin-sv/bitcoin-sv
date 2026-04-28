@@ -22,6 +22,7 @@ from .util import (
     wait_until,
 )
 from .authproxy import JSONRPCException
+from .static_attributes import StaticAttrsMeta
 
 BITCOIND_PROC_WAIT_TIMEOUT = 120
 
@@ -30,7 +31,7 @@ BITCOIND_PROC_WAIT_TIMEOUT = 120
 TestNode_process_list = []
 
 
-class TestNode():
+class TestNode(metaclass=StaticAttrsMeta):
     """A class for representing a bitcoind node under test.
 
     This class contains:
@@ -40,7 +41,9 @@ class TestNode():
     - an RPC connection to the node
 
     To make things easier for the test writer, a bit of magic is happening under the covers.
-    Any unrecognised messages will be dispatched to the RPC connection."""
+    Any unrecognised messages will be dispatched to the RPC connection.
+
+    Note: Uses StaticAttrsMeta to catch attribute typos (e.g., 'proces' instead of 'process')."""
 
     def __init__(self, i, dirname, extra_args, rpchost, timewait, binary, stderr, mocktime, coverage_dir):
         self.index = i

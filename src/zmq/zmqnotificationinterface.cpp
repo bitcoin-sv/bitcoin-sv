@@ -17,16 +17,16 @@ void zmqError(const char *str) {
 }
 
 CZMQNotificationInterface::CZMQNotificationInterface() :
-    pcontext(nullptr),
     zmqPublisher(std::make_shared<CZMQPublisher>())
 {}
 
-CZMQNotificationInterface::~CZMQNotificationInterface() {
+CZMQNotificationInterface::~CZMQNotificationInterface()
+{
     Shutdown();
 
-    for (std::list<CZMQAbstractNotifier *>::iterator i = notifiers.begin();
-         i != notifiers.end(); ++i) {
-        delete *i;
+    for(auto i : notifiers)
+    {
+        delete i; // NOLINT(cppcoreguidelines-owning-memory)
     }
 }
 
@@ -179,15 +179,19 @@ void CZMQNotificationInterface::UpdatedBlockTip(const CBlockIndex *pindexNew,
     // In IBD or blocks were disconnected without any new ones
     if (fInitialDownload || pindexNew == pindexFork) return;
 
-    for (std::list<CZMQAbstractNotifier *>::iterator i = notifiers.begin();
-         i != notifiers.end();) {
-        CZMQAbstractNotifier *notifier = *i;
-        if (notifier->NotifyBlock(pindexNew)) {
+    for(std::list<CZMQAbstractNotifier *>::iterator i = notifiers.begin();
+         i != notifiers.end();)
+    {
+        CZMQAbstractNotifier* notifier = *i;
+        if(notifier->NotifyBlock(pindexNew))
+        {
             ++i;
-        } else {
+        }
+        else
+        {
             notifier->Shutdown();
             i = notifiers.erase(i);
-            delete notifier;
+            delete notifier; //NOLINT(cppcoreguidelines-owning-memory)
         }
     }
 }
@@ -205,33 +209,37 @@ void CZMQNotificationInterface::InvalidTxMessageZMQ(std::string_view message)
         {
             notifier->Shutdown();
             i = notifiers.erase(i);
-            delete notifier;
+            delete notifier; //NOLINT(cppcoreguidelines-owning-memory)
         }
     }
 }
 
-void CZMQNotificationInterface::TransactionAddedToMempool(
-    const CTransactionRef &ptx) {
+void CZMQNotificationInterface::TransactionAddedToMempool(const CTransactionRef& ptx) 
+{
     // Used by BlockConnected and BlockDisconnected as well, because they're all
     // the same external callback.
     const CTransaction &tx = *ptx;
 
     for (std::list<CZMQAbstractNotifier *>::iterator i = notifiers.begin();
-         i != notifiers.end();) {
+         i != notifiers.end();)
+    {
         CZMQAbstractNotifier *notifier = *i;
-        if (notifier->NotifyTransaction(tx)) {
+        if(notifier->NotifyTransaction(tx))
+        {
             ++i;
-        } else {
+        }
+        else
+        {
             notifier->Shutdown();
             i = notifiers.erase(i);
-            delete notifier;
+            delete notifier; //NOLINT(cppcoreguidelines-owning-memory)
         }
     }
 }
 
 
 void CZMQNotificationInterface::TransactionRemovedFromMempool(const uint256& txid, MemPoolRemovalReason reason, 
-                                                            const CTransactionConflict& conflictedWith)
+                                                              const CTransactionConflict& conflictedWith)
 {
 
     for (auto i = notifiers.begin(); i != notifiers.end();)
@@ -245,7 +253,7 @@ void CZMQNotificationInterface::TransactionRemovedFromMempool(const uint256& txi
         {
             notifier->Shutdown();
             i = notifiers.erase(i);
-            delete notifier;
+            delete notifier; // NOLINT(cppcoreguidelines-owning-memory)
         }
     }
 }
@@ -263,7 +271,7 @@ void CZMQNotificationInterface::TransactionRemovedFromMempoolBlock(const uint256
         {
             notifier->Shutdown();
             i = notifiers.erase(i);
-            delete notifier;
+            delete notifier; //NOLINT(cppcoreguidelines-owning-memory)
         }
     }
 }
@@ -284,7 +292,7 @@ void CZMQNotificationInterface::TransactionAdded(const CTransactionRef& ptx)
         {
             notifier->Shutdown();
             i = notifiers.erase(i);
-            delete notifier;
+            delete notifier; //NOLINT(cppcoreguidelines-owning-memory)
         }
     }
 }
@@ -328,7 +336,7 @@ void CZMQNotificationInterface::BlockConnected2(
         {
             notifier->Shutdown();
             i = notifiers.erase(i);
-            delete notifier;
+            delete notifier; //NOLINT(cppcoreguidelines-owning-memory)
         }
     }
 }

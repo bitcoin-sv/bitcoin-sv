@@ -84,8 +84,10 @@ unsigned int CScriptCompressor::GetSpecialSize(unsigned int nSize) const {
 }
 
 bool CScriptCompressor::Decompress(unsigned int nSize,
-                                   const std::vector<uint8_t> &in) {
-    switch (nSize) {
+                                   const std::vector<uint8_t>& in)
+{
+    switch(nSize)
+    {
         case 0x00:
             script.resize(25);
             script[0] = OP_DUP;
@@ -112,10 +114,11 @@ bool CScriptCompressor::Decompress(unsigned int nSize,
             return true;
         case 0x04:
         case 0x05:
-            uint8_t vch[33] = {};
+        {
+            std::array<uint8_t, 33> vch{};
             vch[0] = nSize - 2;
             memcpy(&vch[1], &in[0], 32);
-            CPubKey pubkey(&vch[0], &vch[33]);
+            CPubKey pubkey(vch.begin(), vch.end());
             if (!pubkey.Decompress()) return false;
             assert(pubkey.size() == 65);
             script.resize(67);
@@ -123,8 +126,10 @@ bool CScriptCompressor::Decompress(unsigned int nSize,
             memcpy(&script[1], pubkey.begin(), 65);
             script[66] = OP_CHECKSIG;
             return true;
+        }
+        default:
+            return false;
     }
-    return false;
 }
 
 // Amount compression:
@@ -150,7 +155,7 @@ uint64_t CTxOutCompressor::CompressAmount(Amount amt) {
         e++;
     }
     if (e < 9) {
-        int d = (n % 10);
+        int d = (n % 10); //NOLINT(*-narrowing-conversions)
         assert(d >= 1 && d <= 9);
         n /= 10;
         return 1 + (n * 9 + d - 1) * 10 + e;
@@ -166,12 +171,12 @@ Amount CTxOutCompressor::DecompressAmount(uint64_t x) {
     }
     x--;
     // x = 10*(9*n + d - 1) + e
-    int e = x % 10;
+    int e = x % 10; //NOLINT(*-narrowing-conversions)
     x /= 10;
     uint64_t n = 0;
     if (e < 9) {
         // x = 9*n + d - 1
-        int d = (x % 9) + 1;
+        int d = (x % 9) + 1; //NOLINT(*-narrowing-conversions)
         x /= 9;
         // x = n
         n = x * 10 + d;

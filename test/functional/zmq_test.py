@@ -15,6 +15,8 @@ from test_framework.util import (assert_equal, bytes_to_hex_str,
 class ZMQTest (BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
+        self.zmqContext = None
+        self.zmqSubSocket = None
 
     def setup_nodes(self):
 

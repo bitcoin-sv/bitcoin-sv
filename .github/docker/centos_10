@@ -9,27 +9,19 @@ RUN set -xeu \
     && dnf install -y 'dnf-command(config-manager)' \
     && dnf config-manager -y --set-enabled crb \
     && dnf install -y \
-    epel-release \
     gcc-c++ make which autoconf automake libtool \
     openssl-devel libevent-devel \
     boost-devel \
+    python3 python3-pip \
     git \
+    curl \
+    epel-release \
     && dnf install -y \
+    miniupnpc-devel \
     libdb-cxx-devel \
     cppzmq-devel \
-    python3 python3-pip \
     sysbench \
     gperftools-devel \
-    curl \
-    && curl -L https://miniupnp.free.fr/files/miniupnpc-2.2.5.tar.gz -o miniupnpc-2.2.5.tar.gz \
-    && echo "38acd5f4602f7cf8bcdc1ec30b2d58db2e9912e5d9f5350dd99b06bfdffb517c miniupnpc-2.2.5.tar.gz" | sha256sum -c \
-    && tar xzf miniupnpc-2.2.5.tar.gz \
-    && cd miniupnpc-2.2.5 \
-    && make \
-    && make install \
-    && cd .. \
-    && rm -rf miniupnpc-2.2.5 miniupnpc-2.2.5.tar.gz \
-    && ldconfig \
     && pip install --no-cache-dir bip32utils ecdsa pyzmq \
     && dnf clean all -y \
     && rm -rf /var/cache/dnf /var/log/dnf* /tmp/* /var/tmp/* /root/.cache

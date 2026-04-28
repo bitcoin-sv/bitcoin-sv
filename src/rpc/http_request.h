@@ -68,7 +68,7 @@ class HTTPRequest
     static HTTPRequest CreateJSONPostRequest(const RPCClientConfig& config, const UniValue& json);
 
     // Factory method to make a generic JSON POST request
-    static HTTPRequest CreateJSONPostRequest(const RPCClientConfig& config, const std::string contents);
+    static HTTPRequest CreateJSONPostRequest(const RPCClientConfig& config, const std::string& contents);
 
     // Factory method to make a query request to a double-spend endpoint
     static HTTPRequest CreateDSEndpointQueryRequest(const RPCClientConfig& config, const std::string& txid);

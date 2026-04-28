@@ -14,6 +14,7 @@
 #include "utilstrencodings.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -234,10 +235,17 @@ void TestAES256CBC(const std::string &hexkey, const std::string &hexiv,
     }
 }
 
-void TestChaCha20(const std::string &hexkey, uint64_t nonce, uint64_t seek,
-                  const std::string &hexout) {
+void TestChaCha20(const std::string& hexkey,
+                  uint64_t nonce,
+                  uint64_t seek,
+                  const std::string& hexout)
+{
     std::vector<uint8_t> key = ParseHex(hexkey);
-    ChaCha20 rng(key);
+    BOOST_REQUIRE_EQUAL(key.size(), 32u);
+    std::array<uint8_t, 32> key32; // NOLINT(cppcoreguidelines-pro-type-member-init)
+    std::copy_n(key.begin(), 32, key32.begin());
+    ChaCha20 rng;
+    rng.SetKey(key32);
     rng.SetIV(nonce);
     rng.Seek(seek);
     std::vector<uint8_t> out = ParseHex(hexout);

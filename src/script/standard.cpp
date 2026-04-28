@@ -111,7 +111,7 @@ bool Solver(
         const CScript &script2 = tp_script;
         vSolutionsRet.clear();
 
-        opcodetype opcode1, opcode2;
+        opcodetype opcode1, opcode2; //NOLINT(cppcoreguidelines-init-variables)
         std::vector<uint8_t> vch1, vch2;
 
         // Compare
@@ -201,7 +201,7 @@ bool Solver(
 bool ExtractDestination(const CScript &scriptPubKey, ProtocolEra era, CTxDestination &addressRet)
 {
     std::vector<valtype> vSolutions;
-    txnouttype whichType;
+    txnouttype whichType; //NOLINT(cppcoreguidelines-init-variables)
     if (!Solver(scriptPubKey, era, whichType, vSolutions)) {
         return false;
     }
@@ -269,13 +269,16 @@ bool ExtractDestinations(const CScript &scriptPubKey, ProtocolEra era, txnouttyp
     return true;
 }
 
-namespace {
-class CScriptVisitor : public boost::static_visitor<bool> {
-private:
+namespace
+{
+
+class CScriptVisitor : public boost::static_visitor<bool>
+{
     CScript *script;
 
 public:
-    CScriptVisitor(CScript *scriptin) { script = scriptin; }
+    CScriptVisitor(CScript* scriptin):script{scriptin}
+    {}
 
     bool operator()(const CNoDestination& /*dest*/) const {
         script->clear();
@@ -373,13 +376,14 @@ bool IsStandardOutput(const ConfigScriptPolicy &scriptPolicy, const CScript &scr
 std::optional<bool> IsInputStandard(
     const task::CCancellationToken& token,
     const eval_script_params& params,
+    //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     const CScript& scriptSig,
     const CScript& prevScript,
     ProtocolEra utxoEra,
     uint32_t flags)
 {
     std::vector<std::vector<uint8_t>> vSolutions;
-    txnouttype whichType;
+    txnouttype whichType; //NOLINT(cppcoreguidelines-init-variables)
 
     if (!Solver(prevScript, utxoEra, whichType, vSolutions)) {
         return false;
@@ -409,8 +413,8 @@ std::optional<bool> IsInputStandard(
             return false;
 
         // Active release is set to PreGenesis, because TX_SCRIPTHASH is not supported after genesis
-        bool sigOpCountError;
         CScript subscript(stack.back().begin(), stack.back().end());
+        bool sigOpCountError; //NOLINT(cppcoreguidelines-init-variables)
         uint64_t nSigOpCount = subscript.GetSigOpCount(true, ProtocolEra::PreGenesis, sigOpCountError);
         if (sigOpCountError || nSigOpCount > MAX_P2SH_SIGOPS) {
             return false;
@@ -422,12 +426,17 @@ std::optional<bool> IsInputStandard(
 
 bool IsStandardTx(const ConfigScriptPolicy &scriptPolicy, const CTransaction &tx, int32_t nHeight, std::string &reason)
 {
-    if (tx.nVersion > CTransaction::MAX_STANDARD_VERSION || tx.nVersion < 1) {
-        reason = "version";
-        return false;
-    }
-
     ProtocolEra era { GetProtocolEra(scriptPolicy, nHeight) };
+
+    if (!IsProtocolActive(era, ProtocolName::Chronicle))
+    {
+        if (tx.nVersion > CTransaction::PRE_CHRONICLE_MAX_STANDARD_VERSION ||
+            tx.nVersion < CTransaction::PRE_CHRONICLE_MIN_STANDARD_VERSION)
+        {
+            reason = "version";
+            return false;
+        }
+    }
 
     // Extremely large transactions with lots of inputs can cost the network
     // almost as much to process as they cost the sender in fees, because
@@ -450,14 +459,14 @@ bool IsStandardTx(const ConfigScriptPolicy &scriptPolicy, const CTransaction &tx
             reason = "scriptsig-size";
             return false;
         }
-        if (!txin.scriptSig.IsPushOnly()) {
+        if (!IsProtocolActive(era, ProtocolName::Chronicle) && !txin.scriptSig.IsPushOnly()) {
             reason = "scriptsig-not-pushonly";
             return false;
         }
     }
 
     unsigned int nDataSize = 0;
-    txnouttype whichType;
+    txnouttype whichType; //NOLINT(cppcoreguidelines-init-variables)
     bool scriptpubkey = false;
     for (const CTxOut &txout : tx.vout) {
         if (!::IsStandardOutput(scriptPolicy, txout.scriptPubKey, nHeight, whichType)) {

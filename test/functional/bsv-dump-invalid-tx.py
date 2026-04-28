@@ -77,6 +77,8 @@ class InvalidTx(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 1
+        self.zmqSubSocket = None
+        self.address = None
 
     def setup_network(self):
         self.setup_nodes()
@@ -89,8 +91,8 @@ class InvalidTx(BitcoinTestFramework):
         # import zmq when we know we have the requirements for test with zmq.
         import zmq
 
-        self.zmqContext = zmq.Context()
-        self.zmqSubSocket = self.zmqContext.socket(zmq.SUB)
+        zmqContext = zmq.Context()
+        self.zmqSubSocket = zmqContext.socket(zmq.SUB)
         self.zmqSubSocket.set(zmq.RCVTIMEO, 60000)
         self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, b"invalidtx")
         self.address = f"tcp://127.0.0.1:{zmq_port(0)}"

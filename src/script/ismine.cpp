@@ -41,10 +41,11 @@ isminetype IsMine(const CKeyStore &keystore, const CTxDestination &dest,
     return IsMine(keystore, script, isInvalid);
 }
 
-isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey,
-                  bool &isInvalid) {
+isminetype IsMine(const CKeyStore& keystore, const CScript& scriptPubKey, bool& isInvalid)
+{
     std::vector<valtype> vSolutions;
-    txnouttype whichType;
+    txnouttype whichType; //NOLINT(cppcoreguidelines-init-variables)
+    
     // We will assume that the utxo is before genesis if it is P2SH because we still want to recognize 
     // P2SH scripts as ours and we don't have utxo height here.
     ProtocolEra utxoEra { IsP2SH(scriptPubKey)? ProtocolEra::PreGenesis : ProtocolEra::PostGenesis };
@@ -85,8 +86,8 @@ isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey,
             // spend-out-from-under-you attacks, especially in shared-wallet
             // situations.
             std::vector<valtype> keys(vSolutions.begin() + 1,
-                                      vSolutions.begin() + vSolutions.size() -
-                                          1);
+                                      //NOLINTNEXTLINE(*-narrowing-conversions)
+                                      vSolutions.begin() + vSolutions.size() - 1);
             if (HaveKeys(keys, keystore) == keys.size())
                 return ISMINE_SPENDABLE;
             break;

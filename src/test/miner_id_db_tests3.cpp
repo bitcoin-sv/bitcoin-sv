@@ -1966,6 +1966,25 @@ BOOST_FIXTURE_TEST_CASE(RevokemidRevocation, SetupMinerIDChain)
         BOOST_CHECK_EQUAL(o->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
     }
 
+    // Send a revokemid message that attempts to revoke back to an unknown miner ID
+    CKey unknownID {};
+    unknownID.MakeNewKey(true);
+    revokemidMsg = { miner1V3Fields.revocationKey, miner1IdKey2, unknownID.GetPubKey() };
+    BOOST_CHECK_THROW(minerid_db.ProcessRevokemidMessage(revokemidMsg), std::runtime_error);
+    {
+        // No change to the state of miner 1's IDs
+        BOOST_CHECK_EQUAL(UnitTestAccessMinerIdTests3::GetMinerIdsForMinerByName(minerid_db, mapBlockIndex, "Miner1").size(), 3U);
+        const auto& miner1Key1Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey1.GetHash()) };
+        const auto& miner1Key2Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, miner1IdPubKey2.GetHash()) };
+        const auto& miner1Key3Details { UnitTestAccessMinerIdTests3::GetMinerIdEntry(minerid_db, key3.GetPubKey().GetHash()) };
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key1Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsRotated(miner1Key2Details));
+        BOOST_CHECK(UnitTestAccessMinerIdTests3::MinerIdIsCurrent(miner1Key3Details));
+        const auto o{miner1Key1Details.mNextMinerId};
+        assert(o);
+        BOOST_CHECK_EQUAL(o->GetHash().ToString(), miner1IdPubKey2.GetHash().ToString());
+    }
+
     // Perform a partial revocation of key2 (and key3) via a revokemid msg
     revokemidMsg = { miner1V3Fields.revocationKey, miner1IdKey2, miner1IdPubKey2 };
     BOOST_CHECK_NO_THROW(minerid_db.ProcessRevokemidMessage(revokemidMsg));

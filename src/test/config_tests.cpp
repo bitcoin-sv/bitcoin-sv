@@ -860,4 +860,30 @@ BOOST_AUTO_TEST_CASE(mempool_sync_config)
     BOOST_CHECK(!config.SetMempoolSyncPeriod(-1, &err));
 }
 
+BOOST_AUTO_TEST_CASE(require_standard)
+{
+    GlobalConfig config {};
+
+    for(const auto& networkType : {CBaseChainParams::MAIN,
+                                   CBaseChainParams::TESTNET,
+                                   CBaseChainParams::REGTEST,
+                                   CBaseChainParams::STN})
+    {
+        config.Reset();
+        SelectParams(networkType);
+
+        // Mainnet defaults to requiring standard; others do not
+        const bool expectedDefault = (networkType == CBaseChainParams::MAIN);
+        BOOST_CHECK_EQUAL(Params().RequireStandard(), expectedDefault);
+
+        // Can set requireStandard to false on ALL chains (including mainnet)
+        config.SetRequireStandard(false);
+        BOOST_CHECK_EQUAL(config.GetConfigScriptPolicy().GetRequireStandard(), false);
+
+        // Can set it back to true
+        config.SetRequireStandard(true);
+        BOOST_CHECK_EQUAL(config.GetConfigScriptPolicy().GetRequireStandard(), true);
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -355,7 +355,7 @@ static UniValue disconnectnode(const Config&, const JSONRPCRequest& request)
             "Error: Peer-to-peer functionality missing or disabled");
     }
 
-    bool success;
+    bool success{};
     const UniValue &address_arg = request.params[0];
     const UniValue &id_arg =
         request.params.size() < 2 ? NullUniValue : request.params[1];
@@ -706,7 +706,7 @@ static UniValue setban(const Config&, const JSONRPCRequest& request)
     CNetAddr netAddr;
     bool isSubnet = false;
 
-    if (request.params[0].get_str().find("/") != std::string::npos) {
+    if (request.params[0].get_str().find('/') != std::string::npos) {
         isSubnet = true;
     }
 
@@ -880,28 +880,29 @@ static UniValue getauthconninfo(const Config&, const JSONRPCRequest& request)
     return obj;
 }
 
-// clang-format off
-static const CRPCCommand commands[] = {
-    //  category            name                      actor (function)        okSafeMode
-    //  ------------------- ------------------------  ----------------------  ----------
-    { "network",            "getconnectioncount",     getconnectioncount,     true,  {} },
-    { "network",            "ping",                   ping,                   true,  {} },
-    { "network",            "getpeerinfo",            getpeerinfo,            true,  {} },
-    { "network",            "addnode",                addnode,                true,  {"node","command"} },
-    { "network",            "disconnectnode",         disconnectnode,         true,  {"address", "nodeid"} },
-    { "network",            "getaddednodeinfo",       getaddednodeinfo,       true,  {"node"} },
-    { "network",            "getnettotals",           getnettotals,           true,  {} },
-    { "network",            "getnetworkinfo",         getnetworkinfo,         true,  {} },
-    { "network",            "setban",                 setban,                 true,  {"subnet", "command", "bantime", "absolute"} },
-    { "network",            "listbanned",             listbanned,             true,  {} },
-    { "network",            "clearbanned",            clearbanned,            true,  {} },
-    { "network",            "setnetworkactive",       setnetworkactive,       true,  {"state"} },
-    { "network",            "settxnpropagationfreq",  settxnpropagationfreq,  true,  {"freq"} },
-    { "network",            "getauthconninfo",        getauthconninfo,        true,  {} },
-};
-// clang-format on
+void RegisterNetRPCCommands(CRPCTable& t)
+{
+    static const std::array<CRPCCommand, 14> commands
+    {{
+        //  category            name                      actor (function)        okSafeMode
+        //  ------------------- ------------------------  ----------------------  ----------
+        { "network",            "getconnectioncount",     getconnectioncount,     true,  {} },
+        { "network",            "ping",                   ping,                   true,  {} },
+        { "network",            "getpeerinfo",            getpeerinfo,            true,  {} },
+        { "network",            "addnode",                addnode,                true,  {"node","command"} },
+        { "network",            "disconnectnode",         disconnectnode,         true,  {"address", "nodeid"} },
+        { "network",            "getaddednodeinfo",       getaddednodeinfo,       true,  {"node"} },
+        { "network",            "getnettotals",           getnettotals,           true,  {} },
+        { "network",            "getnetworkinfo",         getnetworkinfo,         true,  {} },
+        { "network",            "setban",                 setban,                 true,  {"subnet", "command", "bantime", "absolute"} },
+        { "network",            "listbanned",             listbanned,             true,  {} },
+        { "network",            "clearbanned",            clearbanned,            true,  {} },
+        { "network",            "setnetworkactive",       setnetworkactive,       true,  {"state"} },
+        { "network",            "settxnpropagationfreq",  settxnpropagationfreq,  true,  {"freq"} },
+        { "network",            "getauthconninfo",        getauthconninfo,        true,  {} },
+    }};
 
-void RegisterNetRPCCommands(CRPCTable &t) {
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
-        t.appendCommand(commands[vcidx].name, &commands[vcidx]);
+    for(const auto& cmd : commands)
+        t.appendCommand(cmd.name, &cmd);
 }
+

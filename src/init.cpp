@@ -32,6 +32,7 @@
 #include "miner_id/miner_id_db.h"
 #include "miner_id/miner_id_db_defaults.h"
 #include "mining/journaling_block_assembler.h"
+#include "net/disk_backed_parser.h"
 #include "net/net.h"
 #include "net/net_processing.h"
 #include "net/netbase.h"
@@ -212,6 +213,12 @@ void Shutdown() {
         g_connman.reset();
     }
     peerLogic.reset();
+
+    // Cleanup P2P temporary message directory
+    if (fs::exists(g_p2p_recv_tmp_dir)) {
+        fs::remove_all(g_p2p_recv_tmp_dir);
+        LogPrintf("Removed P2P temporary message directory\n");
+    }
 
     // must be called after g_connman shutdown as conman threads could still be
     // using it before that
@@ -1028,9 +1035,8 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strUsage += HelpMessageOpt(
             "-acceptnonstdtxn",
             strprintf(
-                "Relay and mine \"non-standard\" transactions (%sdefault: %u)",
-                "testnet/regtest only; ",
-                defaultChainParams->RequireStandard()));
+                "Relay and mine \"non-standard\" transactions (default: %u)",
+                !defaultChainParams->RequireStandard()));
         strUsage += HelpMessageOpt(
                 "-mindebugrejectionfee",
                 strprintf(
@@ -2591,6 +2597,9 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     if(std::string err; !config.SetFeeFilter(gArgs.GetBoolArg("-feefilter", DEFAULT_FEEFILTER), &err)) {
         return InitError(err);
     }
+    if(std::string err; !config.SetMaxRecvBuffer(gArgs.GetArgAsBytes("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER, ONE_KILOBYTE), &err)) {
+        return InitError(err);
+    }
 
     // RPC parameters
     if(std::string err; !config.SetWebhookClientNumThreads(gArgs.GetArg("-rpcwebhookclientnumthreads", rpc::client::WebhookClientDefaults::DEFAULT_NUM_THREADS), &err)) {
@@ -2991,10 +3000,6 @@ bool AppInitParameterInteraction(ConfigInit &config) {
 
     bool requireStandard =
         !gArgs.GetBoolArg("-acceptnonstdtxn", !chainparams.RequireStandard());
-    if (chainparams.RequireStandard() && !requireStandard)
-        return InitError(
-            strprintf("acceptnonstdtxn is not currently supported for %s chain",
-                      chainparams.NetworkIDString()));
     config.SetRequireStandard(requireStandard);
 
     config.SetAcceptNonStandardOutput(
@@ -3429,6 +3434,14 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     // until the very end ("start node") as the UTXO/block state
     // is not yet setup and may end up being set up twice if we
     // need to reindex later.
+
+    // Initialize P2P message temporary storage directory
+    g_p2p_recv_tmp_dir = GetDataDir() / "p2p_recv_tmp";
+    if (fs::exists(g_p2p_recv_tmp_dir)) {
+        fs::remove_all(g_p2p_recv_tmp_dir);
+    }
+    fs::create_directories(g_p2p_recv_tmp_dir);
+    LogPrintf("Created P2P message temporary storage: %s\n", g_p2p_recv_tmp_dir.string());
 
     assert(!g_connman);
     {
@@ -3961,8 +3974,7 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     connOptions.uiInterface = &uiInterface;
     connOptions.nSendBufferMaxSize =
         gArgs.GetArgAsBytes("-maxsendbuffer", DEFAULT_MAXSENDBUFFER, ONE_KILOBYTE);
-    connOptions.nReceiveFloodSize =
-        gArgs.GetArgAsBytes("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER, ONE_KILOBYTE);
+    connOptions.nReceiveFloodSize = config.GetMaxRecvBuffer();
 
     connOptions.nMaxOutboundTimeframe = nMaxOutboundTimeframe;
     connOptions.nMaxOutboundLimit = nMaxOutboundLimit;

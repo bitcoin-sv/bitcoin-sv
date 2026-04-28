@@ -4,8 +4,10 @@
 #include <net/node_state.h>
 
 /** Map maintaining per-node state. */
+//NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 std::map<NodeId, CNodeStatePtr> mapNodeState {};
 std::shared_mutex mapNodeStateMtx {};
+//NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 // Fetch node state
 CNodeStateRef GetState(NodeId pnode)

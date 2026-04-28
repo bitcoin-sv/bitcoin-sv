@@ -155,6 +155,7 @@ uint64_t CScript::GetSigOpCount(const CScript &scriptSig, ProtocolEra era, bool&
     else
     {
         // ... and return its opcount:
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         CScript subscript(data.data(), data.data() + data.size());
         return subscript.GetSigOpCount(true, era, sigOpCountError);
     }
@@ -201,9 +202,11 @@ bool IsMinerId(const span<const uint8_t> script)
            script[7] <= OP_PUSHDATA4;
 }
 
-bool CScript::IsPushOnly(const_iterator pc) const {
-    while (pc < end()) {
-        opcodetype opcode;
+bool CScript::IsPushOnly(const_iterator pc) const
+{
+    while(pc < end())
+    {
+        opcodetype opcode; //NOLINT(cppcoreguidelines-init-variables)
         if (!GetOp(pc, opcode)) return false;
         // Note that IsPushOnly() *does* consider OP_RESERVED to be a push-type
         // opcode, however execution of OP_RESERVED fails, so it's not relevant
@@ -218,12 +221,18 @@ bool CScript::IsPushOnly() const {
     return this->IsPushOnly(begin());
 }
 
-CScript &CScript::push_int64(int64_t n) {
-    if (n == -1 || (n >= 1 && n <= 16)) {
+CScript& CScript::push_int64(int64_t n)
+{
+    if(n == -1 || (n >= 1 && n <= 16))
+    {
         push_back(n + (OP_1 - 1));
-    } else if (n == 0) {
+    }
+    else if(n == 0)
+    {
         push_back(OP_0);
-    } else {
+    }
+    else
+    {
         std::vector<uint8_t> v;
         v.reserve(sizeof(n));
         bsv::serialize(n, back_inserter(v));
@@ -247,6 +256,7 @@ bsv::instruction_iterator CScript::begin_instructions() const
 bsv::instruction_iterator CScript::end_instructions() const
 {
     return bsv::instruction_iterator{
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         span<const uint8_t>{data() + size(), 0}};
 }
 

@@ -26,6 +26,7 @@ class KeypoolRestoreTest(BitcoinTestFramework):
         self.num_nodes = 2
         self.extra_args = [['-usehd=0'],
                            ['-usehd=1', '-keypool=100', '-keypoolmin=20']]
+        self.tmpdir = None
 
     def run_test(self):
         self.tmpdir = self.options.tmpdir

@@ -14,13 +14,17 @@
 #include <cstdint>
 #include <cstring>
 #include <iterator>
+#include <span>
 #include <string>
 #include <vector>
 
 #include "boost/functional/hash.hpp"
 
 /** Template base class for fixed-sized opaque blobs. */
-template <unsigned int BITS> class base_blob {
+template<unsigned int BITS>
+    requires ( BITS % 8 == 0 ) 
+class base_blob
+{
 protected:
     // NOLINTNEXTLINE(cppcoreguidelines-use-enum-class)
     enum { WIDTH = BITS / 8 };
@@ -107,6 +111,9 @@ public:
     const uint8_t* end() const { return data.data() + WIDTH; }
 
     constexpr unsigned int size() const { return data.size(); }
+
+    [[nodiscard]] std::span<uint8_t, WIDTH> span() { return data; }
+    [[nodiscard]] std::span<const uint8_t, WIDTH> span() const { return data; }
 
     uint64_t GetUint64(int pos) const {
         // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)

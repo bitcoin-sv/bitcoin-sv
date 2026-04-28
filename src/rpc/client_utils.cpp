@@ -6,12 +6,10 @@
 #include "rpc/client.h"
 #include "rpc/client_config.h"
 #include "rpc/client_utils.h"
-#include "rpc/protocol.h"
 #include "rpc/http_request.h"
 #include "rpc/http_response.h"
 #include "util.h"
 #include "chainparamsbase.h"
-#include "utilstrencodings.h"
 #include "clientversion.h"
 #include <set>
 #include <univalue.h>
@@ -30,8 +28,8 @@ public:
  *
  * @note Parameter indexes start from 0.
  */
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-static const CRPCConvertParam vRPCConvertParams[] = {
+static const std::array<CRPCConvertParam, 120> vRPCConvertParams  //NOLINT(cert-err58-cpp)
+{{
     {"setmocktime", 0, "timestamp"},
     {"generate", 0, "nblocks"},
     {"generate", 1, "maxtries"},
@@ -153,7 +151,7 @@ static const CRPCConvertParam vRPCConvertParams[] = {
     {"echojson", 9, "arg9"},
     {"createdatareftx", 0, "inputs"},
     {"setminerinfotxfundingoutpoint", 1, "n"},
-};
+}};
 
 class CRPCConvertTable {
 private:
@@ -171,15 +169,14 @@ public:
     }
 };
 
-CRPCConvertTable::CRPCConvertTable() {
-    const unsigned int n_elem =
-        (sizeof(vRPCConvertParams) / sizeof(vRPCConvertParams[0]));
-
-    for (unsigned int i = 0; i < n_elem; i++) {
-        members.insert(std::make_pair(vRPCConvertParams[i].methodName,
-                                      vRPCConvertParams[i].paramIdx));
-        membersByName.insert(std::make_pair(vRPCConvertParams[i].methodName,
-                                            vRPCConvertParams[i].paramName));
+CRPCConvertTable::CRPCConvertTable()
+{
+    for(const auto& param : vRPCConvertParams)
+    {
+        members.insert(std::make_pair(param.methodName,
+                                      param.paramIdx));
+        membersByName.insert(std::make_pair(param.methodName,
+                                            param.paramName));
     }
 }
 
@@ -283,7 +280,9 @@ int AppInitRPC(int argc, char *argv[], const std::string& usage_format, const st
     }
     catch(const std::exception& e)
     {
-       fprintf(stderr, "Error parsing program options: %s\n", e.what());
+        //NOLINTBEGIN(cppcoreguidelines-pro-type-vararg)
+        //NOLINTBEGIN(cert-err33-c)
+        fprintf(stderr, "Error parsing program options: %s\n", e.what());
        return EXIT_FAILURE;
     }
     if (gArgs.IsArgSet("-?") || gArgs.IsArgSet("-h") || gArgs.IsArgSet("-help") || gArgs.IsArgSet("-version"))
@@ -330,6 +329,8 @@ int AppInitRPC(int argc, char *argv[], const std::string& usage_format, const st
     {
         fprintf(stderr, "Error: SSL mode for RPC (-rpcssl) is no longer supported.\n");
         return EXIT_FAILURE;
+        //NOLINTEND(cert-err33-c)
+        //NOLINTEND(cppcoreguidelines-pro-type-vararg)
     }
     return CONTINUE_EXECUTION;
 }

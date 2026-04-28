@@ -364,8 +364,10 @@ const CoinImpl& CoinsStore::AddCoin(const COutPoint& outpoint, CoinImpl&& coin)
 {
     auto res =
         cacheCoins
-            .emplace(std::piecewise_construct, std::forward_as_tuple(outpoint),
-                     std::forward_as_tuple(std::move(coin), CCoinsCacheEntry::Flags(0)));
+            .emplace(std::piecewise_construct,
+                     std::forward_as_tuple(outpoint),
+                     std::forward_as_tuple(std::move(coin),
+                     CCoinsCacheEntry::NONE));
 
     assert(res.second);
 

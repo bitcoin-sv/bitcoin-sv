@@ -37,7 +37,9 @@ class Config;
 
 #define BITCOINCONSENSUS_API_VER 1
 
-typedef enum bitcoinconsensus_error_t {
+//NOLINTNEXTLINE(cppcoreguidelines-use-enum-class)
+typedef enum bitcoinconsensus_error_t //NOLINT(performance-enum-size)
+{
     bitcoinconsensus_ERR_OK = 0,
     bitcoinconsensus_ERR_TX_INDEX,
     bitcoinconsensus_ERR_TX_SIZE_MISMATCH,
@@ -47,6 +49,7 @@ typedef enum bitcoinconsensus_error_t {
 } bitcoinconsensus_error;
 
 /** Script verification flags */
+//NOLINTNEXTLINE(cppcoreguidelines-use-enum-class)
 enum {
     bitcoinconsensus_SCRIPT_FLAGS_VERIFY_NONE = 0,
     // evaluate P2SH (BIP16) subscripts

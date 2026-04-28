@@ -29,12 +29,12 @@ HTTPRequest HTTPRequest::CreateJSONRPCRequest(const RPCClientConfig& config, con
 HTTPRequest HTTPRequest::CreateJSONPostRequest(const RPCClientConfig& config, const UniValue& json)
 {
     // Format contents
-    std::string contents { json.write() + "\r\n" };
-    return CreateJSONPostRequest(config, std::move(contents));
+    const std::string contents { json.write() + "\r\n" };
+    return CreateJSONPostRequest(config, contents);
 }
 
 // Create a generic JSON POST request
-HTTPRequest HTTPRequest::CreateJSONPostRequest(const RPCClientConfig& config, const std::string contents)
+HTTPRequest HTTPRequest::CreateJSONPostRequest(const RPCClientConfig& config, const std::string& contents)
 {
     // Create request
     HTTPRequest request { config.GetEndpoint(), contents, RequestCmdType::POST };

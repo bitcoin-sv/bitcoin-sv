@@ -42,32 +42,32 @@ class TimeoutsTest(BitcoinTestFramework):
 
     def run_test(self):
         # Setup the p2p connections and start up the network thread.
-        self.no_verack_node = TestNode()  # never send verack
-        self.no_version_node = TestNode()  # never send version (just ping)
-        self.no_send_node = TestNode()  # never send anything
+        no_verack_node = TestNode()  # never send verack
+        no_version_node = TestNode()  # never send version (just ping)
+        no_send_node = TestNode()  # never send anything
 
         connections = []
-        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(0), self.no_verack_node),
+        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(0), no_verack_node),
                                       self.nodes[0]))
-        self.no_verack_node.add_connection(connections[0])
+        no_verack_node.add_connection(connections[0])
 
-        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(0), self.no_version_node),
+        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(0), no_version_node),
                                       self.nodes[0],
                                       send_version=False))
-        self.no_version_node.add_connection(connections[1])
+        no_version_node.add_connection(connections[1])
 
-        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(0), self.no_send_node),
+        connections.append(P2PHandler(Connection('127.0.0.1', p2p_port(0), no_send_node),
                                       self.nodes[0],
                                       send_version=False))
-        self.no_send_node.add_connection(connections[2])
+        no_send_node.add_connection(connections[2])
 
         NetworkThread().start()  # Start up network handling in another thread
 
         sleep(1)
 
-        assert (self.no_verack_node.connected)
-        assert (self.no_version_node.connected)
-        assert (self.no_send_node.connected)
+        assert (no_verack_node.connected)
+        assert (no_version_node.connected)
+        assert (no_send_node.connected)
 
         ping_msg = msg_ping()
         connections[0].send_message(ping_msg)
@@ -75,20 +75,20 @@ class TimeoutsTest(BitcoinTestFramework):
 
         sleep(30)
 
-        assert "version" in self.no_verack_node.last_message
+        assert "version" in no_verack_node.last_message
 
-        assert (self.no_verack_node.connected)
-        assert (self.no_version_node.connected)
-        assert (self.no_send_node.connected)
+        assert (no_verack_node.connected)
+        assert (no_version_node.connected)
+        assert (no_send_node.connected)
 
         connections[0].send_message(ping_msg)
         connections[1].send_message(ping_msg)
 
         sleep(31)
 
-        assert (not self.no_verack_node.connected)
-        assert (not self.no_version_node.connected)
-        assert (not self.no_send_node.connected)
+        assert (not no_verack_node.connected)
+        assert (not no_version_node.connected)
+        assert (not no_send_node.connected)
 
 
 if __name__ == '__main__':

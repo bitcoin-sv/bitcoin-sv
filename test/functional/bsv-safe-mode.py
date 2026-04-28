@@ -76,6 +76,11 @@ class SafeMode(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 1
+        self.PORT = None
+        self.webhook_messages = None
+        self.server = None
+        self.serverThread = None
+        self.last_block_time = None
 
     def setup_network(self):
         self.setup_nodes()

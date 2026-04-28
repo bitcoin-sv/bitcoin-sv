@@ -45,6 +45,10 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                 "-acceptnonstdconsolidationinput=1"
             ]
         ]
+        self.consolidation_factor = None
+        self.scriptSigSpam = None
+        self.minConfirmations = None
+        self.acceptNonStandardInputs = None
 
     def test_extra_args_values(self):
         # Check that all exra args are read correction

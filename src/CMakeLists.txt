@@ -315,7 +315,6 @@ add_library(common
 	chain.h
 	chainparams.cpp
 	chainparams.h
-	chainparamsseeds.h
 	coins.cpp
 	coins.h
 	compressor.cpp
@@ -368,6 +367,8 @@ add_library(common
     net/cmpct_size.cpp
     net/cmpctblock_parser.cpp
     net/cmpctblock_parser.h
+    net/disk_backed_parser.cpp
+    net/disk_backed_parser.h
     net/fixed_len_multi_parser.h
     net/fixed_len_multi_parser.cpp
     net/fixed_len_parser.h
@@ -411,6 +412,7 @@ add_library(common
 	rpc/jsonwriter.h
 	scheduler.cpp
 	scheduler.h
+	script/conditional_tracker.h
 	script/int_serialization.h
 	script/interpreter.h
 	script/limitedstack.h
@@ -473,6 +475,7 @@ add_library(bitcoinconsensus
 	script/bitcoinconsensus.h
 	script/instruction.h
 	script/instruction_iterator.h
+	script/conditional_tracker.cpp
 	script/interpreter.cpp
 	script/limitedstack.cpp
 	script/opcodes.cpp
@@ -829,6 +832,8 @@ endif()
 if(ENABLE_CLANG_TIDY)
     include(ClangTidy)
     AddClangTidy(util)
+    AddClangTidy(rpcclient)
+    AddClangTidy(common)
     AddClangTidy(server)
     AddClangTidy(bitcoinconsensus)
     AddClangTidy(bitcoind)

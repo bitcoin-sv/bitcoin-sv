@@ -6,56 +6,51 @@
 #ifndef BITCOIN_THREADSAFETY_H
 #define BITCOIN_THREADSAFETY_H
 
-#ifdef __clang__
-// TL;DR Add GUARDED_BY(mutex) to member variables. The others are rarely
-// necessary. Ex: int nFoo GUARDED_BY(cs_foo);
+// TL;DR Add GUARDED_BY(mutex) to member variables.
+// The others are rarely necessary.
+// Ex: int nFoo GUARDED_BY(cs_foo);
 //
-// See http://clang.llvm.org/docs/LanguageExtensions.html#threadsafety for
-// documentation. The clang compiler can do advanced static analysis of locking
-// when given the -Wthread-safety option.
-#define LOCKABLE __attribute__((lockable))
-#define SCOPED_LOCKABLE __attribute__((scoped_lockable))
+// See https://clang.llvm.org/docs/ThreadSafetyAnalysis.html
+// The clang compiler can do advanced static analysis of
+// locking when given the -Wthread-safety option.
+//
+// GCC does not support these attributes and rejects them
+// syntactically when placed between a function's parameter
+// list and its body, so under non-clang compilers all
+// macros here expand to nothing.
+#ifdef __clang__
+#define CAPABILITY(x) [[clang::capability(x)]]
+#define LOCKABLE CAPABILITY("mutex")
+#define SCOPED_LOCKABLE [[clang::scoped_lockable]]
+// The remaining attributes must use __attribute__ syntax
+// because [[clang::...]] cannot be applied to function
+// declarations or variable declarations.
 #define GUARDED_BY(x) __attribute__((guarded_by(x)))
-#define GUARDED_VAR __attribute__((guarded_var))
-#define PT_GUARDED_BY(x) __attribute__((pt_guarded_by(x)))
-#define PT_GUARDED_VAR __attribute__((pt_guarded_var))
-#define ACQUIRED_AFTER(...) __attribute__((acquired_after(__VA_ARGS__)))
-#define ACQUIRED_BEFORE(...) __attribute__((acquired_before(__VA_ARGS__)))
-#define EXCLUSIVE_LOCK_FUNCTION(...)                                           \
-    __attribute__((exclusive_lock_function(__VA_ARGS__)))
-#define SHARED_LOCK_FUNCTION(...)                                              \
-    __attribute__((shared_lock_function(__VA_ARGS__)))
-#define EXCLUSIVE_TRYLOCK_FUNCTION(...)                                        \
-    __attribute__((exclusive_trylock_function(__VA_ARGS__)))
-#define SHARED_TRYLOCK_FUNCTION(...)                                           \
-    __attribute__((shared_trylock_function(__VA_ARGS__)))
-#define UNLOCK_FUNCTION(...) __attribute__((unlock_function(__VA_ARGS__)))
-#define LOCK_RETURNED(x) __attribute__((lock_returned(x)))
-#define LOCKS_EXCLUDED(...) __attribute__((locks_excluded(__VA_ARGS__)))
-#define EXCLUSIVE_LOCKS_REQUIRED(...)                                          \
-    __attribute__((exclusive_locks_required(__VA_ARGS__)))
-#define SHARED_LOCKS_REQUIRED(...)                                             \
-    __attribute__((shared_locks_required(__VA_ARGS__)))
+#define ACQUIRE(...) __attribute__((acquire_capability(__VA_ARGS__)))
+#define EXCLUSIVE_LOCK_FUNCTION ACQUIRE
+#define TRY_ACQUIRE(...) __attribute__((try_acquire_capability(__VA_ARGS__)))
+#define EXCLUSIVE_TRYLOCK_FUNCTION TRY_ACQUIRE
+#define RELEASE(...) __attribute__((release_capability(__VA_ARGS__)))
+#define UNLOCK_FUNCTION RELEASE
+#define REQUIRES(...) __attribute__((requires_capability(__VA_ARGS__)))
+#define EXCLUDES(...) __attribute__((locks_excluded(__VA_ARGS__)))
+#define LOCKS_EXCLUDED EXCLUDES
 #define NO_THREAD_SAFETY_ANALYSIS __attribute__((no_thread_safety_analysis))
 #else
+#define CAPABILITY(x)
 #define LOCKABLE
 #define SCOPED_LOCKABLE
 #define GUARDED_BY(x)
-#define GUARDED_VAR
-#define PT_GUARDED_BY(x)
-#define PT_GUARDED_VAR
-#define ACQUIRED_AFTER(...)
-#define ACQUIRED_BEFORE(...)
+#define ACQUIRE(...)
 #define EXCLUSIVE_LOCK_FUNCTION(...)
-#define SHARED_LOCK_FUNCTION(...)
+#define TRY_ACQUIRE(...)
 #define EXCLUSIVE_TRYLOCK_FUNCTION(...)
-#define SHARED_TRYLOCK_FUNCTION(...)
+#define RELEASE(...)
 #define UNLOCK_FUNCTION(...)
-#define LOCK_RETURNED(x)
+#define REQUIRES(...)
+#define EXCLUDES(...)
 #define LOCKS_EXCLUDED(...)
-#define EXCLUSIVE_LOCKS_REQUIRED(...)
-#define SHARED_LOCKS_REQUIRED(...)
 #define NO_THREAD_SAFETY_ANALYSIS
-#endif // __GNUC__
+#endif
 
 #endif // BITCOIN_THREADSAFETY_H

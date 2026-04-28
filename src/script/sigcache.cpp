@@ -78,7 +78,7 @@ public:
  * call overhead associated with local static variables even though
  * signatureCache could be made local to VerifySignature.
  */
-static CSignatureCache signatureCache;
+static CSignatureCache signatureCache; //NOLINT(cert-err58-cpp)
 } // namespace
 
 // To be called once in AppInit2/TestingSetup to initialize the signatureCache
@@ -86,15 +86,37 @@ static CSignatureCache signatureCache;
 void InitSignatureCache() {
     // nMaxCacheSize is unsigned. If -maxsigcachesize is set to zero,
     // setup_bytes creates the minimum possible cache (2 elements).
-    auto initCache = [](std::string argName, unsigned int defaultSize, std::string_view type, auto& classInstance, auto callback){
-      size_t nMaxCacheSize = std::min(static_cast<uint64_t>(std::max(int64_t(0), gArgs.GetArgAsBytes(argName, defaultSize, ONE_MEBIBYTE))), MAX_MAX_SIG_CACHE_SIZE * ONE_MEBIBYTE);
-      auto nElems = (classInstance.*callback)(nMaxCacheSize);
-      LogPrintf("Using %zu MiB out of %zu requested for %ssignature cache, able to "
-            "store %zu elements\n", (nElems * sizeof(uint256)) >> 20, nMaxCacheSize >> 20, type, nElems);
+    auto initCache = [](const std::string& argName,
+                        unsigned int defaultSize,
+                        std::string_view type,
+                        auto& classInstance,
+                        auto callback)
+    {
+        size_t nMaxCacheSize = std::min(static_cast<uint64_t>(
+                                            std::max(int64_t(0),
+                                                     gArgs.GetArgAsBytes(argName,
+                                                                         defaultSize,
+                                                                         ONE_MEBIBYTE))),
+                                        MAX_MAX_SIG_CACHE_SIZE * ONE_MEBIBYTE);
+        auto nElems = (classInstance.*callback)(nMaxCacheSize);
+        LogPrintf("Using %zu MiB out of %zu requested for %ssignature cache, able to "
+                  "store %zu elements\n",
+                  (nElems * sizeof(uint256)) >> 20,
+                  nMaxCacheSize >> 20,
+                  type,
+                  nElems);
     };
 
-    initCache("-maxsigcachesize", DEFAULT_MAX_SIG_CACHE_SIZE, "", signatureCache, &CSignatureCache::setup_bytes);
-    initCache("-maxinvalidsigcachesize", DEFAULT_INVALID_MAX_SIG_CACHE_SIZE, "invalid ", signatureCache, &CSignatureCache::setup_bytes_invalid);
+    initCache("-maxsigcachesize",
+              DEFAULT_MAX_SIG_CACHE_SIZE,
+              "",
+              signatureCache,
+              &CSignatureCache::setup_bytes);
+    initCache("-maxinvalidsigcachesize",
+              DEFAULT_INVALID_MAX_SIG_CACHE_SIZE,
+              "invalid ",
+              signatureCache,
+              &CSignatureCache::setup_bytes_invalid);
 }
 
 

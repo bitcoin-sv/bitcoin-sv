@@ -24,10 +24,11 @@ static const unsigned int DEFAULT_WALLET_DBLOGSIZE = 100;
 static const bool DEFAULT_WALLET_PRIVDB = true;
 
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
-class CDBEnv {
+class CDBEnv
+{
 private:
-    bool fDbEnvInit;
-    bool fMockDb;
+    bool fDbEnvInit{false};
+    bool fMockDb{false};
     // Don't change into fs::path, as that can result in
     // shutdown problems/crashes caused by a static initialized internal
     // pointer.
@@ -37,12 +38,13 @@ private:
 
 public:
     mutable CCriticalSection cs_db;
-    DbEnv *dbenv;
+    DbEnv* dbenv{nullptr};
     std::map<std::string, int> mapFileUseCount;
     std::map<std::string, Db *> mapDb;
 
     CDBEnv();
     ~CDBEnv();
+
     void Reset();
 
     void MakeMock();
@@ -54,7 +56,8 @@ public:
      * This must be called BEFORE strFile is opened.
      * Returns true if strFile is OK.
      */
-    enum VerifyResult { VERIFY_OK, RECOVER_OK, RECOVER_FAIL };
+    enum VerifyResult // NOLINT(cppcoreguidelines-use-enum-class)
+    { VERIFY_OK, RECOVER_OK, RECOVER_FAIL };
     typedef bool (*recoverFunc_type)(const std::string &strFile,
                                      std::string &out_backup_filename);
     VerifyResult Verify(const std::string &strFile,
@@ -145,19 +148,21 @@ private:
 
 /** RAII class that provides access to a Berkeley database */
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
-class CDB {
+class CDB
+{
 protected:
-    Db *pdb;
+    Db *pdb{};
     std::string strFile;
-    DbTxn *activeTxn;
+    DbTxn* activeTxn{};
     bool fReadOnly;
     bool fFlushOnClose;
     CDBEnv *env;
 
 public:
-    explicit CDB(CWalletDBWrapper &dbw, const char *pszMode = "r+",
+    explicit CDB(CWalletDBWrapper& dbw,
+                 const char *pszMode = "r+",
                  bool fFlushOnCloseIn = true);
-    ~CDB() { Close(); }
+    ~CDB() { Close(); } //NOLINT(bugprone-exception-escape)
 
     void Flush();
     void Close();
@@ -210,6 +215,7 @@ public:
         try {
             // NOLINTBEGIN(cppcoreguidelines-pro-type-cstyle-cast)
             CDataStream ssValue((char *)datValue.get_data(),
+                                // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                                 (char *)datValue.get_data() +
                                     datValue.get_size(),
                                 SER_DISK, CLIENT_VERSION);
@@ -221,6 +227,7 @@ public:
 
         // Clear and free memory
         memset(datValue.get_data(), 0, datValue.get_size());
+        // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
         free(datValue.get_data()); // NOLINT(cppcoreguidelines-no-malloc)
         return (ret == 0);
     }
@@ -333,19 +340,21 @@ public:
         // Convert to streams
         ssKey.SetType(SER_DISK);
         ssKey.clear();
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast,)
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         ssKey.write((char *)datKey.get_data(), datKey.get_size());
         ssValue.SetType(SER_DISK);
         ssValue.clear();
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast,)
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         ssValue.write((char *)datValue.get_data(), datValue.get_size());
 
         // Clear and free memory
         memset(datKey.get_data(), 0, datKey.get_size());
         memset(datValue.get_data(), 0, datValue.get_size());
         // NOLINTBEGIN(cppcoreguidelines-no-malloc)
+        // NOLINTBEGIN(cppcoreguidelines-owning-memory)
         free(datKey.get_data());
         free(datValue.get_data());
+        // NOLINTEND(cppcoreguidelines-owning-memory)
         // NOLINTEND(cppcoreguidelines-no-malloc)
         return 0;
     }

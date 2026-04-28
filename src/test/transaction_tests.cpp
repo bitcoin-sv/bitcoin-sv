@@ -872,6 +872,93 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
     BOOST_CHECK(!IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), testConfig.GetGenesisActivationHeight(), reason));
 }
 
+BOOST_AUTO_TEST_CASE(test_IsStandard_NonPushOnlyScriptSig_Chronicle)
+{
+    LOCK(cs_main);
+    CBasicKeyStore keystore;
+    CCoinsViewEmpty coinsDummy;
+    CCoinsViewCache coins(coinsDummy);
+    std::vector<CMutableTransaction> dummyTransactions = SetupDummyInputs(keystore, coins);
+
+    const int32_t genesisHeight = testConfig.GetChainParams().GetConsensus().genesisHeight;
+    const int32_t chronicleHeight = testConfig.GetChainParams().GetConsensus().chronicleHeight;
+    testConfig.SetGenesisActivationHeight(genesisHeight);
+    testConfig.SetChronicleActivationHeight(chronicleHeight);
+
+    CMutableTransaction t;
+    t.vin.resize(1);
+    t.vin[0].prevout = COutPoint(dummyTransactions[0].GetId(), 1);
+    // Non-push-only scriptSig: OP_1 OP_1 OP_ADD OP_DROP followed by dummy signature data
+    t.vin[0].scriptSig = CScript() << OP_1 << OP_1 << OP_ADD << OP_DROP << std::vector<uint8_t>(65, 0);
+    t.vout.resize(1);
+    t.vout[0].nValue = 90 * CENT;
+    CKey key;
+    key.MakeNewKey(true);
+    t.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
+
+    std::string reason;
+
+    // Pre-Chronicle: non-push-only scriptSig is non-standard
+    BOOST_CHECK(!IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), chronicleHeight - 1, reason));
+    BOOST_CHECK_EQUAL(reason, "scriptsig-not-pushonly");
+
+    // Post-Chronicle: non-push-only scriptSig is standard
+    BOOST_CHECK(IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), chronicleHeight, reason));
+    BOOST_CHECK(IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), chronicleHeight + 1, reason));
+
+    // Sanity: push-only scriptSig is standard at all heights
+    t.vin[0].scriptSig = CScript() << std::vector<uint8_t>(65, 0);
+    BOOST_CHECK(IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), chronicleHeight - 1, reason));
+    BOOST_CHECK(IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), chronicleHeight, reason));
+}
+
+
+BOOST_AUTO_TEST_CASE(test_IsStandard_TxVersion_Chronicle)
+{
+    LOCK(cs_main);
+    CBasicKeyStore keystore;
+    CCoinsViewEmpty coinsDummy;
+    CCoinsViewCache coins(coinsDummy);
+    std::vector<CMutableTransaction> dummyTransactions = SetupDummyInputs(keystore, coins);
+
+    const int32_t genesisHeight = testConfig.GetChainParams().GetConsensus().genesisHeight;
+    const int32_t chronicleHeight = testConfig.GetChainParams().GetConsensus().chronicleHeight;
+    testConfig.SetGenesisActivationHeight(genesisHeight);
+    testConfig.SetChronicleActivationHeight(chronicleHeight);
+
+    CMutableTransaction t;
+    t.vin.resize(1);
+    t.vin[0].prevout = COutPoint(dummyTransactions[0].GetId(), 1);
+    t.vin[0].scriptSig = CScript() << OP_TRUE;
+    t.vout.resize(1);
+    t.vout[0].nValue = 90 * CENT;
+    CKey key;
+    key.MakeNewKey(true);
+    t.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
+
+    std::string reason;
+
+    auto IsStandardTxVersion = [&](int32_t version, int32_t height) -> bool
+    {
+        t.nVersion = version;
+        return IsStandardTx(testConfig.GetConfigScriptPolicy(), CTransaction(t), height, reason);
+    };
+
+    // Pre-Chronicle, only versions 1 or 2 are standard
+    BOOST_CHECK(IsStandardTxVersion(1, chronicleHeight - 1));
+    BOOST_CHECK(IsStandardTxVersion(2, chronicleHeight - 1));
+    BOOST_CHECK(! IsStandardTxVersion(3, chronicleHeight - 1));
+    BOOST_CHECK(! IsStandardTxVersion(0, chronicleHeight - 1));
+    BOOST_CHECK(! IsStandardTxVersion(-1, chronicleHeight - 1));
+
+    // Post-Chronicle, all version numbers are standard
+    BOOST_CHECK(IsStandardTxVersion(1, chronicleHeight));
+    BOOST_CHECK(IsStandardTxVersion(2, chronicleHeight));
+    BOOST_CHECK(IsStandardTxVersion(3, chronicleHeight));
+    BOOST_CHECK(IsStandardTxVersion(0, chronicleHeight));
+    BOOST_CHECK(IsStandardTxVersion(-1, chronicleHeight));
+}
+
 void AppendScriptPubKeyToFitTxSize(CMutableTransaction& t, uint64_t txSizeNew)
 {
     t.vout[0].scriptPubKey = CScript() << OP_FALSE << OP_RETURN;

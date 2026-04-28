@@ -96,13 +96,13 @@ class BSVBlockWithCBProof(BitcoinTestFramework):
 
     def _send_transactions_to_node(self, node, num_trasactions):
         # Create UTXOs to build a bunch of transactions from
-        self.relayfee = Decimal("0.00000250")
-        utxos = create_confirmed_utxos(self.relayfee, node, 100, nodes=self.nodes)
+        relayfee = Decimal("0.00000250")
+        utxos = create_confirmed_utxos(relayfee, node, 100, nodes=self.nodes)
         self.sync_all()
 
         # Create a lot of transactions from the UTXOs
-        newutxos = split_utxos(self.relayfee, node, num_trasactions, utxos, sync_nodes=self.nodes)
-        fill_mempool(self.relayfee, node, newutxos)
+        newutxos = split_utxos(relayfee, node, num_trasactions, utxos, sync_nodes=self.nodes)
+        fill_mempool(relayfee, node, newutxos)
 
     def _create_and_submit_block(self, node, candidate, get_coinbase):
         # Do POW for mining candidate and submit solution

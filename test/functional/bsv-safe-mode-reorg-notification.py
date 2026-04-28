@@ -71,6 +71,10 @@ class SafeModeReogNotification(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 2
+        self.webhook_messages = None
+        self.server = None
+        self.last_block_time = None
+        self.serverThread = None
 
     def setup_network(self):
         self.setup_nodes()
@@ -122,13 +126,13 @@ class SafeModeReogNotification(BitcoinTestFramework):
 
     def run_test(self):
 
-        self.PORT = 8765
+        PORT = 8765
         with self.webhook_lock:
             self.webhook_messages = []
-        self.server = HTTPServer(('', self.PORT), self.make_handler)
+        self.server = HTTPServer(('', PORT), self.make_handler)
         self.start_server()
 
-        args = [f"-safemodewebhookurl=http://127.0.0.1:{self.PORT}/safemode",
+        args = [f"-safemodewebhookurl=http://127.0.0.1:{PORT}/safemode",
                 ]
 
         with self.run_node_with_connections("Test Reorg", 0, args,

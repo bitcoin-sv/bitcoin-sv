@@ -37,7 +37,9 @@ std::pair<size_t, size_t> tx_parser::parse_input(span<const uint8_t> s)
         total_bytes_read += bytes_read;
         vector<uint8_t> v;
         v.reserve(total_bytes_read);
-        v.insert(v.cend(), s.begin(), s.begin() + total_bytes_read);
+        v.insert(v.cend(),
+                 s.begin(),
+                 s.begin() + total_bytes_read); //NOLINT(*-narrowing-conversions)
         ip_buffers_.push_back(std::move(v));
         s = s.subspan(total_bytes_read);
     }
@@ -51,7 +53,7 @@ std::pair<size_t, size_t> tx_parser::parse_input(span<const uint8_t> s)
 
     auto& cur_ip_buffer{ip_buffers_[ip_buffers_.size() - 1]};
     cur_ip_buffer.insert(cur_ip_buffer.cend(), s.begin(),
-                         s.begin() + extra_bytes_reqd);
+                         s.begin() + extra_bytes_reqd); //NOLINT(*-narrowing-conversions)
 
     return make_pair(total_bytes_read + extra_bytes_reqd, 0);
 }
@@ -73,12 +75,14 @@ std::pair<size_t, size_t> tx_parser::parse_output(span<const uint8_t> s)
         const auto [bytes_read, val] = parse_compact_size(s.subspan(value_len));
         if(!bytes_read)
             return make_pair(0, value_len + val);
-        
+
         script_len_ = val;
         total_bytes_read += bytes_read;
         vector<uint8_t> v;
         v.reserve(total_bytes_read);
-        v.insert(v.cend(), s.begin(), s.begin() + total_bytes_read);
+        v.insert(v.cend(),
+                 s.begin(),
+                 s.begin() + total_bytes_read); //NOLINT(*-narrowing-conversions)
         op_buffers_.push_back(std::move(v));
         s = s.subspan(total_bytes_read);
     }
@@ -92,7 +96,7 @@ std::pair<size_t, size_t> tx_parser::parse_output(span<const uint8_t> s)
     auto& cur_op_buffer{op_buffers_[op_buffers_.size() - 1]};
     cur_op_buffer.insert(cur_op_buffer.cend(), 
                          s.begin(),
-                         s.begin() + extra_bytes_reqd);
+                         s.begin() + extra_bytes_reqd); //NOLINT(*-narrowing-conversions)
 
     return make_pair(total_bytes_read + extra_bytes_reqd, 0);
 }
@@ -119,7 +123,9 @@ std::pair<size_t, size_t> tx_parser::parse_ip_count(span<const uint8_t> s)
 
     n_ips_ = val;
     ip_count_buffer_.resize(bytes_read);
-    copy(s.begin(), s.begin() + bytes_read, ip_count_buffer_.begin());
+    copy(s.begin(),
+         s.begin() + bytes_read, //NOLINT(*-narrowing-conversions)
+         ip_count_buffer_.begin());
     return make_pair(bytes_read, 0);
 }
 
@@ -142,7 +148,7 @@ std::pair<size_t, size_t> tx_parser::parse_inputs(span<const uint8_t> s)
 
         if(bytes_reqd)
             return make_pair(total_bytes_read, bytes_reqd);
-                
+
         ++current_ip_;
 
     }
@@ -159,7 +165,9 @@ std::pair<size_t, size_t> tx_parser::parse_op_count(span<const uint8_t> s)
 
     n_ops_ = val;
     op_count_buffer_.resize(bytes_read);
-    copy(s.begin(), s.begin() + bytes_read, op_count_buffer_.begin());
+    copy(s.begin(),
+         s.begin() + bytes_read, //NOLINT(*-narrowing-conversions)
+         op_count_buffer_.begin());
     return make_pair(bytes_read, 0);
 }
 
@@ -179,12 +187,12 @@ std::pair<size_t, size_t> tx_parser::parse_outputs(span<const uint8_t> s)
 
         if(bytes_reqd)
             return make_pair(total_bytes_read, bytes_reqd);
-                
+
         ++current_op_;
     }
     return make_pair(total_bytes_read, 0);
 }
-    
+
 std::pair<size_t, size_t> tx_parser::parse_locktime(const span<const uint8_t> s)
 {
     assert(state_ == state::lock_time);
@@ -196,7 +204,7 @@ std::pair<size_t, size_t> tx_parser::parse_locktime(const span<const uint8_t> s)
     copy(s.begin(), s.begin() + locktime_len, locktime_buffer_.begin());
     return make_pair(locktime_len, 0);
 }
-    
+
 // return bytes_read, bytes_required
 std::pair<size_t, size_t> tx_parser::operator()(span<const uint8_t> s)
 {
@@ -211,7 +219,7 @@ std::pair<size_t, size_t> tx_parser::operator()(span<const uint8_t> s)
         s = s.subspan(bytes_read);
         if(s.size() < bytes_reqd)
             return make_pair(total_bytes_read, bytes_reqd);
-        
+
         [[fallthrough]];
     }
     case state::ip_count:
@@ -310,7 +318,7 @@ std::pair<size_t, size_t> tx_parser::operator()(span<const uint8_t> s)
     default:
         assert(false);
     }
-           
+
     return make_pair(total_bytes_read, 0);
 }
 
@@ -330,15 +338,15 @@ size_t tx_parser::buffer_size() const
                 locktime_buffer_.size()};
 
     size += accumulate(ip_buffers_.cbegin(), ip_buffers_.cend(),
-                       0,
-                       [](auto acc, const auto& buffer)
+                       size_t{},
+                       [](size_t acc, const auto& buffer)
                        {
                            return acc + buffer.size();
                        });
 
     size += accumulate(op_buffers_.cbegin(), op_buffers_.cend(),
-                       0,
-                       [](auto acc, const auto& buffer)
+                       size_t{},
+                       [](size_t acc, const auto& buffer)
                        {
                            return acc + buffer.size();
                        });

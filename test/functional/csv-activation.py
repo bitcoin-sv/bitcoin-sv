@@ -105,6 +105,11 @@ class BIP68_112_113Test(ComparisonTestFramework):
         self.num_nodes = 1
         self.setup_clean_chain = True
         self.extra_args = [['-whitelist=127.0.0.1', '-blockversion=4']]
+        self.tip = None
+        self.coinbase_blocks = None
+        self.tipheight = None
+        self.last_block_time = None
+        self.nodeaddress = None
 
     def run_test(self):
         self.test.run()

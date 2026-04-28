@@ -91,6 +91,7 @@ void CTxnDoubleSpendDetector::removeTxnInputs(const CTransaction &tx)
         mKnownSpends.begin(), mKnownSpends.end(), [&tx](const auto& op_tx) {
             return op_tx.mOut == tx.vin[0].prevout;
         });
+    assert(it != mKnownSpends.end());
 
     mKnownSpends.erase(it, it + std::ssize(tx.vin));
 }
@@ -100,9 +101,11 @@ size_t CTxnDoubleSpendDetector::getKnownSpendsSize() const {
     return mKnownSpends.size();
 }
 
-void CTxnDoubleSpendDetector::clear() {
+void CTxnDoubleSpendDetector::clear()
+{
     std::lock_guard lock(mMainMtx);
     mKnownSpends.clear();
+    mKnownSpendsTx.clear();
 }
 
 bool CTxnDoubleSpendDetector::isAnyOfInputsKnownNL(

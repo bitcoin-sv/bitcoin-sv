@@ -46,9 +46,10 @@ static std::string EncodeDumpString(const std::string &str) {
     std::stringstream ret;
     for (uint8_t c : str) {
         if (c <= 32 || c >= 128 || c == '%') {
+            //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             ret << '%' << HexStr(&c, &c + 1);
         } else {
-            ret << c;
+            ret << c; //NOLINT(bugprone-unintended-char-ostream-output)
         }
     }
     return ret.str();
@@ -63,7 +64,7 @@ std::string DecodeDumpString(const std::string &str) {
                 ((str[pos + 2] >> 6) * 9 + ((str[pos + 2] - '0') & 15));
             pos += 2;
         }
-        ret << c;
+        ret << c; //NOLINT(bugprone-unintended-char-ostream-output)
     }
     return ret.str();
 }
@@ -347,9 +348,9 @@ UniValue importprunedfunds(const Config&,
                                "Block not found in chain");
         }
 
-        std::vector<uint256>::const_iterator it;
-        if ((it = std::find(vMatch.begin(), vMatch.end(), txid)) ==
-            vMatch.end()) {
+        const auto it = std::find(vMatch.begin(), vMatch.end(), txid);
+        if(it == vMatch.end())
+        {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                                "Transaction given doesn't exist in proof");
         }
@@ -360,7 +361,7 @@ UniValue importprunedfunds(const Config&,
                            "Something wrong with merkleblock");
     }
 
-    wtx.nIndex = txnIndex;
+    wtx.nIndex = txnIndex; //NOLINT(*-narrowing-conversions)
     wtx.hashBlock = merkleBlock.header.GetHash();
 
     LOCK2(cs_main, pwallet->cs_wallet);
@@ -547,7 +548,7 @@ UniValue importwallet(const Config&, const JSONRPCRequest& request)
         }
 
         std::vector<std::string> vstr;
-        boost::split(vstr, line, boost::is_any_of(" "));
+        boost::split(vstr, line, [](const char c) { return c == ' '; });
         if (vstr.size() < 2) {
             continue;
         }
@@ -1319,7 +1320,7 @@ UniValue importmulti(const Config&, const JSONRPCRequest& mainRequest)
                             strprintf("Failed to rescan before time %d, "
                                       "transactions may be missing.",
                                       scannedRange->GetBlockTimeMax())));
-                    response.push_back(std::move(result));
+                    response.push_back(result);
                 }
                 ++i;
             }
@@ -1335,7 +1336,7 @@ void RegisterDumpRPCCommands(CRPCTable& t)
         return;
 
     // clang-format off
-    static const CRPCCommand commands[] = {
+    static const std::array<CRPCCommand, 9> commands{{
         //  category            name                        actor (function)          okSafeMode
         //  ------------------- ------------------------    ----------------------    ----------
         { "wallet",             "dumpprivkey",              dumpprivkey,              true,   {"address"}  },
@@ -1347,10 +1348,12 @@ void RegisterDumpRPCCommands(CRPCTable& t)
         { "wallet",             "importprunedfunds",        importprunedfunds,        true,   {"rawtransaction","txoutproof"} },
         { "wallet",             "importpubkey",             importpubkey,             true,   {"pubkey","label","rescan"} },
         { "wallet",             "removeprunedfunds",        removeprunedfunds,        true,   {"txid"} },
-    };
+    }};
     // clang-format on
 
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++) {
+    for(unsigned int vcidx = 0; vcidx < commands.size(); vcidx++)
+    {
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         t.appendCommand(commands[vcidx].name, &commands[vcidx]);
     }
 }

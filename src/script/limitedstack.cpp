@@ -56,6 +56,7 @@ void LimitedVector::append(const LimitedVector& second)
     stackElement.insert(stackElement.end(), second.begin(), second.end());
 }
 
+//NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void LimitedVector::padRight(size_t size, uint8_t signbit)
 {
     if (size > stackElement.size())

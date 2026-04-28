@@ -3,6 +3,7 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include <array>
 #ifdef HAVE_CONFIG_H
 #include "config/bitcoin-config.h"
 #endif
@@ -27,10 +28,13 @@
 #endif
 
 // Settings
-// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variable)
-static proxyType proxyInfo[NET_MAX];
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
+// NOLINTBEGIN(cert-err58-cpp)
+static std::array<proxyType, NET_MAX> proxyInfo;
 static proxyType nameProxy;
 static CCriticalSection cs_proxyInfos;
+// NOLINTEND(cert-err58-cpp)
+
 int nConnectTimeout = DEFAULT_CONNECT_TIMEOUT;
 bool fNameLookup = DEFAULT_NAME_LOOKUP;
 
@@ -38,7 +42,7 @@ bool fNameLookup = DEFAULT_NAME_LOOKUP;
 // (milliseconds)
 static const int SOCKS5_RECV_TIMEOUT = 20 * 1000;
 static std::atomic<bool> interruptSocks5Recv(false);
-// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variable)
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 enum Network ParseNetwork(std::string net) {
     boost::to_lower(net);
@@ -62,7 +66,7 @@ static bool LookupIntern(const char *pszName, std::vector<CNetAddr> &vIP,
                          unsigned int nMaxSolutions, bool fAllowLookup) {
     vIP.clear();
 
-    struct addrinfo aiHint;
+    struct addrinfo aiHint; // NOLINT(cppcoreguidelines-pro-type-member-init)
     memset(&aiHint, 0, sizeof(struct addrinfo));
 
     aiHint.ai_socktype = SOCK_STREAM;
@@ -83,6 +87,7 @@ static bool LookupIntern(const char *pszName, std::vector<CNetAddr> &vIP,
         if (aiTrav->ai_family == AF_INET) {
             assert(aiTrav->ai_addrlen >= sizeof(sockaddr_in));
             vIP.push_back(
+                //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                 CNetAddr(reinterpret_cast<sockaddr_in *>(aiTrav->ai_addr)->sin_addr));
         }
 
@@ -156,7 +161,9 @@ CService LookupNumeric(const char *pszName, int portDefault) {
     return addr;
 }
 
-struct timeval MillisToTimeval(int64_t nTimeout) {
+struct timeval MillisToTimeval(int64_t nTimeout)
+{
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     struct timeval timeout;
     timeout.tv_sec = nTimeout / 1000;
     timeout.tv_usec = (nTimeout % 1000) * 1000;
@@ -174,8 +181,12 @@ struct timeval MillisToTimeval(int64_t nTimeout) {
  *
  * @note This function requires that hSocket is in non-blocking mode.
  */
-static bool InterruptibleRecv(uint8_t* data, size_t len, int timeout,
-                              SOCKET &hSocket) {
+static bool InterruptibleRecv(uint8_t* data,
+                              //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                              size_t len,
+                              int timeout,
+                              SOCKET& hSocket)
+{
     int64_t curTime = GetTimeMillis();
     int64_t endTime = curTime + timeout;
     // Maximum time to wait in one select call. It will take up until this time
@@ -269,14 +280,16 @@ static bool Socks5(const std::string &strDest, int port,
         // X'00' NO AUTHENTICATION REQUIRED
         vSocks5Init.push_back(0x00);
     }
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     ssize_t ret = send(hSocket, (const char *)vSocks5Init.data(),
                        vSocks5Init.size(), MSG_NOSIGNAL);
     if (ret != (ssize_t)vSocks5Init.size()) {
         CloseSocket(hSocket);
         return error("Error sending to proxy");
     }
-    uint8_t pchRet1[2]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
-    if (!InterruptibleRecv(pchRet1, 2, SOCKS5_RECV_TIMEOUT, hSocket)) {
+    std::array<uint8_t, 2> pchRet1; // NOLINT(cppcoreguidelines-pro-type-member-init)
+    if(!InterruptibleRecv(pchRet1.data(), sizeof(pchRet1), SOCKS5_RECV_TIMEOUT, hSocket))
+    {
         CloseSocket(hSocket);
         LogPrint(BCLog::NETCONN, "Socks5() connect to %s:%d failed: InterruptibleRecv() "
                   "timeout or other failure\n",
@@ -297,7 +310,10 @@ static bool Socks5(const std::string &strDest, int port,
         vAuth.insert(vAuth.end(), auth->username.begin(), auth->username.end());
         vAuth.push_back(auth->password.size());
         vAuth.insert(vAuth.end(), auth->password.begin(), auth->password.end());
-        ret = send(hSocket, (const char *)vAuth.data(), vAuth.size(),
+        ret = send(hSocket,
+                   //NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
+                   (const char *)vAuth.data(),
+                   vAuth.size(),
                    MSG_NOSIGNAL);
         if (ret != (ssize_t)vAuth.size()) {
             CloseSocket(hSocket);
@@ -305,8 +321,12 @@ static bool Socks5(const std::string &strDest, int port,
         }
         LogPrint(BCLog::PROXY, "SOCKS5 sending proxy authentication %s:%s\n",
                  auth->username, auth->password);
-        uint8_t pchRetA[2]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
-        if (!InterruptibleRecv(pchRetA, 2, SOCKS5_RECV_TIMEOUT, hSocket)) {
+        std::array<uint8_t, 2> pchRetA; // NOLINT(cppcoreguidelines-pro-type-member-init)
+        if(!InterruptibleRecv(pchRetA.data(),
+                              sizeof(pchRetA),
+                              SOCKS5_RECV_TIMEOUT,
+                              hSocket))
+        {
             CloseSocket(hSocket);
             return error("Error reading proxy authentication response");
         }
@@ -335,14 +355,21 @@ static bool Socks5(const std::string &strDest, int port,
     vSocks5.insert(vSocks5.end(), strDest.begin(), strDest.end());
     vSocks5.push_back((port >> 8) & 0xFF);
     vSocks5.push_back((port >> 0) & 0xFF);
-    ret = send(hSocket, (const char *)vSocks5.data(), vSocks5.size(),
+    ret = send(hSocket,
+               //NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
+               (const char *)vSocks5.data(),
+               vSocks5.size(),
                MSG_NOSIGNAL);
     if (ret != (ssize_t)vSocks5.size()) {
         CloseSocket(hSocket);
         return error("Error sending to proxy");
     }
-    uint8_t pchRet2[4]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
-    if (!InterruptibleRecv(pchRet2, 4, SOCKS5_RECV_TIMEOUT, hSocket)) {
+    std::array<uint8_t, 4> pchRet2; // NOLINT(cppcoreguidelines-pro-type-member-init)
+    if(!InterruptibleRecv(pchRet2.data(),
+                          sizeof(pchRet2),
+                          SOCKS5_RECV_TIMEOUT,
+                          hSocket))
+    {
         CloseSocket(hSocket);
         return error("Error reading proxy response");
     }
@@ -361,21 +388,22 @@ static bool Socks5(const std::string &strDest, int port,
         CloseSocket(hSocket);
         return error("Error: malformed proxy response");
     }
-    uint8_t pchRet3[256]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+
+    std::array<uint8_t, 256> pchRet3; // NOLINT(cppcoreguidelines-pro-type-member-init)
     switch (pchRet2[3]) {
         case 0x01:
-            ret = InterruptibleRecv(pchRet3, 4, SOCKS5_RECV_TIMEOUT, hSocket);
+            ret = InterruptibleRecv(pchRet3.data(), 4, SOCKS5_RECV_TIMEOUT, hSocket);
             break;
         case 0x04:
-            ret = InterruptibleRecv(pchRet3, 16, SOCKS5_RECV_TIMEOUT, hSocket);
+            ret = InterruptibleRecv(pchRet3.data(), 16, SOCKS5_RECV_TIMEOUT, hSocket);
             break;
         case 0x03: {
-            ret = InterruptibleRecv(pchRet3, 1, SOCKS5_RECV_TIMEOUT, hSocket);
+            ret = InterruptibleRecv(pchRet3.data(), 1, SOCKS5_RECV_TIMEOUT, hSocket);
             if (!ret) {
                 CloseSocket(hSocket);
                 return error("Error reading from proxy");
             }
-            ret = InterruptibleRecv(pchRet3, pchRet3[0], SOCKS5_RECV_TIMEOUT, hSocket);
+            ret = InterruptibleRecv(pchRet3.data(), pchRet3[0], SOCKS5_RECV_TIMEOUT, hSocket);
             break;
         }
         default:
@@ -386,7 +414,7 @@ static bool Socks5(const std::string &strDest, int port,
         CloseSocket(hSocket);
         return error("Error reading from proxy");
     }
-    if (!InterruptibleRecv(pchRet3, 2, SOCKS5_RECV_TIMEOUT, hSocket)) {
+    if (!InterruptibleRecv(pchRet3.data(), 2, SOCKS5_RECV_TIMEOUT, hSocket)) {
         CloseSocket(hSocket);
         return error("Error reading from proxy");
     }
@@ -398,14 +426,18 @@ static bool ConnectSocketDirectly(const CService &addrConnect,
                                   SOCKET &hSocketRet, int nTimeout) {
     hSocketRet = INVALID_SOCKET;
 
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     struct sockaddr_storage sockaddr;
     socklen_t len = sizeof(sockaddr);
-    if (!addrConnect.GetSockAddr((struct sockaddr *)&sockaddr, &len)) {
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
+    if(!addrConnect.GetSockAddr((struct sockaddr *)&sockaddr, &len))
+    {
         LogPrint(BCLog::NETCONN, "Cannot connect to %s: unsupported network\n",
                   addrConnect.ToString());
         return false;
     }
 
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     SOCKET hSocket = socket(((struct sockaddr *)&sockaddr)->sa_family,
                             SOCK_STREAM, IPPROTO_TCP);
     if (hSocket == INVALID_SOCKET) return false;
@@ -438,6 +470,7 @@ static bool ConnectSocketDirectly(const CService &addrConnect,
                      "failed, error %s\n",
                      NetworkErrorString(WSAGetLastError()));
 
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     if (connect(hSocket, (struct sockaddr *)&sockaddr, len) == SOCKET_ERROR) {
         int nErr = WSAGetLastError();
         // WSAEINVAL is here because some legacy version of winsock uses it
@@ -503,6 +536,7 @@ bool SetProxy(enum Network net, const proxyType &addrProxy) {
     assert(net >= 0 && net < NET_MAX);
     if (!addrProxy.IsValid()) return false;
     LOCK(cs_proxyInfos);
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
     proxyInfo[net] = addrProxy;
     return true;
 }
@@ -510,8 +544,11 @@ bool SetProxy(enum Network net, const proxyType &addrProxy) {
 bool GetProxy(enum Network net, proxyType &proxyInfoOut) {
     assert(net >= 0 && net < NET_MAX);
     LOCK(cs_proxyInfos);
-    if (!proxyInfo[net].IsValid()) return false;
+    //NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
+    if(!proxyInfo[net].IsValid())
+        return false;
     proxyInfoOut = proxyInfo[net];
+    //NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
     return true;
 }
 
@@ -534,10 +571,14 @@ bool HaveNameProxy() {
     return nameProxy.IsValid();
 }
 
-bool IsProxy(const CNetAddr &addr) {
+bool IsProxy(const CNetAddr &addr)
+{
     LOCK(cs_proxyInfos);
-    for (int i = 0; i < NET_MAX; i++) {
-        if (addr == (CNetAddr)proxyInfo[i].proxy) return true;
+    for(int i = 0; i < NET_MAX; i++)
+    {
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
+        if(addr == static_cast<const CNetAddr&>(proxyInfo[i].proxy))
+            return true;
     }
     return false;
 }
@@ -583,9 +624,14 @@ bool ConnectSocket(const CService &addrDest, SOCKET &hSocketRet, int nTimeout,
     }
 }
 
-bool ConnectSocketByName(CService &addr, SOCKET &hSocketRet,
-                         const char *pszDest, int portDefault, int nTimeout,
-                         bool *outProxyConnectionFailed) {
+bool ConnectSocketByName(CService& addr,
+                         SOCKET& hSocketRet,
+                         const char* pszDest,
+                         //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                         int portDefault,
+                         int nTimeout,
+                         bool* outProxyConnectionFailed)
+{
     // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
     std::string strDest;
     int port = portDefault;
@@ -662,20 +708,21 @@ std::string NetworkErrorString(int err) {
     }
 }
 #else
-std::string NetworkErrorString(int err) {
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-    char buf[256];
+std::string NetworkErrorString(int err)
+{
+    std::array<char, 256> buf; //NOLINT(cppcoreguidelines-pro-type-member-init)
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-    const char *s = buf;
+    const char* s = buf.data();
     buf[0] = 0;
 /* Too bad there are two incompatible implementations of the
  * thread-safe strerror. */
 #ifdef STRERROR_R_CHAR_P
     /* GNU variant can return a pointer outside the passed buffer */
-    s = strerror_r(err, buf, sizeof(buf));
+    s = strerror_r(err, buf.data(), sizeof(buf));
 #else
     /* POSIX variant always returns message in buffer */
-    if (strerror_r(err, buf, sizeof(buf))) buf[0] = 0; // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    if(strerror_r(err, buf.data(), sizeof(buf)))
+        buf[0] = 0;
 #endif
     return strprintf("%s (%d)", s, err);
 }
@@ -692,7 +739,9 @@ bool CloseSocket(SOCKET &hSocket) {
     return ret != SOCKET_ERROR;
 }
 
-bool SetSocketNonBlocking(SOCKET &hSocket, bool fNonBlocking) {
+bool SetSocketNonBlocking(SOCKET &hSocket, bool fNonBlocking)
+{
+    //NOLINTBEGIN(cppcoreguidelines-pro-type-vararg)
     if (fNonBlocking) {
 #ifdef WIN32
         u_long nOne = 1;
@@ -716,6 +765,7 @@ bool SetSocketNonBlocking(SOCKET &hSocket, bool fNonBlocking) {
             return false;
         }
     }
+    //NOLINTEND(cppcoreguidelines-pro-type-vararg)
 
     return true;
 }

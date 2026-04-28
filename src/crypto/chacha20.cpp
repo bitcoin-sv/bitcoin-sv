@@ -24,42 +24,28 @@ constexpr static inline uint32_t rotl32(uint32_t v, int c) {
     (c) += (d);                                                                \
     (b) = rotl32((b) ^ (c), 7);
 
-// NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays)
-static const uint8_t sigma[] = "expand 32-byte k";
-static const uint8_t tau[] = "expand 16-byte k";
-// NOLINTEND(cppcoreguidelines-avoid-c-arrays)
 
-void ChaCha20::SetKey(std::span<const uint8_t> k)
+void ChaCha20::SetKeyImpl(const std::span<const uint8_t, 32> k)
 {
-    const uint8_t* constants{};
+    static constexpr std::array<uint8_t, 17> sigma{"expand 32-byte k"};
 
     // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-    input[4] = ReadLE32(k.data() + 0);
-    input[5] = ReadLE32(k.data() + 4);
-    input[6] = ReadLE32(k.data()  + 8);
-    input[7] = ReadLE32(k.data()  + 12);
-    if(k.size() == 32)
-    {
-        // recommended
-        k = k.subspan(16);
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-        constants = sigma;
-    }
-    else
-    {
-        // keylen == 16
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-        constants = tau;
-    }
-    input[8] = ReadLE32(k.data()  + 0);
-    input[9] = ReadLE32(k.data()  + 4);
-    input[10] = ReadLE32(k.data()  + 8);
-    input[11] = ReadLE32(k.data()  + 12);
-    input[0] = ReadLE32(constants + 0);
-    input[1] = ReadLE32(constants + 4);
-    input[2] = ReadLE32(constants + 8);
-    input[3] = ReadLE32(constants + 12);
+    input[0]  = ReadLE32(sigma.data() + 0);
+    input[1]  = ReadLE32(sigma.data() + 4);
+    input[2]  = ReadLE32(sigma.data() + 8);
+    input[3]  = ReadLE32(sigma.data() + 12);
+
+    input[4]  = ReadLE32(k.data() + 0);
+    input[5]  = ReadLE32(k.data() + 4);
+    input[6]  = ReadLE32(k.data() + 8);
+    input[7]  = ReadLE32(k.data() + 12);
+
+    input[8]  = ReadLE32(k.data() + 16);
+    input[9]  = ReadLE32(k.data() + 20);
+    input[10] = ReadLE32(k.data() + 24);
+    input[11] = ReadLE32(k.data() + 28);
     // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
     input[12] = 0;
     input[13] = 0;
     input[14] = 0;
@@ -68,12 +54,6 @@ void ChaCha20::SetKey(std::span<const uint8_t> k)
 
 ChaCha20::ChaCha20() : input{}
 {
-}
-
-// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-ChaCha20::ChaCha20(const std::span<const uint8_t> k)
-{
-    SetKey(k);
 }
 
 void ChaCha20::SetIV(uint64_t iv) {

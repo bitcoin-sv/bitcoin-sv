@@ -346,7 +346,7 @@ public:
                                bool fAddnode = false);
     bool CheckIncomingNonce(uint64_t nonce);
 
-    bool ForNode(NodeId id, std::function<bool(const CNodePtr& pnode)> func);
+    bool ForNode(NodeId id, const std::function<bool(const CNodePtr& pnode)>& func);
 
     void PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg, StreamType stream = StreamType::UNKNOWN);
 
@@ -606,7 +606,7 @@ public:
 
         void AddToPool(
             const std::shared_ptr<CNode>& node,
-            std::function<void(std::weak_ptr<CNode>)> function,
+            const std::function<void(std::weak_ptr<CNode>)>& function,
             std::shared_ptr<task::CCancellationSource> source);
 
         bool HasReachedSoftAsyncTaskLimit(NodeId id)
@@ -729,15 +729,15 @@ private:
     std::vector<CSubNet> vMempoolSyncPeers {};
     mutable CCriticalSection cs_vMempoolSyncPeers {};
 
-    unsigned int nSendBufferMaxSize;
-    unsigned int nReceiveFloodSize;
+    unsigned int nSendBufferMaxSize{};
+    unsigned int nReceiveFloodSize{};
 
     std::vector<ListenSocket> vhListenSocket;
-    std::atomic<bool> fNetworkActive;
+    std::atomic<bool> fNetworkActive{true};
     banmap_t setBanned;
     CCriticalSection cs_setBanned;
-    bool setBannedIsDirty;
-    bool fAddressesInitialized;
+    bool setBannedIsDirty{false};
+    bool fAddressesInitialized{};
     CAddrMan addrman;
     std::deque<std::string> vOneShots;
     CCriticalSection cs_vOneShots;
@@ -746,7 +746,7 @@ private:
     std::vector<CNodePtr> vNodes;
     std::list<CNodePtr> vNodesDisconnected;
     mutable CCriticalSection cs_vNodes;
-    std::atomic<NodeId> nLastNodeId;
+    std::atomic<NodeId> nLastNodeId{};
 
     /** Additional streams we want to open to peers */
     std::list<NodeConnectInfo> mPendingStreams {};
@@ -763,13 +763,13 @@ private:
 
     std::shared_ptr<CSemaphore> semOutbound {nullptr};
     std::shared_ptr<CSemaphore> semAddnode {nullptr};
-    int nMaxConnections;
+    int nMaxConnections{};
     int nMaxConnectionsFromAddr;
-    int nMaxOutbound;
-    int nMaxAddnode;
+    int nMaxOutbound{};
+    int nMaxAddnode{};
     int nMaxFeeler;
-    std::atomic<int32_t> nBestHeight;
-    CClientUIInterface *clientInterface;
+    std::atomic<int32_t> nBestHeight{};
+    CClientUIInterface* clientInterface{};
 
     /** SipHasher seeds for deterministic randomness */
     const uint64_t nSeed0, nSeed1;
@@ -779,7 +779,7 @@ private:
 
     std::condition_variable condMsgProc;
     std::mutex mutexMsgProc;
-    std::atomic<bool> flagInterruptMsgProc;
+    std::atomic<bool> flagInterruptMsgProc{};
 
     /** TxIdTracker */
     TxIdTrackerSPtr mTxIdTracker {nullptr};
@@ -1305,7 +1305,7 @@ public:
      *       node instance no longer exists.
      */
     void RunAsyncProcessing(
-        std::function<void(std::weak_ptr<CNode>)> function,
+        const std::function<void(std::weak_ptr<CNode>)>& function,
         std::shared_ptr<task::CCancellationSource> source);
 };
 

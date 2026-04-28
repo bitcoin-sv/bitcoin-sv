@@ -62,7 +62,7 @@ protected:
     void InvalidTxMessageZMQ(std::string_view message) override;
 
 private:
-    void *pcontext;
+    void* pcontext{};
     std::list<CZMQAbstractNotifier *> notifiers;
     std::shared_ptr<CZMQPublisher> zmqPublisher;
     std::vector<boost::signals2::scoped_connection> slotConnections {};

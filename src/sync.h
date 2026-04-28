@@ -53,15 +53,15 @@ LEAVE_CRITICAL_SECTION(mutex); // no RAII
  * Template mixin that adds -Wthread-safety locking
  * annotations to a subset of the mutex API.
  */
-template <typename PARENT> class LOCKABLE AnnotatedMixin : public PARENT {
+template<typename PARENT>
+class LOCKABLE AnnotatedMixin : public PARENT
+{
 public:
     void lock() EXCLUSIVE_LOCK_FUNCTION() { PARENT::lock(); }
 
     void unlock() UNLOCK_FUNCTION() { PARENT::unlock(); }
 
-    bool try_lock() EXCLUSIVE_TRYLOCK_FUNCTION(true) {
-        return PARENT::try_lock();
-    }
+    bool try_lock() EXCLUSIVE_TRYLOCK_FUNCTION(true) { return PARENT::try_lock(); }
 };
 
 #ifdef DEBUG_LOCKORDER
@@ -106,7 +106,6 @@ public:
     }
 };
 
-typedef CCriticalSection CDynamicCriticalSection;
 /** Wrapped boost mutex: supports waiting but not recursive locking */
 typedef AnnotatedMixin<boost::mutex> CWaitableCriticalSection;
 
@@ -119,16 +118,19 @@ void PrintLockContention(const char *pszName, const char *pszFile, int nLine);
 #endif
 
 /** Wrapper around boost::unique_lock<Mutex> */
-template <typename Mutex>
+template<typename Mutex>
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
-class SCOPED_LOCKABLE CMutexLock {
+class SCOPED_LOCKABLE CMutexLock
+{
 private:
     boost::unique_lock<Mutex> lock;
 
-    void Enter(const char *pszName, const char *pszFile, int nLine) {
-        EnterCritical(pszName, pszFile, nLine, (void *)(lock.mutex()));
+    void Enter(const char* pszName, const char* pszFile, int nLine)
+    {
+        EnterCritical(pszName, pszFile, nLine, (void*)(lock.mutex()));
 #ifdef DEBUG_LOCKCONTENTION
-        if (!lock.try_lock()) {
+        if(!lock.try_lock())
+        {
             PrintLockContention(pszName, pszFile, nLine);
 #endif
             lock.lock();
@@ -137,36 +139,49 @@ private:
 #endif
     }
 
-    bool TryEnter(const char *pszName, const char *pszFile, int nLine) {
-        EnterCritical(pszName, pszFile, nLine, (void *)(lock.mutex()), true);
+    bool TryEnter(const char* pszName, const char* pszFile, int nLine)
+    {
+        EnterCritical(pszName, pszFile, nLine, (void*)(lock.mutex()), true);
         lock.try_lock();
-        if (!lock.owns_lock()) LeaveCritical();
+        if(!lock.owns_lock())
+            LeaveCritical();
         return lock.owns_lock();
     }
 
 public:
-    CMutexLock(Mutex &mutexIn, const char *pszName, const char *pszFile,
-               int nLine, bool fTry = false) EXCLUSIVE_LOCK_FUNCTION(mutexIn)
-        : lock(mutexIn, boost::defer_lock) {
-        if (fTry)
+    CMutexLock(Mutex& mutexIn,
+               const char* pszName,
+               const char* pszFile,
+               int nLine,
+               bool fTry = false) EXCLUSIVE_LOCK_FUNCTION(mutexIn)
+        : lock(mutexIn, boost::defer_lock)
+    {
+        if(fTry)
             TryEnter(pszName, pszFile, nLine);
         else
             Enter(pszName, pszFile, nLine);
     }
 
-    CMutexLock(Mutex *pmutexIn, const char *pszName, const char *pszFile,
-               int nLine, bool fTry = false) EXCLUSIVE_LOCK_FUNCTION(pmutexIn) {
-        if (!pmutexIn) return;
+    CMutexLock(Mutex* pmutexIn,
+               const char* pszName,
+               const char* pszFile,
+               int nLine,
+               bool fTry = false) EXCLUSIVE_LOCK_FUNCTION(pmutexIn)
+    {
+        if(!pmutexIn)
+            return;
 
         lock = boost::unique_lock<Mutex>(*pmutexIn, boost::defer_lock);
-        if (fTry)
+        if(fTry)
             TryEnter(pszName, pszFile, nLine);
         else
             Enter(pszName, pszFile, nLine);
     }
 
-    ~CMutexLock() UNLOCK_FUNCTION() {
-        if (lock.owns_lock()) LeaveCritical();
+    ~CMutexLock() UNLOCK_FUNCTION()
+    {
+        if(lock.owns_lock())
+            LeaveCritical();
     }
 
     operator bool() { return lock.owns_lock(); }
@@ -198,7 +213,8 @@ typedef CMutexLock<CCriticalSection> CCriticalBlock;
         LeaveCritical();                                                       \
     }
 
-class CSemaphore {
+class CSemaphore
+{
 private:
     boost::condition_variable condition;
     boost::mutex mutex;
@@ -207,22 +223,27 @@ private:
 public:
     CSemaphore(int init) : value(init) {}
 
-    void wait() {
+    void wait()
+    {
         boost::unique_lock<boost::mutex> lock(mutex);
-        while (value < 1) {
+        while(value < 1)
+        {
             condition.wait(lock);
         }
         value--;
     }
 
-    bool try_wait() {
+    bool try_wait()
+    {
         boost::unique_lock<boost::mutex> lock(mutex);
-        if (value < 1) return false;
+        if(value < 1)
+            return false;
         value--;
         return true;
     }
 
-    void post() {
+    void post()
+    {
         {
             boost::unique_lock<boost::mutex> lock(mutex);
             value++;
@@ -279,5 +300,63 @@ public:
 
     operator bool() { return fHaveGrant; }
 };
+
+namespace bsv
+{
+    class CAPABILITY("mutex") mutex
+    {
+        std::mutex mtx_;
+
+    public:
+        void lock() EXCLUSIVE_LOCK_FUNCTION() { mtx_.lock(); }
+        void unlock() UNLOCK_FUNCTION() { mtx_.unlock(); }
+        bool try_lock() EXCLUSIVE_TRYLOCK_FUNCTION(true) { return mtx_.try_lock(); }
+    };
+
+    // Matches the C++ std::BasicLockable named requirement
+    template<typename L>
+    concept BasicLockable = requires(L& l)
+    {
+        l.lock();
+        l.unlock();
+    };
+
+    template<BasicLockable M>
+    class SCOPED_LOCKABLE lock_guard
+    {
+        std::lock_guard<M> guard_;
+
+    public:
+        lock_guard(M& mtx) EXCLUSIVE_LOCK_FUNCTION(mtx) : guard_{mtx} {}
+
+        lock_guard(const lock_guard&) = delete;
+        lock_guard& operator=(const lock_guard&) = delete;
+
+        lock_guard(lock_guard&&) = delete;
+        lock_guard& operator=(lock_guard&&) = delete;
+
+        ~lock_guard() UNLOCK_FUNCTION() {}
+    };
+
+    template<BasicLockable M>
+    class SCOPED_LOCKABLE unique_lock
+    {
+        std::unique_lock<M> lock_;
+
+    public:
+        unique_lock(M& m) EXCLUSIVE_LOCK_FUNCTION(m) : lock_{m} {}
+
+        unique_lock(const unique_lock&) = delete;
+        unique_lock& operator=(const unique_lock&) = delete;
+
+        unique_lock(unique_lock&&) = default;
+        unique_lock& operator=(unique_lock&&) = default;
+
+        ~unique_lock() UNLOCK_FUNCTION() {}
+
+        void lock() EXCLUSIVE_LOCK_FUNCTION() { lock_.lock(); }
+        void unlock() UNLOCK_FUNCTION() { lock_.unlock(); }
+    };
+}
 
 #endif // BITCOIN_SYNC_H

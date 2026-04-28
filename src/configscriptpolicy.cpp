@@ -34,7 +34,9 @@ bool LessThanZero(
     return LessThan( argValue, err, errorMessage, 0 );
 }
 
-ConfigScriptPolicy::ConfigScriptPolicy() {
+//NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+ConfigScriptPolicy::ConfigScriptPolicy()
+{
     ResetDefault();
 }
 

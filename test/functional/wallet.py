@@ -367,14 +367,14 @@ class WalletTest(BitcoinTestFramework):
         #   - True: unicode escaped as \u....
         #   - False: unicode directly as UTF-8
         for mode in [True, False]:
-            self.nodes[0].ensure_ascii = mode
+            self.nodes[0].rpc.ensure_ascii = mode
             # unicode check: Basic Multilingual Plane, Supplementary Plane respectively
             for s in [u'рыба', u'𝅘𝅥𝅯']:
                 addr = self.nodes[0].getaccountaddress(s)
                 label = self.nodes[0].getaccount(addr)
                 assert_equal(label, s)
                 assert (s in self.nodes[0].listaccounts().keys())
-        self.nodes[0].ensure_ascii = True  # restore to default
+        self.nodes[0].rpc.ensure_ascii = True  # restore to default
 
         # maintenance tests
         maintenance = [

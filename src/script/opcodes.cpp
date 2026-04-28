@@ -7,7 +7,7 @@
 
 std::ostream& operator<<(std::ostream& os, const opcodetype& opcode)
 {
-    if(opcode >= 1 && opcode <= 75)
+    if(opcode >= 1 && opcode < OP_PUSHDATA1)
     {
         os << static_cast<int>(opcode);
         return os;

@@ -17,6 +17,7 @@ CJournal::CJournal(const CJournal& that)
 {
     // Lock journal we are copying from, and copy its contents
     std::shared_lock lock { that.mMtx };
+    //NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer) lock required
     mTransactions = that.mTransactions;
 }
 
@@ -292,7 +293,7 @@ void CJournalTester::dumpJournalContents(std::ostream& str) const
     // Dump out the contents
     for(const auto& txn : index)
     {
-        str << txn.getTxn()->GetId().ToString() << std::endl;
+        str << txn.getTxn()->GetId().ToString() << '\n';
     }
 }
 

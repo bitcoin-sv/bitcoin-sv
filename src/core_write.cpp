@@ -14,12 +14,11 @@
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 #include <univalue.h>
-#include <variant>
 
 std::string FormatScript(const CScript &script) {
     std::string ret;
     CScript::const_iterator it = script.begin();
-    opcodetype op;
+    opcodetype op{};
     while (it != script.end()) {
         CScript::const_iterator it2 = it;
         std::vector<uint8_t> vch;
@@ -43,8 +42,10 @@ std::string FormatScript(const CScript &script) {
             }
 
             if (vch.size() > 0) {
+                //NOLINTBEGIN(*-narrowing-conversions)
                 ret += strprintf("0x%x 0x%x ", HexStr(it2, it - vch.size()),
                                  HexStr(it - vch.size(), it));
+                //NOLINTEND(*-narrowing-conversions)
             } else {
                 ret += strprintf("0x%x ", HexStr(it2, it));
             }
@@ -59,6 +60,7 @@ std::string FormatScript(const CScript &script) {
     return ret.substr(0, ret.size() - 1);
 }
 
+// NOLINTNEXTLINE(cert-err58-cpp)
 const std::map<uint8_t, std::string> mapSigHashTypes = {
     {SIGHASH_ALL, "ALL"},
     {SIGHASH_ALL | SIGHASH_ANYONECANPAY, "ALL|ANYONECANPAY"},
@@ -100,7 +102,7 @@ void ScriptToAsmStr(const CScript& script,
                     const int32_t txnVersion,
                     const bool fAttemptSighashDecode)
 {
-    opcodetype opcode;
+    opcodetype opcode{};
     std::vector<uint8_t> vch;
     CScript::const_iterator pc = script.begin();
     while (pc < script.end()) 
@@ -176,20 +178,21 @@ void ScriptToAsmStr(const CScript& script,
 std::string EncodeHexTx(const CTransaction& tx, const int serialFlags)
 {
     CStringWriter stringWriter;
-    stringWriter.ReserveAdditional(tx.GetTotalSize() * 2);
+    stringWriter.ReserveAdditional(tx.GetTotalSize() * 2UL);
     EncodeHexTx(tx, stringWriter, serialFlags);
     return stringWriter.MoveOutString();
 }
 
 class CHexWriter
 {
-    CTextWriter& tw;
+    CTextWriter& tw; //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+
 public:
     CHexWriter(CTextWriter& twIn) : tw(twIn) {}
 
     void write(const char* pch, size_t nSize)
     {
-        HexStr(pch, pch + nSize, tw);
+        HexStr(pch, pch + nSize, tw); //NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     template <typename T> CHexWriter& operator<<(const T& obj)
@@ -208,15 +211,14 @@ void EncodeHexTx(const CTransaction& tx, CTextWriter& writer, const int /*serial
 
 void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, ProtocolEra era, UniValue &out)
 {
-    txnouttype type;
-    std::vector<CTxDestination> addresses;
-    int nRequired;
-
     out.pushKV("asm", ScriptToAsmStr(scriptPubKey));
     if (fIncludeHex) {
         out.pushKV("hex", HexStr(scriptPubKey.begin(), scriptPubKey.end()));
     }
 
+    txnouttype type{};
+    std::vector<CTxDestination> addresses;
+    int nRequired{};
     if (!ExtractDestinations(scriptPubKey, era, type, addresses, nRequired)) {
         out.pushKV("type", GetTxnOutputType(type));
         return;
@@ -311,9 +313,11 @@ void TxToJSON(const CTransaction& tx,
         entry.pushKV("confirmations", blockDataVal.confirmations);
         if (blockDataVal.time.has_value())
         {
+            //NOLINTBEGIN(bugprone-unchecked-optional-access)
             entry.pushKV("time", blockDataVal.time.value());
             entry.pushKV("blocktime", blockDataVal.blockTime.value());
             entry.pushKV("blockheight", blockDataVal.blockHeight.value());
+            //NOLINTEND(bugprone-unchecked-optional-access)
         }
     }
 
@@ -331,10 +335,6 @@ void ScriptPublicKeyToJSON(const CScript& scriptPubKey,
                            bool fIncludeHex,
                            ProtocolEra era,
                            CJSONWriter& entry) {
-    txnouttype type;
-    std::vector<CTxDestination> addresses;
-    int nRequired;
-
     entry.pushK("asm");
     entry.pushQuote();
     ScriptToAsmStr(scriptPubKey, entry.getWriter());
@@ -347,6 +347,9 @@ void ScriptPublicKeyToJSON(const CScript& scriptPubKey,
         entry.pushQuote();
     }
 
+    txnouttype type{};
+    std::vector<CTxDestination> addresses;
+    int nRequired{};
     if (!ExtractDestinations(scriptPubKey, era, type, addresses, nRequired))
     {
         entry.pushKV("type", GetTxnOutputType(type));

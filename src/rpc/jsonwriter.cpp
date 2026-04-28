@@ -117,6 +117,7 @@ void CJSONWriter::indentStr()
             jWriter.Write('\n');
         }
 
+        //NOLINTNEXTLINE(bugprone-implicit-widening-of-multiplication-result)
         size_t indentation = _indentSize * _indentLevel;
         jWriter.Write(std::string(indentation, ' '));
         _firstWrite = false;

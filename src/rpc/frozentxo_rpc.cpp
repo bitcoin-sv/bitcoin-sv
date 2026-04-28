@@ -896,8 +896,8 @@ Examples:
 
 void RegisterFrozenTransactionRPCCommands(CRPCTable& t)
 {
-    // clang-format off
-    static const CRPCCommand commands[] = {
+    static const std::array<CRPCCommand, 8> commands
+    {{
     //  category      name                            actor (function)                okSafeMode
     //  ------------- -----------------------         ---------------------           ----------
         { "frozentxo", "addToPolicyBlacklist",          addToPolicyBlacklist,           true ,  {"funds"} },
@@ -908,11 +908,8 @@ void RegisterFrozenTransactionRPCCommands(CRPCTable& t)
         { "frozentxo", "addToConfiscationTxidWhitelist",addToConfiscationTxidWhitelist, true ,  {"txs"}   },
         { "frozentxo", "clearConfiscationWhitelist",    clearConfiscationWhitelist,     true ,  {}        },
         { "frozentxo", "queryConfiscationTxidWhitelist",queryConfiscationTxidWhitelist, true ,  {"verbose"} }
-    };
-    // clang-format on
+    }};
 
-    for (auto& vc: commands)
-    {
+    for(const auto& vc: commands)
         t.appendCommand(vc.name, &vc);
-    }
 }

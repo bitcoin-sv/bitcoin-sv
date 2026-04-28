@@ -5,11 +5,14 @@
 #ifndef BITCOIN_RPCTOJSON_H
 #define BITCOIN_RPCTOJSON_H
 
-#include "uint256.h"
-#include "httpserver.h" //for HTTPRequest
-#include <univalue.h>
+#include <functional>
 
-class CScript;
+struct BlockStatus;
+class Config;
+class CTextWriter;
+class HTTPRequest;
+class JSONRPCRequest;
+class UniValue;
 
 UniValue blockStatusToJSON(const BlockStatus&);
 
@@ -18,21 +21,22 @@ void getrawtransaction(const Config& config,
                        const JSONRPCRequest& request,
                        HTTPRequest& httpReq,
                        bool processedInBatch);
+
 void getrawtransaction(const Config& config,
                        const JSONRPCRequest& request,
                        CTextWriter& textWriter,
                        bool processedInBatch,
-                       std::function<void()>HttpCallback);
+                       const std::function<void()>& httpCallback);
+
 void decoderawtransaction(const Config& config,
                           const JSONRPCRequest& request,
                           HTTPRequest& httpReq, 
                           bool processedInBatch);
+
 void decoderawtransaction(const Config& config,
                           const JSONRPCRequest& request,
                           CTextWriter& textWriter,
                           bool processedInBatch,
-                          std::function<void()>HttpCallback);
-
-
+                          const std::function<void()>& httpCallback);
 
 #endif // BITCOIN_RPCTOJSON_H

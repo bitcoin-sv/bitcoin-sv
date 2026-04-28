@@ -5,6 +5,7 @@
 #include "msg_buffer.h"
 
 #include "cmpctblock_parser.h"
+#include "disk_backed_parser.h"
 #include "single_seg_parser.h"
 #include "msg_parser_buffer.h"
 #include "net/block_parser.h"
@@ -12,6 +13,7 @@
 #include "net/net_message.h"
 #include "p2p_msg_lengths.h"
 #include "protocol.h"
+
 #include <cstdint>
 #include <ios>
 #include <memory>
@@ -27,31 +29,37 @@ size_t msg_buffer::size() const
 }
 
 bool msg_buffer::empty() const
-{ 
+{
     return size() == 0; 
 }
 
 const uint8_t* msg_buffer::data() const
-{ 
+{
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     return header_.data() + read_pos_; 
 }
 
 void msg_buffer::command(const string& cmd)
-{ 
+{
     command_ = cmd;
 }
 
 void msg_buffer::payload_len(uint64_t len)
-{ 
+{
     payload_len_ = len;
 }
 
 static std::unique_ptr<msg_parser> make_parser(const string& cmd,
-                                               const uint64_t payload_len)
+                                               const uint64_t payload_len,
+                                               uint64_t max_receive_buffer)
 {
     // Note: It's not a protocol error to call make_parser with an
     // empty cmd string, that's just another example of an unknown
     // command which is detected in later processing.
+
+    // Use disk-backed parser for messages larger than threshold
+    if(payload_len > max_receive_buffer)
+        return make_unique<msg_parser>(disk_backed_parser{payload_len});
 
     if(cmd == "block")
         return make_unique<msg_parser>(block_parser{});
@@ -72,9 +80,10 @@ void msg_buffer::write(span<const uint8_t> s)
     else
     {
         if(!payload_)
-            payload_ = make_unique<msg_parser_buffer>(make_parser(command_, 
-                                                                  payload_len_.value()));
-
+            payload_ = make_unique<msg_parser_buffer>(make_parser(command_,
+            // NOLINTNEXTLINE(bugprone-unchecked-optional-access) protected by header_complete()
+                                                                  payload_len_.value(),
+                                                                  max_recv_buffer_));
         (*payload_)(s);
     }
 }
@@ -90,6 +99,7 @@ void msg_buffer::read(span<uint8_t> s)
         if(end_pos > header_.size())
             throw std::ios_base::failure( "msg_buffer::read(): end of data");
 
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         copy(&header_[read_pos_], &header_[read_pos_] + s.size(), s.begin());
         read_pos_ = end_pos;
     }
@@ -98,7 +108,7 @@ void msg_buffer::read(span<uint8_t> s)
         const auto payload_len{payload_ ? payload_->readable_size() : 0};
         if(end_pos > header_.size() + payload_len)
             throw std::ios_base::failure( "msg_buffer::read(): end of data");
-    
+
         if(payload_)
         {
             payload_->read(read_pos_ - header_.size(), s);
@@ -109,11 +119,13 @@ void msg_buffer::read(span<uint8_t> s)
 
 void msg_buffer::read(char* p, size_t n)
 {
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     read(span{reinterpret_cast<uint8_t*>(p), n});
 }
 
 void msg_buffer::write(const char* p, size_t n)
-{ 
+{
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     write(span{reinterpret_cast<const uint8_t*>(p), n});
 }
 

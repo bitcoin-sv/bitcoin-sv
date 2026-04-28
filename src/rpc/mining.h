@@ -9,8 +9,6 @@
 #include <functional>
 #include <memory>
 
-#include "consensus/params.h"
-
 class Config;
 class CBlock;
 class CReserveScript;
@@ -21,9 +19,9 @@ UniValue generateBlocks(const Config& config,
                         std::shared_ptr<CReserveScript> coinbaseScript,
                         int nGenerate, uint64_t nMaxTries, bool keepScript);
 
-UniValue processBlock(const Config& config,
-	const std::shared_ptr<CBlock>& block,
-	std::function<bool(const Config&, const std::shared_ptr<CBlock>&)> performBlockOperation);
+UniValue processBlock(const Config&,
+    const std::shared_ptr<CBlock>&,
+    const std::function<bool(const Config&, const std::shared_ptr<CBlock>&)>& performBlockOperation);
 
 /** Modify the extranonce in a block */
 void IncrementExtraNonce(CBlock *pblock,

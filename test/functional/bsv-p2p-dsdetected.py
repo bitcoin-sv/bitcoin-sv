@@ -78,6 +78,9 @@ class DSDetectedTests(BitcoinTestFramework):
         self.extra_args = [["-dsdetectedwebhookurl=http://127.0.0.1:8888/dsdetected/webhook",
                             "-banscore=100000",
                             "-safemodemaxforkdistance=288"]]
+        self.server = None
+        self.serverThread = None
+        self.conn = None
 
     def start_webhook_server(self):
         self.server = HTTPServer(('localhost', 8888), partial(WebHookService))

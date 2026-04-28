@@ -41,6 +41,8 @@ class FrozenTXOConfiscation_AssumeWhitelisted(BitcoinTestFramework):
         self.extra_args = [self.extra_args_common,
                            self.extra_args_common + ["-enableassumewhitelistedblockdepth=1", "-assumewhitelistedblockdepth=5"]]
         self.block_count = 0
+        self.prvkey = None
+        self.pubkey = None
 
     def _init(self):
         # Private key used in scripts with CHECKSIG

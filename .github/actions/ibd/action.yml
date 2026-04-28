@@ -19,10 +19,24 @@ runs:
   steps:
     - name: Install Perf
       run: |
-        apt-get update \
-        && apt-get install -y \
-                   linux-tools-$(uname -r) \
-                   linux-headers-$(uname -r)
+        apt-get update
+        if ! apt-get install -y linux-tools-$(uname -r) linux-headers-$(uname -r); then
+          # Host kernel may be from a different Ubuntu release than the container.
+          # Map kernel version to the Ubuntu codename that provides it.
+          case "$(uname -r)" in
+            5.4.*)  codename=focal  ;;
+            5.15.*) codename=jammy  ;;
+            6.5.*)  codename=mantic ;;
+            6.8.*)  codename=noble  ;;
+            *)      echo "Unknown kernel $(uname -r), cannot determine source repo"; exit 1 ;;
+          esac
+          echo "deb http://archive.ubuntu.com/ubuntu ${codename} main universe" \
+            > /etc/apt/sources.list.d/${codename}-kernel-tools.list
+          echo "deb http://archive.ubuntu.com/ubuntu ${codename}-updates main universe" \
+            >> /etc/apt/sources.list.d/${codename}-kernel-tools.list
+          apt-get update
+          apt-get install -y linux-tools-$(uname -r) linux-headers-$(uname -r)
+        fi
       shell: bash
     - name: Configure bitcoind
       run: |
@@ -31,7 +45,7 @@ runs:
       shell: bash
     - name: restore cache
       if: inputs.restore == 'true'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5
       with:
        key: ibd-
        restore-keys: |
@@ -42,7 +56,7 @@ runs:
     - name: delete restored cache
       if: inputs.restore == 'true'
       run: |
-        gh cache delete --all
+        gh cache delete --all -R ${{ github.repository }}
       shell: bash
     - name: Set begin height environment variable
       run: |
@@ -89,7 +103,7 @@ runs:
         echo "prefix=ibd-${now}-${{ inputs.duration }}s-${begin_height}-${end_height}" >> $GITHUB_ENV
       shell: bash
     - name: Upload bitcoind files
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
       with:
        name: ${{ env.prefix }}-.bitcoin
        path: |
@@ -105,13 +119,13 @@ runs:
         > ${{ env.prefix }}-flamegraph.svg
       shell: bash
     - name: Upload flamegraph
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
       with:
        name: ${{ env.prefix }}-flamegraph.svg
        path: ${{ env.prefix }}-flamegraph.svg
     - name: cache save
       if: inputs.save == 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5
       with:
        path: |
          ~/.bitcoin/

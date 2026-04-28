@@ -11,6 +11,7 @@
 #include "primitives/block.h"
 #include "protocol.h"
 
+#include <array>
 #include <memory>
 #include <optional>
 #include <string>
@@ -25,8 +26,9 @@ struct CDNSSeedData {
           supportsServiceBitsFiltering(supportsServiceBitsFilteringIn) {}
 };
 
-struct SeedSpec6 {
-    uint8_t addr[16]; // NOLINT(cppcoreguidelines-avoid-c-arrays)
+struct SeedSpec6
+{
+    std::array<uint8_t, 16> addr;
     uint16_t port;
 };
 

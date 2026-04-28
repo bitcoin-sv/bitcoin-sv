@@ -118,16 +118,14 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
     return candidate;
 }
 
-
-std::vector<uint256> GetMerkleProofBranches(CBlockRef pblock)
+std::vector<uint256> GetMerkleProofBranches(const CBlock& block)
 {
-    std::vector<uint256> ret;
+    const auto len = block.vtx.size();
     std::vector<uint256> leaves;
-    int len = pblock->vtx.size();
-
-    for (int i = 0; i < len; i++)
+    leaves.reserve(len);
+    for(size_t i = 0; i < len; ++i)
     {
-        leaves.emplace_back(pblock->vtx[i]->GetHash());
+        leaves.emplace_back(block.vtx[i]->GetHash());
     }
 
     return ComputeMerkleBranch(leaves, 0);
@@ -185,7 +183,7 @@ UniValue MkMiningCandidateJson(bool coinbaseRequired, CMiningCandidateRef &candi
     ret.push_back(Pair("sizeWithoutCoinbase", static_cast<uint64_t>(block->GetSizeWithoutCoinbase())));
 
     // merkleProof:
-    std::vector<uint256> brancharr = GetMerkleProofBranches(block);
+    std::vector<uint256> brancharr = GetMerkleProofBranches(*block);
     UniValue merkleProof(UniValue::VARR);
     for (const auto &i : brancharr)
     {
@@ -342,7 +340,7 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
 
     // Merkle root
     {
-        std::vector<uint256> merkleProof = GetMerkleProofBranches(block);
+        std::vector<uint256> merkleProof = GetMerkleProofBranches(*block);
         uint256 t = block->vtx[0]->GetHash();
         block->hashMerkleRoot = CalculateMerkleRoot(t, merkleProof);
     }
@@ -380,15 +378,15 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
 
 void RegisterMiningFBBRPCCommands(CRPCTable& t)
 {
-    static const CRPCCommand commands[] =
-    {
+    static const std::array<CRPCCommand, 2> commands
+    {{
     //  category              name                      actor (function)         okSafeMode
     //  --------------------- ------------------------  -----------------------  ----------
         { "mining",             "getminingcandidate",     getminingcandidate,     true, {"coinbase"}  },
         { "mining",             "submitminingsolution",   submitminingsolution,   true, {}  },
-    };
+    }};
 
-    for (auto& cmd : commands)
+    for(const auto& cmd : commands)
         t.appendCommand(cmd.name, &cmd);
 }
 

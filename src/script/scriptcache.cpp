@@ -11,10 +11,14 @@
 #include "util.h"
 #include <mutex>
 
+//NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 std::mutex cs_script_cache;
+
+//NOLINTBEGIN(cert-err58-cpp)
 static auto scriptExecutionCache =
     std::make_unique<CuckooCache::cache<uint256, SignatureCacheHasher>>();
 static uint256 scriptExecutionCacheNonce(GetRandHash());
+//NOLINTEND(cert-err58-cpp)
 
 static void InitScriptExecutionCacheUnlocked() 
 {
@@ -53,6 +57,7 @@ uint256 GetScriptCacheKey(const CTransaction &tx, uint32_t flags) {
     CSHA256()
         .Write(scriptExecutionCacheNonce.begin(), 55 - sizeof(flags) - 32)
         .Write(tx.GetHash().begin(), 32)
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
         .Write((uint8_t *)&flags, sizeof(flags))
         .Finalize(CSHA256::span{key.begin(), CSHA256::OUTPUT_SIZE});
 

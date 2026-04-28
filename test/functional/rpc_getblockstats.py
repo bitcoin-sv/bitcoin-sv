@@ -58,6 +58,7 @@ class GetblockstatsTest(BitcoinTestFramework):
         self.num_nodes = 2
         self.extra_args = [['-txindex'], ['-paytxfee=0.003']]
         self.setup_clean_chain = True
+        self.expected_stats = None
 
     def get_stats(self):
         return [self.nodes[0].getblockstatsbyheight(height=self.start_height + i) for i in range(self.max_stat_pos + 1)]

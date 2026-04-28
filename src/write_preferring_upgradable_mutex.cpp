@@ -24,6 +24,23 @@ void WPUSMutex::ReadLock(Lock& lockHandle)
     }
 }
 
+namespace
+{
+    class PendingGuard {
+        std::atomic<int>& pending;
+    public:
+        PendingGuard(std::atomic<int>& in) : pending{in} { ++pending; }
+
+        PendingGuard(const PendingGuard&) = delete;
+        PendingGuard& operator=(const PendingGuard&) = delete;
+
+        PendingGuard(PendingGuard&&) = delete;
+        PendingGuard& operator=(PendingGuard&&) = delete;
+
+        ~PendingGuard() { --pending; }
+    };
+}
+
 auto WPUSMutex::WriteLock() -> Lock
 {
     std::unique_lock lock{mMutex};
@@ -31,12 +48,7 @@ auto WPUSMutex::WriteLock() -> Lock
     // Even though mWritePending is atomic for access without mMutex lock
     // outside WPUSMutex we want to increment it only under mMutex lock to
     // prevent unnecessary mTryTakeLock wakeups
-    class PendingGuard {
-        std::atomic<int>& pending;
-    public:
-        PendingGuard(std::atomic<int>& in) : pending{in} { ++pending; }
-        ~PendingGuard() { --pending; }
-    } pendingGuard { mWritePending };
+    PendingGuard guard{ mWritePending };
 
     mTryTakeLock.wait(lock, [this]{ return (mLock == 0); });
 
@@ -58,12 +70,7 @@ bool WPUSMutex::TryWriteLock(Lock& lockHandle)
     // Even though mWritePending is atomic for access without mMutex lock
     // outside WPUSMutex we want to increment it only under mMutex lock to
     // prevent unnecessary mTryTakeLock wakeups
-    class PendingGuard {
-        std::atomic<int>& pending;
-    public:
-        PendingGuard(std::atomic<int>& in) : pending{in} { ++pending; }
-        ~PendingGuard() { --pending; }
-    } pendingGuard { mWritePending };
+    PendingGuard guard{ mWritePending };
 
     auto canTakeWriteLock =
         [this, &lockHandle]

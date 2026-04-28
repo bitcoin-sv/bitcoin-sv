@@ -16,12 +16,17 @@
 namespace {
 
 /** A class that deserializes a single CTransaction one time. */
-class TxInputStream {
+class TxInputStream
+{
 public:
-    TxInputStream(int nTypeIn, int nVersionIn, const uint8_t *txTo,
-                  size_t txToLen)
-        : m_type(nTypeIn), m_version(nVersionIn), m_data(txTo),
-          m_remaining(txToLen) {}
+    //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    TxInputStream(int nTypeIn, int nVersionIn, const uint8_t* txTo, size_t txToLen)
+        : m_type(nTypeIn),
+          m_version(nVersionIn),
+          m_data(txTo),
+          m_remaining(txToLen)
+    {
+    }
 
     void read(char *pch, size_t nSize) {
         if (nSize > m_remaining)
@@ -38,7 +43,7 @@ public:
 
         memcpy(pch, m_data, nSize);
         m_remaining -= nSize;
-        m_data += nSize;
+        m_data += nSize; //NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     template <typename T> TxInputStream &operator>>(T &obj) {
@@ -50,9 +55,9 @@ public:
     int GetType() const { return m_type; }
 
 private:
-    const int m_type;
-    const int m_version;
-    const uint8_t *m_data;
+    const int m_type;    //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+    const int m_version; //NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+    const uint8_t* m_data;
     size_t m_remaining;
 };
 
@@ -74,6 +79,7 @@ static int verify_script(const Config& config,
                          unsigned int scriptPubKeyLen,
                          Amount amount,
                          const uint8_t* txTo,
+                         //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                          unsigned int txToLen,
                          unsigned int nIn,
                          unsigned int flags,
@@ -102,6 +108,7 @@ static int verify_script(const Config& config,
             res = VerifyScript(params,
                                source->GetToken(),
                                tx.vin[nIn].scriptSig,
+                               //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                                CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen),
                                flags,
                                TransactionSignatureChecker(&tx, nIn, amount, txdata));
@@ -116,6 +123,7 @@ static int verify_script(const Config& config,
 
 int bitcoinconsensus_verify_script_with_amount(const Config& config,
                                                const uint8_t* scriptPubKey,
+                                               //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                                unsigned int scriptPubKeyLen,
                                                int64_t amount,
                                                const uint8_t* txTo,

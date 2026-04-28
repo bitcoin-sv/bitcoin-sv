@@ -22,6 +22,7 @@ std::unique_ptr<AssociationID> AssociationID::Make(const std::vector<uint8_t>& b
         else
         {
             std::stringstream err {};
+            //NOLINTNEXTLINE(bugprone-unintended-char-ostream-output)
             err << "Unsupported association ID type " << rawIdType;
             throw std::runtime_error(err.str());
         }

@@ -48,6 +48,14 @@ class DoubleSpendHandlerErrors(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.callback_service = "localhost:8080"
+        self.extra_args = [['-dsendpointport=8080',
+                            '-banscore=100000',
+                            '-genesisactivationheight=1'
+                            ]]
+        self.server = None
+        self.conn = None
+        self.node0 = None
+        self.serverThread = None
 
     def start_server(self):
         self.serverThread = threading.Thread(target=self.server.serve_forever)

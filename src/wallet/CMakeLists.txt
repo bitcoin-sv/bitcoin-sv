@@ -27,3 +27,7 @@ target_include_directories(wallet
 	PRIVATE
 		${EVENT_INCLUDE_DIR}
 )
+
+if(ENABLE_CLANG_TIDY)
+    AddClangTidy(wallet)
+endif()

@@ -115,7 +115,7 @@ bool CScriptNum::equal_index(const CScriptNum& other) const
 
 bool operator==(const CScriptNum& a, const CScriptNum& b)
 {
-    return a <=> b == std::strong_ordering::equal;
+    return (a <=> b) == std::strong_ordering::equal;
 }
 
 std::strong_ordering operator<=>(const CScriptNum& a, const CScriptNum& b)
@@ -406,7 +406,7 @@ int CScriptNum::getint() const
                                    else if(n < bn_int_min)
                                        return std::numeric_limits<int>::min();
                                    else
-                                       return bsv::to_long(n);
+                                       return bsv::to_long(n); //NOLINT(*-narrowing-conversions)
                                },
                                [](const int64_t n) {
                                    if(n > std::numeric_limits<int>::max())

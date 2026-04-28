@@ -13,44 +13,44 @@
 #endif
 
 namespace NetMsgType {
-const char *VERSION = "version";
-const char *VERACK = "verack";
-const char *ADDR = "addr";
-const char *INV = "inv";
-const char *GETDATA = "getdata";
-const char *MERKLEBLOCK = "merkleblock";
-const char *GETBLOCKS = "getblocks";
-const char *GETHEADERS = "getheaders";
-const char* GETHDRSEN = "gethdrsen";
-const char *TX = "tx";
-const char *HEADERS = "headers";
-const char* HDRSEN = "hdrsen";
-const char *BLOCK = "block";
-const char *GETADDR = "getaddr";
-const char *MEMPOOL = "mempool";
-const char *PING = "ping";
-const char *PONG = "pong";
-const char *NOTFOUND = "notfound";
-const char *FILTERLOAD = "filterload";
-const char *FILTERADD = "filteradd";
-const char *FILTERCLEAR = "filterclear";
-const char *REJECT = "reject";
-const char *SENDHEADERS = "sendheaders";
-const char *SENDHDRSEN = "sendhdrsen";
-const char *FEEFILTER = "feefilter";
-const char *SENDCMPCT = "sendcmpct";
-const char *CMPCTBLOCK = "cmpctblock";
-const char *GETBLOCKTXN = "getblocktxn";
-const char *BLOCKTXN = "blocktxn";
-const char *PROTOCONF = "protoconf";
-const char *CREATESTREAM = "createstrm";
-const char *STREAMACK = "streamack";
-const char *DSDETECTED = "dsdetected";
-const char *EXTMSG = "extmsg";
-const char *REVOKEMID = "revokemid";
-const char *AUTHCH = "authch";
-const char *AUTHRESP = "authresp";
-const char *DATAREFTX = "datareftx";
+const char* const VERSION = "version";
+const char* const VERACK = "verack";
+const char* const ADDR = "addr";
+const char* const INV = "inv";
+const char* const GETDATA = "getdata";
+const char* const MERKLEBLOCK = "merkleblock";
+const char* const GETBLOCKS = "getblocks";
+const char* const GETHEADERS = "getheaders";
+const char* const GETHDRSEN = "gethdrsen";
+const char* const TX = "tx";
+const char* const HEADERS = "headers";
+const char* const HDRSEN = "hdrsen";
+const char* const BLOCK = "block";
+const char* const GETADDR = "getaddr";
+const char* const MEMPOOL = "mempool";
+const char* const PING = "ping";
+const char* const PONG = "pong";
+const char* const NOTFOUND = "notfound";
+const char* const FILTERLOAD = "filterload";
+const char* const FILTERADD = "filteradd";
+const char* const FILTERCLEAR = "filterclear";
+const char* const REJECT = "reject";
+const char* const SENDHEADERS = "sendheaders";
+const char* const SENDHDRSEN = "sendhdrsen";
+const char* const FEEFILTER = "feefilter";
+const char* const SENDCMPCT = "sendcmpct";
+const char* const CMPCTBLOCK = "cmpctblock";
+const char* const GETBLOCKTXN = "getblocktxn";
+const char* const BLOCKTXN = "blocktxn";
+const char* const PROTOCONF = "protoconf";
+const char* const CREATESTREAM = "createstrm";
+const char* const STREAMACK = "streamack";
+const char* const DSDETECTED = "dsdetected";
+const char* const EXTMSG = "extmsg";
+const char* const REVOKEMID = "revokemid";
+const char* const AUTHCH = "authch";
+const char* const AUTHRESP = "authresp";
+const char* const DATAREFTX = "datareftx";
 
 bool IsBlockLike(const std::string &strCommand) {
     return strCommand == NetMsgType::BLOCK ||
@@ -104,7 +104,8 @@ uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
  * All known message types. Keep this in the same order as the list of messages
  * above and in protocol.h.
  */
-static const std::string allNetMessageTypes[] = {
+static const std::array<std::string, 37> allNetMessageTypes // NOLINT(cert-err58-cpp)
+{
     NetMsgType::VERSION,      NetMsgType::VERACK,     NetMsgType::ADDR,
     NetMsgType::INV,          NetMsgType::GETDATA,    NetMsgType::MERKLEBLOCK,
     NetMsgType::GETBLOCKS,    NetMsgType::GETHEADERS, NetMsgType::GETHDRSEN,   NetMsgType::TX,
@@ -118,13 +119,15 @@ static const std::string allNetMessageTypes[] = {
     NetMsgType::EXTMSG,       NetMsgType::AUTHCH,     NetMsgType::AUTHRESP,
     NetMsgType::DATAREFTX
 };
-static const std::vector<std::string>
-    allNetMessageTypesVec(allNetMessageTypes,
-                          allNetMessageTypes + ARRAYLEN(allNetMessageTypes));
+
+//NOLINTNEXTLINE(cert-err58-cpp)
+static const std::vector<std::string> allNetMessageTypesVec{allNetMessageTypes.begin(),
+                                                            allNetMessageTypes.end()};
 
 // Check a command string for errors
 static bool CheckCommandFormat(const char* cmd)
 {
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     for(const char* p1 = cmd; p1 < cmd + CMessageFields::COMMAND_SIZE; p1++)
     {
         if(*p1 == 0) {
@@ -143,6 +146,7 @@ static bool CheckCommandFormat(const char* cmd)
             return false;
         }
     }
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
     return true;
 }
@@ -163,6 +167,7 @@ CExtendedMessageHeader::CExtendedMessageHeader(const char* pszCommand, uint64_t 
 
 std::string CExtendedMessageHeader::GetCommand() const
 {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     return { pchCommand.data(), pchCommand.data() + strnlen(pchCommand.data(), CMessageFields::COMMAND_SIZE) };
 }
 
@@ -251,7 +256,11 @@ CMessageHeader::CMessageHeader(const MessageMagic& pchMessageStartIn,
     if(buff.size() == requiredLength)
     {
         // We have all the basic header data, check if we also need more for extended fields
-        if(! IsExtended() && strncmp(reinterpret_cast<const char*>(buff.data()) + CMessageFields::BASIC_COMMAND_OFFSET, NetMsgType::EXTMSG, strlen(NetMsgType::EXTMSG)) == 0)
+        if(!IsExtended() 
+            //NOLINTNEXTLINE(cppcoreguidelines-pro-*)
+            && strncmp(reinterpret_cast<const char*>(buff.data()) + CMessageFields::BASIC_COMMAND_OFFSET,
+                       NetMsgType::EXTMSG,
+                       strlen(NetMsgType::EXTMSG)) == 0)
         {
             extendedFields = CExtendedMessageHeader {};
         }
@@ -268,11 +277,12 @@ CMessageHeader::CMessageHeader(const MessageMagic& pchMessageStartIn,
 
 std::string CMessageHeader::GetCommand() const
 {
-    if(IsExtended())
+    if(extendedFields.has_value())
     {
         return extendedFields->GetCommand();
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     return { pchCommand.data(), pchCommand.data() + strnlen(pchCommand.data(), CMessageFields::COMMAND_SIZE) };
 }
 
@@ -283,7 +293,7 @@ uint64_t CMessageHeader::GetLength() const
 
 uint64_t CMessageHeader::GetPayloadLength() const
 {
-    if(IsExtended())
+    if(extendedFields.has_value())
     {
         return extendedFields->GetPayloadLength();;
     }
@@ -342,7 +352,7 @@ bool CMessageHeader::IsValid(const Config& config) const {
     }
 
     // Extended fields
-    if(IsExtended() && !extendedFields->IsValid(config)) {
+    if(extendedFields.has_value() && !extendedFields->IsValid(config)) {
         return false;
     }
 

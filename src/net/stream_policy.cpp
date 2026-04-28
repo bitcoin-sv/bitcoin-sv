@@ -36,9 +36,14 @@ namespace
 /** A BasicStreamPolicy **/
 /*************************/
 
-void BasicStreamPolicy::ServiceSockets(StreamMap& streams, fd_set& setRecv,
-    fd_set& setSend, fd_set& setError, const Config& config, bool& gotNewMsgs,
-    uint64_t& bytesRecv, uint64_t& bytesSent)
+void BasicStreamPolicy::ServiceSockets(StreamMap& streams,
+                                       fd_set& setRecv,
+                                       fd_set& setSend,
+                                       fd_set& setError,
+                                       const Config& config,
+                                       bool& gotNewMsgs, //NOLINT(bugprone-easily-swappable-parameters)
+                                       uint64_t& bytesRecv,
+                                       uint64_t& bytesSent)
 {
     // Service each stream socket
     for(auto& stream : streams)

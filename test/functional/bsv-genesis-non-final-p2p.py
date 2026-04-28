@@ -39,6 +39,7 @@ class NonFinalP2PTest(BitcoinTestFramework):
                             '-txnpropagationfreq=1', '-txnvalidationasynchrunfreq=1',
                             '-mempoolnonfinalmaxreplacementrate=10',
                             '-mempoolnonfinalmaxreplacementrateperiod=1']] * self.num_nodes
+        self.err = None
 
     def send_txn(self, rpcsend, conn, tx):
         self.err = None

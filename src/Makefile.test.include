@@ -64,6 +64,7 @@ BITCOIN_TESTS =\
   test/write_preferring_upgradable_mutex_tests.cpp \
   test/compress_tests.cpp \
   test/config_tests.cpp \
+  test/conditional_tracker_tests.cpp \
   test/configscriptpolicy_tests.cpp \
   test/coinbase_doc_tests.cpp \
   test/core_io_tests.cpp \
@@ -131,6 +132,8 @@ BITCOIN_TESTS =\
   test/msg_parser_buffer_tests.cpp \
   test/multisig_tests.cpp \
   test/net_association_tests.cpp \
+  test/disk_backed_parser_tests.cpp \
+  test/net_message_disk_tests.cpp \
   test/net_message_tests.cpp \
   test/net_message_maker_tests.cpp \
   test/net_tests.cpp \

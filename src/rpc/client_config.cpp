@@ -55,8 +55,9 @@ RPCClientConfig RPCClientConfig::CreateForBitcoind()
     //     2. port in -rpcconnect (ie following : in ipv4 or ]: in ipv6)
     //     3. default port for chain
     int port { BaseParams().RPCPort() };
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     SplitHostPort(gArgs.GetArg("-rpcconnect", DEFAULT_RPCCONNECT), port, config.mServerIP);
-    config.mServerPort = gArgs.GetArg("-rpcport", port);
+    config.mServerPort = gArgs.GetArg("-rpcport", port); //NOLINT(*-narrowing-conversions)
 
     // Get credentials
     if(gArgs.GetArg("-rpcpassword", "") == "")
@@ -76,7 +77,8 @@ RPCClientConfig RPCClientConfig::CreateForBitcoind()
         config.mUsernamePassword = gArgs.GetArg("-rpcuser", "") + ":" + gArgs.GetArg("-rpcpassword", "");
     }
 
-    config.mConnectionTimeout = gArgs.GetArg("-rpcclienttimeout", DEFAULT_HTTP_CLIENT_TIMEOUT);
+    config.mConnectionTimeout = gArgs.GetArg("-rpcclienttimeout", //NOLINT(*-narrowing-conversions)
+                                             DEFAULT_HTTP_CLIENT_TIMEOUT);
     config.mWallet = gArgs.GetArg("-rpcwallet", "");
 
     return config;
