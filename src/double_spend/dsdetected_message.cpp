@@ -51,16 +51,13 @@ size_t hash_value(const DSDetected::BlockDetails& blocks)
     return seed;
 }
 
-namespace std
+size_t std::hash<DSDetected>::operator()(const DSDetected& ds) const
 {
-    size_t hash<DSDetected>::operator()(const DSDetected& ds) const
-    {
-        size_t seed{0};
-        boost::hash_combine(seed, ds.GetVersion());
-        boost::hash_range(seed, ds.begin(), ds.end());
-        return seed;
-    };
-}
+    size_t seed{0};
+    boost::hash_combine(seed, ds.GetVersion());
+    boost::hash_range(seed, ds.begin(), ds.end());
+    return seed;
+};
 
 std::size_t sort_hasher(const DSDetected& ds)
 {
