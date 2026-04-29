@@ -36,6 +36,7 @@
 #define EXCLUDES(...) __attribute__((locks_excluded(__VA_ARGS__)))
 #define LOCKS_EXCLUDED EXCLUDES
 #define NO_THREAD_SAFETY_ANALYSIS __attribute__((no_thread_safety_analysis))
+#define REENTRANT_CAPABILITY __attribute__((reentrant_capability))
 #else
 #define CAPABILITY(x)
 #define LOCKABLE
@@ -51,6 +52,7 @@
 #define EXCLUDES(...)
 #define LOCKS_EXCLUDED(...)
 #define NO_THREAD_SAFETY_ANALYSIS
+#define REENTRANT_CAPABILITY
 #endif
 
 #endif // BITCOIN_THREADSAFETY_H

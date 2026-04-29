@@ -14,6 +14,7 @@
 #include <boost/thread/recursive_mutex.hpp>
 
 #include <memory>
+#include <mutex>
 
 /////////////////////////////////////////////////
 //                                             //
@@ -310,7 +311,17 @@ namespace bsv
     public:
         void lock() EXCLUSIVE_LOCK_FUNCTION() { mtx_.lock(); }
         void unlock() UNLOCK_FUNCTION() { mtx_.unlock(); }
-        bool try_lock() EXCLUSIVE_TRYLOCK_FUNCTION(true) { return mtx_.try_lock(); }
+        bool try_lock() noexcept EXCLUSIVE_TRYLOCK_FUNCTION(true) { return mtx_.try_lock(); }
+    };
+
+    class CAPABILITY("mutex") REENTRANT_CAPABILITY recursive_mutex
+    {
+        std::recursive_mutex mtx_;
+
+    public:
+        void lock() EXCLUSIVE_LOCK_FUNCTION() { mtx_.lock(); }
+        void unlock() UNLOCK_FUNCTION() { mtx_.unlock(); }
+        bool try_lock() noexcept EXCLUSIVE_TRYLOCK_FUNCTION(true) { return mtx_.try_lock(); }
     };
 
     // Matches the C++ std::BasicLockable named requirement
