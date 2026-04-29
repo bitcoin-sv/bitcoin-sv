@@ -192,7 +192,6 @@ public:
                                            std::string* error = nullptr) override
     {
         SetErrorMsg(error);
-
         return false;
     }
     int GetMaxConcurrentAsyncTasksPerNode() const override;
@@ -204,7 +203,6 @@ public:
                                         std::string* error = nullptr) override
     {
         SetErrorMsg(error);
-
         return false;
     }
     int GetMaxParallelBlocks() const override;
@@ -297,7 +295,6 @@ public:
     bool SetMaxStdTxnValidationDuration(int /*ms*/, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
-
         return false;
     }
     std::chrono::milliseconds GetMaxStdTxnValidationDuration() const override
@@ -308,7 +305,6 @@ public:
     bool SetMaxNonStdTxnValidationDuration(int /*ms*/, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
-
         return false;
     }
     std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const override
@@ -320,7 +316,6 @@ public:
                                                  std::string* err = nullptr) override
     {
         SetErrorMsg(err);
-
         return false;
     }
 
@@ -332,7 +327,6 @@ public:
     bool SetMaxTxnChainValidationBudget(int /*ms*/, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
-
         return false;
     }
     std::chrono::milliseconds GetMaxTxnChainValidationBudget() const override
@@ -403,7 +397,6 @@ public:
     bool SetMaxCoinsViewCacheSize(int64_t /*max*/, std::string* err) override
     {
         SetErrorMsg(err);
-
         return false;
     }
     uint64_t GetMaxCoinsViewCacheSize() const override { return 0; /* unlimited */ }
@@ -411,15 +404,27 @@ public:
     bool SetMaxCoinsProviderCacheSize(int64_t /*max*/, std::string* err) override
     {
         SetErrorMsg(err);
-
         return false;
     }
     uint64_t GetMaxCoinsProviderCacheSize() const override { return 0; /* unlimited */ }
 
+    bool SetCoinsCacheSize(int64_t /*bytes*/, std::string* err) override
+    {
+        SetErrorMsg(err);
+        return false;
+    }
+    uint64_t GetCoinsCacheSize() const override { return 0; }
+
+    bool SetCoinsDBCacheSize(int64_t /*bytes*/, std::string* err) override
+    {
+        SetErrorMsg(err);
+        return false;
+    }
+    uint64_t GetCoinsDBCacheSize() const override { return 0; }
+
     bool SetMaxCoinsDbOpenFiles(int64_t /*max*/, std::string* err) override
     {
         SetErrorMsg(err);
-
         return false;
     }
     uint64_t GetMaxCoinsDbOpenFiles() const override { return 64; /* old default */ }
@@ -433,7 +438,6 @@ public:
     bool SetMaxMempool(int64_t /*maxMempool*/, std::string* err) override
     {
         SetErrorMsg(err);
-
         return true;
     }
     uint64_t GetMaxMempool() const override
@@ -444,7 +448,6 @@ public:
     bool SetMaxMempoolSizeDisk(int64_t /*maxMempoolSizeDisk*/, std::string* err) override
     {
         SetErrorMsg(err);
-
         return true;
     }
     uint64_t GetMaxMempoolSizeDisk() const override
@@ -457,7 +460,6 @@ public:
                                   std::string* err) override
     {
         SetErrorMsg(err);
-
         return true;
     }
     uint64_t GetMempoolMaxPercentCPFP() const override
@@ -468,7 +470,6 @@ public:
     bool SetMemPoolExpiry(int64_t /*memPoolExpiry*/, std::string* err) override
     {
         SetErrorMsg(err);
-
         return true;
     }
     uint64_t GetMemPoolExpiry() const override
@@ -479,7 +480,6 @@ public:
     bool SetMaxOrphanTxSize(int64_t /*maxOrphanTxSize*/, std::string* err) override
     {
         SetErrorMsg(err);
-
         return true;
     }
     uint64_t GetMaxOrphanTxSize() const override
@@ -490,7 +490,6 @@ public:
     bool SetMaxOrphansInBatchPercentage(uint64_t /*percent*/, std::string* err) override
     {
         SetErrorMsg(err);
-
         return true;
     }
 
@@ -502,7 +501,6 @@ public:
     bool SetMaxInputsForSecondLayerOrphan(uint64_t /*maxInputs*/, std::string* err) override
     {
         SetErrorMsg(err);
-
         return true;
     }
     uint64_t GetMaxInputsForSecondLayerOrphan() const override
@@ -513,7 +511,6 @@ public:
     bool SetStopAtHeight(int32_t /*stopAtHeight*/, std::string* err) override
     {
         SetErrorMsg(err);
-
         return true;
     }
     int32_t GetStopAtHeight() const override { return DEFAULT_STOPATHEIGHT; }
@@ -522,7 +519,6 @@ public:
                                     std::string* err) override
     {
         SetErrorMsg(err);
-
         return true;
     }
     uint64_t GetPromiscuousMempoolFlags() const override { return 0; }

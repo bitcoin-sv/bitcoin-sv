@@ -98,7 +98,6 @@ bool fHavePruned = false;
 bool fPruneMode = false;
 bool fCheckBlockIndex = false;
 bool fCheckpointsEnabled = DEFAULT_CHECKPOINTS_ENABLED;
-size_t nCoinCacheUsage = 5000 * 300;
 uint64_t nPruneTarget = 0;
 int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
 
@@ -3810,8 +3809,6 @@ bool FlushStateToDisk(
     FlushStateMode mode,
     int32_t nManualPruneHeight)
 {
-    // NOLINTNEXTLINE(*-narrowing-conversions)
-    int64_t nMempoolUsage = mempool.DynamicMemoryUsage();
     LOCK(cs_main);
     // pcoinsTip may be null during startup (before block index is loaded)
     // or during reinit. Nothing to flush in that case.
@@ -3891,9 +3888,8 @@ bool FlushStateToDisk(
                 nLastSetChain = nNow;
             }
             // NOLINTBEGIN(*-narrowing-conversions)
-            int64_t nMempoolSizeMax = GlobalConfig::GetConfig().GetMaxMempool();
             int64_t cacheSize = pcoinsTip->DynamicMemoryUsage();
-            int64_t nTotalSpace = nCoinCacheUsage + std::max<int64_t>(nMempoolSizeMax - nMempoolUsage, 0);
+            int64_t nTotalSpace = static_cast<int64_t>(GlobalConfig::GetConfig().GetCoinsCacheSize());
             // NOLINTEND(*-narrowing-conversions)
 
             // The cache is large and we're within 10% and 10 MiB of the limit,
@@ -6873,7 +6869,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
         // disconnect of tip blocks
         if (nCheckLevel >= 3 && pindex == pindexState &&
             (coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <=
-                nCoinCacheUsage) {
+                GlobalConfig::GetConfig().GetCoinsCacheSize()) {
             assert(coins.GetBestBlock() == pindex->GetBlockHash());
             DisconnectResult res = ProcessingBlockIndex(*pindex).DisconnectBlock(block, coins, shutdownToken);
             if (res == DISCONNECT_FAILED && !shutdownToken.IsCanceled()) {

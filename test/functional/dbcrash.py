@@ -6,7 +6,7 @@
 
 - 4 nodes
   * node0, node1, and node2 will have different dbcrash ratios, and different
-    dbcache sizes
+    coinsdbcache sizes
   * node3 will be a regular node, with no crashing.
   * The nodes will not connect to each other.
 
@@ -52,17 +52,14 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
         self.restart_counts = None
         self.crashed_on_restart = None
 
-        # Set -maxmempool=0 to turn off mempool memory sharing with dbcache
         # Set -rpcservertimeout=900 to reduce socket disconnects in this
         # long-running test
-        self.base_args = ["-maxmempool=0", "-maxmempoolsizedisk=0", "-disablesafemode=1",
-                          "-rpcservertimeout=900", "-dbbatchsize=200000", "-mindebugrejectionfee"]
+        self.base_args = ["-disablesafemode=1", "-rpcservertimeout=900", "-dbbatchsize=200000", "-mindebugrejectionfee"]
 
-        # Set different crash ratios and cache sizes.  Note that not all of
-        # -dbcache goes to pcoinsTip.
-        self.node0_args = ["-dbcrashratio=8", "-dbcache=4"] + self.base_args
-        self.node1_args = ["-dbcrashratio=16", "-dbcache=8"] + self.base_args
-        self.node2_args = ["-dbcrashratio=24", "-dbcache=16"] + self.base_args
+        # Set different crash ratios and cache sizes.
+        self.node0_args = ["-dbcrashratio=8", "-coinsdbcache=4"] + self.base_args
+        self.node1_args = ["-dbcrashratio=16", "-coinsdbcache=8"] + self.base_args
+        self.node2_args = ["-dbcrashratio=24", "-coinsdbcache=16"] + self.base_args
 
         # Node3 is a normal node with default args, except will mine full blocks
         self.node3_args = ["-blockmaxweight=4000000", "-disablesafemode=1"]

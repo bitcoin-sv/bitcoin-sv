@@ -8,6 +8,7 @@
 #include "consensus/consensus.h"
 #include "double_spend/dsdetected_defaults.h"
 #include "miner_id/miner_id_db_defaults.h"
+#include "policy/policy.h"
 #include "rpc/webhook_client_defaults.h"
 #include "test/test_bitcoin.h"
 #include "txdb_defaults.h"
@@ -849,6 +850,131 @@ BOOST_AUTO_TEST_CASE(leveldb)
     BOOST_CHECK_EQUAL(config.GetCoinsDBMaxFileSize(), CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE * 2);
     BOOST_CHECK(config.SetCoinsDBMaxFileSize(CoinsDBDefaults::MIN_LEVELDB_FILE_SIZE, &err));
     BOOST_CHECK(! config.SetCoinsDBMaxFileSize(CoinsDBDefaults::MIN_LEVELDB_FILE_SIZE - 1, &err));
+}
+
+BOOST_AUTO_TEST_CASE(coinsdb_cache_split)
+{
+    using Split = std::pair<int64_t, int64_t>;
+
+    // Default → 1/8 to LevelDB (below the cap), remainder in-memory.
+    {
+        constexpr int64_t requested = CoinsDBDefaults::DEFAULT_COINSDB_CACHE_SIZE;
+        static_assert(CoinsDBDefaults::ComputeCoinsDbCacheSplit(requested) == Split {
+            requested / 8,
+            requested - requested / 8 }
+        );
+    }
+
+    // 2x default → 1/8 lands exactly on the LevelDB cap, in-memory takes the rest.
+    {
+        constexpr int64_t requested = 2 * CoinsDBDefaults::DEFAULT_COINSDB_CACHE_SIZE;
+        static_assert(CoinsDBDefaults::ComputeCoinsDbCacheSplit(requested) == Split {
+            CoinsDBDefaults::MAX_COINS_LEVELDB_CACHE_SIZE,
+            requested - CoinsDBDefaults::MAX_COINS_LEVELDB_CACHE_SIZE}
+        );
+    }
+
+    // Max → LevelDB capped, in-memory takes the rest.
+    {
+        constexpr int64_t requested = CoinsDBDefaults::MAX_COINSDB_CACHE_SIZE;
+        static_assert(CoinsDBDefaults::ComputeCoinsDbCacheSplit(requested) == Split {
+            CoinsDBDefaults::MAX_COINS_LEVELDB_CACHE_SIZE,
+            requested - CoinsDBDefaults::MAX_COINS_LEVELDB_CACHE_SIZE}
+        );
+    }
+
+    // Min → 1/8 to LevelDB, remainder in-memory.
+    {
+        constexpr int64_t requested = CoinsDBDefaults::MIN_COINSDB_CACHE_SIZE;
+        static_assert(CoinsDBDefaults::ComputeCoinsDbCacheSplit(requested) == Split {
+            requested / 8,
+            requested - requested / 8}
+        );
+    }
+
+    // Below min clamps up to min, then splits.
+    {
+        static_assert(CoinsDBDefaults::ComputeCoinsDbCacheSplit(
+            CoinsDBDefaults::MIN_COINSDB_CACHE_SIZE / 2) == Split {
+            CoinsDBDefaults::MIN_COINSDB_CACHE_SIZE / 8,
+            CoinsDBDefaults::MIN_COINSDB_CACHE_SIZE - CoinsDBDefaults::MIN_COINSDB_CACHE_SIZE / 8});
+    }
+
+    // Above max clamps down to max, then splits.
+    {
+        static_assert(CoinsDBDefaults::ComputeCoinsDbCacheSplit(
+            2 * CoinsDBDefaults::MAX_COINSDB_CACHE_SIZE) == Split {
+            CoinsDBDefaults::MAX_COINS_LEVELDB_CACHE_SIZE,
+            CoinsDBDefaults::MAX_COINSDB_CACHE_SIZE - CoinsDBDefaults::MAX_COINS_LEVELDB_CACHE_SIZE});
+    }
+
+    // Negative input clamps to min, then splits.
+    {
+        static_assert(CoinsDBDefaults::ComputeCoinsDbCacheSplit(-1) == Split {
+            CoinsDBDefaults::MIN_COINSDB_CACHE_SIZE / 8,
+            CoinsDBDefaults::MIN_COINSDB_CACHE_SIZE - CoinsDBDefaults::MIN_COINSDB_CACHE_SIZE / 8});
+    }
+}
+
+BOOST_AUTO_TEST_CASE(coinsdb_cache_config)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    // -coinsdbcache: both halves of the split.
+    const auto defaultSplit = CoinsDBDefaults::ComputeCoinsDbCacheSplit(
+        CoinsDBDefaults::DEFAULT_COINSDB_CACHE_SIZE);
+
+    BOOST_CHECK_EQUAL(config.GetCoinsCacheSize(), defaultSplit.second);
+    BOOST_CHECK(! config.SetCoinsCacheSize(-1, &err));
+    BOOST_CHECK(! config.SetCoinsCacheSize(0, &err));
+    BOOST_CHECK(config.SetCoinsCacheSize(2 * ONE_GIBIBYTE, &err));
+    BOOST_CHECK_EQUAL(config.GetCoinsCacheSize(), 2 * ONE_GIBIBYTE);
+
+    BOOST_CHECK_EQUAL(config.GetCoinsDBCacheSize(), defaultSplit.first);
+    BOOST_CHECK(! config.SetCoinsDBCacheSize(-1, &err));
+    BOOST_CHECK(! config.SetCoinsDBCacheSize(0, &err));
+    BOOST_CHECK(config.SetCoinsDBCacheSize(512 * ONE_MEBIBYTE, &err));
+    BOOST_CHECK_EQUAL(config.GetCoinsDBCacheSize(), 512 * ONE_MEBIBYTE);
+
+    // -maxcoinsviewcachesize: 0 is the unlimited sentinel; reject negatives.
+    BOOST_CHECK_EQUAL(config.GetMaxCoinsViewCacheSize(), 0u);
+    BOOST_CHECK(! config.SetMaxCoinsViewCacheSize(-1, &err));
+    BOOST_CHECK(config.SetMaxCoinsViewCacheSize(0, &err));
+    BOOST_CHECK(config.SetMaxCoinsViewCacheSize(123, &err));
+    BOOST_CHECK_EQUAL(config.GetMaxCoinsViewCacheSize(), 123u);
+
+    // -maxcoinsdbfiles: must be >= 1.
+    BOOST_CHECK(! config.SetMaxCoinsDbOpenFiles(0, &err));
+    BOOST_CHECK(config.SetMaxCoinsDbOpenFiles(1, &err));
+    BOOST_CHECK_EQUAL(config.GetMaxCoinsDbOpenFiles(), 1u);
+    BOOST_CHECK(config.SetMaxCoinsDbOpenFiles(1024, &err));
+    BOOST_CHECK_EQUAL(config.GetMaxCoinsDbOpenFiles(), 1024u);
+}
+
+BOOST_AUTO_TEST_CASE(max_coins_provider_cache_size)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    // Check lower bound
+    BOOST_CHECK(! config.SetMaxCoinsProviderCacheSize(MIN_COINS_PROVIDER_CACHE_SIZE - 1, &err));
+    BOOST_CHECK(config.SetMaxCoinsProviderCacheSize(MIN_COINS_PROVIDER_CACHE_SIZE, &err));
+
+    // Check bounds after setting coins cache size
+    BOOST_CHECK(config.SetCoinsCacheSize(100 * ONE_MEBIBYTE, &err));
+    BOOST_CHECK(! config.SetMaxCoinsProviderCacheSize(MIN_COINS_PROVIDER_CACHE_SIZE - 1, &err));
+    BOOST_CHECK(config.SetMaxCoinsProviderCacheSize(MIN_COINS_PROVIDER_CACHE_SIZE, &err));
+    BOOST_CHECK(config.SetMaxCoinsProviderCacheSize(50 * ONE_MEBIBYTE, &err));
+    BOOST_CHECK_EQUAL(config.GetMaxCoinsProviderCacheSize(), 50 * ONE_MEBIBYTE);
+
+    // Equal-to-cap allowed.
+    BOOST_CHECK(config.SetMaxCoinsProviderCacheSize(100 * ONE_MEBIBYTE, &err));
+
+    // One byte over → fails with "must not exceed" wording.
+    err.clear();
+    BOOST_CHECK(! config.SetMaxCoinsProviderCacheSize(100 * ONE_MEBIBYTE + 1, &err));
+    BOOST_CHECK(err.find("must not exceed") != std::string::npos);
 }
 
 BOOST_AUTO_TEST_CASE(mempool_sync_config)

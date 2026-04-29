@@ -27,8 +27,10 @@ class uint256;
 
 //! No need to periodic flush if at least this much space still available.
 static constexpr int MAX_BLOCK_COINSDB_USAGE = 10;
-//! -dbcache default (MiB)
-static const int64_t nDefaultDbCache = 2048;
+//! -dbcache default (MiB). Sizes only the block-tree-DB and Merkle-tree-index-DB
+//! caches; the residue after those two is unused. Coins cache sizing is
+//! controlled separately by -coinsdbcache.
+static const int64_t nDefaultDbCache = 512;
 //! -dbbatchsize default (bytes)
 static const int64_t nDefaultDbBatchSize = 16 << 20;
 //! max. -dbcache (MiB)
@@ -42,8 +44,6 @@ static const int64_t nMaxBlockDBCache = 2;
 // a meaningful difference:
 // https://github.com/bitcoin/bitcoin/pull/8273#issuecomment-229601991
 static const int64_t nMaxBlockDBAndTxIndexCache = 1024;
-//! Max memory allocated to coin DB specific cache (MiB)
-static const int64_t nMaxCoinsDBCache = 256;
 
 /** Iterate over coins in DB */
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)

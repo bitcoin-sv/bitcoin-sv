@@ -67,7 +67,10 @@ void GlobalConfig::Reset()
     data->mPTVTaskScheduleStrategy = DEFAULT_PTV_TASK_SCHEDULE_STRATEGY;
 
     data->mMaxCoinsViewCacheSize = 0;
-    data->mMaxCoinsProviderCacheSize = DEFAULT_COINS_PROVIDER_CACHE_SIZE;
+    const auto coinsDBSplit = CoinsDBDefaults::ComputeCoinsDbCacheSplit(CoinsDBDefaults::DEFAULT_COINSDB_CACHE_SIZE);
+    data->mCoinsDBCacheSize = coinsDBSplit.first;
+    data->mCoinsCacheSize = coinsDBSplit.second;
+    data->mMaxCoinsProviderCacheSize = data->mCoinsCacheSize;
     data->mMaxCoinsDBFileSize = CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE;
 
     data->maxProtocolRecvPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
@@ -890,7 +893,49 @@ bool GlobalConfig::SetMaxCoinsProviderCacheSize(int64_t max, std::string* err)
         return false;
     }
 
+    if (static_cast<uint64_t>(max) > data->mCoinsCacheSize)
+    {
+        if (err)
+        {
+            *err = "Maximum coins provider cache size must not exceed the coins cache size ("
+                + std::to_string(data->mCoinsCacheSize) + " bytes)";
+        }
+        return false;
+    }
+
     data->mMaxCoinsProviderCacheSize = static_cast<uint64_t>(max);
+
+    return true;
+}
+
+bool GlobalConfig::SetCoinsCacheSize(int64_t bytes, std::string* err)
+{
+    if (bytes <= 0)
+    {
+        if(err)
+        {
+            *err = "Coins cache size must be greater than 0.";
+        }
+        return false;
+    }
+
+    data->mCoinsCacheSize = static_cast<uint64_t>(bytes);
+
+    return true;
+}
+
+bool GlobalConfig::SetCoinsDBCacheSize(int64_t bytes, std::string* err)
+{
+    if (bytes <= 0)
+    {
+        if(err)
+        {
+            *err = "Coins DB cache size must be greater than 0.";
+        }
+        return false;
+    }
+
+    data->mCoinsDBCacheSize = static_cast<uint64_t>(bytes);
 
     return true;
 }

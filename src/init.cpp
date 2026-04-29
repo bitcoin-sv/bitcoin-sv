@@ -382,8 +382,22 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-dbcache=<n>",
         strprintf(
-            _("Set database cache size in megabytes (%d to %d, default: %d). The value may be given in megabytes or with unit (B, KiB, MiB, GiB)."),
+            _("Set the cache size in megabytes for all databases except the CoinsDB (%d to %d, default: %d). "
+              "CoinsDB cache sizing is controlled separately by -coinsdbcache. "
+              "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
             nMinDbCache, nMaxDbCache, nDefaultDbCache));
+
+    strUsage += HelpMessageOpt(
+        "-coinsdbcache=<n>",
+        strprintf(
+            _("Set the total CoinsDB cache budget in megabytes (%d to %d, default: %d). "
+              "1/8 of this value is used as the LevelDB chainstate cache (capped at %d), "
+              "and the remainder becomes the in-memory UTXO flush threshold. "
+              "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+            CoinsDBDefaults::MIN_COINSDB_CACHE_SIZE / ONE_MEBIBYTE,
+            CoinsDBDefaults::MAX_COINSDB_CACHE_SIZE / ONE_MEBIBYTE,
+            CoinsDBDefaults::DEFAULT_COINSDB_CACHE_SIZE / ONE_MEBIBYTE,
+            CoinsDBDefaults::MAX_COINS_LEVELDB_CACHE_SIZE / ONE_MEBIBYTE));
 
     strUsage += HelpMessageOpt(
         "-frozentxodbcache=<n>",
@@ -410,10 +424,9 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
 
     strUsage += HelpMessageOpt("-maxmempool=<n>",
                    strprintf(_("Keep the resident size of the transaction memory pool below <n> megabytes "
-                               "(default: %u%s,  must be at least %d). "
+                               "(default: %u, must be at least %d). "
                                "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
                              DEFAULT_MAX_MEMPOOL_SIZE,
-                             showDebug ? ", 0 to turn off mempool memory sharing with dbcache" : "",
                              std::ceil(DEFAULT_MAX_MEMPOOL_SIZE*0.3)));
     if (showDebug) 
     {
@@ -1463,9 +1476,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             "The value may be given in bytes or with unit (B, kB, MB, GB)."));
     strUsage += HelpMessageOpt(
         "-maxcoinsprovidercachesize=<n>",
-        strprintf(_("Set soft maximum limit of cached coin tip buffer size (default: %d GB, minimum: %d MB). "
+        strprintf(_("Set soft maximum limit of cached coin tip buffer size (minimum: %d MB). "
+            "If unset, defaults to the in-memory portion of -coinsdbcache. "
+            "Must not exceed that value if specified. "
             "The value may be given in bytes or with unit (B, kB, MB, GB)."),
-            DEFAULT_COINS_PROVIDER_CACHE_SIZE / ONE_GIGABYTE,
             MIN_COINS_PROVIDER_CACHE_SIZE / ONE_MEGABYTE));
     strUsage += HelpMessageOpt(
         "-maxcoinsdbfiles=<n>",
@@ -2793,12 +2807,35 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     {
         return InitError(err);
     }
-    if(std::string err; !config.SetMaxCoinsProviderCacheSize(
-        gArgs.GetArgAsBytes("-maxcoinsprovidercachesize", DEFAULT_COINS_PROVIDER_CACHE_SIZE),
-        &err))
+
+    // -coinsdbcache: total CoinsDB budget. Split 1/8 to LevelDB (capped at
+    // MAX_COINS_LEVELDB_CACHE_SIZE), remainder to the in-memory UTXO flush
+    // threshold.
     {
-        return InitError(err);
+        const int64_t coinsTotal = gArgs.GetArgAsBytes(
+            "-coinsdbcache", CoinsDBDefaults::DEFAULT_COINSDB_CACHE_SIZE / ONE_MEBIBYTE, ONE_MEBIBYTE);
+        const auto split = CoinsDBDefaults::ComputeCoinsDbCacheSplit(coinsTotal);
+        if(std::string err; !config.SetCoinsDBCacheSize(split.first, &err))
+        {
+            return InitError(err);
+        }
+        if(std::string err; !config.SetCoinsCacheSize(split.second, &err))
+        {
+            return InitError(err);
+        }
+
+        // -maxcoinsprovidercachesize: defaults to the in-memory portion of
+        // -coinsdbcache; if user-set, must not exceed it (cross-checked in
+        // SetMaxCoinsProviderCacheSize against the value just stored above).
+        const int64_t providerCacheSize = gArgs.IsArgSet("-maxcoinsprovidercachesize")
+            ? gArgs.GetArgAsBytes("-maxcoinsprovidercachesize", 0)
+            : split.second;
+        if(std::string err; !config.SetMaxCoinsProviderCacheSize(providerCacheSize, &err))
+        {
+            return InitError(err);
+        }
     }
+
     if(std::string err; !config.SetMaxCoinsDbOpenFiles(
         // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg("-maxcoinsdbfiles", CoinsDB::MaxFiles::Default().maxFiles), &err))
@@ -3645,43 +3682,41 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     fReindex = gArgs.GetBoolArg("-reindex", false);
     bool fReindexChainState = gArgs.GetBoolArg("-reindex-chainstate", false);
 
-    // cache size calculations
+    // -- Block-tree + Merkle-tree budget (-dbcache)
     int64_t nTotalCache = gArgs.GetArgAsBytes("-dbcache", nDefaultDbCache, ONE_MEBIBYTE);
-    // total cache cannot be less than nMinDbCache
-    nTotalCache = std::max(nTotalCache, nMinDbCache << 20);
-    // total cache cannot be greater than nMaxDbcache
-    nTotalCache = std::min(nTotalCache, nMaxDbCache << 20);
-    int64_t nBlockTreeDBCache = nTotalCache / 8;
-    nBlockTreeDBCache = std::min(nBlockTreeDBCache,
-                                 (gArgs.GetBoolArg("-txindex", DEFAULT_TXINDEX)
-                                      ? nMaxBlockDBAndTxIndexCache
-                                      : nMaxBlockDBCache)
-                                     << 20);
-    nTotalCache -= nBlockTreeDBCache;
-    // use 25%-50% of the remainder for disk cache
-    int64_t nCoinDBCache =
-        std::min(nTotalCache / 2, (nTotalCache / 4) + (1 << 23));
-    // cap total coins db cache
-    nCoinDBCache = std::min(nCoinDBCache, nMaxCoinsDBCache << 20);
-    nTotalCache -= nCoinDBCache;
-    // calculate cache for Merkle Tree database
-    int64_t nMerkleTreeIndexDBCache = nBlockTreeDBCache / 4;
-    nTotalCache -= nMerkleTreeIndexDBCache;
-    // the rest goes to in-memory cache
-    nCoinCacheUsage = nTotalCache;
+    nTotalCache = std::clamp(nTotalCache, nMinDbCache << 20, nMaxDbCache << 20);
+    // Block-tree DB has the whole -dbcache budget available, capped by its
+    // own per-component max (txindex on/off).
+    int64_t nBlockTreeDBCache = std::min(
+        nTotalCache,
+        (gArgs.GetBoolArg("-txindex", DEFAULT_TXINDEX)
+            ? nMaxBlockDBAndTxIndexCache
+            : nMaxBlockDBCache) << 20);
+    // Merkle-tree DB gets either 1/4 of the block-tree allocation or
+    // whatever is left of the -dbcache budget, whichever is smaller.
+    int64_t nMerkleTreeIndexDBCache = std::min(
+        nBlockTreeDBCache / 4,
+        nTotalCache - nBlockTreeDBCache);
+
+    // -- Coins budget
+    const int64_t nCoinDBCache = static_cast<int64_t>(config.GetCoinsDBCacheSize());
+    const int64_t nCoinsInMemory = static_cast<int64_t>(config.GetCoinsCacheSize());
+
     MempoolSizeLimits limits = MempoolSizeLimits::FromConfig();
     LogPrintf("Cache configuration:\n");
     LogPrintf("* Using %.1fMiB for block index database\n",
               nBlockTreeDBCache * (1.0 / ONE_MEBIBYTE));
     LogPrintf("* Using %.1fMiB for Merkle Tree index database\n",
               nMerkleTreeIndexDBCache * (1.0 / ONE_MEBIBYTE));
-    LogPrintf("* Using %.1fMiB for chain state database\n",
+    LogPrintf("* Using %.1fMiB for chain state database (LevelDB cache)\n",
               nCoinDBCache * (1.0 / ONE_MEBIBYTE));
-    LogPrintf("* Using %.1fMiB for in-memory UTXO set (plus up to %.1fMiB of "
-              "unused mempool space and %.1fMiB of disk space)\n",
-              nCoinCacheUsage * (1.0 / 1024 / 1024),
-              limits.Memory() * (1.0 / 1024 / 1024),
-              limits.Disk() * (1.0 / 1024 / 1024));
+    LogPrintf("* Using %.1fMiB for in-memory UTXO set (plus %.1fMiB of disk space)\n",
+              nCoinsInMemory * (1.0 / ONE_MEBIBYTE),
+              limits.Disk() * (1.0 / ONE_MEBIBYTE));
+    LogPrintf("* CoinsDB total budget %.1fMiB (LevelDB %.1fMiB + in-memory %.1fMiB)\n",
+              (nCoinDBCache + nCoinsInMemory) * (1.0 / ONE_MEBIBYTE),
+              nCoinDBCache * (1.0 / ONE_MEBIBYTE),
+              nCoinsInMemory * (1.0 / ONE_MEBIBYTE));
 
     std::int64_t frozen_txo_db_cache_size = gArgs.GetArg("-frozentxodbcache", static_cast<std::int64_t>(DEFAULT_FROZEN_TXO_DB_CACHE));
     if(frozen_txo_db_cache_size<0)

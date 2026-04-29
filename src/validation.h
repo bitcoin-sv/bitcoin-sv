@@ -234,7 +234,6 @@ extern std::atomic_bool fReindex;
 extern bool fTxIndex;
 extern bool fCheckBlockIndex;
 extern bool fCheckpointsEnabled;
-extern size_t nCoinCacheUsage;
 
 /**
  * Absolute maximum transaction fee (in satoshis) used by wallet and mempool
