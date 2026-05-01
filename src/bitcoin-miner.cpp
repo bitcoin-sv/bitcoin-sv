@@ -290,6 +290,7 @@ static bool CpuMineBlockHasher(CBlockHeader *pblock, vector<unsigned char>& coin
                     if (ntries-- < 1)
                     {
                         pblock->nNonce = nNonce; // report the last nonce checked for accounting
+                        // Here we want to return the hash as a source of entropy
                         return false; // Give up leave
                     }
                 }

@@ -1,0 +1,5 @@
+image:
+  file:  .gitpod.dockerfile
+tasks:
+  - init: cd /workspace
+    command:  ./autogen.sh && ./configure && make && make install
