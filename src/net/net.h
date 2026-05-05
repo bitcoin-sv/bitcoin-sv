@@ -375,7 +375,7 @@ public:
     template<typename Callable>
     void ForEachNode(const Callable& func) const
     { 
-        LOCK(cs_vNodes);
+        bsv::lock_guard lock{cs_vNodes};
         for(const CNodePtr& node : vNodes)
         {
             if(NodeFullyConnected(node))
@@ -392,7 +392,7 @@ public:
         using resultType = std::invoke_result_t<Callable, const CNodePtr&>;
         std::vector<std::future<resultType>> results {};
 
-        LOCK(cs_vNodes);
+        bsv::lock_guard lock{cs_vNodes};
         results.reserve(vNodes.size());
         for(const CNodePtr& node : vNodes) {
             if(NodeFullyConnected(node))
@@ -743,9 +743,9 @@ private:
     CCriticalSection cs_vOneShots;
     std::vector<std::string> vAddedNodes;
     CCriticalSection cs_vAddedNodes;
-    std::vector<CNodePtr> vNodes;
+    std::vector<CNodePtr> vNodes GUARDED_BY(cs_vNodes);
     std::list<CNodePtr> vNodesDisconnected;
-    mutable CCriticalSection cs_vNodes;
+    mutable bsv::recursive_mutex cs_vNodes;
     std::atomic<NodeId> nLastNodeId{};
 
     /** Additional streams we want to open to peers */
