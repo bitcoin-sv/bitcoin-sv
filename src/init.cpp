@@ -64,7 +64,7 @@
 
 #ifdef ENABLE_WALLET
 #include "wallet/rpcdump.h"
-#include "wallet/wallet.h"
+#include "wallet/wallet_tx.h"
 #endif
 #include "warnings.h"
 

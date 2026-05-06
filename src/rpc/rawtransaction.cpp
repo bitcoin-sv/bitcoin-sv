@@ -40,7 +40,7 @@
 
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
-#include "wallet/wallet.h"
+#include "wallet/wallet_tx.h"
 #endif
 
 #include <cstdint>

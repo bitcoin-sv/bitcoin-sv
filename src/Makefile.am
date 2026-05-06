@@ -295,9 +295,11 @@ BITCOIN_CORE_H = \
   wallet/crypter.h \
   wallet/db.h \
   wallet/finaltx.h \
+  wallet/merkle_tx.h \
   wallet/rpcdump.h \
   wallet/rpcwallet.h \
   wallet/wallet.h \
+  wallet/wallet_tx.h \
   wallet/walletdb.h \
   warnings.h \
   write_preferring_upgradable_mutex.h \
@@ -455,10 +457,12 @@ libbitcoin_wallet_a_SOURCES = \
   wallet/crypter.cpp \
   wallet/db.cpp \
   wallet/finaltx.cpp \
+  wallet/merkle_tx.cpp \
   wallet/rpcdump.cpp \
   wallet/rpcwallet.cpp \
   wallet/wallet.cpp \
   wallet/walletdb.cpp \
+  wallet/wallet_tx.cpp \
   $(BITCOIN_CORE_H)
 
 # crypto primitives library

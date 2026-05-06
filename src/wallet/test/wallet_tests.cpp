@@ -2,7 +2,6 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include "wallet/wallet.h"
 
 #include "block_index_store.h"
 #include "chainparams.h"
@@ -13,6 +12,7 @@
 #include "validation.h"
 #include "wallet/rpcdump.h"
 #include "wallet/test/wallet_test_fixture.h"
+#include "wallet/wallet_tx.h"
 #include "blockfileinfostore.h"
 
 #include <univalue.h>

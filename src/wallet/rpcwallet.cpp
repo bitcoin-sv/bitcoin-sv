@@ -21,7 +21,7 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "validation.h"
-#include "wallet.h"
+#include "wallet_tx.h"
 #include "walletdb.h"
 #include "coincontrol.h"
 

@@ -16,7 +16,7 @@
 #include "util.h"
 #include "utiltime.h"
 #include "validation.h" // For CheckRegularTransaction
-#include "wallet/wallet.h"
+#include "wallet/wallet_tx.h"
 #include "config.h"
 
 #include <atomic>

@@ -18,6 +18,7 @@
 #include "utiltime.h"
 #include "validation.h"
 #include "wallet.h"
+#include "wallet_tx.h"
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <univalue.h>
