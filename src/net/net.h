@@ -744,7 +744,11 @@ private:
     std::vector<std::string> vAddedNodes;
     CCriticalSection cs_vAddedNodes;
     std::vector<CNodePtr> vNodes GUARDED_BY(cs_vNodes);
+
+    // Single-thread-confined: only accessed from ThreadSocketHandler and from
+    // Stop() after that thread is joined. No mutex required.
     std::list<CNodePtr> vNodesDisconnected;
+
     mutable bsv::recursive_mutex cs_vNodes;
     std::atomic<NodeId> nLastNodeId{};
 
