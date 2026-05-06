@@ -167,11 +167,15 @@ UniValue importprivkey(const Config&, const JSONRPCRequest& request)
     return NullUniValue;
 }
 
-void ImportAddress(CWallet *, const CTxDestination &dest,
-                   const std::string &strLabel);
-void ImportScript(CWallet *const pwallet, const CScript &script,
-                  const std::string &strLabel, bool isRedeemScript) {
-    if (!isRedeemScript && ::IsMine(*pwallet, script) == ISMINE_SPENDABLE) {
+void ImportAddress(CWallet*, const CTxDestination& dest, const std::string& strLabel);
+
+void ImportScript(CWallet* const pwallet,
+                  const CScript& script,
+                  const std::string& strLabel,
+                  bool isRedeemScript) REQUIRES(pwallet->cs_wallet)
+{
+    if(!isRedeemScript && ::IsMine(*pwallet, script) == ISMINE_SPENDABLE)
+    {
         throw JSONRPCError(RPC_WALLET_ERROR, "The wallet already contains the "
                                              "private key for this address or "
                                              "script");
@@ -198,8 +202,10 @@ void ImportScript(CWallet *const pwallet, const CScript &script,
     }
 }
 
-void ImportAddress(CWallet *const pwallet, const CTxDestination &dest,
-                   const std::string &strLabel) {
+void ImportAddress(CWallet* const pwallet,
+                   const CTxDestination& dest,
+                   const std::string& strLabel) REQUIRES(pwallet->cs_wallet)
+{
     CScript script = GetScriptForDestination(dest);
     ImportScript(pwallet, script, strLabel, false);
     // add to address book or update label
@@ -793,8 +799,10 @@ UniValue dumpwallet(const Config&, const JSONRPCRequest& request)
     return reply;
 }
 
-UniValue ProcessImport(CWallet *const pwallet, const UniValue &data,
-                       const int64_t timestamp) {
+UniValue ProcessImport(CWallet* const pwallet,
+                       const UniValue& data,
+                       const int64_t timestamp) REQUIRES(pwallet->cs_wallet)
+{
     try {
         bool success = false;
 

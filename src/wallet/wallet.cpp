@@ -27,6 +27,7 @@
 #include "script/script.h"
 #include "script/sighashtype.h"
 #include "script/sign.h"
+#include "sync.h"
 #include "timedata.h"
 #include "txmempool.h"
 #include "txn_validator.h"
@@ -1785,14 +1786,17 @@ void CWallet::ResendWalletTransactions(int64_t nBestBlockTime,
  *
  * @{
  */
-Amount CWallet::GetBalance() const {
-    LOCK2(cs_main, cs_wallet);
+Amount CWallet::GetBalance() const
+{
+    bsv::lock_guard lock1{cs_main};
+    bsv::lock_guard lock2{cs_wallet};
 
     Amount nTotal(0);
-    for (std::map<uint256, CWalletTx>::const_iterator it = mapWallet.begin();
-         it != mapWallet.end(); ++it) {
-        const CWalletTx *pcoin = &(*it).second;
-        if (pcoin->IsTrusted()) {
+    for(auto it = mapWallet.begin(); it != mapWallet.end(); ++it)
+    {
+        const CWalletTx* pcoin = &(*it).second;
+        if(pcoin->IsTrusted())
+        {
             nTotal += pcoin->GetAvailableCredit();
         }
     }
@@ -1800,15 +1804,17 @@ Amount CWallet::GetBalance() const {
     return nTotal;
 }
 
-Amount CWallet::GetUnconfirmedBalance() const {
-    LOCK2(cs_main, cs_wallet);
+Amount CWallet::GetUnconfirmedBalance() const
+{
+    bsv::lock_guard lock1{cs_main};
+    bsv::lock_guard lock2{cs_wallet};
 
     Amount nTotal(0);
-    for (std::map<uint256, CWalletTx>::const_iterator it = mapWallet.begin();
-         it != mapWallet.end(); ++it) {
-        const CWalletTx *pcoin = &(*it).second;
-        if (!pcoin->IsTrusted() && pcoin->GetDepthInMainChain() == 0 &&
-            pcoin->InMempool()) {
+    for(auto it = mapWallet.begin(); it != mapWallet.end(); ++it)
+    {
+        const CWalletTx* pcoin = &(*it).second;
+        if(!pcoin->IsTrusted() && pcoin->GetDepthInMainChain() == 0 && pcoin->InMempool())
+        {
             nTotal += pcoin->GetAvailableCredit();
         }
     }
@@ -3912,6 +3918,7 @@ std::unique_ptr<CWallet> CWallet::CreateWalletFromFile(const CChainParams& chain
             gArgs.GetArg("-zapwallettxes", "1") != "2") {
             CWalletDB walletdb(*walletInstance->dbw);
 
+            bsv::lock_guard lock{walletInstance->cs_wallet};
             for(const CWalletTx& wtxOld : vWtx)
             {
                 uint256 txid = wtxOld.GetId();

@@ -200,9 +200,9 @@ static UniValue getnewaddress(const Config&, const JSONRPCRequest& request)
     return EncodeDestination(keyID);
 }
 
-CTxDestination GetAccountAddress(CWallet* const  pwallet,
+CTxDestination GetAccountAddress(CWallet* const pwallet,
                                  const std::string& strAccount,
-                                 bool bForceNew = false)
+                                 bool bForceNew = false) REQUIRES(pwallet->cs_wallet)
 {
     CPubKey pubKey;
     if (!pwallet->GetAccountPubkey(pubKey, strAccount, bForceNew)) {
@@ -1390,13 +1390,13 @@ struct tallyitem
     bool fIsWatchonly{false};
 };
 
-static UniValue ListReceived(
-    const Config &config,
-    CWallet *const pwallet,
-    const UniValue &params,
-    bool fByAccounts,
-    int32_t nChainActiveHeight,
-    int nMedianTimePast) {
+static UniValue ListReceived(const Config& config,
+                             CWallet* const pwallet,
+                             const UniValue& params,
+                             bool fByAccounts,
+                             int32_t nChainActiveHeight,
+                             int nMedianTimePast) REQUIRES(pwallet->cs_wallet)
+{
 
     // Minimum confirmations
     int nMinDepth = 1;

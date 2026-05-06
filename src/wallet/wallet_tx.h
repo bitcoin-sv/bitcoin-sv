@@ -190,9 +190,9 @@ public:
     Amount GetDebit(const isminefilter& filter) const;
     Amount GetCredit(const isminefilter& filter) const;
     Amount GetImmatureCredit(bool fUseCache = true) const;
-    Amount GetAvailableCredit(bool fUseCache = true) const;
+    Amount GetAvailableCredit(bool fUseCache = true) const REQUIRES(pwallet->cs_wallet);
     Amount GetImmatureWatchOnlyCredit(const bool& fUseCache = true) const;
-    Amount GetAvailableWatchOnlyCredit(const bool& fUseCache = true) const;
+    Amount GetAvailableWatchOnlyCredit(const bool& fUseCache = true) const REQUIRES(pwallet->cs_wallet);
     Amount GetChange() const;
 
     void GetAmounts(std::list<COutputEntry>& listReceived,
@@ -219,5 +219,5 @@ public:
     // RelayWalletTransaction may only be called if fBroadcastTransactions!
     bool RelayWalletTransaction(CConnman* connman);
 
-    std::set<uint256> GetConflicts() const;
+    std::set<uint256> GetConflicts() const REQUIRES(pwallet->cs_wallet);
 };

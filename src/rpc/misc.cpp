@@ -97,10 +97,10 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
 
 #ifdef ENABLE_WALLET
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
-
-    LOCK2(cs_main, pwallet ? &pwallet->cs_wallet : nullptr);
 #endif
-    
+
+    bsv::lock_guard lock_main{cs_main};
+
     auto tip = chainActive.Tip();
 
     proxyType proxy;
@@ -109,12 +109,6 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
     UniValue obj(UniValue::VOBJ);
     obj.push_back(Pair("version", CLIENT_VERSION));
     obj.push_back(Pair("protocolversion", PROTOCOL_VERSION));
-#ifdef ENABLE_WALLET
-    if (pwallet) {
-        obj.push_back(Pair("walletversion", pwallet->GetVersion()));
-        obj.push_back(Pair("balance", ValueFromAmount(pwallet->GetBalance())));
-    }
-#endif
     obj.push_back(Pair("initcomplete", GetAppInitCompleted()));
     obj.push_back(Pair("blocks", (int)(tip ? tip->GetHeight() : -1)));
     obj.push_back(Pair("timeoffset", GetTimeOffset()));
@@ -134,13 +128,16 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
                        CBaseChainParams::STN));
 #ifdef ENABLE_WALLET
     if (pwallet) {
+        bsv::lock_guard lock_wallet{pwallet->cs_wallet};
+        obj.push_back(Pair("walletversion", pwallet->GetVersion()));
+        obj.push_back(Pair("balance", ValueFromAmount(pwallet->GetBalance())));
         obj.push_back(Pair("keypoololdest", pwallet->GetOldestKeyPoolTime()));
         obj.push_back(Pair("keypoolsize", (int)pwallet->GetKeyPoolSize()));
+        if (pwallet->IsCrypted()) {
+            obj.push_back(Pair("unlocked_until", pwallet->nRelockTime));
+        }
+        obj.push_back(Pair("paytxfee", ValueFromAmount(payTxFee.GetFeePerK())));
     }
-    if (pwallet && pwallet->IsCrypted()) {
-        obj.push_back(Pair("unlocked_until", pwallet->nRelockTime));
-    }
-    obj.push_back(Pair("paytxfee", ValueFromAmount(payTxFee.GetFeePerK())));
 #endif
     obj.push_back(Pair("relayfee",
                        ValueFromAmount(config.GetMinFeePerKB().GetFeePerK())));
