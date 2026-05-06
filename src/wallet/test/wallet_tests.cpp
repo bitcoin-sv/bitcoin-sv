@@ -596,6 +596,7 @@ BOOST_FIXTURE_TEST_CASE(importwallet_rescan, TestChain100Setup) {
         vpwallets[0] = std::move(wallet);
         ::importwallet(GlobalConfig::GetConfig(), request);
 
+        bsv::lock_guard lock{vpwallets[0]->cs_wallet};
         BOOST_CHECK_EQUAL(vpwallets[0]->mapWallet.size(), 3U);
         BOOST_CHECK_EQUAL(coinbaseTxns.size(), 103U);
         for(size_t i = 0; i < coinbaseTxns.size(); ++i)
@@ -656,6 +657,7 @@ static int64_t AddTx(CWallet &wallet, uint32_t lockTime, int64_t mockTime,
         wtx.SetMerkleBranch(block, 0);
     }
     wallet.AddToWallet(wtx);
+    bsv::lock_guard lock{wallet.cs_wallet};
     return wallet.mapWallet.at(wtx.GetId()).nTimeSmart;
 }
 
