@@ -3068,6 +3068,95 @@ static UniValue resendwallettransactions(const Config&,
     return result;
 }
 
+static UniValue rescanblockchain(const Config&, const JSONRPCRequest& request)
+{
+    CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() > 2) {
+        throw std::runtime_error(
+            "rescanblockchain ( start_height stop_height )\n"
+            "\nRescan blockchain for wallet transactions.\n"
+            "\nArguments:\n"
+            "1. start_height    (numeric, optional, default=0) Block height "
+            "where rescan starts.\n"
+            "2. stop_height     (numeric, optional, default=chain tip) Block "
+            "height where rescan stops.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"start_height\": n,    (numeric) Rescan start height\n"
+            "  \"stop_height\": n      (numeric) Rescan stop height\n"
+            "}\n"
+            "\nExamples:\n" +
+            HelpExampleCli("rescanblockchain", "") +
+            HelpExampleCli("rescanblockchain", "100000") +
+            HelpExampleCli("rescanblockchain", "100000 120000") +
+            HelpExampleRpc("rescanblockchain", "") +
+            HelpExampleRpc("rescanblockchain", "100000, 120000"));
+    }
+
+    int start_height = 0;
+    if (request.params.size() > 0 && !request.params[0].isNull()) {
+        RPCTypeCheckArgument(request.params[0], UniValue::VNUM);
+        start_height = request.params[0].get_int();
+    }
+
+    int stop_height = 0;
+    const CBlockIndex *start_block = nullptr;
+    const CBlockIndex *stop_block = nullptr;
+    {
+        LOCK(cs_main);
+
+        if (start_height < 0 || start_height > chainActive.Height()) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER,
+                               "Block height out of range");
+        }
+
+        stop_height = chainActive.Height();
+        if (request.params.size() > 1 && !request.params[1].isNull()) {
+            RPCTypeCheckArgument(request.params[1], UniValue::VNUM);
+            stop_height = request.params[1].get_int();
+        }
+
+        if (stop_height < 0 || stop_height > chainActive.Height()) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER,
+                               "Block height out of range");
+        }
+
+        if (start_height > stop_height) {
+            throw JSONRPCError(
+                RPC_INVALID_PARAMETER,
+                "stop_height must be greater than or equal to start_height");
+        }
+
+        start_block = chainActive[start_height];
+        stop_block = chainActive[stop_height];
+    }
+
+    uiInterface.InitMessage(_("Rescanning..."));
+    LogPrintf("Rescanning wallet %s from block %d to %d...\n",
+              pwallet->GetName(), start_height, stop_height);
+
+    const CBlockIndex *const scanned_block =
+        pwallet->ScanForWalletTransactions(start_block, true, stop_block);
+    pwallet->MarkDirty();
+    pwallet->ReacceptWalletTransactions();
+
+    if (scanned_block == nullptr ||
+        scanned_block->GetHeight() > start_block->GetHeight()) {
+        throw JSONRPCError(
+            RPC_MISC_ERROR,
+            "Rescan failed for some blocks. Your node may be pruned.");
+    }
+
+    UniValue result(UniValue::VOBJ);
+    result.push_back(Pair("start_height", start_height));
+    result.push_back(Pair("stop_height", stop_height));
+    return result;
+}
+
 static UniValue listunspent(const Config &config,
                             const JSONRPCRequest &request) {
     CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
@@ -3516,7 +3605,7 @@ void RegisterWalletRPCCommands(CRPCTable& t)
         return;
 
     // clang-format off
-    static const std::array<CRPCCommand, 39> commands{{
+    static const std::array<CRPCCommand, 40> commands{{
         //  category            name                        actor (function)          okSafeMode
         //  ------------------- ------------------------    ----------------------    ----------
         { "rawtransactions",    "fundrawtransaction",       fundrawtransaction,       false,  {"hexstring","options"} },
@@ -3548,6 +3637,7 @@ void RegisterWalletRPCCommands(CRPCTable& t)
         { "wallet",             "listwallets",              listwallets,              true,   {} },
         { "wallet",             "lockunspent",              lockunspent,              true,   {"unlock","transactions"} },
         { "wallet",             "move",                     movecmd,                  false,  {"fromaccount","toaccount","amount","minconf","comment"} },
+        { "wallet",             "rescanblockchain",         rescanblockchain,         false,  {"start_height","stop_height"} },
         { "wallet",             "sendfrom",                 sendfrom,                 false,  {"fromaccount","toaddress","amount","minconf","comment","comment_to"} },
         { "wallet",             "sendmany",                 sendmany,                 false,  {"fromaccount","amounts","minconf","comment","subtractfeefrom"} },
         { "wallet",             "sendtoaddress",            sendtoaddress,            false,  {"address","amount","comment","comment_to","subtractfeefromamount"} },
