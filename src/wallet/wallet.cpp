@@ -1736,8 +1736,9 @@ void CWalletTx::GetAmounts(std::list<COutputEntry> &listReceived,
  * before CWallet::nTimeFirstKey). Returns null if there is no such range, or
  * the range doesn't include chainActive.Tip().
  */
-const CBlockIndex *CWallet::ScanForWalletTransactions(const CBlockIndex *pindexStart,
-                                                bool fUpdate) {
+const CBlockIndex *CWallet::ScanForWalletTransactions(
+    const CBlockIndex *pindexStart, bool fUpdate,
+    const CBlockIndex *pindexStop) {
     LOCK2(cs_main, cs_wallet);
 
     int64_t nNow = GetTime();
@@ -1752,7 +1753,8 @@ const CBlockIndex *CWallet::ScanForWalletTransactions(const CBlockIndex *pindexS
         pindex = chainActive.Next(pindex);
     }
 
-    while (pindex) {
+    while (pindex &&
+           (!pindexStop || pindex->GetHeight() <= pindexStop->GetHeight())) {
 
         auto stream = pindex->GetDiskBlockStreamReader();
 

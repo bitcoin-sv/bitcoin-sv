@@ -541,6 +541,59 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChain100Setup) {
     }
 }
 
+BOOST_FIXTURE_TEST_CASE(rescan_range, TestChain100Setup) {
+    LOCK(cs_main);
+
+    // Cap last block file size, and mine new block in a new block file.
+    CBlockIndex *oldTip = chainActive.Tip();
+    pBlockFileInfoStore
+        ->GetBlockFileInfo(oldTip->GetBlockPos().File())
+        ->AddNewBlock(1, 1, DEFAULT_PREFERRED_BLOCKFILE_SIZE);
+    CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
+    CBlockIndex *newTip = chainActive.Tip();
+
+    // Verify bounded rescans respect stop height.
+    {
+        CWallet wallet(Params());
+        LOCK(wallet.cs_wallet);
+        wallet.AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey());
+        BOOST_CHECK_EQUAL(
+            oldTip, wallet.ScanForWalletTransactions(oldTip, false, oldTip));
+        BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), 50 * COIN);
+    }
+
+    {
+        CWallet wallet(Params());
+        LOCK(wallet.cs_wallet);
+        wallet.AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey());
+        BOOST_CHECK_EQUAL(
+            oldTip, wallet.ScanForWalletTransactions(oldTip, false, newTip));
+        BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), 100 * COIN);
+    }
+
+    // Prune older block file and verify bounded rescans fail or partially
+    // succeed as expected.
+    UnlinkPrunedFiles({oldTip->GetBlockPos().File()});
+
+    {
+        CWallet wallet(Params());
+        LOCK(wallet.cs_wallet);
+        wallet.AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey());
+        BOOST_CHECK(wallet.ScanForWalletTransactions(oldTip, false, oldTip) ==
+                    nullptr);
+        BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), Amount(0));
+    }
+
+    {
+        CWallet wallet(Params());
+        LOCK(wallet.cs_wallet);
+        wallet.AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey());
+        BOOST_CHECK_EQUAL(
+            newTip, wallet.ScanForWalletTransactions(oldTip, false, newTip));
+        BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), 50 * COIN);
+    }
+}
+
 // Verify importwallet RPC starts rescan at earliest block with timestamp
 // greater or equal than key birthday. Previously there was a bug where
 // importwallet RPC would start the scan at the latest block with timestamp less

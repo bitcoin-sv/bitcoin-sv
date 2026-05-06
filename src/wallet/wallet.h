@@ -910,8 +910,9 @@ public:
     bool AddToWalletIfInvolvingMe(const CTransactionRef &tx,
                                   const CBlockIndex *pIndex, int posInBlock,
                                   bool fUpdate);
-    const CBlockIndex *ScanForWalletTransactions(const CBlockIndex *pindexStart,
-                                           bool fUpdate = false);
+    const CBlockIndex *ScanForWalletTransactions(
+        const CBlockIndex *pindexStart, bool fUpdate = false,
+        const CBlockIndex *pindexStop = nullptr);
     void ReacceptWalletTransactions();
     // ResendWalletTransactionsBefore may only be called if
     // fBroadcastTransactions!

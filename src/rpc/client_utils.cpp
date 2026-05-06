@@ -28,7 +28,7 @@ public:
  *
  * @note Parameter indexes start from 0.
  */
-static const std::array<CRPCConvertParam, 120> vRPCConvertParams  //NOLINT(cert-err58-cpp)
+static const std::array<CRPCConvertParam, 122> vRPCConvertParams  //NOLINT(cert-err58-cpp)
 {{
     {"setmocktime", 0, "timestamp"},
     {"generate", 0, "nblocks"},
@@ -111,6 +111,8 @@ static const std::array<CRPCConvertParam, 120> vRPCConvertParams  //NOLINT(cert-
     {"getblockstatsbyheight", 1, "stats"},
     {"pruneblockchain", 0, "height"},
     {"keypoolrefill", 0, "newsize"},
+    {"rescanblockchain", 0, "start_height"},
+    {"rescanblockchain", 1, "stop_height"},
     {"getrawmempool", 0, "verbose"},
     {"prioritisetransaction", 1, "priority_delta"},
     {"prioritisetransaction", 2, "fee_delta"},
@@ -334,4 +336,3 @@ int AppInitRPC(int argc, char *argv[], const std::string& usage_format, const st
     }
     return CONTINUE_EXECUTION;
 }
-
