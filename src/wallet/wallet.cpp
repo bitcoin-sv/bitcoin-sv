@@ -1786,6 +1786,38 @@ void CWallet::ResendWalletTransactions(int64_t nBestBlockTime,
  *
  * @{
  */
+Amount CWallet::GetAvailableCredit(const CWalletTx& wtx, bool fUseCache) const
+{
+    AssertLockHeld(cs_wallet);
+
+    // Must wait until coinbase is safely deep enough in the chain before valuing it.
+    if(wtx.IsCoinBase() && wtx.GetBlocksToMaturity() > 0)
+        return Amount(0);
+
+    if(fUseCache && wtx.fAvailableCreditCached)
+        return wtx.nAvailableCreditCached;
+
+    Amount nCredit(0);
+    uint256 hashTx = wtx.GetId();
+    for(unsigned int i = 0; i < wtx.tx->vout.size(); i++)
+    {
+        if(!IsSpent(hashTx, i))
+        {
+            const CTxOut& txout = wtx.tx->vout[i];
+            nCredit += GetCredit(txout, ISMINE_SPENDABLE);
+            if(!MoneyRange(nCredit))
+            {
+                throw std::runtime_error(
+                    "CWallet::GetAvailableCredit() : value out of range");
+            }
+        }
+    }
+
+    wtx.nAvailableCreditCached = nCredit;
+    wtx.fAvailableCreditCached = true;
+    return nCredit;
+}
+
 Amount CWallet::GetBalance() const
 {
     bsv::lock_guard lock1{cs_main};
@@ -1797,7 +1829,7 @@ Amount CWallet::GetBalance() const
         const CWalletTx* pcoin = &(*it).second;
         if(pcoin->IsTrusted())
         {
-            nTotal += pcoin->GetAvailableCredit();
+            nTotal += GetAvailableCredit(*pcoin);
         }
     }
 
@@ -1815,7 +1847,7 @@ Amount CWallet::GetUnconfirmedBalance() const
         const CWalletTx* pcoin = &(*it).second;
         if(!pcoin->IsTrusted() && pcoin->GetDepthInMainChain() == 0 && pcoin->InMempool())
         {
-            nTotal += pcoin->GetAvailableCredit();
+            nTotal += GetAvailableCredit(*pcoin);
         }
     }
 

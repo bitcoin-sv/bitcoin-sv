@@ -190,7 +190,6 @@ public:
     Amount GetDebit(const isminefilter& filter) const;
     Amount GetCredit(const isminefilter& filter) const;
     Amount GetImmatureCredit(bool fUseCache = true) const;
-    Amount GetAvailableCredit(bool fUseCache = true) const REQUIRES(pwallet->cs_wallet);
     Amount GetImmatureWatchOnlyCredit(bool fUseCache = true) const;
     Amount GetAvailableWatchOnlyCredit(bool fUseCache = true) const REQUIRES(pwallet->cs_wallet);
     Amount GetChange() const;

@@ -644,6 +644,9 @@ public:
     Amount GetWatchOnlyBalance() const;
     Amount GetUnconfirmedWatchOnlyBalance() const;
     Amount GetImmatureWatchOnlyBalance() const;
+
+    Amount GetAvailableCredit(const CWalletTx&,
+                              bool fUseCache = true) const REQUIRES(cs_wallet);
     Amount GetLegacyBalance(const isminefilter &filter, int minDepth,
                             const std::string *account) const;
 

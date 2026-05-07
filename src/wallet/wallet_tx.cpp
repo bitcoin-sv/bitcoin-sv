@@ -277,46 +277,6 @@ Amount CWalletTx::GetImmatureCredit(bool fUseCache) const
     return Amount(0);
 }
 
-Amount CWalletTx::GetAvailableCredit(bool fUseCache) const
-{
-    if(pwallet == 0)
-    {
-        return Amount(0);
-    }
-
-    // Must wait until coinbase is safely deep enough in the chain before
-    // valuing it.
-    if(IsCoinBase() && GetBlocksToMaturity() > 0)
-    {
-        return Amount(0);
-    }
-
-    if(fUseCache && fAvailableCreditCached)
-    {
-        return nAvailableCreditCached;
-    }
-
-    Amount nCredit(0);
-    uint256 hashTx = GetId();
-    for(unsigned int i = 0; i < tx->vout.size(); i++)
-    {
-        if(!pwallet->IsSpent(hashTx, i))
-        {
-            const CTxOut& txout = tx->vout[i];
-            nCredit += pwallet->GetCredit(txout, ISMINE_SPENDABLE);
-            if(!MoneyRange(nCredit))
-            {
-                throw std::runtime_error(
-                    "CWalletTx::GetAvailableCredit() : value out of range");
-            }
-        }
-    }
-
-    nAvailableCreditCached = nCredit;
-    fAvailableCreditCached = true;
-    return nCredit;
-}
-
 Amount CWalletTx::GetImmatureWatchOnlyCredit(const bool fUseCache) const
 {
     if(IsCoinBase() && GetBlocksToMaturity() > 0 && IsInMainChain())
