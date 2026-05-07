@@ -1614,92 +1614,6 @@ static UniValue listreceivedbyaccount(const Config &config,
                 chainActive.Tip()->GetMedianTimePast());
 }
 
-static void MaybePushAddress(UniValue &entry, const CTxDestination &dest) {
-    if (IsValidDestination(dest)) {
-        entry.push_back(Pair("address", EncodeDestination(dest)));
-    }
-}
-
-void ListTransactions(CWallet *const pwallet, const CWalletTx &wtx,
-                      const std::string &strAccount, int nMinDepth, bool fLong,
-                      UniValue &ret, const isminefilter &filter) {
-    Amount nFee;
-    std::string strSentAccount;
-    std::list<COutputEntry> listReceived;
-    std::list<COutputEntry> listSent;
-
-    wtx.GetAmounts(listReceived, listSent, nFee, strSentAccount, filter);
-
-    bool fAllAccounts = (strAccount == std::string("*"));
-    bool involvesWatchonly = wtx.IsFromMe(ISMINE_WATCH_ONLY);
-
-    // Sent
-    if ((!listSent.empty() || nFee != Amount(0)) &&
-        (fAllAccounts || strAccount == strSentAccount)) {
-        for (const COutputEntry &s : listSent) {
-            UniValue entry(UniValue::VOBJ);
-            if (involvesWatchonly ||
-                (::IsMine(*pwallet, s.destination) & ISMINE_WATCH_ONLY)) {
-                entry.push_back(Pair("involvesWatchonly", true));
-            }
-            entry.push_back(Pair("account", strSentAccount));
-            MaybePushAddress(entry, s.destination);
-            entry.push_back(Pair("category", "send"));
-            entry.push_back(Pair("amount", ValueFromAmount(-s.amount)));
-            if (pwallet->mapAddressBook.count(s.destination)) {
-                entry.push_back(
-                    Pair("label", pwallet->mapAddressBook[s.destination].name));
-            }
-            entry.push_back(Pair("vout", s.vout));
-            entry.push_back(Pair("fee", ValueFromAmount(-1 * nFee)));
-            if (fLong) {
-                pwallet->ToJSON(wtx, entry);
-            }
-            entry.push_back(Pair("abandoned", wtx.isAbandoned()));
-            ret.push_back(entry);
-        }
-    }
-
-    // Received
-    if (listReceived.size() > 0 && wtx.GetDepthInMainChain() >= nMinDepth) {
-        for (const COutputEntry &r : listReceived) {
-            std::string account;
-            if (pwallet->mapAddressBook.count(r.destination)) {
-                account = pwallet->mapAddressBook[r.destination].name;
-            }
-            if (fAllAccounts || (account == strAccount)) {
-                UniValue entry(UniValue::VOBJ);
-                if (involvesWatchonly ||
-                    (::IsMine(*pwallet, r.destination) & ISMINE_WATCH_ONLY)) {
-                    entry.push_back(Pair("involvesWatchonly", true));
-                }
-                entry.push_back(Pair("account", account));
-                MaybePushAddress(entry, r.destination);
-                if (wtx.IsCoinBase()) {
-                    if (wtx.GetDepthInMainChain() < 1) {
-                        entry.push_back(Pair("category", "orphan"));
-                    } else if (wtx.GetBlocksToMaturity() > 0) {
-                        entry.push_back(Pair("category", "immature"));
-                    } else {
-                        entry.push_back(Pair("category", "generate"));
-                    }
-                } else {
-                    entry.push_back(Pair("category", "receive"));
-                }
-                entry.push_back(Pair("amount", ValueFromAmount(r.amount)));
-                if (pwallet->mapAddressBook.count(r.destination)) {
-                    entry.push_back(Pair("label", account));
-                }
-                entry.push_back(Pair("vout", r.vout));
-                if (fLong) {
-                    pwallet->ToJSON(wtx, entry);
-                }
-                ret.push_back(entry);
-            }
-        }
-    }
-}
-
 void AcentryToJSON(const CAccountingEntry &acentry,
                    const std::string &strAccount, UniValue &ret) {
     bool fAllAccounts = (strAccount == std::string("*"));
@@ -1860,7 +1774,7 @@ static UniValue listtransactions(const Config&, const JSONRPCRequest& request)
          it != txOrdered.rend(); ++it) {
         CWalletTx *const pwtx = (*it).second.first;
         if (pwtx != 0) {
-            ListTransactions(pwallet, *pwtx, strAccount, 0, true, ret, filter);
+            pwallet->ListTransactions(*pwtx, strAccount, 0, true, ret, filter);
         }
         CAccountingEntry *const pacentry = (*it).second.second;
         if (pacentry != 0) {
@@ -2129,7 +2043,7 @@ static UniValue listsinceblock(const Config&, const JSONRPCRequest& request)
         CWalletTx tx = pairWtx.second;
 
         if (depth == -1 || tx.GetDepthInMainChain() < depth) {
-            ListTransactions(pwallet, tx, "*", 0, true, transactions, filter);
+            pwallet->ListTransactions(tx, "*", 0, true, transactions, filter);
         }
     }
 
@@ -2262,7 +2176,7 @@ static UniValue gettransaction(const Config&, const JSONRPCRequest& request)
     pwallet->ToJSON(wtx, entry);
 
     UniValue details(UniValue::VARR);
-    ListTransactions(pwallet, wtx, "*", 0, false, details, filter);
+    pwallet->ListTransactions(wtx, "*", 0, false, details, filter);
     entry.push_back(Pair("details", details));
 
     std::string strHex =

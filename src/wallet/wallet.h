@@ -653,6 +653,13 @@ public:
                                        bool fUseCache = true) const REQUIRES(cs_wallet);
 
     void ToJSON(const CWalletTx&, UniValue&) const REQUIRES(cs_wallet);
+
+    void ListTransactions(const CWalletTx&,
+                          const std::string& strAccount,
+                          int nMinDepth,
+                          bool fLong,
+                          UniValue& ret,
+                          const isminefilter& filter) const REQUIRES(cs_wallet);
     Amount GetLegacyBalance(const isminefilter &filter, int minDepth,
                             const std::string *account) const;
 

@@ -23,6 +23,7 @@
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "protocol_era.h"
+#include "rpc/server.h"
 #include "scheduler.h"
 #include "script/script.h"
 #include "script/sighashtype.h"
@@ -1933,6 +1934,103 @@ void CWallet::ToJSON(const CWalletTx& wtx, UniValue& entry) const
 
     for(const auto& item : wtx.mapValue)
         entry.push_back(Pair(item.first, item.second));
+}
+
+static void MaybePushAddress(UniValue& entry, const CTxDestination& dest)
+{
+    if(IsValidDestination(dest))
+        entry.push_back(Pair("address", EncodeDestination(dest)));
+}
+
+void CWallet::ListTransactions(const CWalletTx& wtx,
+                               const std::string& strAccount,
+                               int nMinDepth,
+                               bool fLong,
+                               UniValue& ret,
+                               const isminefilter& filter) const
+{
+    AssertLockHeld(cs_wallet);
+
+    Amount nFee;
+    std::string strSentAccount;
+    std::list<COutputEntry> listReceived;
+    std::list<COutputEntry> listSent;
+    wtx.GetAmounts(listReceived, listSent, nFee, strSentAccount, filter);
+
+    bool fAllAccounts = (strAccount == std::string("*"));
+    bool involvesWatchonly = wtx.IsFromMe(ISMINE_WATCH_ONLY);
+
+    // Sent
+    if((!listSent.empty() || nFee != Amount(0)) &&
+       (fAllAccounts || strAccount == strSentAccount))
+    {
+        for(const COutputEntry& s : listSent)
+        {
+            UniValue entry(UniValue::VOBJ);
+            if(involvesWatchonly || (::IsMine(*this, s.destination) & ISMINE_WATCH_ONLY))
+                entry.push_back(Pair("involvesWatchonly", true));
+
+            entry.push_back(Pair("account", strSentAccount));
+            MaybePushAddress(entry, s.destination);
+            entry.push_back(Pair("category", "send"));
+            entry.push_back(Pair("amount", ValueFromAmount(-s.amount)));
+            if(auto it = mapAddressBook.find(s.destination); it != mapAddressBook.end())
+                entry.push_back(Pair("label", it->second.name));
+
+            entry.push_back(Pair("vout", s.vout));
+            entry.push_back(Pair("fee", ValueFromAmount(-1 * nFee)));
+            if(fLong)
+                ToJSON(wtx, entry);
+
+            entry.push_back(Pair("abandoned", wtx.isAbandoned()));
+            ret.push_back(entry);
+        }
+    }
+
+    // Received
+    if(listReceived.size() > 0 && wtx.GetDepthInMainChain() >= nMinDepth)
+    {
+        for(const COutputEntry& r : listReceived)
+        {
+            std::string account;
+            if(auto it = mapAddressBook.find(r.destination); it != mapAddressBook.end())
+                account = it->second.name;
+
+            if(fAllAccounts || (account == strAccount))
+            {
+                UniValue entry(UniValue::VOBJ);
+                if(involvesWatchonly ||
+                   (::IsMine(*this, r.destination) & ISMINE_WATCH_ONLY))
+                {
+                    entry.push_back(Pair("involvesWatchonly", true));
+                }
+
+                entry.push_back(Pair("account", account));
+                MaybePushAddress(entry, r.destination);
+                if(wtx.IsCoinBase())
+                {
+                    if(wtx.GetDepthInMainChain() < 1)
+                        entry.push_back(Pair("category", "orphan"));
+                    else if(wtx.GetBlocksToMaturity() > 0)
+                        entry.push_back(Pair("category", "immature"));
+                    else
+                        entry.push_back(Pair("category", "generate"));
+                }
+                else
+                    entry.push_back(Pair("category", "receive"));
+
+                entry.push_back(Pair("amount", ValueFromAmount(r.amount)));
+                if(mapAddressBook.count(r.destination))
+                    entry.push_back(Pair("label", account));
+
+                entry.push_back(Pair("vout", r.vout));
+                if(fLong)
+                    ToJSON(wtx, entry);
+
+                ret.push_back(entry);
+            }
+        }
+    }
 }
 
 Amount CWallet::GetWatchOnlyBalance() const {
