@@ -32,6 +32,7 @@
 #include "txmempool.h"
 #include "txn_validator.h"
 #include "ui_interface.h"
+#include "univalue.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "wallet/coincontrol.h"
@@ -1897,6 +1898,39 @@ Amount CWallet::GetAvailableWatchOnlyCredit(const CWalletTx& wtx, bool fUseCache
     wtx.nAvailableWatchCreditCached = nCredit;
     wtx.fAvailableWatchCreditCached = true;
     return nCredit;
+}
+
+void CWallet::ToJSON(const CWalletTx& wtx, UniValue& entry) const
+{
+    AssertLockHeld(cs_wallet);
+
+    int confirms = wtx.GetDepthInMainChain();
+    entry.push_back(Pair("confirmations", confirms));
+    if(wtx.IsCoinBase())
+        entry.push_back(Pair("generated", true));
+
+    if(confirms > 0)
+    {
+        entry.push_back(Pair("blockhash", wtx.hashBlock.GetHex()));
+        entry.push_back(Pair("blockindex", wtx.nIndex));
+        entry.push_back(Pair("blocktime",
+                             mapBlockIndex.Get(wtx.hashBlock)->GetBlockTime()));
+    }
+    else
+        entry.push_back(Pair("trusted", wtx.IsTrusted()));
+
+    uint256 hash = wtx.GetId();
+    entry.push_back(Pair("txid", hash.GetHex()));
+    UniValue conflicts(UniValue::VARR);
+    for(const uint256& conflict : wtx.GetConflicts())
+        conflicts.push_back(conflict.GetHex());
+
+    entry.push_back(Pair("walletconflicts", conflicts));
+    entry.push_back(Pair("time", wtx.GetTxTime()));
+    entry.push_back(Pair("timereceived", (int64_t)wtx.nTimeReceived));
+
+    for(const auto& item : wtx.mapValue)
+        entry.push_back(Pair(item.first, item.second));
 }
 
 Amount CWallet::GetWatchOnlyBalance() const {

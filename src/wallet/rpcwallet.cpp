@@ -107,35 +107,6 @@ void EnsureWalletIsUnlocked(CWallet *const pwallet) {
     }
 }
 
-void WalletTxToJSON(const CWalletTx &wtx, UniValue &entry) {
-    int confirms = wtx.GetDepthInMainChain();
-    entry.push_back(Pair("confirmations", confirms));
-    if (wtx.IsCoinBase()) {
-        entry.push_back(Pair("generated", true));
-    }
-    if (confirms > 0) {
-        entry.push_back(Pair("blockhash", wtx.hashBlock.GetHex()));
-        entry.push_back(Pair("blockindex", wtx.nIndex));
-        entry.push_back(
-            Pair("blocktime", mapBlockIndex.Get(wtx.hashBlock)->GetBlockTime()));
-    } else {
-        entry.push_back(Pair("trusted", wtx.IsTrusted()));
-    }
-    uint256 hash = wtx.GetId();
-    entry.push_back(Pair("txid", hash.GetHex()));
-    UniValue conflicts(UniValue::VARR);
-    for (const uint256 &conflict : wtx.GetConflicts()) {
-        conflicts.push_back(conflict.GetHex());
-    }
-    entry.push_back(Pair("walletconflicts", conflicts));
-    entry.push_back(Pair("time", wtx.GetTxTime()));
-    entry.push_back(Pair("timereceived", (int64_t)wtx.nTimeReceived));
-
-    for (const auto& item : wtx.mapValue) {
-        entry.push_back(Pair(item.first, item.second));
-    }
-}
-
 std::string AccountFromValue(const UniValue &value) {
     std::string strAccount = value.get_str();
     if (strAccount == "*") {
@@ -1682,7 +1653,7 @@ void ListTransactions(CWallet *const pwallet, const CWalletTx &wtx,
             entry.push_back(Pair("vout", s.vout));
             entry.push_back(Pair("fee", ValueFromAmount(-1 * nFee)));
             if (fLong) {
-                WalletTxToJSON(wtx, entry);
+                pwallet->ToJSON(wtx, entry);
             }
             entry.push_back(Pair("abandoned", wtx.isAbandoned()));
             ret.push_back(entry);
@@ -1721,7 +1692,7 @@ void ListTransactions(CWallet *const pwallet, const CWalletTx &wtx,
                 }
                 entry.push_back(Pair("vout", r.vout));
                 if (fLong) {
-                    WalletTxToJSON(wtx, entry);
+                    pwallet->ToJSON(wtx, entry);
                 }
                 ret.push_back(entry);
             }
@@ -2288,7 +2259,7 @@ static UniValue gettransaction(const Config&, const JSONRPCRequest& request)
         entry.push_back(Pair("fee", ValueFromAmount(nFee)));
     }
 
-    WalletTxToJSON(wtx, entry);
+    pwallet->ToJSON(wtx, entry);
 
     UniValue details(UniValue::VARR);
     ListTransactions(pwallet, wtx, "*", 0, false, details, filter);

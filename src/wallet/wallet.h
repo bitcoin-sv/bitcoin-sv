@@ -79,6 +79,7 @@ class CScript;
 class CScheduler;
 class CTxMemPool;
 class CWalletTx;
+class UniValue;
 
 /** (client) version numbers for particular wallet features */
 enum WalletFeature //NOLINT(cppcoreguidelines-use-enum-class)
@@ -650,6 +651,8 @@ public:
 
     Amount GetAvailableWatchOnlyCredit(const CWalletTx&,
                                        bool fUseCache = true) const REQUIRES(cs_wallet);
+
+    void ToJSON(const CWalletTx&, UniValue&) const REQUIRES(cs_wallet);
     Amount GetLegacyBalance(const isminefilter &filter, int minDepth,
                             const std::string *account) const;
 
