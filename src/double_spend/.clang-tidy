@@ -4,6 +4,7 @@ Checks: '-*,
          clang-analyzer-*,
          cppcoreguidelines-*,
          -cppcoreguidelines-avoid-magic-numbers,
+         performance-*,
       '
 
 InheritParentConfig: true

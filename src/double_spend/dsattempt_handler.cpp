@@ -452,7 +452,7 @@ void DSAttemptHandler::ProcessDoubleSpend()
                     {
                         using namespace std::chrono_literals;
                         SuspensionScore score { SUSPENSION_SCORE_MAX, SUSPENSION_SCORE_INCREASE, 1s };
-                        mSuspensionTracker.insert( { doubleSpendTxnDetails.sender, std::move(score) } );
+                        mSuspensionTracker.insert( { doubleSpendTxnDetails.sender, score } );
                     }
                 }
             }
