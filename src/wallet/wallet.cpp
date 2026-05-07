@@ -1867,6 +1867,38 @@ Amount CWallet::GetImmatureBalance() const {
     return nTotal;
 }
 
+Amount CWallet::GetAvailableWatchOnlyCredit(const CWalletTx& wtx, bool fUseCache) const
+{
+    AssertLockHeld(cs_wallet);
+
+    // Must wait until coinbase is safely deep enough in the chain before valuing it.
+    if(wtx.IsCoinBase() && wtx.GetBlocksToMaturity() > 0)
+        return Amount(0);
+
+    if(fUseCache && wtx.fAvailableWatchCreditCached)
+        return wtx.nAvailableWatchCreditCached;
+
+    Amount nCredit(0);
+    uint256 hashTx = wtx.GetId();
+    for(unsigned int i{}; i < wtx.tx->vout.size(); i++)
+    {
+        if(!IsSpent(hashTx, i))
+        {
+            const CTxOut& txout = wtx.tx->vout[i];
+            nCredit += GetCredit(txout, ISMINE_WATCH_ONLY);
+            if(!MoneyRange(nCredit))
+            {
+                throw std::runtime_error(
+                    "CWallet::GetAvailableWatchOnlyCredit() : value out of range");
+            }
+        }
+    }
+
+    wtx.nAvailableWatchCreditCached = nCredit;
+    wtx.fAvailableWatchCreditCached = true;
+    return nCredit;
+}
+
 Amount CWallet::GetWatchOnlyBalance() const {
     LOCK2(cs_main, cs_wallet);
 
@@ -1875,7 +1907,7 @@ Amount CWallet::GetWatchOnlyBalance() const {
          it != mapWallet.end(); ++it) {
         const CWalletTx *pcoin = &(*it).second;
         if (pcoin->IsTrusted()) {
-            nTotal += pcoin->GetAvailableWatchOnlyCredit();
+            nTotal += GetAvailableWatchOnlyCredit(*pcoin);
         }
     }
 
@@ -1891,7 +1923,7 @@ Amount CWallet::GetUnconfirmedWatchOnlyBalance() const {
         const CWalletTx *pcoin = &(*it).second;
         if (!pcoin->IsTrusted() && pcoin->GetDepthInMainChain() == 0 &&
             pcoin->InMempool()) {
-            nTotal += pcoin->GetAvailableWatchOnlyCredit();
+            nTotal += GetAvailableWatchOnlyCredit(*pcoin);
         }
     }
 

@@ -191,7 +191,6 @@ public:
     Amount GetCredit(const isminefilter& filter) const;
     Amount GetImmatureCredit(bool fUseCache = true) const;
     Amount GetImmatureWatchOnlyCredit(bool fUseCache = true) const;
-    Amount GetAvailableWatchOnlyCredit(bool fUseCache = true) const REQUIRES(pwallet->cs_wallet);
     Amount GetChange() const;
 
     void GetAmounts(std::list<COutputEntry>& listReceived,
