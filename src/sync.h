@@ -310,9 +310,9 @@ namespace bsv
         std::mutex mtx_;
 
     public:
-        void lock() EXCLUSIVE_LOCK_FUNCTION() { mtx_.lock(); }
-        void unlock() UNLOCK_FUNCTION() { mtx_.unlock(); }
-        bool try_lock() noexcept EXCLUSIVE_TRYLOCK_FUNCTION(true) { return mtx_.try_lock(); }
+        void lock() ACQUIRE() { mtx_.lock(); }
+        void unlock() RELEASE() { mtx_.unlock(); }
+        bool try_lock() noexcept TRY_ACQUIRE(true) { return mtx_.try_lock(); }
     };
 
     class CAPABILITY("mutex") REENTRANT_CAPABILITY recursive_mutex
@@ -320,9 +320,9 @@ namespace bsv
         std::recursive_mutex mtx_;
 
     public:
-        void lock() EXCLUSIVE_LOCK_FUNCTION() { mtx_.lock(); }
-        void unlock() UNLOCK_FUNCTION() { mtx_.unlock(); }
-        bool try_lock() noexcept EXCLUSIVE_TRYLOCK_FUNCTION(true) { return mtx_.try_lock(); }
+        void lock() ACQUIRE() { mtx_.lock(); }
+        void unlock() RELEASE() { mtx_.unlock(); }
+        bool try_lock() noexcept TRY_ACQUIRE(true) { return mtx_.try_lock(); }
     };
 
     class CAPABILITY("shared_mutex") shared_mutex
@@ -353,7 +353,7 @@ namespace bsv
         std::lock_guard<M> guard_;
 
     public:
-        lock_guard(M& mtx) EXCLUSIVE_LOCK_FUNCTION(mtx) : guard_{mtx} {}
+        lock_guard(M& mtx) ACQUIRE(mtx) : guard_{mtx} {}
 
         lock_guard(const lock_guard&) = delete;
         lock_guard& operator=(const lock_guard&) = delete;
@@ -361,16 +361,16 @@ namespace bsv
         lock_guard(lock_guard&&) = delete;
         lock_guard& operator=(lock_guard&&) = delete;
 
-        ~lock_guard() UNLOCK_FUNCTION() {}
+        ~lock_guard() RELEASE() {}
     };
 
     template<BasicLockable M>
-    class SCOPED_LOCKABLE unique_lock
+    class SCOPED_CAPABILITY unique_lock
     {
         std::unique_lock<M> lock_;
 
     public:
-        unique_lock(M& m) EXCLUSIVE_LOCK_FUNCTION(m) : lock_{m} {}
+        unique_lock(M& m) ACQUIRE(m) : lock_{m} {}
 
         unique_lock(const unique_lock&) = delete;
         unique_lock& operator=(const unique_lock&) = delete;
@@ -378,10 +378,10 @@ namespace bsv
         unique_lock(unique_lock&&) = default;
         unique_lock& operator=(unique_lock&&) = default;
 
-        ~unique_lock() UNLOCK_FUNCTION() {}
+        ~unique_lock() RELEASE() {}
 
-        void lock() EXCLUSIVE_LOCK_FUNCTION() { lock_.lock(); }
-        void unlock() UNLOCK_FUNCTION() { lock_.unlock(); }
+        void lock() ACQUIRE() { lock_.lock(); }
+        void unlock() RELEASE() { lock_.unlock(); }
     };
 }
 
