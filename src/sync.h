@@ -403,6 +403,23 @@ namespace bsv
         void lock() ACQUIRE_SHARED() { lock_.lock(); }
         void unlock() RELEASE() { lock_.unlock(); }
     };
+
+    template<BasicLockable... Ms>
+    class SCOPED_CAPABILITY scoped_lock
+    {
+        std::scoped_lock<Ms...> guard_;
+
+    public:
+        explicit scoped_lock(Ms&... ms) ACQUIRE(ms...) : guard_{ms...} {}
+
+        scoped_lock(const scoped_lock&) = delete;
+        scoped_lock& operator=(const scoped_lock&) = delete;
+
+        scoped_lock(scoped_lock&&) = delete;
+        scoped_lock& operator=(scoped_lock&&) = delete;
+
+        ~scoped_lock() RELEASE() {}
+    };
 }
 
 #endif // BITCOIN_SYNC_H
