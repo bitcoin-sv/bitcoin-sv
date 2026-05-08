@@ -15,6 +15,7 @@
 
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 
 /////////////////////////////////////////////////
 //                                             //
@@ -322,6 +323,20 @@ namespace bsv
         void lock() EXCLUSIVE_LOCK_FUNCTION() { mtx_.lock(); }
         void unlock() UNLOCK_FUNCTION() { mtx_.unlock(); }
         bool try_lock() noexcept EXCLUSIVE_TRYLOCK_FUNCTION(true) { return mtx_.try_lock(); }
+    };
+
+    class CAPABILITY("shared_mutex") shared_mutex
+    {
+        std::shared_mutex mtx_;
+
+    public:
+        void lock() ACQUIRE() { mtx_.lock(); }
+        void unlock() RELEASE() { mtx_.unlock(); }
+        bool try_lock() noexcept TRY_ACQUIRE(true) { return mtx_.try_lock(); }
+
+        void lock_shared() ACQUIRE_SHARED() { mtx_.lock_shared(); }
+        bool try_lock_shared() TRY_ACQUIRE_SHARED(true) { return mtx_.try_lock_shared(); }
+        void unlock_shared() RELEASE_SHARED() { mtx_.unlock_shared(); }
     };
 
     // Matches the C++ std::BasicLockable named requirement

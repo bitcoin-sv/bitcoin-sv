@@ -37,6 +37,11 @@
 #define LOCKS_EXCLUDED EXCLUDES
 #define NO_THREAD_SAFETY_ANALYSIS __attribute__((no_thread_safety_analysis))
 #define REENTRANT_CAPABILITY __attribute__((reentrant_capability))
+
+#define ACQUIRE_SHARED(...) __attribute__((acquire_shared_capability(__VA_ARGS__)))
+#define RELEASE_SHARED(...) __attribute__((release_shared_capability(__VA_ARGS__)))
+#define TRY_ACQUIRE_SHARED(...) __attribute__((try_acquire_shared_capability(__VA_ARGS__)))
+
 #else
 #define CAPABILITY(x)
 #define LOCKABLE
@@ -53,6 +58,11 @@
 #define LOCKS_EXCLUDED(...)
 #define NO_THREAD_SAFETY_ANALYSIS
 #define REENTRANT_CAPABILITY
+
+#define ACQUIRE_SHARED(...)
+#define RELEASE_SHARED(...)
+#define TRY_ACQUIRE_SHARED(...)
+
 #endif
 
 #endif // BITCOIN_THREADSAFETY_H
