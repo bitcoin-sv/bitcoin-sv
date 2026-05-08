@@ -102,7 +102,7 @@ CTxnValidator::QueueCounts CTxnValidator::GetTransactionsInQueueCounts() const
 {
     // Take shared locks in the following order.
     bsv::shared_lock lock1 { mStdTxnsMtx };
-    std::shared_lock lock2 { mNonStdTxnsMtx };
+    bsv::shared_lock lock2 { mNonStdTxnsMtx };
     std::shared_lock lock3 { mProcessingQueueMtx };
     return {mStdTxns.size(), mNonStdTxns.size(), mProcessingQueue.size()};
 }
@@ -123,8 +123,9 @@ void CTxnValidator::newTransaction(TxInputDataSPtr pTxInputData)
         bsv::lock_guard lock{mStdTxnsMtx};
         enqueueStdTxnNL(pTxInputData);
     }
-    else if (TxValidationPriority::low == txpriority) {
-        std::unique_lock lock { mNonStdTxnsMtx };
+    else if (TxValidationPriority::low == txpriority)
+    {
+        bsv::lock_guard lock { mNonStdTxnsMtx };
         enqueueNonStdTxnNL(pTxInputData);
     }
 }
@@ -462,10 +463,11 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                 "Txnval-asynch: Validation timeout occurred for %d txn(s) received from the Standard queue "
                                 "(forwarding them to the Non-standard queue)\n",
                                  nDetectedLowPriorityTxnsNum);
-                        std::unique_lock lock_non_std{ mNonStdTxnsMtx };
-                        enqueueTxnsNL(imdResult.mDetectedLowPriorityTxns.begin(), imdResult.mDetectedLowPriorityTxns.end(),
-                            [this](const TxInputDataSPtr& txn){ enqueueNonStdTxnNL(txn); }
-                        );
+                        bsv::lock_guard lock_non_std{ mNonStdTxnsMtx };
+                        enqueueTxnsNL(imdResult.mDetectedLowPriorityTxns.begin(),
+                                      imdResult.mDetectedLowPriorityTxns.end(),
+                                      [this](const TxInputDataSPtr &txn) REQUIRES(mNonStdTxnsMtx)
+                                      { enqueueNonStdTxnNL(txn); });
                     }
                     // Move back into the processing queue any txns which were re-submitted.
                     size_t nResubmittedTxnsNum = imdResult.mResubmittedTxns.size();
@@ -764,7 +766,7 @@ bool CTxnValidator::isTxnKnown(const uint256& txid) const
     bsv::shared_lock lock1 { mStdTxnsMtx };
     if (!isTxnKnownInSetNL(txid, mStdTxns)) {
         // Check if exists in non-standard queue
-        std::shared_lock lock2 { mNonStdTxnsMtx };
+        bsv::shared_lock lock2 { mNonStdTxnsMtx };
         if (!isTxnKnownInSetNL(txid, mNonStdTxns)) {
             // Check if exists in mProcessingQueue
             std::shared_lock lock3 { mProcessingQueueMtx };

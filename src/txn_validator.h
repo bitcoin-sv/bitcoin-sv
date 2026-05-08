@@ -236,7 +236,7 @@ class CTxnValidator final
     /** Add a standard txn to the queue */
     bool enqueueStdTxnNL(const TxInputDataSPtr&) REQUIRES(mStdTxnsMtx);
     /** Add a non-standard txn to the queue */
-    bool enqueueNonStdTxnNL(const TxInputDataSPtr& txn);
+    bool enqueueNonStdTxnNL(const TxInputDataSPtr&) REQUIRES(mNonStdTxnsMtx);
 
     /** Add some txns (standard or non-standard) to the queue */
     template<typename Iterator, typename Callable>
@@ -280,10 +280,10 @@ class CTxnValidator final
     /** A dedicated mutex to protect an exclusive access to mStdTxns */
     mutable bsv::shared_mutex mStdTxnsMtx {};
     /** List of new non-standard transactions that need processing */
-    std::deque<TxInputDataSPtr> mNonStdTxns {};
+    std::deque<TxInputDataSPtr> mNonStdTxns GUARDED_BY(mNonStdTxnsMtx) {};
     std::atomic<uint64_t> mNonStdTxnsMemSize {0};
     /** A dedicated mutex to protect an exclusive access to mStdTxns */
-    mutable std::shared_mutex mNonStdTxnsMtx {};
+    mutable bsv::shared_mutex mNonStdTxnsMtx {};
     /** A vector of txns which are currently being processed */
     std::vector<TxInputDataSPtr> mProcessingQueue {};
     /** A dedicated mutex to protect an access to mTxnsProcessingQueue */
