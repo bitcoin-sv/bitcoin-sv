@@ -522,16 +522,6 @@ size_t CoinsDB::DynamicMemoryUsage() const {
 
 void CoinsDB::DBCacheAllInputs(const std::vector<CTransactionRef>& txns) const
 {
-    // Sort inputs; leveldb seems to prefer it that way
-    auto Sort = [](const COutPoint& out1, const COutPoint& out2)
-    {
-        if(out1.GetTxId() == out2.GetTxId())
-        {
-            return out1.GetN() < out2.GetN();
-        }
-        return out1.GetTxId() < out2.GetTxId();
-    };
-
     std::vector<COutPoint> allInputs {};
     for(size_t i = 1; i < txns.size(); ++i)
     {
@@ -540,9 +530,10 @@ void CoinsDB::DBCacheAllInputs(const std::vector<CTransactionRef>& txns) const
             allInputs.push_back(in.prevout);
         }
     }
-    // FIXME: Consider using parallel sort when it beconmes available
-    // NOTE: parallel sorting requires -ltbb in few GCC versions
-    std::sort(allInputs.begin(), allInputs.end(), Sort);
+
+    // Sort inputs; leveldb seems to prefer it that way
+    // FIXME: Consider using parallel sort.
+    std::sort(allInputs.begin(), allInputs.end());
 
     for(const auto& outpoint : allInputs)
     {
