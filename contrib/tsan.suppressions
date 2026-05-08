@@ -16,5 +16,3 @@
 
 deadlock:libdb_cxx
 race:libzmq
-deadlock:CTxMemPool::Expire
-deadlock:FindUndoPos
