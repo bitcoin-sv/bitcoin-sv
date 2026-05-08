@@ -317,7 +317,7 @@ Amount CWalletTx::GetAvailableCredit(bool fUseCache) const
     return nCredit;
 }
 
-Amount CWalletTx::GetImmatureWatchOnlyCredit(const bool& fUseCache) const
+Amount CWalletTx::GetImmatureWatchOnlyCredit(const bool fUseCache) const
 {
     if(IsCoinBase() && GetBlocksToMaturity() > 0 && IsInMainChain())
     {
@@ -334,7 +334,7 @@ Amount CWalletTx::GetImmatureWatchOnlyCredit(const bool& fUseCache) const
     return Amount(0);
 }
 
-Amount CWalletTx::GetAvailableWatchOnlyCredit(const bool& fUseCache) const
+Amount CWalletTx::GetAvailableWatchOnlyCredit(const bool fUseCache) const
 {
     if(pwallet == 0)
     {
@@ -363,7 +363,7 @@ Amount CWalletTx::GetAvailableWatchOnlyCredit(const bool& fUseCache) const
             if(!MoneyRange(nCredit))
             {
                 throw std::runtime_error(
-                    "CWalletTx::GetAvailableCredit() : value out of range");
+                    "CWalletTx::GetAvailableWatchOnlyCredit() : value out of range");
             }
         }
     }
