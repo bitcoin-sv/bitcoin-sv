@@ -285,9 +285,9 @@ class CTxnValidator final
     /** A dedicated mutex to protect an exclusive access to mStdTxns */
     mutable bsv::shared_mutex mNonStdTxnsMtx {};
     /** A vector of txns which are currently being processed */
-    std::vector<TxInputDataSPtr> mProcessingQueue {};
+    std::vector<TxInputDataSPtr> mProcessingQueue GUARDED_BY(mProcessingQueueMtx) {};
     /** A dedicated mutex to protect an access to mTxnsProcessingQueue */
-    mutable std::shared_mutex mProcessingQueueMtx {};
+    mutable bsv::shared_mutex mProcessingQueueMtx {};
 
     /** A common mutex used for:
      * - protecting mAsynchRunFrequency

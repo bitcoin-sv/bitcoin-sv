@@ -103,7 +103,7 @@ CTxnValidator::QueueCounts CTxnValidator::GetTransactionsInQueueCounts() const
     // Take shared locks in the following order.
     bsv::shared_lock lock1 { mStdTxnsMtx };
     bsv::shared_lock lock2 { mNonStdTxnsMtx };
-    std::shared_lock lock3 { mProcessingQueueMtx };
+    bsv::shared_lock lock3 { mProcessingQueueMtx };
     return {mStdTxns.size(), mNonStdTxns.size(), mProcessingQueue.size()};
 }
 
@@ -412,7 +412,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                         }
                         // Lock processing queue in a shared mode as it might be queried during processing.
                         {
-                            std::shared_lock lockPQ { mProcessingQueueMtx };
+                            bsv::shared_lock lockPQ { mProcessingQueueMtx };
                             // Process all new transactions (if any exists)
                             if(!mProcessingQueue.empty()) {
                                 LogPrint(BCLog::TXNVAL, "Txnval-asynch: Got %d new transactions\n",
@@ -506,7 +506,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                     //    a) doing it now ensures that executing queries, on the processing queue,
                     //       won't return false negative results
                     {
-                        std::scoped_lock lockPQ { mProcessingQueueMtx };
+                        bsv::lock_guard lockPQ{mProcessingQueueMtx};
                         std::swap(mProcessingQueue, vNextProcessingQueue);
                     }
                     // Clear the swapped content of the temporary vector
@@ -767,9 +767,9 @@ bool CTxnValidator::isTxnKnown(const uint256& txid) const
     if (!isTxnKnownInSetNL(txid, mStdTxns)) {
         // Check if exists in non-standard queue
         bsv::shared_lock lock2 { mNonStdTxnsMtx };
-        if (!isTxnKnownInSetNL(txid, mNonStdTxns)) {
+        if (!isTxnKnownInSetNL(txid, mNonStdTxns)){
             // Check if exists in mProcessingQueue
-            std::shared_lock lock3 { mProcessingQueueMtx };
+            bsv::shared_lock lock3 { mProcessingQueueMtx };
             return isTxnKnownInSetNL(txid, mProcessingQueue);
         }
     }
