@@ -18,6 +18,9 @@ static_assert(!std::copyable<bsv::lock_guard<bsv::mutex>>);
 
 static_assert(!std::copyable<bsv::unique_lock<bsv::mutex>>);
 static_assert(std::movable<bsv::unique_lock<bsv::mutex>>);
+    
+static_assert(!std::copyable<bsv::shared_lock<bsv::shared_mutex>>);
+static_assert(std::movable<bsv::shared_lock<bsv::shared_mutex>>);
 
 #ifdef DEBUG_LOCKCONTENTION
 void PrintLockContention(const char *pszName, const char *pszFile, int nLine) {
