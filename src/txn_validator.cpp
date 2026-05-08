@@ -4,10 +4,10 @@
 
 #include "txn_validator.h"
 
-#include "protocol_era.h"
-#include "txn_validation_config.h"
 #include "config.h"
 #include "net/net_processing.h"
+#include "protocol_era.h"
+#include "txn_validation_config.h"
 
 #include <utility>
 
@@ -60,10 +60,11 @@ CTxnValidator::~CTxnValidator() {
 void CTxnValidator::shutdown() {
     // Only shutdown once
     bool expected {true};
-    if(mRunning.compare_exchange_strong(expected, false)) {
+    if(mRunning.compare_exchange_strong(expected, false))
+    {
         // Shutdown thread
         {
-            std::unique_lock lock { mMainMtx };
+            bsv::lock_guard lock{mMainMtx};
             mMainCV.notify_one();
         }
         mNewTxnsThread.join();
@@ -71,14 +72,16 @@ void CTxnValidator::shutdown() {
 }
 
 /** Get the frequency we run */
-std::chrono::milliseconds CTxnValidator::getRunFrequency() const {
-    std::shared_lock lock { mMainMtx };
+std::chrono::milliseconds CTxnValidator::getRunFrequency() const
+{
+    bsv::shared_lock lock{mMainMtx};
     return mAsynchRunFrequency;
 }
 
 /** Set the frequency we run */
-void CTxnValidator::setRunFrequency(const std::chrono::milliseconds& freq) {
-    std::unique_lock lock { mMainMtx };
+void CTxnValidator::setRunFrequency(const std::chrono::milliseconds& freq)
+{
+    bsv::lock_guard lock{mMainMtx};
     mAsynchRunFrequency = freq;
     // Also wake up the processing thread so that it is then rescheduled at the right frequency
     mMainCV.notify_one();
@@ -353,9 +356,10 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
         MempoolSizeLimits nLimits(MempoolSizeLimits::FromConfig());
 
         // The main running loop
-        while(mRunning) {
+        while(mRunning)
+        {
             // Run every few seconds or until stopping
-            std::unique_lock lock { mMainMtx };
+            bsv::unique_lock lock{mMainMtx};
             mMainCV.wait_for(lock, mAsynchRunFrequency);
             // Check if we are still running
             if(mRunning) {

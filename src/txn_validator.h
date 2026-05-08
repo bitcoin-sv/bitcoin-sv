@@ -295,8 +295,8 @@ class CTxnValidator final
      * - controlling sync and async validation mode
      *   (only one can run at the same time)
      */
-    mutable std::shared_mutex mMainMtx {};
-    std::condition_variable_any mMainCV {};
+    mutable bsv::shared_mutex mMainMtx {};
+    std::condition_variable_any mMainCV GUARDED_BY(mMainMtx) {};
     // A condition variable used to signal when all currently queued txns were processed.
     std::condition_variable_any mTxnsProcessedCV {} ;
 
@@ -323,5 +323,5 @@ class CTxnValidator final
     std::atomic<bool> mRunning {true};
 
     /** Frequency we run in asynchronous mode */
-    std::chrono::milliseconds mAsynchRunFrequency {DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS};
+    std::chrono::milliseconds mAsynchRunFrequency GUARDED_BY(mMainMtx) {DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS};
 };
