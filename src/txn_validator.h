@@ -298,7 +298,7 @@ class CTxnValidator final
     mutable bsv::shared_mutex mMainMtx {};
     std::condition_variable_any mMainCV GUARDED_BY(mMainMtx) {};
     // A condition variable used to signal when all currently queued txns were processed.
-    std::condition_variable_any mTxnsProcessedCV {} ;
+    std::condition_variable_any mTxnsProcessedCV GUARDED_BY(mProcessingQueueMtx) {};
 
     // A reference to the configuration
     const Config& mConfig;

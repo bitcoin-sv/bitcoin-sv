@@ -515,8 +515,9 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                     // If no orphan, cancelled and resubmitted transactions were detected, then:
                     // - the processing queue is empty
                     // - unblock one of the waiting threads (if any exists)
-                    if (!nOrphanP2PTxnsNum && !nCancelledTxnsNum && !nResubmittedTxnsNum) {
-                        std::shared_lock lockPQ { mProcessingQueueMtx };
+                    if (!nOrphanP2PTxnsNum && !nCancelledTxnsNum && !nResubmittedTxnsNum)
+                    {
+                        bsv::shared_lock lockPQ { mProcessingQueueMtx };
                         mTxnsProcessedCV.notify_one();
                     }
                 } catch (const std::exception& e) {
@@ -782,8 +783,9 @@ bool CTxnValidator::isTxnKnown(const uint256& txid) const
 void CTxnValidator::waitUntil(const std::function<bool(const QueueCounts&)>& predicate,
                               bool fCheckOrphanQueueEmpty)
 {
-    do {
-       std::shared_lock lock { mProcessingQueueMtx };
+    do
+    {
+       bsv::shared_lock lock { mProcessingQueueMtx };
        // Block the calling thread until notification is received and the predicate is not satisfied
        // (excluding the fact of being unblocked spuriously).
        mTxnsProcessedCV.wait(lock,
