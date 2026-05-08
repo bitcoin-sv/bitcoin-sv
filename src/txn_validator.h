@@ -234,7 +234,7 @@ class CTxnValidator final
     inline bool isSpaceForTxnNL(const TxInputDataSPtr& txn, const std::atomic<uint64_t>& currMemUsage) const;
 
     /** Add a standard txn to the queue */
-    bool enqueueStdTxnNL(const TxInputDataSPtr& txn);
+    bool enqueueStdTxnNL(const TxInputDataSPtr&) REQUIRES(mStdTxnsMtx);
     /** Add a non-standard txn to the queue */
     bool enqueueNonStdTxnNL(const TxInputDataSPtr& txn);
 
@@ -275,10 +275,10 @@ class CTxnValidator final
     }
 
     /** List of new transactions that need processing */
-    std::deque<TxInputDataSPtr> mStdTxns {};
+    std::deque<TxInputDataSPtr> mStdTxns GUARDED_BY(mStdTxnsMtx) {};
     std::atomic<uint64_t> mStdTxnsMemSize {0};
     /** A dedicated mutex to protect an exclusive access to mStdTxns */
-    mutable std::shared_mutex mStdTxnsMtx {};
+    mutable bsv::shared_mutex mStdTxnsMtx {};
     /** List of new non-standard transactions that need processing */
     std::deque<TxInputDataSPtr> mNonStdTxns {};
     std::atomic<uint64_t> mNonStdTxnsMemSize {0};

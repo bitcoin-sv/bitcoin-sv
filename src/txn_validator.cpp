@@ -98,9 +98,10 @@ std::shared_ptr<CTxnRecentRejects> CTxnValidator::getTxnRecentRejectsPtr() {
 }
 
 /** Get the number of transactions waiting to be processed. */
-CTxnValidator::QueueCounts CTxnValidator::GetTransactionsInQueueCounts() const {
+CTxnValidator::QueueCounts CTxnValidator::GetTransactionsInQueueCounts() const
+{
     // Take shared locks in the following order.
-    std::shared_lock lock1 { mStdTxnsMtx };
+    bsv::shared_lock lock1 { mStdTxnsMtx };
     std::shared_lock lock2 { mNonStdTxnsMtx };
     std::shared_lock lock3 { mProcessingQueueMtx };
     return {mStdTxns.size(), mNonStdTxns.size(), mProcessingQueue.size()};
@@ -113,11 +114,13 @@ size_t CTxnValidator::GetTransactionsInQueueCount() const {
 
 /** Handle a new transaction */
 // NOLINTNEXTLINE(performance-unnecessary-value-param)
-void CTxnValidator::newTransaction(TxInputDataSPtr pTxInputData) {
+void CTxnValidator::newTransaction(TxInputDataSPtr pTxInputData)
+{
     const TxValidationPriority& txpriority = pTxInputData->GetTxValidationPriority();
     // Add transaction to the right queue based on priority.
-    if (TxValidationPriority::high == txpriority || TxValidationPriority::normal == txpriority) {
-        std::unique_lock lock { mStdTxnsMtx };
+    if(TxValidationPriority::high == txpriority || TxValidationPriority::normal == txpriority)
+    {
+        bsv::lock_guard lock{mStdTxnsMtx};
         enqueueStdTxnNL(pTxInputData);
     }
     else if (TxValidationPriority::low == txpriority) {
@@ -386,10 +389,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                         }
                         // Lock mStdTxnsMtx, mNonStdTxnsMtx & mProcessingQueueMtx for a minimal duration to get queued txns.
                         {
-                            std::unique_lock<std::shared_mutex> lock1(mStdTxnsMtx, std::defer_lock);
-                            std::unique_lock<std::shared_mutex> lock2(mNonStdTxnsMtx, std::defer_lock);
-                            std::unique_lock<std::shared_mutex> lock3(mProcessingQueueMtx, std::defer_lock);
-                            std::lock(lock1, lock2, lock3);
+                            bsv::scoped_lock lck{mStdTxnsMtx, mNonStdTxnsMtx, mProcessingQueueMtx};
                             size_t nNumOfStdTxns = mStdTxns.size();
                             size_t nMaxNumOfStdTxnsToSchedule = nMaxStdTxnsPerThreadRatio * nNumStdTxValidationThreads;
                             size_t nNumOfNonStdTxns = mNonStdTxns.size();
@@ -758,9 +758,10 @@ bool CTxnValidator::enqueueNonStdTxnNL(const TxInputDataSPtr& txn) {
 
 /** Check if the given txn is already queued for processing (an expensive check).
  * An interface to facilitate Unit Tests. */
-bool CTxnValidator::isTxnKnown(const uint256& txid) const {
+bool CTxnValidator::isTxnKnown(const uint256& txid) const
+{
     // Check if exists in standard queue
-    std::shared_lock lock1 { mStdTxnsMtx };
+    bsv::shared_lock lock1 { mStdTxnsMtx };
     if (!isTxnKnownInSetNL(txid, mStdTxns)) {
         // Check if exists in non-standard queue
         std::shared_lock lock2 { mNonStdTxnsMtx };
