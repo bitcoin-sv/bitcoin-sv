@@ -19,6 +19,7 @@
 #include "ui_interface.h"
 
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include <boost/thread.hpp>
@@ -523,12 +524,23 @@ size_t CoinsDB::DynamicMemoryUsage() const {
 void CoinsDB::DBCacheAllInputs(const std::vector<CTransactionRef>& txns) const
 {
     std::vector<COutPoint> allInputs {};
+    allInputs.reserve(txns.size() * 2); // Assume average number of inputs per transaction is around 2
+    std::unordered_set<TxId> txIds {};
+    txIds.reserve(txns.size());
+
     for(size_t i = 1; i < txns.size(); ++i)
     {
         for(const auto& in: txns[i]->vin)
         {
-            allInputs.push_back(in.prevout);
+            // Skip inputs that are from transactions within the same block
+            // as they cannot be cached from the DB.
+            if(! txIds.contains(in.prevout.GetTxId()))
+            {
+                allInputs.push_back(in.prevout);
+            }
         }
+
+        txIds.insert(txns[i]->GetId());
     }
 
     // Sort inputs; leveldb seems to prefer it that way
@@ -541,7 +553,8 @@ void CoinsDB::DBCacheAllInputs(const std::vector<CTransactionRef>& txns) const
     }
 }
 
-std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const {
+std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const
+{
     std::optional<CoinImpl> coinFromCache;
     size_t maxScriptLoadingSize = 0;
 
