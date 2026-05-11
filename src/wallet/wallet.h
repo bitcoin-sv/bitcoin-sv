@@ -647,9 +647,7 @@ public:
     Amount GetImmatureWatchOnlyBalance() const;
 
     Amount GetAvailableCredit(const CWalletTx&) const REQUIRES(cs_wallet);
-
-    Amount GetAvailableWatchOnlyCredit(const CWalletTx&,
-                                       bool fUseCache = true) const REQUIRES(cs_wallet);
+    Amount GetAvailableWatchOnlyCredit(const CWalletTx&) const REQUIRES(cs_wallet);
 
     void ToJSON(const CWalletTx&, UniValue&) const REQUIRES(cs_wallet);
 

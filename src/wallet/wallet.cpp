@@ -1869,7 +1869,7 @@ Amount CWallet::GetImmatureBalance() const {
     return nTotal;
 }
 
-Amount CWallet::GetAvailableWatchOnlyCredit(const CWalletTx& wtx, bool fUseCache) const
+Amount CWallet::GetAvailableWatchOnlyCredit(const CWalletTx& wtx) const
 {
     AssertLockHeld(cs_wallet);
 
@@ -1877,7 +1877,7 @@ Amount CWallet::GetAvailableWatchOnlyCredit(const CWalletTx& wtx, bool fUseCache
     if(wtx.IsCoinBase() && wtx.GetBlocksToMaturity() > 0)
         return Amount(0);
 
-    if(fUseCache && wtx.fAvailableWatchCreditCached)
+    if(wtx.fAvailableWatchCreditCached)
         return wtx.nAvailableWatchCreditCached;
 
     Amount nCredit(0);
