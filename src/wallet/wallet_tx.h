@@ -216,6 +216,4 @@ public:
 
     // RelayWalletTransaction may only be called if fBroadcastTransactions!
     bool RelayWalletTransaction(CConnman* connman);
-
-    std::set<uint256> GetConflicts() const REQUIRES(pwallet->cs_wallet);
 };

@@ -167,19 +167,6 @@ bool CWalletTx::RelayWalletTransaction(CConnman* connman)
     return false;
 }
 
-std::set<uint256> CWalletTx::GetConflicts() const
-{
-    std::set<uint256> result;
-    if(pwallet != nullptr)
-    {
-        uint256 myHash = GetId();
-        result = pwallet->GetConflicts(myHash);
-        result.erase(myHash);
-    }
-
-    return result;
-}
-
 Amount CWalletTx::GetDebit(const isminefilter& filter) const
 {
     if(tx->vin.empty())

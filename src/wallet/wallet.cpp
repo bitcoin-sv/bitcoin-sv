@@ -1922,7 +1922,9 @@ void CWallet::ToJSON(const CWalletTx& wtx, UniValue& entry) const
     uint256 hash = wtx.GetId();
     entry.push_back(Pair("txid", hash.GetHex()));
     UniValue conflicts(UniValue::VARR);
-    for(const uint256& conflict : wtx.GetConflicts())
+    std::set<uint256> conflictSet = GetConflicts(hash);
+    conflictSet.erase(hash);
+    for(const uint256& conflict : conflictSet)
         conflicts.push_back(conflict.GetHex());
 
     entry.push_back(Pair("walletconflicts", conflicts));
