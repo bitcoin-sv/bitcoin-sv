@@ -646,8 +646,7 @@ public:
     Amount GetUnconfirmedWatchOnlyBalance() const;
     Amount GetImmatureWatchOnlyBalance() const;
 
-    Amount GetAvailableCredit(const CWalletTx&,
-                              bool fUseCache = true) const REQUIRES(cs_wallet);
+    Amount GetAvailableCredit(const CWalletTx&) const REQUIRES(cs_wallet);
 
     Amount GetAvailableWatchOnlyCredit(const CWalletTx&,
                                        bool fUseCache = true) const REQUIRES(cs_wallet);

@@ -1788,7 +1788,7 @@ void CWallet::ResendWalletTransactions(int64_t nBestBlockTime,
  *
  * @{
  */
-Amount CWallet::GetAvailableCredit(const CWalletTx& wtx, bool fUseCache) const
+Amount CWallet::GetAvailableCredit(const CWalletTx& wtx) const
 {
     AssertLockHeld(cs_wallet);
 
@@ -1796,7 +1796,7 @@ Amount CWallet::GetAvailableCredit(const CWalletTx& wtx, bool fUseCache) const
     if(wtx.IsCoinBase() && wtx.GetBlocksToMaturity() > 0)
         return Amount(0);
 
-    if(fUseCache && wtx.fAvailableCreditCached)
+    if(wtx.fAvailableCreditCached)
         return wtx.nAvailableCreditCached;
 
     Amount nCredit(0);
