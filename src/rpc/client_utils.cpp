@@ -11,9 +11,12 @@
 #include "util.h"
 #include "chainparamsbase.h"
 #include "clientversion.h"
-#include <set>
-#include <univalue.h>
+#include "univalue.h"
+
 #include <event2/buffer.h>
+
+#include <array>
+#include <set>
 
 class CRPCConvertParam {
 public:
@@ -28,8 +31,8 @@ public:
  *
  * @note Parameter indexes start from 0.
  */
-static const std::array<CRPCConvertParam, 120> vRPCConvertParams  //NOLINT(cert-err58-cpp)
-{{
+static const auto vRPCConvertParams = std::to_array<CRPCConvertParam>(  //NOLINT(cert-err58-cpp)
+{
     {"setmocktime", 0, "timestamp"},
     {"generate", 0, "nblocks"},
     {"generate", 1, "maxtries"},
@@ -104,6 +107,8 @@ static const std::array<CRPCConvertParam, 120> vRPCConvertParams  //NOLINT(cert-
     {"importpubkey", 2, "rescan"},
     {"importmulti", 0, "requests"},
     {"importmulti", 1, "options"},
+    {"rescanblockchain", 0, "start_height"},
+    {"rescanblockchain", 1, "stop_height"},
     {"verifychain", 0, "checklevel"},
     {"verifychain", 1, "nblocks"},
     {"getblockstats", 1, "stats"},
@@ -151,7 +156,7 @@ static const std::array<CRPCConvertParam, 120> vRPCConvertParams  //NOLINT(cert-
     {"echojson", 9, "arg9"},
     {"createdatareftx", 0, "inputs"},
     {"setminerinfotxfundingoutpoint", 1, "n"},
-}};
+});
 
 class CRPCConvertTable {
 private:

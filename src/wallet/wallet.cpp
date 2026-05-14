@@ -1626,66 +1626,142 @@ bool CWallet::IsHDEnabled() {
 }
 
 
-/**
- * Scan the block chain (starting in pindexStart) for transactions from or to
- * us. If fUpdate is true, found transactions that already exist in the wallet
- * will be updated.
- *
- * Returns pointer to the first block in the last contiguous range that was
- * successfully scanned or elided (elided if pIndexStart points at a block
- * before CWallet::nTimeFirstKey). Returns null if there is no such range, or
- * the range doesn't include chainActive.Tip().
- */
-const CBlockIndex *CWallet::ScanForWalletTransactions(const CBlockIndex *pindexStart,
-                                                bool fUpdate) {
-    LOCK2(cs_main, cs_wallet);
-
-    int64_t nNow = GetTime();
-
-    const CBlockIndex *pindex = pindexStart;
-    const CBlockIndex *ret = pindexStart;
-
-    // No need to read and scan block, if block was created before our wallet
-    // birthday (as adjusted for block time variability)
-    while (pindex && nTimeFirstKey &&
-           (pindex->GetBlockTime() < (nTimeFirstKey - 7200))) {
-        pindex = chainActive.Next(pindex);
+int64_t CWallet::RescanFromTime(int64_t startTime,
+                                const WalletRescanReserver& reserver,
+                                bool update)
+{
+    // Find starting block. May be null if nCreateTime is greater than the
+    // highest blockchain timestamp, in which case there is nothing that needs
+    // to be scanned.
+    const CBlockIndex* startBlock = nullptr;
+    {
+        LOCK(cs_main);
+        startBlock = chainActive.FindEarliestAtLeast(startTime - TIMESTAMP_WINDOW);
+        LogPrintf("%s: Rescanning last %i blocks\n", __func__,
+                  startBlock ? chainActive.Height() - startBlock->GetHeight() + 1 : 0);
     }
 
-    while (pindex) {
-
-        auto stream = pindex->GetDiskBlockStreamReader();
-
-        if (stream)
+    if(startBlock)
+    {
+        const CBlockIndex* const failedBlock = ScanForWalletTransactions(startBlock, nullptr, reserver, update);
+        if(failedBlock)
         {
-            int posInBlock = 0;
-            do
-            {
-                const CTransaction& transaction = stream->ReadTransaction();
-                AddToWalletIfInvolvingMe(
-                    MakeTransactionRef(transaction),
-                    pindex,
-                    posInBlock,
-                    fUpdate);
-                ++posInBlock;
-            } while(!stream->EndOfStream());
-
-            if (!ret) {
-                ret = pindex;
-            }
-        } else {
-            ret = nullptr;
+            return failedBlock->GetBlockTimeMax() + TIMESTAMP_WINDOW + 1;
         }
+    }
+    return startTime;
+}
 
-        if (GetTime() >= nNow + 60) {
+/**
+ * Scan the block chain (starting in pindexStart) for transactions
+ * from or to us. If fUpdate is true, found transactions that already
+ * exist in the wallet will be updated.
+ *
+ * Returns null if scan was successful. Otherwise, if a complete rescan was not
+ * possible (due to pruning or corruption), returns pointer to the most recent
+ * block that could not be scanned.
+ *
+ * If pindexStop is not a nullptr, the scan will stop at the block-index
+ * defined by pindexStop
+ *
+ * Caller needs to make sure pindexStop (and the optional pindexStart) are on
+ * the main chain after to the addition of any new keys you want to detect
+ * transactions for.
+ */
+const CBlockIndex* CWallet::ScanForWalletTransactions(const CBlockIndex* pindexStart,
+                                                      const CBlockIndex* pindexStop,
+                                                      const WalletRescanReserver& reserver,
+                                                      bool fUpdate)
+{
+    int64_t nNow = GetTime();
+    const Config& config = GlobalConfig::GetConfig();
+
+    assert(reserver.isReserved());
+    if(pindexStop && pindexStop->GetHeight() < pindexStart->GetHeight())
+    {
+        throw std::runtime_error("ScanForWalletTransactions: stop index cannot be older than start");
+    }
+
+    const CBlockIndex* pindex = pindexStart;
+    const CBlockIndex* ret = nullptr;
+
+    // show rescan progress in GUI as dialog or on splashscreen, if -rescan on startup
+    uiInterface.ShowProgress(_("Rescanning..."), 0);
+    const CBlockIndex* tip = nullptr;
+    double dProgressStart {};
+    double dProgressTip {};
+    {
+        LOCK(cs_main);
+        tip = chainActive.Tip();
+        dProgressStart = GuessVerificationProgress(chainParams.TxData(), pindex);
+        dProgressTip = GuessVerificationProgress(chainParams.TxData(), tip);
+
+        // No need to read and scan block, if block was created before our wallet
+        // birthday (as adjusted for block time variability)
+        while(pindex && nTimeFirstKey && (pindex->GetBlockTime() < (nTimeFirstKey - TIMESTAMP_WINDOW)))
+        {
+            if(pindex == pindexStop)
+            {
+                break;  // Don't skip past the requested stop point
+            }
+            pindex = chainActive.Next(pindex);
+        }
+    }
+
+    while(pindex)
+    {
+        if(pindex->GetHeight() % 100 == 0 && dProgressTip - dProgressStart > 0.0)
+        {
+            const double gvp = GuessVerificationProgress(chainParams.TxData(), pindex);
+            uiInterface.ShowProgress(_("Rescanning..."),
+                std::max(1, std::min(99,
+                    static_cast<int>((gvp - dProgressStart) / (dProgressTip - dProgressStart) * 100))));
+        }
+        if(GetTime() >= nNow + 60)
+        {
             nNow = GetTime();
             LogPrintf("Still rescanning. At block %d. Progress=%f\n",
                       pindex->GetHeight(),
                       GuessVerificationProgress(chainParams.TxData(), pindex));
         }
 
-        pindex = chainActive.Next(pindex);
+        CBlock block;
+        if(pindex->ReadBlockFromDisk(block, config))
+        {
+            LOCK2(cs_main, cs_wallet);
+            if(!chainActive.Contains(pindex))
+            {
+                // Abort scan if current block is no longer active, to prevent
+                // marking transactions as coming from the wrong block.
+                ret = pindex;
+                break;
+            }
+            for(size_t posInBlock = 0; posInBlock < block.vtx.size(); ++posInBlock)
+            {
+                AddToWalletIfInvolvingMe(block.vtx[posInBlock], pindex, static_cast<int>(posInBlock), fUpdate);
+            }
+        }
+        else
+        {
+            ret = pindex;
+        }
+        if(pindex == pindexStop)
+        {
+            break;
+        }
+
+        {
+            LOCK(cs_main);
+            pindex = chainActive.Next(pindex);
+            if(tip != chainActive.Tip())
+            {
+                tip = chainActive.Tip();
+                // in case the tip has changed, update progress max
+                dProgressTip = GuessVerificationProgress(chainParams.TxData(), tip);
+            }
+        }
     }
+    uiInterface.ShowProgress(_("Rescanning..."), 100);
 
     return ret;
 }
@@ -4095,17 +4171,24 @@ std::unique_ptr<CWallet> CWallet::CreateWalletFromFile(const CChainParams& chain
                   chainActive.Height() - pindexRescan->GetHeight(),
                   pindexRescan->GetHeight());
         nStart = GetTimeMillis();
-        if (walletInstance->ScanForWalletTransactions(pindexRescan, true) == nullptr)
         {
-            // We can't rescan beyond non-pruned blocks, stop and throw an error.
-            // This might happen if a user uses a old wallet within a pruned node or
-            // if he ran -disablewallet for a longer time, then decided to
-            // re-enable.
-            LogPrintf(" failed rescan      %15dms\n", GetTimeMillis() - nStart);
-            InitError(_("Prune: last wallet synchronisation goes beyond "
-                        "pruned data. You need to -reindex (download the "
-                        "whole blockchain again in case of pruned node)"));
-            return nullptr;
+            WalletRescanReserver reserver { walletInstance.get() };
+            if (!reserver.reserve()) {
+                InitError(_("Failed to rescan the wallet during initialization"));
+                return nullptr;
+            }
+            if (walletInstance->ScanForWalletTransactions(pindexRescan, nullptr, reserver, true))
+            {
+                // We can't rescan beyond non-pruned blocks, stop and throw an error.
+                // This might happen if a user uses a old wallet within a pruned node or
+                // if he ran -disablewallet for a longer time, then decided to
+                // re-enable.
+                LogPrintf(" failed rescan      %15dms\n", GetTimeMillis() - nStart);
+                InitError(_("Prune: last wallet synchronisation goes beyond "
+                            "pruned data. You need to -reindex (download the "
+                            "whole blockchain again in case of pruned node)"));
+                return nullptr;
+            }
         }
         LogPrintf(" rescan      %15dms\n", GetTimeMillis() - nStart);
         walletInstance->SetBestChain(chainActive.GetLocator());

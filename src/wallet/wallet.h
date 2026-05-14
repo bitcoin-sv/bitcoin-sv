@@ -80,6 +80,7 @@ class CScheduler;
 class CTxMemPool;
 class CWalletTx;
 class UniValue;
+class WalletRescanReserver;
 
 /** (client) version numbers for particular wallet features */
 enum WalletFeature //NOLINT(cppcoreguidelines-use-enum-class)
@@ -314,6 +315,10 @@ private:
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
     static std::atomic<bool> fFlushScheduled;
 
+    bsv::mutex mutexScanning;
+    bool fScanningWallet GUARDED_BY(mutexScanning);
+    friend class WalletRescanReserver;
+
     mutable std::mt19937 randomNumbers;
     /**
      * Select a set of coins such that nValueRet >= nTargetValue and at least
@@ -468,6 +473,9 @@ public:
         m_max_keypool_index = 0;
         nTimeFirstKey = 0;
         fBroadcastTransactions = false;
+
+        bsv::lock_guard lock { mutexScanning };
+        fScanningWallet = false;
     }
 
     std::map<uint256, CWalletTx> mapWallet GUARDED_BY(cs_wallet);
@@ -632,8 +640,14 @@ public:
                                   const CBlockIndex*,
                                   int posInBlock,
                                   bool fUpdate) REQUIRES(cs_wallet);
+
+    int64_t RescanFromTime(int64_t startTime,
+                           const WalletRescanReserver &reserver,
+                           bool update);
     const CBlockIndex *ScanForWalletTransactions(const CBlockIndex *pindexStart,
-                                           bool fUpdate = false);
+                                                 const CBlockIndex *pindexStop,
+                                                 const WalletRescanReserver &reserver,
+                                                 bool fUpdate = false);
     void ReacceptWalletTransactions();
     // ResendWalletTransactionsBefore may only be called if
     // fBroadcastTransactions!
@@ -882,6 +896,49 @@ public:
      * Extract single destination from script even if it is p2sh (multisig not supported)
      */
     static bool ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet);
+};
+
+/** RAII object to check and reserve a wallet rescan */
+class WalletRescanReserver
+{
+private:
+    CWallet* m_wallet {nullptr};
+    bool m_could_reserve {false};
+
+public:
+    explicit WalletRescanReserver(CWallet* w) : m_wallet{w} {}
+
+    WalletRescanReserver(const WalletRescanReserver&) = delete;
+    WalletRescanReserver(WalletRescanReserver&&) = delete;
+    WalletRescanReserver& operator=(const WalletRescanReserver&) = delete;
+    WalletRescanReserver& operator=(WalletRescanReserver&&) = delete;
+
+    bool reserve()
+    {
+        assert(!m_could_reserve);
+        bsv::lock_guard lock { m_wallet->mutexScanning };
+        if(m_wallet->fScanningWallet)
+        {
+            return false;
+        }
+        m_wallet->fScanningWallet = true;
+        m_could_reserve = true;
+        return true;
+    }
+
+    bool isReserved() const
+    {
+        return m_could_reserve;
+    }
+
+    ~WalletRescanReserver()
+    {
+        if(m_could_reserve)
+        {
+            bsv::lock_guard lock { m_wallet->mutexScanning };
+            m_wallet->fScanningWallet = false;
+        }
+    }
 };
 
 /** A key allocated from the key pool. */
