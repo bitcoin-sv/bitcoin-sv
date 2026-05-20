@@ -4,6 +4,7 @@
 #pragma once
 
 #include <compare>
+#include <cstdint>
 #include <memory>
 #include <span>
 #include <stdexcept>
