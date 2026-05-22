@@ -13,7 +13,7 @@
 struct CoinsDBDefaults
 {
     static constexpr size_t MIN_LEVELDB_FILE_SIZE { 256 * ONE_KIBIBYTE };
-    static constexpr size_t DEFAULT_MAX_LEVELDB_FILE_SIZE { 32 * ONE_MEBIBYTE };
+    static constexpr size_t DEFAULT_MAX_LEVELDB_FILE_SIZE { 128 * ONE_MEBIBYTE };
 
     // -coinsdbcache default - total budget for the coins LevelDB cache plus
     // the in-memory UTXO flush threshold. Split 1/8 to LevelDB (capped at
