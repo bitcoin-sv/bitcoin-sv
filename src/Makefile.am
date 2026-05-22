@@ -140,6 +140,7 @@ BITCOIN_CORE_H = \
   key.h \
   keystore.h \
   dbwrapper.h \
+  dbwrapper_limits.h \
   leaky_bucket.h \
   limitedmap.h \
   limited_cache.h \

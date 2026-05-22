@@ -1483,8 +1483,12 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             MIN_COINS_PROVIDER_CACHE_SIZE / ONE_MEGABYTE));
     strUsage += HelpMessageOpt(
         "-maxcoinsdbfiles=<n>",
-        strprintf(_("Set maximum number of files used by coins leveldb (default: %d). "),
-                  CoinsDB::MaxFiles::Default().maxFiles));
+        strprintf(_("Set maximum number of files used by coins leveldb "
+                    "(default: min(%d, RLIMIT_NOFILE_hard - %d); "
+                    "currently %d). "),
+                  CoinsDB::MaxFiles::AbsoluteMax,
+                  CoinsDB::MaxFiles::ReservedFds,
+                  CoinsDB::MaxFiles::Default().Get()));
     strUsage += HelpMessageOpt(
         "-maxcoinsdbfilesize=<n>",
         strprintf(_("Set maximum file size used by the coins leveldb (default: %d MB). "
@@ -2154,11 +2158,27 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         std::max(std::min(nMaxConnections,
                           (int)(FD_SETSIZE - nBind - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections)),
                  0);
-    nFD = RaiseFileDescriptorLimit(nMaxConnections + MIN_CORE_FILEDESCRIPTORS + maxAddNodeConnections);
+    if(std::string err; !config.SetMaxCoinsDbOpenFiles(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
+        gArgs.GetArg("-maxcoinsdbfiles", CoinsDB::MaxFiles::Default().Get()), &err))
+    {
+        return InitError(err);
+    }
+    LogPrintf("Using -maxcoinsdbfiles=%d (default: %d)\n",
+              config.GetMaxCoinsDbOpenFiles(),
+              CoinsDB::MaxFiles::Default().Get());
+    // Reserve FDs for the coins leveldb on top of the connection/core budget,
+    // otherwise a large -maxcoinsdbfiles value can be promised but unusable.
+    // NOLINTNEXTLINE(*-narrowing-conversions)
+    const int coinsDbFiles = config.GetMaxCoinsDbOpenFiles();
+    nFD = RaiseFileDescriptorLimit(
+        nMaxConnections + MIN_CORE_FILEDESCRIPTORS + maxAddNodeConnections + coinsDbFiles);
     if (nFD < MIN_CORE_FILEDESCRIPTORS)
         return InitError(_("Not enough file descriptors available."));
+    // If the rlimit was clipped, take the shortfall out of the connection
+    // budget rather than letting connections encroach on coinsDbFiles.
     nMaxConnections =
-        std::max(std::min(nFD - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections, nMaxConnections), 0);
+        std::max(std::min(nFD - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections - coinsDbFiles, nMaxConnections), 0);
     if (nMaxConnections < nUserMaxConnections)
         InitWarning(strprintf(_("Reducing -maxconnections from %d to %d, "
                                 "because of system limitations."),
@@ -2836,12 +2856,6 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         }
     }
 
-    if(std::string err; !config.SetMaxCoinsDbOpenFiles(
-        // NOLINTNEXTLINE(*-narrowing-conversions)
-        gArgs.GetArg("-maxcoinsdbfiles", CoinsDB::MaxFiles::Default().maxFiles), &err))
-    {
-        return InitError(err);
-    }
     if(std::string err; !config.SetCoinsDBMaxFileSize(
         gArgs.GetArgAsBytes("-maxcoinsdbfilesize", CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE), &err))
     {

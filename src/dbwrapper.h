@@ -6,6 +6,7 @@
 #define BITCOIN_DBWRAPPER_H
 
 #include "clientversion.h"
+#include "dbwrapper_limits.h"
 #include "fs.h"
 #include "serialize.h"
 #include "streams.h"
@@ -359,12 +360,7 @@ private:
     std::vector<uint8_t> obfuscate_key;
 
 public:
-    struct MaxFiles {
-        // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
-        const size_t maxFiles;
-        explicit MaxFiles(size_t maxFiles_) : maxFiles{maxFiles_} {}
-        static MaxFiles Default() { return MaxFiles{64}; }
-    };
+    using MaxFiles = dbwrapper_limits::MaxFiles;
 
     // Default levelDB maximum file size (2MB)
     static constexpr size_t MaxFileSize { 2 * ONE_MEBIBYTE };

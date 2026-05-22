@@ -5,6 +5,7 @@
 
 #include "chainparams.h"
 #include "consensus/consensus.h"
+#include "dbwrapper_limits.h"
 #include "double_spend/dsdetected_defaults.h"
 #include "merkletree.h"
 #include "miner_id/miner_id_db_defaults.h"
@@ -71,6 +72,7 @@ void GlobalConfig::Reset()
     data->mCoinsDBCacheSize = coinsDBSplit.first;
     data->mCoinsCacheSize = coinsDBSplit.second;
     data->mMaxCoinsProviderCacheSize = data->mCoinsCacheSize;
+    data->mMaxCoinsDbOpenFiles = dbwrapper_limits::MaxFiles::DefaultFallback;
     data->mMaxCoinsDBFileSize = CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE;
 
     data->maxProtocolRecvPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
@@ -944,6 +946,16 @@ bool GlobalConfig::SetMaxCoinsDbOpenFiles(int64_t max, std::string* err)
 {
     if (LessThanZero(max - 1, err, "Minimum value for max number of leveldb open files for coinsdb size must not be less than 1."))
     {
+        return false;
+    }
+
+    if (static_cast<uint64_t>(max) > dbwrapper_limits::MaxFiles::LevelDbMax)
+    {
+        if (err)
+        {
+            *err = "Maximum number of leveldb open files for coinsdb must not exceed "
+                + std::to_string(dbwrapper_limits::MaxFiles::LevelDbMax);
+        }
         return false;
     }
 

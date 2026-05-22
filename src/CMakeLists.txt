@@ -332,6 +332,7 @@ add_library(common
 	core_memusage.h
 	core_read.cpp
 	core_write.cpp
+	dbwrapper_limits.h
 	dirty_block_index_store.h
 	disk_block_pos.h
 	dstencode.cpp
