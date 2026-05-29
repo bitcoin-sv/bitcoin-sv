@@ -10,10 +10,10 @@
 #include "test/test_bitcoin.h"
 #include <boost/test/unit_test.hpp>
 
-namespace{ class Unique; }
+namespace{ class BlockIndexMutexDistributionTag; }
 
 template <>
-struct CBlockIndex::UnitTestAccess<class Unique>
+struct CBlockIndex::UnitTestAccess<class BlockIndexMutexDistributionTag>
 {
     UnitTestAccess() = delete;
 
@@ -22,7 +22,7 @@ struct CBlockIndex::UnitTestAccess<class Unique>
         return blockIndex->GetMutex();
     }
 };
-using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<class Unique>;
+using BlockIndexMutexDistributionAccess = CBlockIndex::UnitTestAccess<class BlockIndexMutexDistributionTag>;
 
 BOOST_FIXTURE_TEST_SUITE(blockindexmutex_tests, TestingSetup)
 
@@ -53,7 +53,7 @@ BOOST_AUTO_TEST_CASE(BlockIndexMutexDistributionTest)
     for (uint32_t i = 0; i < BLOCK_COUNT; i++)
     {
         prev = AddBlockIndex(*prev, mapBlockIndex);
-        ++blockIndexDistribution[&TestAccessCBlockIndex::GetCBIMutex(prev)];
+        ++blockIndexDistribution[&BlockIndexMutexDistributionAccess::GetCBIMutex(prev)];
     }
 
     BOOST_CHECK(blockIndexDistribution.size() == MUTEX_COUNT);

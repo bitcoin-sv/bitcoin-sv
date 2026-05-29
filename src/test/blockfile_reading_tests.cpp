@@ -21,10 +21,10 @@
 #include <optional>
 #include <vector>
 
-namespace{ class Unique; }
+namespace{ class BlockfileReadingTag; }
 
 template <>
-struct CBlockIndex::UnitTestAccess<class Unique>
+struct CBlockIndex::UnitTestAccess<class BlockfileReadingTag>
 {
     UnitTestAccess() = delete;
 
@@ -41,7 +41,7 @@ struct CBlockIndex::UnitTestAccess<class Unique>
         return blockIndex.nFile;
     }
 };
-using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<class Unique>;
+using BlockfileReadingAccess = CBlockIndex::UnitTestAccess<class BlockfileReadingTag>;
 
 namespace
 {
@@ -160,7 +160,7 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
     // (is read from block index cache instead)
     {
         uint256 randomHash =
-            TestAccessCBlockIndex::CorruptDiskBlockMetaData( index, dummyDirty );
+            BlockfileReadingAccess::CorruptDiskBlockMetaData( index, dummyDirty );
 
         auto streamCorruptMetaData =
             index->StreamBlockFromDisk(INIT_PROTO_VERSION, dummyDirty);
@@ -198,7 +198,7 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
 
     // prepare file ids set for pruning
     std::set<int> fileIds;
-    fileIds.insert(TestAccessCBlockIndex::GetNFile(index));
+    fileIds.insert(BlockfileReadingAccess::GetNFile(index));
 
     // start reading and inbetween the read try to delete the file on disk
     {

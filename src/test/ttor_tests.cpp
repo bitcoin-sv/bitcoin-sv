@@ -19,10 +19,10 @@
 
 #include <boost/test/unit_test.hpp>
 
-namespace{ class Unique; }
+namespace{ class TtorTag; }
 
 template <>
-struct CBlockIndex::UnitTestAccess<class Unique>
+struct CBlockIndex::UnitTestAccess<class TtorTag>
 {
     UnitTestAccess() = delete;
 
@@ -31,7 +31,7 @@ struct CBlockIndex::UnitTestAccess<class Unique>
         blockIndex.nStatus = blockIndex.nStatus.withValidity(BlockValidity::SCRIPTS);
     }
 };
-using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<class Unique>;
+using TtorAccess = CBlockIndex::UnitTestAccess<class TtorTag>;
 
 CBlockIndex& AddToBlockIndex(CBlockIndex& prev)
 {
@@ -40,7 +40,7 @@ CBlockIndex& AddToBlockIndex(CBlockIndex& prev)
     header.hashPrevBlock = prev.GetBlockHash();
     header.nBits = GetNextWorkRequired( &prev, &header, GlobalConfig::GetConfig() );
     CBlockIndex& current = *mapBlockIndex.Insert( header );
-    TestAccessCBlockIndex::SetStatusWithValidity( current );
+    TtorAccess::SetStatusWithValidity( current );
 
     return current;
 }
