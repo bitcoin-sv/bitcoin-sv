@@ -54,6 +54,12 @@ Flags marked *(debug)* are only listed by `bitcoind -help -help-debug`.
 - **`-dbcache=<MB>`** *(default: 512)* — Cache size for all databases except the
   CoinsDB (block index, etc.). Much smaller impact than `-coinsdbcache` but cheap
   to raise on RAM-rich hosts.
+- **`-maxcoinsdbfiles=<n>`** *(default: upto 8192)* - The maximum number of LevelDB
+  chainstate files that can be open and memory-mapped at once. The default is to
+  try to cover the entire chainstate, but depends on the system limits for
+  maxmimum number of open files. This also presumes you have a significant RAM
+  budget to support it; if you have less RAM, consider lowering this to save
+  memory.
 - **`-threadsperblock=<n>`** *(default: 0 = auto)* and **`-txnthreadsperblock=<n>`**
   *(default: 0 = auto)* — Script and transaction verification thread counts per
   block. Auto-detection from the CPU topology is almost always correct; override
