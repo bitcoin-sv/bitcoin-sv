@@ -2715,4 +2715,60 @@ BOOST_AUTO_TEST_CASE(op_2rot)
     }
 }
 
+// Post-Genesis a stack element may exceed INT32_MAX bytes (the stack-memory limit
+// is INT64_MAX). OP_SPLIT originally guarded the position only with
+//     if(n < 0 || n > data.size())
+// i.e. it bounded n by the *element size*, not by INT32_MAX
+//
+// This exercises both sides of the fixed guard against the same oversized element:
+//   - n == INT32_MAX     : the largest position the guard must ADMIT (valid split).
+//   - n == INT32_MAX + 1 : exceeds INT32_MAX yet is still < data.size().
+BOOST_AUTO_TEST_CASE(op_split_int32_max)
+{
+    Config& config = GlobalConfig::GetConfig();
+
+    // Stack element larger than INT32_MAX bytes (2^31 == INT32_MAX + 1, +16 so the
+    // positions below are genuine in-range splits, not at-the-end splits).
+    const size_t bigSize = (size_t(1) << 31) + 16; // ~2 GiB, > INT32_MAX
+    const valtype data(bigSize, 0x00);
+
+    constexpr uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS};
+    const auto params{
+        make_eval_script_params(config.GetConfigScriptPolicy(), flags, true)};
+
+    // Run OP_SPLIT on { data, position }: it reads stacktop(-2)=data,
+    // stacktop(-1)=position, minimal little-endian CScriptNum encoding.
+    const auto splitAt = [&](const valtype& position) {
+        LimitedStack stack = LimitedStack({data, position}, INT64_MAX);
+        auto source = task::CCancellationSource::Make();
+        const auto r = EvalScript(params,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript() << OP_SPLIT,
+                                  flags,
+                                  BaseSignatureChecker{});
+        return std::make_pair(r, std::move(stack));
+    };
+
+    // n == INT32_MAX (0x7fffffff): valid split into INT32_MAX and bigSize-INT32_MAX.
+    {
+        auto [r, stack] = splitAt({0xff, 0xff, 0xff, 0x7f});
+        BOOST_REQUIRE(r);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, r.value());
+        BOOST_CHECK_EQUAL(2U, stack.size());
+        BOOST_CHECK_EQUAL(size_t(INT32_MAX),
+                          stack.stacktop(-2).GetElement().size());
+        BOOST_CHECK_EQUAL(bigSize - INT32_MAX,
+                          stack.stacktop(-1).GetElement().size());
+    }
+
+    // n == INT32_MAX + 1 (2^31, 0x80000000): rejected, not aborted. The trailing
+    // 0x00 keeps the value positive past the sign bit of 0x80.
+    {
+        auto [r, stack] = splitAt({0x00, 0x00, 0x00, 0x80, 0x00});
+        BOOST_REQUIRE(r);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_INVALID_SPLIT_RANGE, r.value());
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
