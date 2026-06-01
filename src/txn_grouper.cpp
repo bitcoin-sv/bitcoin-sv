@@ -130,6 +130,10 @@ void TxnGrouper::ScanDependencies(const std::vector<CTransactionRef>& vtx)
             txnNode = mNodes.emplace(txid, Node{index});
         }
 
+        // Hold a reference to the node for this transaction to update dependencies below
+        // because the iterator may be invalidated by insertions into the graph.
+        Node& txnNodeRef { txnNode->second };
+
         // Scan inputs for this transaction
         for(const auto& input : txn->vin)
         {
@@ -154,7 +158,7 @@ void TxnGrouper::ScanDependencies(const std::vector<CTransactionRef>& vtx)
             }
 
             // Update our node to add this as a dependency of ours
-            txnNode->second.AddDependency(inputId);
+            txnNodeRef.AddDependency(inputId);
         }
     }
 }
