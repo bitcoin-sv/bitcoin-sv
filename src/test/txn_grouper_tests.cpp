@@ -284,15 +284,20 @@ BOOST_AUTO_TEST_CASE(multi_dependency)
     }
 
     {
-        // Txn that spends a txn in group A, and a dependencey of a txn in group B, and a new unknown input -> All txns in a new group C
+        // Txn that spends a txn in group A, a *different output* of an external parent
+        // whose output 0 is spent by a txn in group B, and a new unknown input.
+        // It spends vtx[1] (in group A) so it joins group A. The second input is output 1
+        // of vtx[2]'s external parent, but vtx[2] spends output 0 - spending a different
+        // output of the same external parent no longer merges the groups, so group B is
+        // left untouched. -> Txn simply joins group A.
         vtx.push_back(CreateSharedRandomTransaction({ {vtx[1]->GetId(), 0}, {vtx[2]->vin[0].prevout.GetTxId(), 1}, {GetRandTxId(), 0} }));
 
         {
             TxnGrouper grouper {};
             const auto& groups { grouper.GetGroups(vtx) };
 
-            // Groups A & B removed, one new larger group created
-            BOOST_CHECK_EQUAL(groups.size(), oldGroupCount - 2 + 1);
+            // Txn joins group A; no groups merged or removed
+            BOOST_CHECK_EQUAL(groups.size(), oldGroupCount);
 
             // Total number of txns across all constructed groups should match the number passed in
             BOOST_CHECK_EQUAL(CountTxnsInGroups(groups), vtx.size());
@@ -300,9 +305,6 @@ BOOST_AUTO_TEST_CASE(multi_dependency)
             // Check txn ordering
             BOOST_CHECK(CheckTxnOrdering(groups));
         }
-
-        // NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores)
-        oldGroupCount = oldGroupCount - 2 + 1;
     }
 }
 
@@ -378,11 +380,10 @@ BOOST_AUTO_TEST_CASE(double_spend_same_inblock_output)
 }
 
 // Two (then three) txns in the block spend the same output that is NOT in the block. They
-// must still be grouped together. This exercises the placeholder-node path in
-// ScanDependencies, taken when `range.first == mNodes.end()` (txn_grouper.cpp:140); the
-// unordered associative container requirements guarantee equal_range() returns
-// {end(), end()} for a missing key, so that branch reliably creates the shared placeholder
-// that links the spenders. This test documents/guards that grouping behaviour.
+// must still be grouped together. The shared external parent is not in the block, so the
+// spenders are tied together by the direct outpoint-spender links added in ScanDependencies,
+// not by the external placeholder node.
+// This test documents/guards that grouping behaviour.
 BOOST_AUTO_TEST_CASE(double_spend_external_output)
 {
     const COutPoint external { GetRandTxId(), 0 };
@@ -411,6 +412,49 @@ BOOST_AUTO_TEST_CASE(double_spend_external_output)
         BOOST_CHECK_EQUAL(CountTxnsInGroups(groups), vtx.size());
         BOOST_CHECK(InSameGroup(groups, {0, 1, 2}));
     }
+}
+
+// Two txns spend DIFFERENT outputs of the same parent that is NOT in the block. They have no
+// real dependency or conflict, so they must end up in separate groups. This is the over-grouping
+// the outpoint-precise design removes: keying purely on the parent txid would wrongly merge them.
+BOOST_AUTO_TEST_CASE(external_parent_different_outputs)
+{
+    const TxId parent { GetRandTxId() }; // parent not in the block
+
+    std::vector<CTransactionRef> vtx {};
+    vtx.push_back(CreateSharedRandomTransaction({ {parent, 0} })); // 0: A spends parent:0
+    vtx.push_back(CreateSharedRandomTransaction({ {parent, 1} })); // 1: B spends parent:1
+
+    TxnGrouper grouper {};
+    const auto& groups { grouper.GetGroups(vtx) };
+
+    // Different outputs of an external parent -> independent groups
+    BOOST_CHECK_EQUAL(groups.size(), 2U);
+    BOOST_CHECK_EQUAL(CountTxnsInGroups(groups), vtx.size());
+    BOOST_CHECK(CheckTxnOrdering(groups));
+    BOOST_CHECK(! InSameGroup(groups, {0, 1}));
+}
+
+// A mix of same and different-output spenders of an external parent. The two spenders of the
+// same output must group together; the spender of a different output stays separate.
+BOOST_AUTO_TEST_CASE(external_parent_mixed_outputs)
+{
+    const TxId parent { GetRandTxId() }; // parent not in the block
+
+    std::vector<CTransactionRef> vtx {};
+    vtx.push_back(CreateSharedRandomTransaction({ {parent, 0} })); // 0: A spends parent:0
+    vtx.push_back(CreateSharedRandomTransaction({ {parent, 0} })); // 1: B spends parent:0 (same output as A)
+    vtx.push_back(CreateSharedRandomTransaction({ {parent, 1} })); // 2: C spends parent:1 (different output)
+
+    TxnGrouper grouper {};
+    const auto& groups { grouper.GetGroups(vtx) };
+
+    // {A,B} together (same output), C separate
+    BOOST_CHECK_EQUAL(groups.size(), 2U);
+    BOOST_CHECK_EQUAL(CountTxnsInGroups(groups), vtx.size());
+    BOOST_CHECK(CheckTxnOrdering(groups));
+    BOOST_CHECK(InSameGroup(groups, {0, 1}));
+    BOOST_CHECK(! InSameGroup(groups, {0, 2}));
 }
 
 // A shared output links two txns that each already belong to their own established group;
@@ -527,6 +571,32 @@ BOOST_AUTO_TEST_CASE(out_of_order_with_multiple_dependents)
     BOOST_CHECK_EQUAL(CountTxnsInGroups(groups), vtx.size());
     BOOST_CHECK(CheckTxnOrdering(groups));
     BOOST_CHECK(InSameGroup(groups, {0, 1, 2}));
+}
+
+// A forward-referenced parent whose FIRST-scanned dependent is not the txn the group walk
+// starts from. The walk enters P's component via X -> C2 -> P, so C1 is only pulled in by
+// the reverse edge recorded on P's freshly-created placeholder.
+// Guards that edge: without it C1 would be split into its own group despite its intra-block
+// dependency on P. Note C1 and C2 spend DIFFERENT outputs of P, so neither mOutpointSpenders
+// nor the existing-placeholder path can link C1 here.
+BOOST_AUTO_TEST_CASE(out_of_order_parent_entered_via_later_child)
+{
+    auto p { CreateSharedRandomTransaction({}) };                   // parent P, appears last
+    auto c2 { CreateSharedRandomTransaction({ {p->GetId(), 1} }) }; // C2 spends P:1
+
+    std::vector<CTransactionRef> vtx {};
+    vtx.push_back(CreateSharedRandomTransaction({ {c2->GetId(), 0} })); // 0: X spends C2:0 (forward ref)
+    vtx.push_back(CreateSharedRandomTransaction({ {p->GetId(), 0} }));  // 1: C1 spends P:0 (forward ref, creates P's placeholder)
+    vtx.push_back(c2);                                                  // 2: C2 (P's placeholder already exists)
+    vtx.push_back(p);                                                   // 3: P itself
+
+    TxnGrouper grouper {};
+    const auto& groups { grouper.GetGroups(vtx) };
+
+    BOOST_CHECK_EQUAL(groups.size(), 1U);
+    BOOST_CHECK_EQUAL(CountTxnsInGroups(groups), vtx.size());
+    BOOST_CHECK(CheckTxnOrdering(groups));
+    BOOST_CHECK(InSameGroup(groups, {0, 1, 2, 3}));
 }
 
 // Diamond / DAG fan-in: B and C both spend A; D spends both B and C. All four must be in one
