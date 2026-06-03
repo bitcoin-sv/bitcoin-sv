@@ -67,6 +67,8 @@ jobs:
         uses: ./.github/actions/build_bitcoin_autotools
       - name: Unit test
         uses: ./.github/actions/unit_test_bitcoin_autotools
+      - name: Bench test Bitcoin
+        uses: ./.github/actions/bench_test_bitcoin_cmake
       - name: Functional test
         uses: ./.github/actions/functional_test
         with: 
@@ -130,8 +132,6 @@ jobs:
         with:
           name: test_bitcoin_cov-${{ env.now }}
           path: ./src/test/test_bitcoin_cov
-      - name: Bench test Bitcoin
-        uses: ./.github/actions/bench_test_bitcoin_cmake
       - name: Functional test
         if: ${{ matrix.config.build_type != 'Debug' }}
         uses: ./.github/actions/functional_test
