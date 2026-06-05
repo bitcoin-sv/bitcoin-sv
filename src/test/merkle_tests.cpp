@@ -16,7 +16,6 @@
 #include "merkletree.h"
 #include "serialize.h"
 #include "support/allocators/zeroafterfree.h"
-#include "task_helpers.h"
 #include "test/test_bitcoin.h"
 #include "uint256.h"
 
@@ -232,10 +231,95 @@ BOOST_AUTO_TEST_CASE(merkle_tree_test)
     }
 }
 
+BOOST_AUTO_TEST_CASE(ComputeMerkleRoot_large_inputs)
+{
+    // Deterministic sizes straddling 16384 = 2^14 leaves give boundary coverage.
+    // Cross-check against ComputeMerkleRootFromBranch(ComputeMerkleBranch(...)),
+    // which goes through the independent MerkleComputation path.
+    // NOLINTNEXTLINE(cert-msc32-c, cert-msc51-cpp)
+    std::mt19937 gen{0xC0FFEE};
+    std::uniform_int_distribution<int> byte_dist{0, 255};
+
+    constexpr size_t k{16'384};
+    for(const size_t n : {k - 1, k, k + 1, 2 * k, 2 * k + 7, 3 * k + 1})
+    {
+        std::vector<uint256> leaves(n);
+        for(auto& h : leaves)
+        {
+            std::generate(h.begin(), h.end(),
+                [&]{ return static_cast<std::uint8_t>(byte_dist(gen)); });
+        }
+
+        bool mutated{};
+        const uint256 root{ComputeMerkleRoot(leaves, &mutated)};
+        BOOST_CHECK(!mutated);
+
+        // Independent reference: derive the root from a branch for
+        // position 0 via MerkleComputation.
+        const std::vector<uint256> branch{ComputeMerkleBranch(leaves, 0)};
+        const uint256 root_from_branch{ComputeMerkleRootFromBranch(leaves[0],
+                                                                   branch,
+                                                                   0)};
+        BOOST_CHECK_EQUAL(root, root_from_branch);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(ComputeMerkleRoot_branch_cross_check)
+{
+    // Property-based check that ComputeMerkleRoot and the
+    // MerkleComputation-based ComputeMerkleBranch/ComputeMerkleRootFromBranch
+    // pair agree across random inputs. Sweeps a wide size range; for each
+    // size verifies a handful of random branch positions reconstruct the
+    // same root.
+    // NOLINTNEXTLINE(cert-msc32-c, cert-msc51-cpp)
+    std::mt19937 gen{0xDEADBEEF};
+    std::uniform_int_distribution<int> byte_dist{0, 255};
+    std::uniform_int_distribution<size_t> size_dist{1, 50'000};
+
+    for(size_t i{}; i < 30; ++i)
+    {
+        const size_t n{size_dist(gen)};
+        std::vector<uint256> leaves(n);
+        for(auto& h : leaves)
+        {
+            std::generate(h.begin(), h.end(),
+                [&]{ return static_cast<std::uint8_t>(byte_dist(gen)); });
+        }
+
+        const uint256 root{ComputeMerkleRoot(leaves)};
+
+        std::uniform_int_distribution<size_t> pos_dist{0, n - 1};
+        const size_t positions_to_check{std::min<size_t>(4, n)};
+        for(size_t p{}; p < positions_to_check; ++p)
+        {
+            const size_t pos{pos_dist(gen)};
+            const std::vector<uint256> branch{ComputeMerkleBranch(leaves, pos)};
+            BOOST_CHECK_EQUAL(root, ComputeMerkleRootFromBranch(leaves[pos],
+                                                                branch,
+                                                                pos));
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(zero_sentinel_collision)
+{
+    // Check that a default constructed uint256 (all-zero) adjacent leaf pair
+    // is processed correctly. Ensures that binary_counter is instantiated with
+    // std::optional.
+    const std::vector<uint256> leaves{uint256S("11"),
+                                      uint256S("22"),
+                                      uint256{},
+                                      uint256{}};
+    const uint256 oracle{ ComputeMerkleRootFromBranch(leaves[0],
+                                                      ComputeMerkleBranch(leaves, 0), 0)};
+    BOOST_CHECK_EQUAL(ComputeMerkleRoot(leaves), oracle);
+}
+
 // --- SHA256D64 transform tests ----------------------------------------------
 //
-// Direct tests of the underlying double-SHA256 transforms (1-way scalar).
-// More variants (2-way SHA-NI) are added in later commits.
+// Direct tests of the underlying double-SHA256 transforms (1-way scalar,
+// 2-way SHA-NI). The production caller is SHA256D64_2way (used by
+// ComputeMerkleRoot's `combine`).
 
 BOOST_AUTO_TEST_CASE(d_block_1way_direct_matches_naive)
 {
@@ -244,7 +328,8 @@ BOOST_AUTO_TEST_CASE(d_block_1way_direct_matches_naive)
     using sha256_dispatch::d_block_1way;
 
     // Call the scalar 1-way transform directly. Verifies the universal
-    // fallback in isolation.
+    // fallback in isolation; SHA256D64_2way relies on this when SHA-NI
+    // 2-way is unavailable.
     BOOST_REQUIRE(d_block_1way != nullptr);
 
     // NOLINTNEXTLINE(cert-msc32-c, cert-msc51-cpp) for reproducible tests
@@ -277,8 +362,8 @@ BOOST_AUTO_TEST_CASE(d_block_2way_direct_matches_naive)
     using sha256_dispatch::d_pair_bytes;
     using sha256_dispatch::d_block_2way;
 
-    // Call the SHA-NI 2-way transform directly. Skips silently on hosts
-    // without SHA-NI.
+    // Call the SHA-NI 2-way transform directly. SHA256D64_2way relies on
+    // this when available. Skips silently on hosts without SHA-NI.
     if(d_block_2way == nullptr)
         return;
 
@@ -318,7 +403,7 @@ BOOST_AUTO_TEST_CASE(SHA256D64_2way_kat)
     // CHash256 and the underlying transforms would share (the consistency
     // tests above hash both sides via CHash256). Vector is the first 128
     // input bytes / 64 output bytes of Bitcoin Core's TransformD64 self-test
-    // (Lorem ipsum), exercising whichever path SHA256D64_2way takes --
+    // (Lorem ipsum), exercising whichever path SHA256D64_2way takes —
     // SHA-NI 2-way when available, scalar 1-way fallback otherwise.
     static constexpr std::array<std::uint8_t, 128> kInput{
         'L','o','r','e','m',' ','i','p','s','u','m',' ','d','o','l','o',
@@ -366,7 +451,7 @@ BOOST_AUTO_TEST_CASE(default_construction)
     BOOST_CHECK(contains_txid(mp));
     BOOST_CHECK(contains_coinbase_tx(mp));
 }
-            
+
 BOOST_AUTO_TEST_CASE(txid_construction)
 {
     const TxId txid{uint256S("1")};
