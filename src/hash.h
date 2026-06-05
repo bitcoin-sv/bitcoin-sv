@@ -115,6 +115,15 @@ inline uint256 Hash(const T1 p1begin, const T1 p1end, const T2 p2begin, const T2
     return result;
 }
 
+/** Double-SHA-256 of two concatenated 256-bit values. */
+inline uint256 Sha256d(const uint256& a, const uint256& b)
+{
+    uint256 r;
+    CHash256().Write(a.begin(), 32).Write(b.begin(), 32)
+              .Finalize(CHash256::span{r.begin(), CHash256::OUTPUT_SIZE});
+    return r;
+}
+
 /** Compute the 256-bit hash of the concatenation of three objects. */
 template<typename T1, typename T2, typename T3>
 inline uint256 Hash(const T1 p1begin,
