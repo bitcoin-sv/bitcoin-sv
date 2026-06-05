@@ -22,6 +22,7 @@ bench_bench_bitcoin_SOURCES = \
   bench/ccoins_caching.cpp \
   bench/mempool_eviction.cpp \
   bench/mempooltxdb.cpp \
+  bench/merkle.cpp \
   bench/base58.cpp \
   bench/lockedpool.cpp \
   bench/op_codes.cpp \
