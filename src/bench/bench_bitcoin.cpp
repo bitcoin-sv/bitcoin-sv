@@ -3,8 +3,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "bench.h"
-#include "crypto/sha256.h"
-#include "fs.h"
+#include "crypto/sha256_dispatch.h"
 #include "random.h"
 #include "util.h"
 
@@ -80,7 +79,7 @@ public:
 
 int main(int /*argc*/, char** /*argv*/) // NOLINT(bugprone-exception-escape)
 {
-    SHA256AutoDetect();
+    sha256_dispatch::AutoDetect();
     RandomInit();
     SetupEnvironment();
 

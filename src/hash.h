@@ -38,7 +38,13 @@ public:
                    .Finalize(hash);
     }
 
-    CHash256 &Write(const uint8_t *data, size_t len) {
+    CHash256& Write(const std::span<const uint8_t> data)
+    {
+        return Write(data.data(), data.size_bytes());
+    }
+
+    CHash256& Write(const uint8_t* data, size_t len)
+    {
         sha.Write(data, len);
         return *this;
     }

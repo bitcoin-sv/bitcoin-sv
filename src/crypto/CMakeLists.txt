@@ -13,7 +13,11 @@ add_library(crypto
 	ripemd160.cpp
 	sha1.cpp
 	sha256.cpp
+	sha256_dispatch.cpp
 	$<$<BOOL:${CRYPTO_USE_ASM}>:sha256_sse4.cpp>
+	$<$<BOOL:${CRYPTO_USE_ASM}>:sha256_sse4_shim.cpp>
+	sha256d64_scalar.cpp
+	sha256_stream_scalar.cpp
 	sha512.cpp
 )
 enable_coverage(crypto)

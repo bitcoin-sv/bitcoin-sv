@@ -485,11 +485,19 @@ crypto_libbitcoin_crypto_a_SOURCES = \
   crypto/sha1.h \
   crypto/sha256.cpp \
   crypto/sha256.h \
+  crypto/sha256_dispatch.cpp \
+  crypto/sha256_dispatch.h \
+  crypto/sha256_sse4.h \
+  crypto/sha256_stream_scalar.cpp \
+  crypto/sha256_stream_scalar.h \
+  crypto/sha256d64_scalar.cpp \
+  crypto/sha256d64_scalar.h \
   crypto/sha512.cpp \
   crypto/sha512.h
 
 if USE_ASM
 crypto_libbitcoin_crypto_a_SOURCES += crypto/sha256_sse4.cpp
+crypto_libbitcoin_crypto_a_SOURCES += crypto/sha256_sse4_shim.cpp
 endif
 
 # consensus: shared between all executables that validate any consensus rules.

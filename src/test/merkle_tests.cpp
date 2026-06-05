@@ -2,17 +2,16 @@
 // Copyright (c) 2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 #include <algorithm>
-#include <stdexcept>
+#include <random>
 #include <string>
 #include <tuple>
-#include <iostream>
 
 #include "boost/algorithm/hex.hpp"
 #include <boost/test/tools/old/interface.hpp>
 #include <boost/test/unit_test.hpp>
 
 #include "consensus/merkle.h"
-#include "double_spend/dsdetected_message.h"
+#include "crypto/sha256_dispatch.h"
 #include "merkleproof.h"
 #include "merkletree.h"
 #include "serialize.h"
@@ -231,6 +230,44 @@ BOOST_AUTO_TEST_CASE(merkle_tree_test)
         // root from CMerkleTree instance must be same as legacy merkle root
         BOOST_CHECK(originalMerkleRoot == newMerkleRoot);
     }
+}
+
+// --- SHA256D64 transform tests ----------------------------------------------
+//
+// Direct tests of the underlying double-SHA256 transforms (1-way scalar).
+// More variants (2-way SHA-NI) are added in later commits.
+
+BOOST_AUTO_TEST_CASE(d_block_1way_direct_matches_naive)
+{
+    using sha256_dispatch::hash_bytes;
+    using sha256_dispatch::d_pair_bytes;
+    using sha256_dispatch::d_block_1way;
+
+    // Call the scalar 1-way transform directly. Verifies the universal
+    // fallback in isolation.
+    BOOST_REQUIRE(d_block_1way != nullptr);
+
+    // NOLINTNEXTLINE(cert-msc32-c, cert-msc51-cpp) for reproducible tests
+    std::mt19937 gen{0xC0FFEE};
+    std::uniform_int_distribution<int> byte_dist{0, 255};
+    std::array<std::uint8_t, d_pair_bytes> ip{};
+    std::ranges::generate(ip,
+        [&]{ return static_cast<std::uint8_t>(byte_dist(gen)); });
+
+    // Reference: naive CHash256 over the single 64-byte pair.
+    std::array<std::uint8_t, hash_bytes> expected{};
+    const std::span<const std::uint8_t, d_pair_bytes> in_span{ip};
+    CHash256()
+        .Write(in_span.first<hash_bytes>())
+        .Write(in_span.subspan<hash_bytes, hash_bytes>())
+        .Finalize(std::span<std::uint8_t, hash_bytes>{expected});
+
+    // Direct call to the scalar transform.
+    std::array<std::uint8_t, hash_bytes> op{};
+    d_block_1way(ip, op);
+
+    BOOST_CHECK_EQUAL_COLLECTIONS(expected.begin(), expected.end(),
+                                  op.begin(), op.end());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

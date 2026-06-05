@@ -8,6 +8,7 @@
 #endif
 
 #include "init.h"
+
 #include "addrman.h"
 #include "amount.h"
 #include "block_index_store.h"
@@ -18,8 +19,9 @@
 #include "chainparams.h"
 #include "compat/sanity.h"
 #include "config.h"
-#include "consensus/validation.h"
 #include "consensus/consensus.h"
+#include "consensus/validation.h"
+#include "crypto/sha256_dispatch.h"
 #include "double_spend/dsattempt_handler.h"
 #include "double_spend/dsdetected_defaults.h"
 #include "fs.h"
@@ -28,9 +30,9 @@
 #include "invalid_txn_publisher.h"
 #include "key.h"
 #include "miner_id/dataref_index.h"
-#include "miner_id/miner_info_tracker.h"
 #include "miner_id/miner_id_db.h"
 #include "miner_id/miner_id_db_defaults.h"
+#include "miner_id/miner_info_tracker.h"
 #include "mining/journaling_block_assembler.h"
 #include "net/disk_backed_parser.h"
 #include "net/net.h"
@@ -3305,7 +3307,7 @@ bool AppInitSanityChecks() {
     // Step 4: sanity checks
 
     // Initialize elliptic curve code
-    std::string sha256_algo = SHA256AutoDetect();
+    std::string sha256_algo = sha256_dispatch::AutoDetect();
     LogPrintf("Using the '%s' SHA256 implementation\n", sha256_algo);
     RandomInit();
 

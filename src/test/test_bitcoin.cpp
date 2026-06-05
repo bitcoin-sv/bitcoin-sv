@@ -10,7 +10,7 @@
 #include "consensus/consensus.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
-#include "crypto/sha256.h"
+#include "crypto/sha256_dispatch.h"
 #include "key.h"
 #include "logging.h"
 #include "miner_id/miner_info_tracker.h"
@@ -69,7 +69,7 @@ void ResetGlobalRandomContext() {
 }
 
 BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(GlobalConfig::GetModifiableGlobalConfig()) {
-    SHA256AutoDetect();
+    sha256_dispatch::AutoDetect();
     SetupEnvironment();
     SetupNetworking();
     InitSignatureCache();
