@@ -239,6 +239,7 @@ add_library(util
 	threadpriority.h
 	threadsafety.h
 	tinyformat.h
+	uint256.cpp
 	uint256.h
 	util.cpp
 	util.h

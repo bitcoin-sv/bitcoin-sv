@@ -312,6 +312,42 @@ BOOST_AUTO_TEST_CASE(d_block_2way_direct_matches_naive)
 }
 #endif
 
+BOOST_AUTO_TEST_CASE(SHA256D64_2way_kat)
+{
+    // Known-answer test for the SHA256D64_2way wrapper. Catches bugs that
+    // CHash256 and the underlying transforms would share (the consistency
+    // tests above hash both sides via CHash256). Vector is the first 128
+    // input bytes / 64 output bytes of Bitcoin Core's TransformD64 self-test
+    // (Lorem ipsum), exercising whichever path SHA256D64_2way takes --
+    // SHA-NI 2-way when available, scalar 1-way fallback otherwise.
+    static constexpr std::array<std::uint8_t, 128> kInput{
+        'L','o','r','e','m',' ','i','p','s','u','m',' ','d','o','l','o',
+        'r',' ','s','i','t',' ','a','m','e','t',',',' ','c','o','n','s',
+        'e','c','t','e','t','u','r',' ','a','d','i','p','i','s','c','i',
+        'n','g',' ','e','l','i','t',',',' ','s','e','d',' ','d','o',' ',
+        'e','i','u','s','m','o','d',' ','t','e','m','p','o','r',' ','i',
+        'n','c','i','d','i','d','u','n','t',' ','u','t',' ','l','a','b',
+        'o','r','e',' ','e','t',' ','d','o','l','o','r','e',' ','m','a',
+        'g','n','a',' ','a','l','i','q','u','a','.',' ','E','t',' ','m',
+    };
+    static constexpr std::array<std::uint8_t, 64> kExpected{
+        0x09, 0x3a, 0xc4, 0xd0, 0x0f, 0xf7, 0x57, 0xe1, 0x72, 0x85, 0x79, 0x42, 0xfe, 0xe7, 0xe0, 0xa0,
+        0xfc, 0x52, 0xd7, 0xdb, 0x07, 0x63, 0x45, 0xfb, 0x53, 0x14, 0x7d, 0x17, 0x22, 0x86, 0xf0, 0x52,
+        0x48, 0xb6, 0x11, 0x9e, 0x6e, 0x48, 0x81, 0x6d, 0xcc, 0x57, 0x1f, 0xb2, 0x97, 0xa8, 0xd5, 0x25,
+        0x9b, 0x82, 0xaa, 0x89, 0xe2, 0xfd, 0x2d, 0x56, 0xe8, 0x28, 0x83, 0x0b, 0xe2, 0xfa, 0x53, 0xb7,
+    };
+
+    std::array<uint256, 4> input;
+    std::memcpy(input.data(), kInput.data(), kInput.size());
+
+    std::array<uint256, 2> output;
+    SHA256D64_2way(input, output);
+
+    const auto* output_bytes = reinterpret_cast<const std::uint8_t*>(output.data());
+    BOOST_CHECK_EQUAL_COLLECTIONS(output_bytes, output_bytes + kExpected.size(),
+                                  kExpected.begin(), kExpected.end());
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(merkle_proof_tests)

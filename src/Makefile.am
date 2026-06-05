@@ -637,6 +637,7 @@ libbitcoin_util_a_SOURCES = \
   sync.cpp \
   threadinterrupt.cpp \
   threadpriority.cpp \
+  uint256.cpp \
   uint256.h \
   util.cpp \
   utilmoneystr.cpp \

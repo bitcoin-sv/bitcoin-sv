@@ -3,8 +3,14 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "merkle.h"
+
+#include "crypto/sha256_dispatch.h"
 #include "hash.h"
 #include "utilstrencodings.h"
+
+#include <array>
+#include <cassert>
+#include <cstddef>
 #include <cstdint>
 
 /*     WARNING! If you're reading this because you're learning about crypto
@@ -146,6 +152,29 @@ static void MerkleComputation(const std::vector<uint256> &leaves,
     if (proot) *proot = h;
 }
 // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
+
+void SHA256D64_2way(std::span<const uint256, 4> ip, std::span<uint256, 2> op)
+{
+    using sha256_dispatch::hash_bytes;
+    using sha256_dispatch::d_pair_bytes;
+
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+    const std::span<const std::uint8_t, 2 * d_pair_bytes> ip_bytes{reinterpret_cast<const std::uint8_t*>(ip.data()),
+                                                                                                         2 * d_pair_bytes};
+    const std::span<std::uint8_t, 2 * hash_bytes> op_bytes{reinterpret_cast<std::uint8_t*>(op.data()),
+                                                                                           2 * hash_bytes};
+    // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
+
+    if(sha256_dispatch::d_block_2way)
+    {
+        sha256_dispatch::d_block_2way(ip_bytes, op_bytes);
+    }
+    else
+    {
+        sha256_dispatch::d_block_1way(ip_bytes.first<d_pair_bytes>(), op_bytes.first<hash_bytes>());
+        sha256_dispatch::d_block_1way(ip_bytes.last<d_pair_bytes>(),  op_bytes.last<hash_bytes>());
+    }
+}
 
 uint256 ComputeMerkleRoot(const std::vector<uint256> &leaves, bool *mutated) {
     uint256 hash;
