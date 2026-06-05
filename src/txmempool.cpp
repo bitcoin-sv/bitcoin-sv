@@ -2151,13 +2151,27 @@ void CTxMemPool::removeStagedNL(
     
     for(auto it: stage)
     {
-        // cut connections to the transactions which remain in the mempool
-        for(auto parent: GetMemPoolParentsNL(it))
+        // Cut connections to the transactions which remain in the mempool, and
+        // also sever links to co-staged parents. The latter is required because
+        // removeUncheckedNL captures "it"'s parents set (when the eviction
+        // tracker is live) and uses it after nodes have started to be erased.
+        // A parent that is itself staged for removal may be freed before "it"
+        // is processed, so leaving it in "it"'s parents set would leave a
+        // dangling txiter that CEvictionCandidateTracker::EntryRemoved would
+        // dereference. We iterate a copy because we modify "it"'s parents set.
+        const setEntries parents = GetMemPoolParentsNL(it);
+        for(auto parent : parents)
         {
             if(stage.find(parent) == stage.end())
             {
-                // remove "it" from "parents" children list
+                // remove "it" from surviving "parent"'s children list
                 updateChildNL(parent, it, false);
+            }
+            else
+            {
+                // "parent" is also being removed; drop it from "it"'s parents
+                // set now, while both are still alive.
+                updateParentNL(it, parent, false);
             }
         }
 
