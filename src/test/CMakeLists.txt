@@ -61,6 +61,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	base58data_tests.cpp
 	base64_tests.cpp
     big_int_tests.cpp
+    binary_counter_tests.cpp
 	bip32_tests.cpp
 	blockcheck_tests.cpp
     block_download_tracking_tests.cpp

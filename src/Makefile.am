@@ -84,6 +84,7 @@ BITCOIN_CORE_H = \
   async_file_reader.h \
   attributes.h \
   base58.h \
+  binary_counter.h \
   bloom.h \
   block_hasher.h \
   block_index.h \
@@ -617,6 +618,7 @@ libbitcoin_util_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_util_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_util_a_SOURCES = \
   support/lockedpool.cpp \
+  binary_counter.cpp \
   chainparamsbase.cpp \
   clientversion.cpp \
   compat/glibc_sanity.cpp \

@@ -192,6 +192,8 @@ add_subdirectory(univalue)
 add_library(util
 	amount.h
 	attributes.h
+	binary_counter.cpp
+	binary_counter.h
 	cfile_util.cpp
 	cfile_util.h
 	chainparamsbase.cpp
