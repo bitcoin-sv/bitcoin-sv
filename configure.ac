@@ -19,6 +19,14 @@ BITCOIN_TX_NAME=bitcoin-tx
 
 AC_CANONICAL_HOST
 
+dnl Detect x86_64 / amd64 so the SHA-NI convenience archive can gate
+dnl ENABLE_X86_SHANI on architecture without touching the vendored source.
+case $host_cpu in
+  x86_64|amd64) host_is_x86_64=yes ;;
+  *)            host_is_x86_64=no  ;;
+esac
+AM_CONDITIONAL([HOST_IS_X86_64], [test "x$host_is_x86_64" = "xyes"])
+
 AH_TOP([#ifndef BITCOIN_BITCOIN_CONFIG_H])
 AH_TOP([#define BITCOIN_BITCOIN_CONFIG_H])
 AH_BOTTOM([#endif // BITCOIN_BITCOIN_CONFIG_H])

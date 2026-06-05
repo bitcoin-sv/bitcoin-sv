@@ -270,6 +270,48 @@ BOOST_AUTO_TEST_CASE(d_block_1way_direct_matches_naive)
                                   op.begin(), op.end());
 }
 
+#if defined(__x86_64__) || defined(__amd64__)
+BOOST_AUTO_TEST_CASE(d_block_2way_direct_matches_naive)
+{
+    using sha256_dispatch::hash_bytes;
+    using sha256_dispatch::d_pair_bytes;
+    using sha256_dispatch::d_block_2way;
+
+    // Call the SHA-NI 2-way transform directly. Skips silently on hosts
+    // without SHA-NI.
+    if(d_block_2way == nullptr)
+        return;
+
+    // NOLINTNEXTLINE(cert-msc32-c, cert-msc51-cpp) for reproducible tests
+    std::mt19937 gen{0xC0FFEE};
+    std::uniform_int_distribution<int> byte_dist{0, 255};
+    std::array<std::uint8_t, 2 * d_pair_bytes> ip{};
+    std::ranges::generate(ip,
+        [&]{ return static_cast<std::uint8_t>(byte_dist(gen)); });
+
+    // Reference: naive CHash256 over each of the 2 pairs.
+    std::array<std::uint8_t, 2 * hash_bytes> expected{};
+    std::span<const std::uint8_t> ip_remaining{ip};
+    std::span<std::uint8_t> op_remaining{expected};
+    while(!ip_remaining.empty())
+    {
+        CHash256()
+            .Write(ip_remaining.first<hash_bytes>())
+            .Write(ip_remaining.subspan<hash_bytes, hash_bytes>())
+            .Finalize(op_remaining.first<hash_bytes>());
+        ip_remaining = ip_remaining.subspan(d_pair_bytes);
+        op_remaining = op_remaining.subspan(hash_bytes);
+    }
+
+    // Direct call to the SHA-NI transform.
+    std::array<std::uint8_t, 2 * hash_bytes> op{};
+    d_block_2way(ip, op);
+
+    BOOST_CHECK_EQUAL_COLLECTIONS(expected.begin(), expected.end(),
+                                  op.begin(), op.end());
+}
+#endif
+
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(merkle_proof_tests)

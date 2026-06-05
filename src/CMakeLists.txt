@@ -191,6 +191,7 @@ add_subdirectory(univalue)
 # Various completely unrelated features shared by all executables.
 add_library(util
 	amount.h
+	attributes.h
 	cfile_util.cpp
 	cfile_util.h
 	chainparamsbase.cpp

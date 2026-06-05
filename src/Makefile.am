@@ -28,7 +28,9 @@ LIBBITCOIN_COMMON=libbitcoin_common.a
 LIBBITCOIN_CONSENSUS=libbitcoin_consensus.a
 LIBBITCOIN_CLI=libbitcoin_cli.a
 LIBBITCOIN_UTIL=libbitcoin_util.a
-LIBBITCOIN_CRYPTO=crypto/libbitcoin_crypto.a
+LIBBITCOIN_CRYPTO_BASE=crypto/libbitcoin_crypto.a
+LIBBITCOIN_CRYPTO_SHANI=crypto/libbitcoin_crypto_shani.la
+LIBBITCOIN_CRYPTO=$(LIBBITCOIN_CRYPTO_BASE) $(LIBBITCOIN_CRYPTO_SHANI)
 LIBSECP256K1=secp256k1/libsecp256k1.la
 
 if ENABLE_ZMQ
@@ -47,7 +49,7 @@ $(LIBSECP256K1): $(wildcard secp256k1/src/*) $(wildcard secp256k1/include/*)
 # Make is not made aware of per-object dependencies to avoid limiting building parallelization
 # But to build the less dependent modules first, we manually select their order here:
 EXTRA_LIBRARIES += \
-  $(LIBBITCOIN_CRYPTO) \
+  $(LIBBITCOIN_CRYPTO_BASE) \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_COMMON) \
   $(LIBBITCOIN_CONSENSUS) \
@@ -55,6 +57,8 @@ EXTRA_LIBRARIES += \
   $(LIBBITCOIN_CLI) \
   $(LIBBITCOIN_WALLET) \
   $(LIBBITCOIN_ZMQ)
+
+noinst_LTLIBRARIES = $(LIBBITCOIN_CRYPTO_SHANI)
 
 lib_LTLIBRARIES = $(LIBBITCOINCONSENSUS)
 
@@ -78,6 +82,7 @@ BITCOIN_CORE_H = \
   addrdb.h \
   addrman.h \
   async_file_reader.h \
+  attributes.h \
   base58.h \
   bloom.h \
   block_hasher.h \
@@ -492,6 +497,7 @@ crypto_libbitcoin_crypto_a_SOURCES = \
   crypto/sha256_stream_scalar.h \
   crypto/sha256d64_scalar.cpp \
   crypto/sha256d64_scalar.h \
+  crypto/sha256d64_shani_shim.cpp \
   crypto/sha512.cpp \
   crypto/sha512.h
 
@@ -499,6 +505,24 @@ if USE_ASM
 crypto_libbitcoin_crypto_a_SOURCES += crypto/sha256_sse4.cpp
 crypto_libbitcoin_crypto_a_SOURCES += crypto/sha256_sse4_shim.cpp
 endif
+
+# SHA-NI-only convenience archive. The vendored body in sha256d64_shani.cpp
+# is byte-identical to upstream and gated on ENABLE_X86_SHANI; we define that
+# macro and the ISA flags only on x86_64 hosts (matching src/crypto/CMakeLists.txt)
+# so the file compiles to an empty TU elsewhere
+crypto_libbitcoin_crypto_shani_la_CPPFLAGS = $(AM_CPPFLAGS)
+crypto_libbitcoin_crypto_shani_la_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+if HOST_IS_X86_64
+crypto_libbitcoin_crypto_shani_la_CPPFLAGS += -DENABLE_X86_SHANI
+# -Wno-cast-align: upstream's (__m128i*) casts on byte buffers pair
+# with _mm_loadu_si128 / _mm_storeu_si128 (unaligned variants), but
+# Clang's -Wcast-align flags the cast itself regardless of how the
+# result is used. Verbatim vendoring forbids modifying the body.
+crypto_libbitcoin_crypto_shani_la_CXXFLAGS += -msha -msse4.1 -mssse3 -Wno-cast-align
+endif
+crypto_libbitcoin_crypto_shani_la_SOURCES = \
+  crypto/sha256d64_shani.cpp \
+  crypto/sha256d64_shani.h
 
 # consensus: shared between all executables that validate any consensus rules.
 libbitcoin_consensus_a_CPPFLAGS = $(AM_CPPFLAGS) $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) $(OPENSSL_LIBS) $(BITCOIN_INCLUDES)
@@ -746,7 +770,7 @@ if GLIBC_BACK_COMPAT
 endif
 
 libbitcoinconsensus_la_LDFLAGS = $(AM_LDFLAGS) -no-undefined $(RELDFLAGS)
-libbitcoinconsensus_la_LIBADD = $(LIBSECP256K1)
+libbitcoinconsensus_la_LIBADD = $(LIBSECP256K1) $(LIBBITCOIN_CRYPTO_SHANI)
 libbitcoinconsensus_la_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) $(OPENSSL_LIBS) -I$(builddir)/obj -I$(srcdir)/secp256k1/include -DBUILD_BITCOIN_INTERNAL
 libbitcoinconsensus_la_CXXFLAGS = $(AM_CXXFLAGS) $(BITCOIN_INCLUDES) $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) $(OPENSSL_LIBS) $(PIE_FLAGS)
 

@@ -24,6 +24,8 @@
 #include "crypto/sha256_sse4.h"
 #endif
 
+#include "crypto/sha256d64_shani.h"
+
 #endif
 
 static bool SelfTest(sha256_dispatch::StreamType tr)
@@ -72,6 +74,34 @@ static bool SelfTest(sha256_dispatch::StreamType tr)
     return true;
 }
 
+// KAT vectors from bitcoin/bitcoin commit ddb94fd3..., SelfTest() body.
+// The byte-1 alignment offset on `data` is deliberate (the lead `-`
+// gives the transform an unaligned input).
+namespace {
+constexpr std::array<const std::uint8_t, 130> kSelfTestD64Data{
+    "-"
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do "
+    "eiusmod tempor incididunt ut labore et dolore magna aliqua. Et m"};
+
+constexpr std::array<unsigned char, 64> kSelfTestD64Expected = {
+    0x09, 0x3a, 0xc4, 0xd0, 0x0f, 0xf7, 0x57, 0xe1, 0x72, 0x85, 0x79, 0x42, 0xfe, 0xe7, 0xe0, 0xa0,
+    0xfc, 0x52, 0xd7, 0xdb, 0x07, 0x63, 0x45, 0xfb, 0x53, 0x14, 0x7d, 0x17, 0x22, 0x86, 0xf0, 0x52,
+    0x48, 0xb6, 0x11, 0x9e, 0x6e, 0x48, 0x81, 0x6d, 0xcc, 0x57, 0x1f, 0xb2, 0x97, 0xa8, 0xd5, 0x25,
+    0x9b, 0x82, 0xaa, 0x89, 0xe2, 0xfd, 0x2d, 0x56, 0xe8, 0x28, 0x83, 0x0b, 0xe2, 0xfa, 0x53, 0xb7,
+};
+}
+
+/** Minimal startup self-test for a TransformD64 candidate.
+ *  Catches runtime-environment failures (CPUID lies, broken XSAVE on the
+ *  current host) before the dispatcher commits to a faster implementation.
+ *  Comprehensive correctness coverage lives in src/test/merkle_tests.cpp. */
+static bool SelfTestD64(sha256_dispatch::DBlock2wayType tr)
+{
+    std::array<std::uint8_t, 64> out{};
+    tr(std::span{kSelfTestD64Data}.subspan<1, 128>(), std::span{out});
+    return std::equal(out.begin(), out.end(), kSelfTestD64Expected.begin());
+}
+
 #if defined(__x86_64__) || defined(__amd64__)
 
 [[maybe_unused]] static bool has_sse41()
@@ -80,6 +110,14 @@ static bool SelfTest(sha256_dispatch::StreamType tr)
     if(__get_cpuid(1, &eax, &ebx, &ecx, &edx) == 0)
         return false;
     return ((ecx >> 19) & 1u) != 0;
+}
+
+static bool has_shani()
+{
+    uint32_t eax{}, ebx{}, ecx{}, edx{};
+    if(__get_cpuid_count(7, 0, &eax, &ebx, &ecx, &edx) == 0)
+        return false;
+    return (ebx & (1u << 29)) != 0;
 }
 
 #endif
@@ -105,6 +143,20 @@ std::string sha256_dispatch::AutoDetect()
             }
         }
     #endif
+        // Install SHA-NI 2-way when present; callers fall back to the
+        // scalar 1-way path otherwise.
+        if(has_sse41() && has_shani())
+        {
+            if(SelfTestD64(sha256d64_shani::Transform_2way))
+            {
+                d_block_2way = sha256d64_shani::Transform_2way;
+                ret += ",shani(2way)";
+            }
+            else
+            {
+                ret += ",shani(selftest-failed)";
+            }
+        }
     #endif
 
         assert(SelfTest(stream));
