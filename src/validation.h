@@ -105,7 +105,7 @@ static const int DEFAULT_SCRIPTCHECK_THREADS = 0;
 /** -txnthreadsperblock default (number of block txn-checking threads, 0 = auto) */
 static const int DEFAULT_TXNCHECK_THREADS = 0;
 /** Default batch size for PTV during block validation */
-static const unsigned DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE = 100;
+static const unsigned DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE = 10;
 /** Number of blocks that can be requested at any given time from a single peer.
  */
 static const int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 16;
