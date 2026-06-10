@@ -52,6 +52,14 @@ jobs:
   claude-review:
     runs-on: ubuntu-latest
     if: '!github.event.pull_request.draft'
+    env:
+      # Single source of truth for the review model — used by the
+      # claude-code-action step and claude-code-review-rereview.sh
+      CLAUDE_REVIEW_MODEL: claude-sonnet-4-6
+      # Claude Code CLI version installed by claude-code-review-rereview.sh.
+      # Keep in sync with the version bundled in the pinned
+      # anthropics/claude-code-action commit used by the claude-review step.
+      CLAUDE_CODE_VERSION: "2.1.170"
     permissions:
       contents: write
       pull-requests: write
@@ -143,6 +151,7 @@ jobs:
           # For available options see:
           # https://docs.claude.com/en/docs/claude-code/cli-reference
           claude_args: >-
+            --model ${{ env.CLAUDE_REVIEW_MODEL }}
             --allowed-tools
             "mcp__github_inline_comment__create_inline_comment,
             Glob,

@@ -15,10 +15,12 @@ set -euo pipefail
 : "${PR_NUMBER:?Required}"
 : "${ANTHROPIC_API_KEY:?Required}"
 : "${GH_TOKEN:?Required}"
+: "${CLAUDE_REVIEW_MODEL:?Required}"
+: "${CLAUDE_CODE_VERSION:?Required}"
 
 readonly resolve_script=".github/workflows/resolve-review-issue.sh"
 readonly issues_file="/tmp/claude-actionable-issues.json"
-readonly model="claude-sonnet-4-6"
+readonly model="$CLAUDE_REVIEW_MODEL"
 
 readonly owner=${GITHUB_REPOSITORY%/*}
 readonly repo=${GITHUB_REPOSITORY#*/}
@@ -37,12 +39,10 @@ function agent_for_file
   esac
 }
 
-# Install Claude Code CLI
-if ! command -v claude &>/dev/null; then
-  printf "Installing Claude Code CLI...\n"
-  npm install -g @anthropic-ai/claude-code 2>&1
-  printf "Claude Code CLI installed.\n\n"
-fi
+# Install the pinned Claude Code CLI version
+printf "Installing Claude Code CLI %s...\n" "$CLAUDE_CODE_VERSION"
+npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" 2>&1
+printf "Claude Code CLI installed.\n\n"
 
 function call_claude
 {
