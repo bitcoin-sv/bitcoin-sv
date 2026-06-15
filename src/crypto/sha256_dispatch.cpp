@@ -24,6 +24,7 @@
 #include "crypto/sha256_sse4.h"
 #endif
 
+#include "crypto/sha256_shani.h"
 #include "crypto/sha256d64_shani.h"
 
 #endif
@@ -143,10 +144,22 @@ std::string sha256_dispatch::AutoDetect()
             }
         }
     #endif
-        // Install SHA-NI 2-way when present; callers fall back to the
-        // scalar 1-way path otherwise.
+        // Install SHA-NI when present. The streaming transform overrides
+        // SSE4/scalar for the `stream` pointer (SHA-NI is faster on hosts
+        // that have it); the 2-way transform installs into d_block_2way,
+        // and callers fall back to the scalar 1-way path otherwise.
         if(has_sse41() && has_shani())
         {
+            if(SelfTest(sha256_shani::Transform))
+            {
+                stream = sha256_shani::Transform;
+                ret = "shani";
+            }
+            else
+            {
+                ret += ",shani(stream selftest-failed)";
+            }
+
             if(SelfTestD64(sha256d64_shani::Transform_2way))
             {
                 d_block_2way = sha256d64_shani::Transform_2way;
@@ -154,7 +167,7 @@ std::string sha256_dispatch::AutoDetect()
             }
             else
             {
-                ret += ",shani(selftest-failed)";
+                ret += ",shani(2way selftest-failed)";
             }
         }
     #endif

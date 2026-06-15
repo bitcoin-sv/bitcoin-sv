@@ -19,6 +19,7 @@ add_library(crypto
 	sha256d64_scalar.cpp
 	sha256d64_shani.cpp
 	sha256d64_shani_shim.cpp
+	sha256_shani_shim.cpp
 	sha256_stream_scalar.cpp
 	sha512.cpp
 )

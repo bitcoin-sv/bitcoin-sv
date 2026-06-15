@@ -493,6 +493,8 @@ crypto_libbitcoin_crypto_a_SOURCES = \
   crypto/sha256.h \
   crypto/sha256_dispatch.cpp \
   crypto/sha256_dispatch.h \
+  crypto/sha256_shani.h \
+  crypto/sha256_shani_shim.cpp \
   crypto/sha256_sse4.h \
   crypto/sha256_stream_scalar.cpp \
   crypto/sha256_stream_scalar.h \
