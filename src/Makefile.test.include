@@ -38,6 +38,7 @@ BITCOIN_TESTS =\
   test/bip32_tests.cpp \
   test/big_int_tests.cpp \
   test/binary_counter_tests.cpp \
+  test/bitcoinconsensus_tests.cpp \
   test/blockcheck_tests.cpp \
   test/block_download_tracking_tests.cpp \
   test/blockencodings_tests.cpp \

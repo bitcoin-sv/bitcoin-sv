@@ -35,7 +35,7 @@ extern "C" {
 
 class Config;
 
-#define BITCOINCONSENSUS_API_VER 1
+#define BITCOINCONSENSUS_API_VER 2
 
 //NOLINTNEXTLINE(cppcoreguidelines-use-enum-class)
 typedef enum bitcoinconsensus_error_t //NOLINT(performance-enum-size)
@@ -62,16 +62,27 @@ enum {
     bitcoinconsensus_SCRIPT_FLAGS_VERIFY_CHECKLOCKTIMEVERIFY = (1U << 9),
     // enable CHECKSEQUENCEVERIFY (BIP112)
     bitcoinconsensus_SCRIPT_FLAGS_VERIFY_CHECKSEQUENCEVERIFY = (1U << 10),
-    // enable WITNESS (BIP141)
-    bitcoinconsensus_SCRIPT_FLAGS_VERIFY_WITNESS_DEPRECATED = (1U << 11),
-    // enable SIGHASH_FORKID replay protection
+    // enable SIGHASH_FORKID replay protection (requires the _with_amount entry point)
     bitcoinconsensus_SCRIPT_ENABLE_SIGHASH_FORKID = (1U << 16),
+    // transaction is part of a block that uses Genesis rules
+    bitcoinconsensus_SCRIPT_GENESIS = (1U << 18),
+    // the UTXO being spent was created after Genesis activation (per-input flag)
+    bitcoinconsensus_SCRIPT_UTXO_AFTER_GENESIS = (1U << 19),
+    // transaction is part of a block that uses Chronicle rules
+    bitcoinconsensus_SCRIPT_CHRONICLE = (1U << 20),
+    // the UTXO being spent was created after Chronicle activation (per-input flag)
+    bitcoinconsensus_SCRIPT_UTXO_AFTER_CHRONICLE = (1U << 21),
     bitcoinconsensus_SCRIPT_FLAGS_VERIFY_ALL =
         bitcoinconsensus_SCRIPT_FLAGS_VERIFY_P2SH |
         bitcoinconsensus_SCRIPT_FLAGS_VERIFY_DERSIG |
         bitcoinconsensus_SCRIPT_FLAGS_VERIFY_NULLDUMMY |
         bitcoinconsensus_SCRIPT_FLAGS_VERIFY_CHECKLOCKTIMEVERIFY |
-        bitcoinconsensus_SCRIPT_FLAGS_VERIFY_CHECKSEQUENCEVERIFY,
+        bitcoinconsensus_SCRIPT_FLAGS_VERIFY_CHECKSEQUENCEVERIFY |
+        bitcoinconsensus_SCRIPT_ENABLE_SIGHASH_FORKID |
+        bitcoinconsensus_SCRIPT_GENESIS |
+        bitcoinconsensus_SCRIPT_UTXO_AFTER_GENESIS |
+        bitcoinconsensus_SCRIPT_CHRONICLE |
+        bitcoinconsensus_SCRIPT_UTXO_AFTER_CHRONICLE,
 };
 
 /// Returns 1 if the input nIn of the serialized transaction pointed to by txTo

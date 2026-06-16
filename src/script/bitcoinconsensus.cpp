@@ -10,8 +10,27 @@
 #include "pubkey.h"
 #include "script/interpreter.h"
 #include "script/script_error.h"
+#include "script/script_flags.h"
 #include "taskcancellation.h"
 #include "version.h"
+
+// The public bitcoinconsensus_SCRIPT_* flag values are hand-written in the
+// standalone C header (bitcoinconsensus.h is the only installed header and must
+// stay C-includable, so it cannot pull in the internal C++ script_flags.h).
+// These assertions bind the two enums together.
+#define ASSERT_SAME_FLAG(pub, internal) \
+    static_assert(static_cast<uint32_t>(pub) == static_cast<uint32_t>(internal))
+ASSERT_SAME_FLAG(bitcoinconsensus_SCRIPT_FLAGS_VERIFY_P2SH, SCRIPT_VERIFY_P2SH);
+ASSERT_SAME_FLAG(bitcoinconsensus_SCRIPT_FLAGS_VERIFY_DERSIG, SCRIPT_VERIFY_DERSIG);
+ASSERT_SAME_FLAG(bitcoinconsensus_SCRIPT_FLAGS_VERIFY_NULLDUMMY, SCRIPT_VERIFY_NULLDUMMY);
+ASSERT_SAME_FLAG(bitcoinconsensus_SCRIPT_FLAGS_VERIFY_CHECKLOCKTIMEVERIFY, SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY);
+ASSERT_SAME_FLAG(bitcoinconsensus_SCRIPT_FLAGS_VERIFY_CHECKSEQUENCEVERIFY, SCRIPT_VERIFY_CHECKSEQUENCEVERIFY);
+ASSERT_SAME_FLAG(bitcoinconsensus_SCRIPT_ENABLE_SIGHASH_FORKID, SCRIPT_ENABLE_SIGHASH_FORKID);
+ASSERT_SAME_FLAG(bitcoinconsensus_SCRIPT_GENESIS, SCRIPT_GENESIS);
+ASSERT_SAME_FLAG(bitcoinconsensus_SCRIPT_UTXO_AFTER_GENESIS, SCRIPT_UTXO_AFTER_GENESIS);
+ASSERT_SAME_FLAG(bitcoinconsensus_SCRIPT_CHRONICLE, SCRIPT_CHRONICLE);
+ASSERT_SAME_FLAG(bitcoinconsensus_SCRIPT_UTXO_AFTER_CHRONICLE, SCRIPT_UTXO_AFTER_CHRONICLE);
+#undef ASSERT_SAME_FLAG
 
 namespace {
 
@@ -71,7 +90,17 @@ inline int set_error(bitcoinconsensus_error *ret,
 
 /** Check that all specified flags are part of the libconsensus interface. */
 static bool verify_flags(unsigned int flags) {
-    return (flags & ~(bitcoinconsensus_SCRIPT_FLAGS_VERIFY_ALL)) == 0;
+    if ((flags & ~(bitcoinconsensus_SCRIPT_FLAGS_VERIFY_ALL)) != 0) {
+        return false;
+    }
+    // Mirror VerifyScript's valid_flags() precondition: a UTXO cannot be after
+    // Chronicle without also being after Genesis. Reject it here so the caller
+    // gets a clean bitcoinconsensus_ERR_INVALID_FLAGS rather than a bare verdict
+    // of 0 with *err left at ERR_OK.
+    if (IsUtxoAfterChronicle(flags) && !IsUtxoAfterGenesis(flags)) {
+        return false;
+    }
+    return true;
 }
 
 static int verify_script(const Config& config,
@@ -146,8 +175,12 @@ int bitcoinconsensus_verify_script(const Config& config,
                                    unsigned int flags,
                                    bitcoinconsensus_error* err)
 {
-    if (flags & bitcoinconsensus_SCRIPT_ENABLE_SIGHASH_FORKID ||
-        flags & bitcoinconsensus_SCRIPT_FLAGS_VERIFY_WITNESS_DEPRECATED) {
+    // Check flag validity before the amount guard so that ERR_INVALID_FLAGS
+    // takes precedence over ERR_AMOUNT_REQUIRED when both conditions hold.
+    if (!verify_flags(flags)) {
+        return bitcoinconsensus_ERR_INVALID_FLAGS;
+    }
+    if (flags & bitcoinconsensus_SCRIPT_ENABLE_SIGHASH_FORKID) {
         return set_error(err, bitcoinconsensus_ERR_AMOUNT_REQUIRED);
     }
 
