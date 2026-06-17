@@ -24,6 +24,7 @@ RUN set -xeu \
         gcc g++ \
         lcov \
         libgoogle-perftools-dev \
+        systemtap-sdt-dev \
         wget \
         lsb-release software-properties-common gnupg \
         sysbench \

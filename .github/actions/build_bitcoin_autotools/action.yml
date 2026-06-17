@@ -14,7 +14,7 @@ runs:
   steps:
     - run: |
           ./autogen.sh; 
-          ./configure --enable-zmq --enable-werror
+          ./configure --enable-zmq --enable-werror --enable-usdt
           make -j$(nproc --all)
       shell: bash
     - name: Artifact upload
