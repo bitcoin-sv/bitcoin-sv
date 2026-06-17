@@ -291,6 +291,7 @@ BITCOIN_CORE_H = \
   txn_validator.h \
   ui_interface.h \
   undo.h \
+  usdt.h \
   util.h \
   utilmoneystr.h \
   utiltime.h \

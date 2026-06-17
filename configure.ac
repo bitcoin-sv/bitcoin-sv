@@ -136,6 +136,11 @@ AC_ARG_ENABLE([extended-functional-tests],
     [use_extended_functional_tests=$enableval],
     [use_extended_functional_tests=no])
 
+AC_ARG_ENABLE([usdt],
+    AS_HELP_STRING([--enable-usdt],[enable USDT instrumentation, requires systemtap sys/sdt.h (default no)]),
+    [use_usdt=$enableval],
+    [use_usdt=no])
+
 AC_ARG_ENABLE([hardening],
   [AS_HELP_STRING([--disable-hardening],
   [do not attempt to harden the resulting executables (default is to harden)])],
@@ -1242,6 +1247,12 @@ fi
 
 AM_CONDITIONAL([ENABLE_ZMQ], [test "x$use_zmq" = "xyes"])
 
+if test "x$use_usdt" = "xyes"; then
+  AC_CHECK_HEADER([sys/sdt.h],
+    [AC_DEFINE([ENABLE_USDT],[1],[Define to 1 to compile in USDT instrumentation])],
+    [AC_MSG_ERROR([--enable-usdt given but sys/sdt.h not found; install the systemtap SDT development headers (e.g. systemtap-sdt-dev / systemtap-sdt-devel)])])
+fi
+
 AC_MSG_CHECKING([whether to build test_bitcoin])
 if test x$use_tests = xyes; then
   AC_MSG_RESULT([yes])
@@ -1387,6 +1398,7 @@ esac
 echo
 echo "Options used to compile and link:"
 echo "  prod build        = $enable_prod_build"
+echo "  with usdt         = $use_usdt"
 echo "  with wallet       = $enable_wallet"
 echo "  with zmq          = $use_zmq"
 echo "  with test         = $use_tests"

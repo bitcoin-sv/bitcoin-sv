@@ -121,12 +121,26 @@ check_symbol_exists(daemon "unistd.h" HAVE_DECL_DAEMON)
 set(CMAKE_REQUIRED_INCLUDES ${OPENSSL_CRYPTO_INCLUDES})
 set(CMAKE_REQUIRED_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY})
 check_symbol_exists(EVP_MD_CTX_new "openssl/evp.h" HAVE_DECL_EVP_MD_CTX_NEW)
+# Restore the default (empty) check state so these OpenSSL include/lib
+# requirements do not leak into subsequent check_*() calls below.
+unset(CMAKE_REQUIRED_INCLUDES)
+unset(CMAKE_REQUIRED_LIBRARIES)
 
 # Activate wallet
 set(ENABLE_WALLET ${BUILD_BITCOIN_WALLET})
 
 # Activate ZeroMQ
 set(ENABLE_ZMQ ${BUILD_BITCOIN_ZMQ})
+
+if(ENABLE_USDT)
+	check_include_files("sys/sdt.h" HAVE_SYS_SDT_H)
+	if(NOT HAVE_SYS_SDT_H)
+		message(FATAL_ERROR
+			"ENABLE_USDT=ON but sys/sdt.h was not found. Install the systemtap "
+			"SDT development headers (e.g. systemtap-sdt-dev / systemtap-sdt-devel) "
+			"or configure with -DENABLE_USDT=OFF.")
+	endif()
+endif()
 
 # Generate the config
 configure_file(bitcoin-config.h.cmake.in bitcoin-config.h ESCAPE_QUOTES)

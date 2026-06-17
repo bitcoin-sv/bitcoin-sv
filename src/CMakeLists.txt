@@ -20,6 +20,7 @@ option(BUILD_BITCOIN_BENCH "Build benchmarks" ON)
 
 option(ENABLE_TCMALLOC "Use TCMAlloc" ON)
 option(ENABLE_CLANG_TIDY "Use ClangTidy" OFF)
+option(ENABLE_USDT "Compile in USDT instrumentation (requires systemtap sys/sdt.h)" OFF)
 
 option(CMAKE_UNITY_BUILD "Enable Unity build")
 
