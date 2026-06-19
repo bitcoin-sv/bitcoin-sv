@@ -1,0 +1,59 @@
+#!/usr/bin/env bpftrace
+
+// Copyright (c) 2026 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
+
+
+/* p2p_latency.bt - per-message processing latency.
+
+ Inbound messages are handled on the single msghand thread, so entry/exit are
+ paired by tid; command is payload.
+
+   p2p:msg_process_entry(peer_id, command, msg_size)
+   p2p:msg_process_exit(peer_id, command)
+
+ Prints a live line per message and, on exit, a per-command latency histogram
+ (microseconds) plus a per-command call tally.
+
+ Usage:
+   sudo bpftrace contrib/usdt/p2p_latency.bt /usr/local/bin/bitcoind
+
+*/
+
+BEGIN
+{
+    printf("%-8s %-12s %13s %13s\n",
+           "peer",
+           "command",
+           "size (bytes)",
+           "duration (us)");
+}
+
+usdt:$1:p2p:msg_process_entry
+{
+    @start[tid] = nsecs;
+    @cmd[tid]   = str(uptr(arg1));
+    @bytes[tid] = arg2;
+}
+
+usdt:$1:p2p:msg_process_exit
+{
+    if(@start[tid] != 0)
+    {
+        $duration_us = ((int64)nsecs - (int64)@start[tid]) / (int64)1000;
+        printf("%-8lld %-12s %13lld %13lld\n",
+               arg0,
+               @cmd[tid],
+               @bytes[tid],
+               $duration_us);
+        @latency_us[@cmd[tid]] = hist($duration_us);
+        @calls[@cmd[tid]]      = count();
+    }
+}
+
+END
+{
+    clear(@start);
+    clear(@cmd);
+    clear(@bytes);
+}

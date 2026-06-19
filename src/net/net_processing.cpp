@@ -46,6 +46,7 @@
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
+#include "usdt.h"
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validation.h"
@@ -4897,6 +4898,41 @@ static bool SendRejectsAndCheckIfBanned(const CNodePtr& pnode, CConnman &connman
     return false;
 }
 
+//NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
+TRACEPOINT_SEMAPHORE(p2p, msg_process_entry);
+TRACEPOINT_SEMAPHORE(p2p, msg_process_exit);
+//NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
+
+namespace
+{
+    class usdt_guard
+    {
+        [[maybe_unused]] NodeId node_id_{};
+        [[maybe_unused]] const char* cmd_{};
+
+    public:
+        explicit usdt_guard(NodeId node_id,
+                            const char* cmd,
+                            [[maybe_unused]] uint64_t msg_size):
+            node_id_{node_id},
+            cmd_{cmd}
+        {
+            TRACEPOINT(p2p, msg_process_entry, node_id, cmd, msg_size);
+        }
+
+        ~usdt_guard()
+        {
+            TRACEPOINT(p2p, msg_process_exit, node_id_, cmd_);
+        }
+
+        usdt_guard(const usdt_guard&) = delete;
+        usdt_guard& operator=(const usdt_guard&) = delete;
+
+        usdt_guard(usdt_guard&&) = delete;
+        usdt_guard& operator=(usdt_guard&&) = delete;
+    };
+}
+
 bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &connman,
                      const std::atomic<bool> &interruptMsgProc,
                      std::chrono::milliseconds debugP2PTheadStallsThreshold)
@@ -5032,6 +5068,9 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     }
 
     // Process message
+    [[maybe_unused]] const usdt_guard guard{pfrom->GetId(),
+                                            strCommand.c_str(),
+                                            nPayloadLength};
     bool fRet = false;
     try {
         fRet = ProcessMessage(config, pfrom, strCommand, msg.GetData(), msg.GetTime(),
