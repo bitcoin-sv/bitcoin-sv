@@ -1,0 +1,47 @@
+#!/usr/bin/env bpftrace
+
+// Copyright (c) 2026 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
+
+
+/* rpc_latency.bt - per-command RPC latency.
+
+ Each RPC command runs to completion on one HTTP worker thread, so entry/exit
+ are paired by tid; method is payload.
+
+   rpc:request_entry(method)
+   rpc:request_exit(method, succeeded)
+
+ Prints a live line per command and, on exit, a per-method latency histogram
+ (microseconds) plus an ok/error tally.
+
+ Usage:
+   sudo bpftrace contrib/usdt/rpc_latency.bt /usr/local/bin/bitcoind
+
+*/
+
+usdt:$1:rpc:request_entry
+{
+    @start[tid]  = nsecs;
+    @method[tid] = str(uptr(arg0));
+}
+
+usdt:$1:rpc:request_exit
+{
+    if(@start[tid] != 0)
+    {
+        $duration_us = ((int64)nsecs - (int64)@start[tid]) / (int64)1000;
+        printf("%-24s %10lld us  %s\n",
+               @method[tid],
+               $duration_us,
+               arg1 ? "succeeded" : "err");
+        @latency_us[@method[tid]] = hist($duration_us);
+        @calls[@method[tid], arg1 ? "succeeded" : "err"] = count();
+    }
+}
+
+END
+{
+    clear(@start);
+    clear(@method);
+}
