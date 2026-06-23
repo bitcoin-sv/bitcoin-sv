@@ -257,6 +257,13 @@ AC_ARG_ENABLE([ubsan],
     [enable_ubsan=$enableval],
     [enable_ubsan=no])
 
+# Enable frame pointers
+AC_ARG_ENABLE([frame-pointers],
+    [AS_HELP_STRING([--enable-frame-pointers],
+                    [build with frame pointers for accurate profiling/flamegraphs (default is no)])],
+    [enable_frame_pointers=$enableval],
+    [enable_frame_pointers=no])
+
 # Turn warnings into errors
 AC_ARG_ENABLE([werror],
     [AS_HELP_STRING([--enable-werror],
@@ -329,6 +336,13 @@ if test "x$enable_ubsan" = xyes; then
   if test "x$ubsan_failed" = xyes; then
     AC_MSG_ERROR("UBSAN is not supported")
   fi
+fi
+
+if test "x$enable_frame_pointers" = xyes; then
+  AX_CHECK_COMPILE_FLAG([-fno-omit-frame-pointer],
+    [CFLAGS="$CFLAGS -fno-omit-frame-pointer"
+     CXXFLAGS="$CXXFLAGS -fno-omit-frame-pointer"],
+    [AC_MSG_ERROR("frame pointers are not supported by the compiler")])
 fi
 
 if test "x$enable_debug" = xyes; then
@@ -1407,6 +1421,7 @@ echo "  with upnp         = $use_upnp"
 echo "  use asm           = $use_asm"
 echo "  debug enabled     = $enable_debug"
 echo "  werror            = $enable_werror"
+echo "  frame pointers    = $enable_frame_pointers"
 echo
 echo "  sanitizers"
 echo "          asan      = $enable_asan"
