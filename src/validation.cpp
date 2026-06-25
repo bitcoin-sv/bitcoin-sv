@@ -4740,7 +4740,7 @@ static bool ActivateBestChainStep(
                     if (state.IsInvalid()) {
                         // The block violates a consensus rule.
                         if (!state.CorruptionPossible()) {
-                            InvalidChainFound(config, vpindexToConnect.back());
+                            InvalidChainFound(config, vpindexToConnect.front());
                         }
                         state = CValidationState();
                         fInvalidFound = true;
