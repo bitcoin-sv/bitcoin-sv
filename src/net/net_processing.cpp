@@ -3697,9 +3697,12 @@ static void ProcessBlockTxnMessage(const Config& config,
         // Since we requested this block (it was in mapBlocksInFlight),
         // force it to be processed, even if it would not be a candidate for
         // new tip (missing previous block, chain not long enough, etc)
+        // This bypasses some anti-DoS logic in AcceptBlock (eg to prevent
+        // disk-space attacks), but this is safe because the block was
+        // explicitly requested (confirmed by blockDownloadTracker above).
         auto bestChainActivation =
             ProcessNewBlockWithAsyncBestChainActivation(
-                task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, true, &fNewBlock, CBlockSource::MakeP2P(pfrom->GetAssociation().GetPeerAddr().ToString()));
+                task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, /*fForceProcessing=*/true, &fNewBlock, CBlockSource::MakeP2P(pfrom->GetAssociation().GetPeerAddr().ToString()));
         if(!bestChainActivation)
         {
             // something went wrong before we need to activate best chain
@@ -3992,9 +3995,19 @@ static bool ProcessCompactBlockMessage(
             "ProcessCompactBlock",
             pfrom->GetAddrName(),
             pfrom->GetId());
+
+        // Setting fForceProcessing to true means that we bypass some of
+        // our anti-DoS protections in AcceptBlock, which filters
+        // unrequested blocks that might be trying to waste our resources
+        // (eg disk space). Because we only try to reconstruct blocks when
+        // we're close to caught up (via the CanDirectFetch() requirement
+        // above, combined with the behavior of not requesting blocks until
+        // we have a chain with at least nMinimumChainWork), and we ignore
+        // compact blocks with less work than our tip, it is safe to treat
+        // reconstructed compact blocks as having been requested.
         auto bestChainActivation =
             ProcessNewBlockWithAsyncBestChainActivation(
-                task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, true, &fNewBlock, CBlockSource::MakeP2P(pfrom->GetAssociation().GetPeerAddr().ToString()));
+                task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, /*fForceProcessing=*/true, &fNewBlock, CBlockSource::MakeP2P(pfrom->GetAssociation().GetPeerAddr().ToString()));
         if(bestChainActivation)
         {
             pfrom->RunAsyncProcessing(
