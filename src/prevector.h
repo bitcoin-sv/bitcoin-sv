@@ -11,6 +11,7 @@
 #include <cstring>
 
 #include <iterator>
+#include <memory>
 
 #include "compiler_warnings.h"
 
@@ -375,31 +376,25 @@ public:
         }
     }
 
-    prevector(const prevector<N, T, Size, Diff> &other) : _size(0) {
+    prevector(const prevector<N, T, Size, Diff>& other) : _size(0)
+    {
         change_capacity(other.size());
-        const_iterator it = other.begin();
-        while (it != other.end()) {
-            _size++;
-            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T(*it);
-            ++it;
-        }
+        std::uninitialized_copy_n(other.item_ptr(0), other.size(), item_ptr(0));
+        _size += other.size();
     }
 
     // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
     prevector(prevector<N, T, Size, Diff> &&other) : _size(0) { swap(other); }
 
-    prevector &operator=(const prevector<N, T, Size, Diff> &other) {
-        if (&other == this) {
+    prevector& operator=(const prevector<N, T, Size, Diff>& other)
+    {
+        if(&other == this)
             return *this;
-        }
+
         resize(0);
         change_capacity(other.size());
-        const_iterator it = other.begin();
-        while (it != other.end()) {
-            _size++;
-            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T(*it);
-            ++it;
-        }
+        std::uninitialized_copy_n(other.item_ptr(0), other.size(), item_ptr(0));
+        _size += other.size();
         return *this;
     }
 
