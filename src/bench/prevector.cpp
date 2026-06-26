@@ -6,7 +6,7 @@
 
 #include <cstdint>
 
-constexpr size_t cscript_len{28};
+constexpr size_t cscript_len{32};
 
 static void prevector_copy_construct(benchmark::State& state, const size_t len)
 {
