@@ -83,6 +83,10 @@ public:
     std::vector<CTransactionRef> vtx;
 
     // memory only
+    // Caching hint set by CheckBlock(). Under parallel block validation it may be
+    // accessed concurrently for the same CBlock, so any potentially-concurrent
+    // read/write must go through std::atomic_ref (see CheckBlock() in
+    // validation.cpp). Construction-time writes (SetNull) are single-threaded.
     mutable bool fChecked;
 
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)

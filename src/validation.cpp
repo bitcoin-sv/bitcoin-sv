@@ -5751,7 +5751,11 @@ bool CheckBlock(const Config &config, const CBlock &block,
                 int32_t blockHeight,
                 BlockValidationOptions validationOptions) {
     // These are checks that are independent of context.
-    if (block.fChecked) {
+    // fChecked is a benign idempotent caching hint that may be read/written from
+    // multiple threads under parallel block validation, so access it through
+    // std::atomic_ref to avoid a data race (UB). Relaxed ordering is sufficient:
+    // the flag publishes no other state, and recomputing CheckBlock() is harmless.
+    if (std::atomic_ref<bool>(block.fChecked).load(std::memory_order_relaxed)) {
         return true;
     }
 
@@ -5888,7 +5892,9 @@ bool CheckBlock(const Config &config, const CBlock &block,
     if ((validationOptions.shouldValidatePoW() && validationOptions.shouldValidateMerkleRoot()) ||
          validationOptions.shouldMarkChecked())
     {
-        block.fChecked = true;
+        // See note at the fChecked read above: write through atomic_ref to avoid
+        // a data race under parallel block validation.
+        std::atomic_ref<bool>(block.fChecked).store(true, std::memory_order_relaxed);
     }
 
     return true;
