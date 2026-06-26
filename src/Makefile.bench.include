@@ -28,6 +28,7 @@ bench_bench_bitcoin_SOURCES = \
   bench/op_codes.cpp \
   bench/perf.cpp \
   bench/perf.h \
+  bench/prevector.cpp \
   bench/cscript.cpp \
   bench/interpreter.cpp \
   bench/safe_mode.cpp \

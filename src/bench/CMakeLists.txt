@@ -27,6 +27,7 @@ add_executable(bench_bitcoin
         merkle.cpp
         op_codes.cpp
         perf.cpp
+        prevector.cpp
         rollingbloom.cpp
         safe_mode.cpp
         serialisation.cpp
