@@ -6,13 +6,15 @@
 
 #include <cstdint>
 
+constexpr size_t cscript_len{28};
+
 static void prevector_copy_construct(benchmark::State& state, const size_t len)
 {
-    prevector<28, uint8_t> src(len, uint8_t{0x5a});
+    prevector<cscript_len, uint8_t> src(len, uint8_t{0x5a});
     while(state.KeepRunning())
     {
         //NOLINTNEXTLINE(performance-unnecessary-copy-initialization)
-        const prevector<28, uint8_t> dst{src};
+        const prevector<cscript_len, uint8_t> dst{src};
     }
 }
 
@@ -28,6 +30,18 @@ static void prevector_copy_construct29(benchmark::State& state)
 }
 BENCHMARK(prevector_copy_construct29)
 
+static void prevector_copy_construct32(benchmark::State& state)
+{
+    prevector_copy_construct(state, 32);
+}
+BENCHMARK(prevector_copy_construct32)
+
+static void prevector_copy_construct33(benchmark::State& state)
+{
+    prevector_copy_construct(state, 33);
+}
+BENCHMARK(prevector_copy_construct33)
+
 static void prevector_copy_construct1024(benchmark::State& state)
 {
     prevector_copy_construct(state, 1024);
@@ -36,8 +50,8 @@ BENCHMARK(prevector_copy_construct1024)
 
 static void prevector_copy_assign(benchmark::State& state, const size_t len)
 {
-    const prevector<28, uint8_t> src(len, uint8_t{0x5a});
-    prevector<28, uint8_t> dst;
+    const prevector<cscript_len, uint8_t> src(len, uint8_t{0x5a});
+    prevector<cscript_len, uint8_t> dst;
     while(state.KeepRunning())
     {
         dst = src;
@@ -55,6 +69,18 @@ static void prevector_copy_assign29(benchmark::State& state)
     prevector_copy_assign(state, 29);
 }
 BENCHMARK(prevector_copy_assign29)
+
+static void prevector_copy_assign32(benchmark::State& state)
+{
+    prevector_copy_assign(state, 32);
+}
+BENCHMARK(prevector_copy_assign32)
+
+static void prevector_copy_assign33(benchmark::State& state)
+{
+    prevector_copy_assign(state, 33);
+}
+BENCHMARK(prevector_copy_assign33)
 
 static void prevector_copy_assign1024(benchmark::State& state)
 {
