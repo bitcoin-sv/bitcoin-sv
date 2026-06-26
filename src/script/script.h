@@ -41,7 +41,7 @@ template <typename T> std::vector<uint8_t> ToByteVector(const T &in) {
 
 class CScriptNum;
 
-typedef prevector<28, uint8_t> CScriptBase;
+using CScriptBase = prevector<32, uint8_t>;
 
 template<typename InputIt>
 concept uint8_iterator = std::input_iterator<InputIt> 
