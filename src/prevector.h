@@ -12,6 +12,7 @@
 
 #include <iterator>
 #include <memory>
+#include <type_traits>
 
 #include "compiler_warnings.h"
 
@@ -42,15 +43,15 @@
  *   - Size capacity: the number of allocated elements
  *   - T* indirect: a pointer to an array of capacity elements of type T
  *     (only the first _size are initialized).
- *
- * The data type T must be movable by memmove/realloc(). Once we switch to C++,
- * move constructors can be used instead.
  */
 // NOLINTBEGIN(bugprone-multi-level-implicit-pointer-conversion)
 // NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
 // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-template <unsigned int N, typename T, typename Size = uint64_t,
-          typename Diff = int64_t>
+template<unsigned int N,
+        typename T,
+        typename Size = uint64_t,
+        typename Diff = int64_t>
+    requires std::is_trivially_copyable_v<T>
 class prevector {
 public:
     typedef Size size_type;
