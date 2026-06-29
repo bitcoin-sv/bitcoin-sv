@@ -15,7 +15,9 @@
 
 BOOST_FIXTURE_TEST_SUITE(prevector_tests, TestingSetup)
 
-template <unsigned int N, typename T> class prevector_tester {
+template<unsigned int N, typename T>
+class prevector_tester
+{
     typedef std::vector<T> realtype;
     realtype real_vector;
     realtype real_vector_alt;
@@ -73,6 +75,16 @@ template <unsigned int N, typename T> class prevector_tester {
     }
 
 public:
+    prevector_tester() = default;
+
+    prevector_tester(const prevector_tester&) = delete;
+    prevector_tester& operator=(const prevector_tester&) = delete;
+
+    prevector_tester(prevector_tester&&) = delete;
+    prevector_tester& operator=(prevector_tester&&) = delete;
+
+    ~prevector_tester() { BOOST_CHECK(passed); }
+
     void resize(Size s) {
         real_vector.resize(s);
         local_check_equal(real_vector.size(), s);
