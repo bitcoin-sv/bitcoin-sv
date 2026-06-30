@@ -377,7 +377,7 @@ public:
         }
     }
 
-    prevector(const prevector<N, T, Size, Diff>& other) : _size(0)
+    prevector(const prevector& other) : _size(0)
     {
         change_capacity(other.size());
         std::uninitialized_copy_n(other.item_ptr(0), other.size(), item_ptr(0));
@@ -387,7 +387,7 @@ public:
     prevector(prevector&& other) noexcept : _size(0)
     { swap(other); }
 
-    prevector& operator=(const prevector<N, T, Size, Diff>& other)
+    prevector& operator=(const prevector& other)
     {
         if(&other == this)
             return *this;
@@ -548,10 +548,11 @@ public:
         }
     }
 
-    bool operator==(const prevector<N, T, Size, Diff> &other) const {
-        if (other.size() != size()) {
+    bool operator==(const prevector& other) const
+    {
+        if(other.size() != size())
             return false;
-        }
+
         const_iterator b1 = begin();
         const_iterator b2 = other.begin();
         const_iterator e1 = end();
@@ -565,13 +566,14 @@ public:
         return true;
     }
 
-    bool operator<(const prevector<N, T, Size, Diff> &other) const {
-        if (size() < other.size()) {
+    bool operator<(const prevector& other) const
+    {
+        if(size() < other.size())
             return true;
-        }
-        if (size() > other.size()) {
+
+        if(size() > other.size())
             return false;
-        }
+
         const_iterator b1 = begin();
         const_iterator b2 = other.begin();
         const_iterator e1 = end();
