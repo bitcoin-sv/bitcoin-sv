@@ -384,8 +384,8 @@ public:
         _size += other.size();
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
-    prevector(prevector<N, T, Size, Diff> &&other) : _size(0) { swap(other); }
+    prevector(prevector&& other) noexcept : _size(0)
+    { swap(other); }
 
     prevector& operator=(const prevector<N, T, Size, Diff>& other)
     {
@@ -399,8 +399,8 @@ public:
         return *this;
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
-    prevector &operator=(prevector<N, T, Size, Diff> &&other) {
+    prevector& operator=(prevector&& other) noexcept
+    {
         swap(other);
         return *this;
     }
@@ -533,8 +533,8 @@ public:
 
     const T &back() const { return *item_ptr(size() - 1); }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-swap, performance-noexcept-swap)
-    void swap(prevector<N, T, Size, Diff> &other) {
+    void swap(prevector& other) noexcept
+    {
         std::swap(_union, other._union);
         std::swap(_size, other._size);
     }
