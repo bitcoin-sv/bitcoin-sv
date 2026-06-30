@@ -16,7 +16,7 @@
 #include <utility>
 
 // Confirm that CScriptBase's capacity increase from 28 to 32 did not
-// effect the sizeof(CScript) but simply utilised wasted padding bytes.
+// affect the sizeof(CScript) but simply utilised wasted padding bytes.
 static_assert(40 == sizeof(CScript));
 
 static_assert(EncodeOP_N(0) == OP_0);
