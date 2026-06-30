@@ -251,15 +251,15 @@ public:
     };
 
 private:
-    size_type _size;
+    size_type _size{};
     union direct_or_indirect {
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         char direct[sizeof(T) * N];
         struct {
             size_type capacity;
-            char *indirect;
+            char* indirect;
         } other;
-    } _union;
+    } _union{};
 
     T *direct_ptr(difference_type pos) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
@@ -354,11 +354,12 @@ public:
         }
     }
 
-    prevector() : _size(0) {}
+    prevector() = default;
 
-    explicit prevector(size_type n) : _size(0) { resize(n); }
+    explicit prevector(size_type n) { resize(n); }
 
-    explicit prevector(size_type n, const T &val = T()) : _size(0) {
+    explicit prevector(size_type n, const T& val = T())
+    {
         change_capacity(n);
         while (size() < n) {
             _size++;
@@ -366,8 +367,9 @@ public:
         }
     }
 
-    template <typename InputIterator>
-    prevector(InputIterator first, InputIterator last) : _size(0) {
+    template<typename InputIterator>
+    prevector(InputIterator first, InputIterator last)
+    {
         size_type n = static_cast<size_type>(last - first);
         change_capacity(n);
         while (first != last) {
@@ -377,14 +379,14 @@ public:
         }
     }
 
-    prevector(const prevector& other) : _size(0)
+    prevector(const prevector& other)
     {
         change_capacity(other.size());
         std::uninitialized_copy_n(other.item_ptr(0), other.size(), item_ptr(0));
         _size += other.size();
     }
 
-    prevector(prevector&& other) noexcept : _size(0)
+    prevector(prevector&& other) noexcept
     { swap(other); }
 
     prevector& operator=(const prevector& other)
