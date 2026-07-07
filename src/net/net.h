@@ -1179,9 +1179,9 @@ private:
     mutable CCriticalSection cs_addrName {};
     std::string addrName {};
 
+    mutable CCriticalSection cs_mInvList {};
     /** Deque of inventory msgs for transactions to send */
-    std::deque<CTxnSendingDetails> mInvList;
-    CCriticalSection cs_mInvList {};
+    std::deque<CTxnSendingDetails> mInvList GUARDED_BY(cs_mInvList);
 
     CConnman::CAsyncTaskPool& mAsyncTaskPool;
 

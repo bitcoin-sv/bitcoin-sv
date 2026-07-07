@@ -820,7 +820,7 @@ void CNode::copyStats(NodeStats &stats)
 
     {
         // Fetch size of inventory queue
-        LOCK(cs_mInvList);
+        bsv::lock_guard lock{cs_mInvList};
         stats.nInvQueueSize = mInvList.size();
     }
 }
@@ -844,7 +844,7 @@ void CNode::AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns)
     // inventory before cs_filter to prevent deadlocks
     LOCK(cs_inventory);
     LOCK(cs_filter);
-    LOCK(cs_mInvList);
+    bsv::lock_guard lock{cs_mInvList};
 
     if(!fRelayTxes)
     {
@@ -882,7 +882,7 @@ void CNode::AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns)
 void CNode::RemoveTxnsFromInventory(const std::set<CInv>& toRemove)
 {
     // Remove them
-    LOCK(cs_mInvList);
+    bsv::lock_guard lock{cs_mInvList};
 
     mInvList.erase(
         std::remove_if(
