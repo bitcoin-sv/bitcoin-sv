@@ -1198,11 +1198,9 @@ private:
 
 public:
 
-    /** Add some new transactions to our pending inventory list */
     void AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns);
-    /** Remove some transactions from our pending inventroy list */
     void RemoveTxnsFromInventory(const std::set<CInv>& toRemove);
-    /** Fetch the next N items from our inventory */
+    bool HasTxnsInInventory() const;
     std::vector<CTxnSendingDetails> FetchNInventory(size_t n);
 
     NodeId GetId() const { return id; }

@@ -62,7 +62,20 @@ void CTxnPropagator::removeTransactions(const std::vector<CTransactionRef>& txns
 {
     LogPrint(BCLog::TXNPROP, "Purging %d transactions\n", txns.size());
 
-    // Create set of objects to use it as lookup when deleting 
+    // When nothing is queued for announcement anywhere - the norm during IBD,
+    // there is nothing to purge, so don't pay for building it.
+    if(getNewTxnQueueLength() == 0)
+    {
+        bool anyQueued{};
+        g_connman->ForEachNode([&anyQueued](const CNodePtr& node)
+        {
+            anyQueued = anyQueued || node->HasTxnsInInventory();
+        });
+        if(!anyQueued)
+            return;
+    }
+
+    // Create set of objects to use it as lookup when deleting
     std::set<CInv> toRemove {};
     for(const CTransactionRef& txn : txns)
     {   

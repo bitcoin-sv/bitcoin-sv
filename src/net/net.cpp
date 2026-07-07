@@ -886,11 +886,18 @@ void CNode::RemoveTxnsFromInventory(const std::set<CInv>& toRemove)
 
     mInvList.erase(
         std::remove_if(
-            mInvList.begin(), mInvList.end(), 
+            mInvList.begin(), mInvList.end(),
             [&toRemove](const CTxnSendingDetails& i) {
-                return toRemove.find(i.getInv()) != toRemove.end(); 
-            }), 
-        mInvList.end());    
+                return toRemove.find(i.getInv()) != toRemove.end();
+            }),
+        mInvList.end());
+}
+
+/** Check whether our pending inventory list contains any transactions */
+bool CNode::HasTxnsInInventory() const
+{
+    bsv::lock_guard lock{cs_mInvList};
+    return !mInvList.empty();
 }
 
 /** Fetch the next N items from our inventory */
