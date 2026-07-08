@@ -32,6 +32,7 @@ add_executable(bench_bitcoin
         safe_mode.cpp
         serialisation.cpp
         thread_safe_queue.cpp
+        txn_propagator_lookup.cpp
         data/block413567.raw.h)
 
 enable_coverage(bench_bitcoin)
