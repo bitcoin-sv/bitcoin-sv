@@ -1915,7 +1915,7 @@ BOOST_AUTO_TEST_CASE(op_substr_post_chronicle)
     using test_args = tuple<vector<uint8_t>,            // script
                             ScriptError,                // expected scriptError
                             LimitedStack::size_type,    // expected stack size 
-                            exp_stack_top_type>;             // expected top of stack
+                            exp_stack_top_type>;        // expected top of stack
     const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
     const vector<test_args> test_data
     {
@@ -1964,6 +1964,41 @@ BOOST_AUTO_TEST_CASE(op_substr_post_chronicle)
             SCRIPT_ERR_OK, 1, exp_stack_top_type{{0, 1}} },
       { {OP_PUSHDATA1, 3, 0, 1, 2, OP_1, OP_2, OP_SUBSTR},
             SCRIPT_ERR_OK, 1, exp_stack_top_type{{1, 2}} },
+
+      // length 9
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0,
+         9, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, OP_SUBSTR},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0}} },
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0,
+         9, 0x01, 0, 0, 0, 0, 0, 0, 0, 0x80, OP_SUBSTR},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3,
+            exp_stack_top_type{{0x01, 0, 0, 0, 0, 0, 0, 0, 0x80}} },
+      // 9-byte length whose magnitude is out of int64 range -> overflow
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0,
+         9, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, OP_SUBSTR},
+            SCRIPT_ERR_SCRIPTNUM_OVERFLOW, 3,
+            exp_stack_top_type{{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00}} },
+
+      // length 10
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0,
+         10, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, OP_SUBSTR},
+            SCRIPT_ERR_SCRIPTNUM_OVERFLOW, 3,
+            exp_stack_top_type{{0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0}} },
+      { {OP_PUSHDATA1, 3, 0, 1, 2,
+         10, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, OP_1, OP_SUBSTR},
+            SCRIPT_ERR_SCRIPTNUM_OVERFLOW, 3, exp_stack_top_type{{1}} },
+
+      // 9-byte start-position (offset) operand
+      { {OP_PUSHDATA1, 3, 0, 1, 2,
+         9, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, OP_1, OP_SUBSTR},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{1}} },
+      { {OP_PUSHDATA1, 3, 0, 1, 2,
+         9, 0x01, 0, 0, 0, 0, 0, 0, 0, 0x80, OP_1, OP_SUBSTR},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top_type{{1}} },
+      // 9-byte offset whose magnitude is out of int64 range -> overflow
+      { {OP_PUSHDATA1, 3, 0, 1, 2,
+         9, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, OP_1, OP_SUBSTR},
+            SCRIPT_ERR_SCRIPTNUM_OVERFLOW, 3, exp_stack_top_type{{1}} },
     };
 
     for(const auto& [script,
@@ -2084,6 +2119,26 @@ BOOST_AUTO_TEST_CASE(op_left_post_chronicle)
             SCRIPT_ERR_OK, 1, exp_stack_top_type{{0, 1}} },
       { {OP_PUSHDATA1, 2, 0, 1, OP_3, OP_LEFT}, // length out-of-bounds
             SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{3}} },
+
+      // 9-byte length
+      { {OP_PUSHDATA1, 2, 0, 1,
+         9, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, OP_LEFT},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0}} },
+      { {OP_PUSHDATA1, 2, 0, 1,
+         9, 0x01, 0, 0, 0, 0, 0, 0, 0, 0x80, OP_LEFT},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2,
+            exp_stack_top_type{{0x01, 0, 0, 0, 0, 0, 0, 0, 0x80}} },
+      // 9-byte length whose magnitude is out of int64 range -> overflow
+      { {OP_PUSHDATA1, 2, 0, 1,
+         9, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, OP_LEFT},
+            SCRIPT_ERR_SCRIPTNUM_OVERFLOW, 2,
+            exp_stack_top_type{{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00}} },
+
+      // 10-byte length
+      { {OP_PUSHDATA1, 2, 0, 1,
+         10, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, OP_LEFT},
+            SCRIPT_ERR_SCRIPTNUM_OVERFLOW, 2,
+            exp_stack_top_type{{0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0}} },
     };
 
     for(const auto& [script,
@@ -2204,6 +2259,26 @@ BOOST_AUTO_TEST_CASE(op_right_post_chronicle)
             SCRIPT_ERR_OK, 1, exp_stack_top_type{{0, 1}} },
       { {OP_PUSHDATA1, 2, 0, 1, OP_3, OP_RIGHT},
             SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{3}} },
+
+      // 9-byte length
+      { {OP_PUSHDATA1, 2, 0, 1,
+         9, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, OP_RIGHT},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{1}} },
+      { {OP_PUSHDATA1, 2, 0, 1,
+         9, 0x01, 0, 0, 0, 0, 0, 0, 0, 0x80, OP_RIGHT},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2,
+            exp_stack_top_type{{0x01, 0, 0, 0, 0, 0, 0, 0, 0x80}} },
+      // 9-byte length whose magnitude is out of int64 range -> overflow
+      { {OP_PUSHDATA1, 2, 0, 1,
+         9, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, OP_RIGHT},
+            SCRIPT_ERR_SCRIPTNUM_OVERFLOW, 2,
+            exp_stack_top_type{{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00}} },
+
+      // 10-byte length
+      { {OP_PUSHDATA1, 2, 0, 1,
+         10, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, OP_RIGHT},
+            SCRIPT_ERR_SCRIPTNUM_OVERFLOW, 2,
+            exp_stack_top_type{{0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0}} },
     };
 
     for(const auto& [script,
