@@ -81,8 +81,10 @@ CScriptNum::CScriptNum(const span<const uint8_t> span,
     {
         if(big_int)
             m_value = bsv::bint::deserialize(span);
+        else if(const auto v{bsv::deserialize<int64_t>(span)})
+            m_value = *v;
         else
-            m_value = bsv::deserialize<int64_t>(span.begin(), span.end());
+            throw scriptnum_overflow_error("script number overflow");
     }
 
     assert(big_int ? m_value.index() == 1 : m_value.index() == 0);

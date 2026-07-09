@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include <cassert>
 #include <cstdint>
-#include <iterator>
+#include <limits>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -58,39 +58,62 @@ namespace bsv
         }
     }
 
-    // I Models the RandomAccess Iterator concept
-    // T Models the Integer concept
-    template <typename T, typename I>
-    inline T deserialize(I f, I l)
+    // Deserialize a little-endian, sign-magnitude script number into N.
+    //
+    // Returns nullopt when the operand cannot denote a value of type N:
+    //  - longer than sizeof(N)+1 bytes; or
+    //  - exactly sizeof(N)+1 bytes with either a final byte that carries
+    //    magnitude bits (not a pure 0x00/0x80 sign byte) or a magnitude out of
+    //    range for the sign.
+    //
+    // numeric_limits<N>::min() is the only value that needs the extra sign
+    // byte; it cannot be negated, so it is handled explicitly and every other
+    // value uses an ordinary signed negation.
+    template<std::signed_integral N>
+    inline std::optional<N> deserialize(const std::span<const uint8_t> s)
     {
-        // pre-condition: bounded_range(f, l) and f < l
-        assert(f != l);
+        if(s.empty())
+            return N{};
 
-        const auto d{static_cast<size_t>(std::distance(f, l))};
+        constexpr auto n{sizeof(N)};
+        const auto d{s.size()};
+        if(d > n + 1)
+            return {};
 
-        T result{0};
-        for(size_t i{0}; i < d - 1; ++i)
+        if(d == n + 1 && (s.back() & 0x7f) != 0)
+            return {};
+
+        N result{};
+        for(size_t i{}; i < d - 1; ++i)
         {
-            T tmp{*f};
+            N tmp{s[i]};
             tmp <<= (8 * i);
             result |= tmp;
-
-            f = std::next(f);
         }
 
-        if(d > sizeof(T))
-            return result;
-
         bool negative{};
-        T tmp{*f};
+        N tmp{s[d - 1]};
         if(tmp & 0x80)
         {
             negative = true;
-            tmp &= 0x7f;
+            if(d <= n)
+                tmp &= 0x7f;
         }
 
-        tmp <<= (8 * (d - 1));
-        result |= tmp;
+        if(d <= n)
+        {
+            tmp <<= (8 * (d - 1));
+            result |= tmp;
+        }
+        else
+        {
+            if(result == std::numeric_limits<N>::min())
+                return negative ? std::optional{result} : std::nullopt;
+
+            if(result < 0)
+                return {};
+        }
+
         return negative ? -result : result;
     }
 
