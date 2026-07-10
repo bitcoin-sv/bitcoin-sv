@@ -145,19 +145,14 @@ namespace
         node->fRelayTxes = true;
         node->AddTxnsToInventory(MakeQueuedTxns());
 
-        // The lookup removeTransactions builds from the block.
-        std::unordered_set<CInv, SaltedInvHasher> toRemove {};
+        // The sorted lookup removeTransactions builds from the block.
+        std::vector<CInv> toRemove {};
         toRemove.reserve(blockTxnCount);
         for(size_t i = 0; i < blockTxnCount; ++i)
         {
-            toRemove.emplace(MSG_TX, BenchTxnPool()[i]->GetId());
+            toRemove.emplace_back(MSG_TX, BenchTxnPool()[i]->GetId());
         }
-
-//        std::set<CInv> toRemove;
-//        for(size_t i = 0; i < blockTxnCount; ++i)
-//        {
-//            toRemove.emplace(MSG_TX, BenchTxnPool()[i]->GetId());
-//        }
+        std::sort(toRemove.begin(), toRemove.end());
 
         while(state.KeepRunning())
         {
