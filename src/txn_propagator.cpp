@@ -6,7 +6,7 @@
 #include "util.h"
 
 #include <algorithm>
-#include <unordered_set>
+#include <iterator>
 
 // When we get C++17 we should loose this redundant definition, until then it's required.
 constexpr unsigned CTxnPropagator::DEFAULT_RUN_FREQUENCY_MILLIS;
@@ -78,15 +78,18 @@ void CTxnPropagator::removeTransactions(const std::vector<CTransactionRef>& txns
             return;
     }
 
-    const std::unordered_set<CInv, SaltedInvHasher> toRemove{[&txns]
+    const std::vector<CInv> toRemove{[&txns]
     {
-        std::unordered_set<CInv, SaltedInvHasher> s;
-        s.reserve(txns.size());
-        for(const CTransactionRef& txn : txns)
-        {
-            s.emplace(MSG_TX, txn->GetId());
-        }
-        return s;
+        std::vector<CInv> v;
+        v.reserve(txns.size());
+        std::ranges::transform(txns,
+                               std::back_inserter(v),
+                               [](const CTransactionRef& txn)
+                               {
+                                   return CInv{MSG_TX, txn->GetId()};
+                               });
+        std::ranges::sort(v);
+        return v;
     }()};
 
     // Filter list of new transactions
@@ -96,7 +99,7 @@ void CTxnPropagator::removeTransactions(const std::vector<CTransactionRef>& txns
         mNewTxns.erase(
             std::remove_if(mNewTxns.begin(), mNewTxns.end(),
                 [&toRemove](const CTxnSendingDetails& i) {
-                    return toRemove.contains(i.getInv());
+                    return std::binary_search(toRemove.begin(), toRemove.end(), i.getInv());
                 }),
             mNewTxns.end());
     }

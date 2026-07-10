@@ -7,7 +7,6 @@
 
 #include "primitives/transaction.h"
 #include "hash.h"
-#include "protocol.h"
 
 /**
  * Hasher objects transactions for std::unordered_set and similar hash-based containers.
@@ -33,15 +32,6 @@ public:
     size_t operator()(const COutPoint& outpoint) const
     {
         return SipHashUint256Extra(k0, k1, outpoint.GetTxId(), outpoint.GetN());
-    }
-};
-
-class SaltedInvHasher : private StaticHasherSalt
-{
-public:
-    size_t operator()(const CInv& inv) const
-    {
-        return SipHashUint256Extra(k0, k1, inv.hash, inv.type);
     }
 };
 

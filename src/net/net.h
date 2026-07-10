@@ -33,7 +33,6 @@
 #include "task_helpers.h"
 #include "threadinterrupt.h"
 #include "txmempool.h"
-#include "txhasher.h"
 #include "txn_sending_details.h"
 #include "txn_validation_config.h"
 #include "uint256.h"
@@ -48,7 +47,6 @@
 #include <memory>
 #include <optional>
 #include <thread>
-#include <unordered_set>
 #include <vector>
 #include <functional>
 
@@ -1201,7 +1199,8 @@ private:
 public:
 
     void AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns);
-    void RemoveTxnsFromInventory(const std::unordered_set<CInv, SaltedInvHasher>& toRemove);
+    // pre-condition: toRemove must be sorted
+    void RemoveTxnsFromInventory(const std::vector<CInv>& toRemove);
     bool HasTxnsInInventory() const;
     std::vector<CTxnSendingDetails> FetchNInventory(size_t n);
 

@@ -876,10 +876,11 @@ void CNode::AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns)
 
 /**
 * Remove some transactions from our pending inventory list.
+* pre-condition: toRemove must be sorted
 * Assumes the caller has taken care of locking access to the mempool,
 * and so can be called in parallel.
 */
-void CNode::RemoveTxnsFromInventory(const std::unordered_set<CInv, SaltedInvHasher>& toRemove)
+void CNode::RemoveTxnsFromInventory(const std::vector<CInv>& toRemove)
 {
     bsv::lock_guard lock{cs_mInvList};
 
@@ -887,7 +888,7 @@ void CNode::RemoveTxnsFromInventory(const std::unordered_set<CInv, SaltedInvHash
         std::remove_if(
             mInvList.begin(), mInvList.end(),
             [&toRemove](const CTxnSendingDetails& i) {
-                return toRemove.contains(i.getInv());
+                return std::binary_search(toRemove.begin(), toRemove.end(), i.getInv());
             }),
         mInvList.end());
 }
