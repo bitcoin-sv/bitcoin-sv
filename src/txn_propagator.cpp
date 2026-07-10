@@ -5,6 +5,9 @@
 #include "net/net.h"
 #include "util.h"
 
+#include <algorithm>
+#include <unordered_set>
+
 // When we get C++17 we should loose this redundant definition, until then it's required.
 constexpr unsigned CTxnPropagator::DEFAULT_RUN_FREQUENCY_MILLIS;
 
@@ -75,32 +78,38 @@ void CTxnPropagator::removeTransactions(const std::vector<CTransactionRef>& txns
             return;
     }
 
-    // Create set of objects to use it as lookup when deleting
-    std::set<CInv> toRemove {};
-    for(const CTransactionRef& txn : txns)
-    {   
-        toRemove.emplace(MSG_TX, txn->GetId());
-    }
-   
+    const std::unordered_set<CInv, SaltedInvHasher> toRemove{[&txns]
+    {
+        std::unordered_set<CInv, SaltedInvHasher> s;
+        s.reserve(txns.size());
+        for(const CTransactionRef& txn : txns)
+        {
+            s.emplace(MSG_TX, txn->GetId());
+        }
+        return s;
+    }()};
+
     // Filter list of new transactions
     {
-        std::unique_lock<std::mutex> lock { mNewTxnsMtx };
+        std::lock_guard lock{mNewTxnsMtx};
 
         mNewTxns.erase(
-            std::remove_if(mNewTxns.begin(), mNewTxns.end(), 
+            std::remove_if(mNewTxns.begin(), mNewTxns.end(),
                 [&toRemove](const CTxnSendingDetails& i) {
-                    return toRemove.find(i.getInv()) != toRemove.end(); 
-                }), 
+                    return toRemove.contains(i.getInv());
+                }),
             mNewTxns.end());
     }
 
     // Update lists of pending transactions for each node
-    auto results { g_connman->ParallelForEachNode([&toRemove](const CNodePtr& node) { node->RemoveTxnsFromInventory(toRemove); }) };
+    const auto results { g_connman->ParallelForEachNode([&toRemove](const CNodePtr& node)
+    {
+        node->RemoveTxnsFromInventory(toRemove);
+    })};
 
     // Wait for all nodes to finish since they depend on local variable txnDetails
     for(auto& result : results)
          result.wait();
-
 }
 
 /** Shutdown and clean up */

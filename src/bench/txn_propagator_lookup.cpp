@@ -14,7 +14,6 @@
 #include <cassert>
 #include <chrono>
 #include <memory>
-#include <set>
 #include <vector>
 
 /**
@@ -147,11 +146,18 @@ namespace
         node->AddTxnsToInventory(MakeQueuedTxns());
 
         // The lookup removeTransactions builds from the block.
-        std::set<CInv> toRemove {};
+        std::unordered_set<CInv, SaltedInvHasher> toRemove {};
+        toRemove.reserve(blockTxnCount);
         for(size_t i = 0; i < blockTxnCount; ++i)
         {
             toRemove.emplace(MSG_TX, BenchTxnPool()[i]->GetId());
         }
+
+//        std::set<CInv> toRemove;
+//        for(size_t i = 0; i < blockTxnCount; ++i)
+//        {
+//            toRemove.emplace(MSG_TX, BenchTxnPool()[i]->GetId());
+//        }
 
         while(state.KeepRunning())
         {
