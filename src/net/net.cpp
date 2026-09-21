@@ -1355,8 +1355,16 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket)
     }
 
     if (hSocket == INVALID_SOCKET) {
-        int nErr = WSAGetLastError();
-        if (nErr != WSAEWOULDBLOCK) {
+        const int nErr { WSAGetLastError() };
+        if (IsOutOfFileDescriptorsError(nErr)) {
+            // An operator problem rather than a peer one, so report it at the
+            // default log level. The listen socket stays readable while its
+            // backlog is unserved, so back off for one tick rather than spin
+            // on accept().
+            ReportOutOfFileDescriptors("accept()", nErr);
+            (void)interruptNet.sleep_for(SOCKET_HANDLER_TICK);
+        }
+        else if (nErr != WSAEWOULDBLOCK) {
             LogPrint(BCLog::NETCONN, "socket error accept failed: %s\n",
                       NetworkErrorString(nErr));
         }
@@ -1438,11 +1446,6 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket)
         vNodes.push_back(pnode);
     }
 }
-
-// Period of one iteration of the socket handler loop. This bounds how long a
-// message queued for sending waits before the socket is checked for
-// writability, and how long the loop sleeps after a wait failure.
-static constexpr std::chrono::milliseconds SOCKET_HANDLER_TICK {50};
 
 #ifdef USE_POLL
 void CConnman::WaitForSockets(SocketWaitSet& waitSet)

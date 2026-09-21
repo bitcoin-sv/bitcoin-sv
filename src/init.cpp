@@ -73,6 +73,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <memory>
 #include <cinttypes>
 #include <chrono>
@@ -110,8 +111,14 @@ std::unique_ptr<CZMQNotificationInterface> pzmqNotificationInterface;
 // block files don't count towards the fd_set size limit anyway.
 #define MIN_CORE_FILEDESCRIPTORS 0
 #else
+// Descriptors reserved for everything that is neither a peer socket nor a
+// coins database file: block files, the other LevelDB instances, RPC, ZMQ,
+// logs.
 #define MIN_CORE_FILEDESCRIPTORS 150
 #endif
+// Sockets a single peer may hold open: the default stream policy opens a
+// second (DATA1) stream alongside the GENERAL one (BlockPriorityStreamPolicy).
+static constexpr int SOCKETS_PER_PEER {2};
 
 /** Used to pass flags to the Bind() function */
 enum BindFlags // NOLINT(cppcoreguidelines-use-enum-class)
@@ -1487,7 +1494,9 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "-maxcoinsdbfiles=<n>",
         strprintf(_("Set maximum number of files used by coins leveldb "
                     "(default: min(%d, RLIMIT_NOFILE_hard - %d); "
-                    "currently %d). "),
+                    "currently %d). Counts against the file descriptor limit "
+                    "together with -maxconnections; if the system limit is too "
+                    "low this value is reduced first. "),
                   CoinsDB::MaxFiles::AbsoluteMax,
                   CoinsDB::MaxFiles::ReservedFds,
                   CoinsDB::MaxFiles::Default().Get()));
@@ -2135,13 +2144,6 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 
     // Make sure enough file descriptors are available
-    // NOLINTNEXTLINE(*-narrowing-conversions)
-    const int nBind = std::max(
-        (gArgs.IsArgSet("-bind") ? gArgs.GetArgs("-bind").size() : 0) +
-            (gArgs.IsArgSet("-whitebind") ? gArgs.GetArgs("-whitebind").size()
-                                          : 0),
-        size_t(1));
-
     const int nUserMaxConnections =
         static_cast<int>(gArgs.GetArg("-maxconnections", DEFAULT_MAX_PEER_CONNECTIONS));
     nMaxConnections = std::max(nUserMaxConnections, 0);
@@ -2156,10 +2158,33 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     const uint16_t maxAddNodeConnections { config.GetMaxAddNodeConnections() };
-    nMaxConnections =
-        std::max(std::min(nMaxConnections,
-                          (int)(FD_SETSIZE - nBind - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections)),
-                 0);
+    // Listen sockets: one per -bind/-whitebind address, at least one.
+    // NOLINTNEXTLINE(*-narrowing-conversions)
+    const int nBind = std::max(
+        (gArgs.IsArgSet("-bind") ? gArgs.GetArgs("-bind").size() : 0) +
+            (gArgs.IsArgSet("-whitebind") ? gArgs.GetArgs("-whitebind").size()
+                                          : 0),
+        size_t(1));
+    // Everything the budget counts explicitly: peer and addnode sockets, the
+    // listen sockets, the core reserve and the coins files. Used identically
+    // by both backends and by every clamp below so the accounting agrees.
+    // int64_t: under poll() -maxconnections is not pre-clamped, so the request
+    // must not overflow int before RaiseFileDescriptorLimit bounds it.
+    const auto fdBudget = [&maxAddNodeConnections, nBind](int connections, int coinsFiles) -> int64_t {
+        return (static_cast<int64_t>(connections) + maxAddNodeConnections) * SOCKETS_PER_PEER +
+               nBind + MIN_CORE_FILEDESCRIPTORS + coinsFiles;
+    };
+#ifndef USE_POLL
+    // select() can only wait on sockets numbered below FD_SETSIZE, so with
+    // that backend the connection count is capped so that the whole budget,
+    // before any coins files, fits inside that range. With poll() (USE_POLL)
+    // the only bound is the descriptor limit applied below.
+    {
+        const int selectableConnections { static_cast<int>(
+            std::max<int64_t>(static_cast<int64_t>(FD_SETSIZE) - fdBudget(0, 0), 0) / SOCKETS_PER_PEER) };
+        nMaxConnections = std::clamp(nMaxConnections, 0, selectableConnections);
+    }
+#endif
     if(std::string err; !config.SetMaxCoinsDbOpenFiles(
         // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg("-maxcoinsdbfiles", CoinsDB::MaxFiles::Default().Get()), &err))
@@ -2171,20 +2196,50 @@ bool AppInitParameterInteraction(ConfigInit &config) {
               CoinsDB::MaxFiles::Default().Get());
     // Reserve FDs for the coins leveldb on top of the connection/core budget,
     // otherwise a large -maxcoinsdbfiles value can be promised but unusable.
+    // The full value is reserved: we have told LevelDB it may hold that many
+    // files open, so budget for it doing exactly that, whatever its internal
+    // policy for actually keeping descriptors happens to be in this version.
     // NOLINTNEXTLINE(*-narrowing-conversions)
-    const int coinsDbFiles = config.GetMaxCoinsDbOpenFiles();
-    nFD = RaiseFileDescriptorLimit(
-        nMaxConnections + MIN_CORE_FILEDESCRIPTORS + maxAddNodeConnections + coinsDbFiles);
+    int coinsDbFiles = config.GetMaxCoinsDbOpenFiles();
+    // LevelDB sizes some of its own internal limits from the soft limit at
+    // the moment the first database is opened (in AppInitMain), so the limit
+    // must be raised here, before any of them.
+    nFD = RaiseFileDescriptorLimit(static_cast<int>(
+        std::min<int64_t>(fdBudget(nMaxConnections, coinsDbFiles), std::numeric_limits<int>::max())));
     if (nFD < MIN_CORE_FILEDESCRIPTORS)
         return InitError(_("Not enough file descriptors available."));
-    // If the rlimit was clipped, take the shortfall out of the connection
-    // budget rather than letting connections encroach on coinsDbFiles.
-    nMaxConnections =
-        std::max(std::min(nFD - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections - coinsDbFiles, nMaxConnections), 0);
-    if (nMaxConnections < nUserMaxConnections)
+    if (nFD < fdBudget(nMaxConnections, coinsDbFiles)) {
+        // The limit was clipped. Connections take priority: shrink the coins
+        // file budget first, down to the fixed fallback default at most, and
+        // only then take any remaining shortfall out of the connection count.
+        const int minCoinsFiles { static_cast<int>(CoinsDB::MaxFiles::DefaultFallback) };
+        if (coinsDbFiles > minCoinsFiles) {
+            const int64_t shortfall { fdBudget(nMaxConnections, coinsDbFiles) - nFD };
+            // Bounded above by coinsDbFiles and below by minCoinsFiles, so it fits an int.
+            const int reduced { static_cast<int>(std::max<int64_t>(coinsDbFiles - shortfall, minCoinsFiles)) };
+            InitWarning(strprintf(_("Reducing -maxcoinsdbfiles from %d to %d, "
+                                    "because of system limitations."),
+                                  coinsDbFiles, reduced));
+            coinsDbFiles = reduced;
+            if(std::string err; !config.SetMaxCoinsDbOpenFiles(coinsDbFiles, &err))
+            {
+                return InitError(err);
+            }
+        }
+        const int connectionFds {
+            nFD - MIN_CORE_FILEDESCRIPTORS - nBind - coinsDbFiles - maxAddNodeConnections * SOCKETS_PER_PEER };
+        nMaxConnections = std::clamp(connectionFds / SOCKETS_PER_PEER, 0, nMaxConnections);
+    }
+    if (nMaxConnections < nUserMaxConnections) {
+        if (nMaxConnections == 0 && nUserMaxConnections > 0) {
+            return InitError(strprintf(_("Not enough file descriptors available for any "
+                                         "connections (limit %d). Raise the limit or lower "
+                                         "-maxcoinsdbfiles."), nFD));
+        }
         InitWarning(strprintf(_("Reducing -maxconnections from %d to %d, "
                                 "because of system limitations."),
                               nUserMaxConnections, nMaxConnections));
+    }
 
     nMaxOutboundConnections = std::clamp(nUserMaxOutboundConnections, 0, nMaxConnections);
     if(nMaxOutboundConnections < nUserMaxOutboundConnections) 
@@ -3440,8 +3495,8 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
         "Using config file %s\n",
         GetConfigFile(gArgs.GetArg("-conf", BITCOIN_CONF_FILENAME)).string());
     LogPrintf("Using at most %i automatic connections (%i file descriptors "
-              "available)\n",
-              nMaxConnections, nFD);
+              "available, %i reserved for coins database files)\n",
+              nMaxConnections, nFD, config.GetMaxCoinsDbOpenFiles());
 
     InitSignatureCache();
     InitScriptExecutionCache();
@@ -3456,6 +3511,9 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     // Late configuration for globaly constructed objects
     mempool.SuspendSanityCheck();
     mempool.getNonFinalPool().loadConfig();
+    // First LevelDB open in the process. LevelDB sizes internal limits from
+    // the soft descriptor limit at this point, so RaiseFileDescriptorLimit
+    // (AppInitParameterInteraction) must already have run. Keep that ordering.
     mempool.InitMempoolTxDB();
     if (!gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
         mempool.ResumeSanityCheck();

@@ -170,6 +170,30 @@ struct timeval MillisToTimeval(int64_t nTimeout)
     return timeout;
 }
 
+bool IsOutOfFileDescriptorsError(int err)
+{
+#ifdef WIN32
+    return err == WSAEMFILE;
+#else
+    return err == EMFILE || err == ENFILE;
+#endif
+}
+
+void ReportOutOfFileDescriptors(const char* operation, int err)
+{
+    // Once this starts happening it happens on every attempt, so rate limit.
+    static constexpr int64_t REPORT_INTERVAL_MS { 60 * 1000 };
+    static std::atomic<int64_t> lastReport { 0 };
+    const int64_t now { GetTimeMillis() };
+    int64_t last { lastReport.load() };
+    if (now - last < REPORT_INTERVAL_MS || !lastReport.compare_exchange_strong(last, now)) {
+        return;
+    }
+    LogPrintf("%s failed: %s. The node is out of file descriptors; raise the "
+              "system limit (ulimit -n) or lower -maxcoinsdbfiles or -maxconnections.\n",
+              operation, NetworkErrorString(err));
+}
+
 /**
  * Read bytes from socket. This will either read the full number of bytes
  * requested or return False on error or timeout.
@@ -450,7 +474,16 @@ static bool ConnectSocketDirectly(const CService &addrConnect,
     //NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     SOCKET hSocket = socket(((struct sockaddr *)&sockaddr)->sa_family,
                             SOCK_STREAM, IPPROTO_TCP);
-    if (hSocket == INVALID_SOCKET) return false;
+    if (hSocket == INVALID_SOCKET) {
+        const int nErr { WSAGetLastError() };
+        if (IsOutOfFileDescriptorsError(nErr)) {
+            ReportOutOfFileDescriptors("socket()", nErr);
+        } else {
+            LogPrint(BCLog::NETCONN, "ConnectSocketDirectly: socket() failed: %s\n",
+                     NetworkErrorString(nErr));
+        }
+        return false;
+    }
     if (!IsSelectableSocket(hSocket)) {
         LogPrint(BCLog::NETCONN,
                  "ConnectSocketDirectly: Cannot create connection: "

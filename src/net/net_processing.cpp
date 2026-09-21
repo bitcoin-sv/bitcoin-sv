@@ -1134,7 +1134,16 @@ static void SendUnseenTransactions(
 
     auto stream = index.GetDiskBlockStreamReader();
     if (!stream) {
-        assert(!"can not load block from disk");
+        // Not the peer's doing: the block file could not be opened, most
+        // likely because the node is out of file descriptors, or the block
+        // was pruned meanwhile. Send nothing further and let the peer ask
+        // again. Never assert here: this runs on behalf of a remote peer and
+        // asserts are live in release builds. Debug category only: a peer
+        // can trigger this once per filtered-block request, and descriptor
+        // exhaustion is already reported at the default level elsewhere.
+        LogPrint(BCLog::NETMSG, "Unable to read block %s from disk to serve its transactions to peer=%d\n",
+                 index.GetBlockHash().ToString(), pfrom->GetId());
+        return;
     }
 
     size_t currentTransactionNumber = 0;
@@ -5395,16 +5404,30 @@ void SendBlockHeaders(const Config& config, const CNodePtr& pto, CConnman &connm
                 // FIXME pBestIndex could be null... what to do in that case?
                 auto reader =
                     pBestIndex->GetDiskBlockStreamReader( config );
-                if (!reader) {
-                    assert(!"cannot load block from disk");
+                if (reader) {
+                    SendCompactBlock(
+                        config,
+                        true,
+                        pto,
+                        connman,
+                        msgMaker,
+                        *reader);
                 }
-                SendCompactBlock(
-                    config,
-                    true,
-                    pto,
-                    connman,
-                    msgMaker,
-                    *reader);
+                else {
+                    // The block file could not be opened, most likely because
+                    // the node is out of file descriptors. Announce the block
+                    // with a plain header instead: a compact-block peer accepts
+                    // that like any headers-first announcement and fetches the
+                    // block itself. Never assert here: asserts are live in
+                    // release builds and this runs on every new tip for every
+                    // such peer, so it would turn descriptor exhaustion into a
+                    // crash.
+                    LogPrint(BCLog::NETMSG,
+                             "%s: cannot read block %s from disk to announce it as a compact "
+                             "block, sending header instead to peer=%d\n",
+                             __func__, pBestIndex->GetBlockHash().ToString(), pto->id);
+                    connman.PushMessage(pto, msgMaker.Make(NetMsgType::HEADERS, vHeaders));
+                }
             }
             state->pindexBestHeaderSent = pBestIndex;
         }

@@ -666,6 +666,11 @@ private:
     void ThreadMessageHandler();
     void AcceptConnection(const ListenSocket &hListenSocket);
     void ThreadSocketHandler();
+    // Period of one iteration of the socket handler loop. Bounds how long a
+    // queued message waits before its socket is checked for writability, and
+    // how long the loop backs off after a wait failure or descriptor
+    // exhaustion.
+    static constexpr std::chrono::milliseconds SOCKET_HANDLER_TICK {50};
     // Wait for at most one socket handler tick for any registered socket to
     // become ready, recording the result in waitSet.
     void WaitForSockets(SocketWaitSet& waitSet);
