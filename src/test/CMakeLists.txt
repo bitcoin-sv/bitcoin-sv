@@ -157,6 +157,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	multisig_tests.cpp
     net_message_maker_tests.cpp
     net_association_tests.cpp
+    net_socket_wait_set_tests.cpp
 	net_tests.cpp
     disk_backed_parser_tests.cpp
     net_message_disk_tests.cpp

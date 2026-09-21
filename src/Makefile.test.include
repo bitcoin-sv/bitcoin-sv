@@ -134,6 +134,7 @@ BITCOIN_TESTS =\
   test/msg_parser_buffer_tests.cpp \
   test/multisig_tests.cpp \
   test/net_association_tests.cpp \
+  test/net_socket_wait_set_tests.cpp \
   test/disk_backed_parser_tests.cpp \
   test/net_message_disk_tests.cpp \
   test/net_message_tests.cpp \

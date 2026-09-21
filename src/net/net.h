@@ -757,6 +757,11 @@ private:
     // iteration of ThreadSocketHandler. Single-thread-confined to that thread;
     // kept as a member only so its allocations are reused between iterations.
     SocketWaitSet mSocketWaitSet;
+#ifdef USE_POLL
+    // Scratch array handed to poll(), parallel to mSocketWaitSet.Entries().
+    // Same thread confinement as mSocketWaitSet.
+    std::vector<pollfd> mPollFds;
+#endif
 
     mutable bsv::recursive_mutex cs_vNodes;
     std::atomic<NodeId> nLastNodeId{};

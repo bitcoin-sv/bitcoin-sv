@@ -180,3 +180,46 @@ inline std::ostream& operator<<(std::ostream& os, SocketWaitSet::Flags flags)
     }
     return os;
 }
+
+#ifdef USE_POLL
+// Translate the flags a socket was registered with into poll(2) request bits.
+// Error conditions (POLLERR, POLLHUP, POLLNVAL) are reported by poll()
+// whether or not they are requested, so ERR adds nothing here. POLLPRI is not
+// requested: TCP urgent data is of no interest to the P2P protocol.
+inline short PollRequestedEvents(SocketWaitSet::Flags wanted)
+{
+    short events {0};
+    if((wanted & SocketWaitSet::RECV) != SocketWaitSet::NONE)
+    {
+        events |= POLLIN;
+    }
+    if((wanted & SocketWaitSet::SEND) != SocketWaitSet::NONE)
+    {
+        events |= POLLOUT;
+    }
+    return events;
+}
+
+// Translate poll(2) result bits into readiness flags. A hang-up or error is
+// reported as ERR so that the stream calls recv(), which then observes the
+// close or the error exactly as it does today; POLLNVAL (the socket was
+// closed by another thread between registration and the wait) is treated the
+// same way and is harmless because the stream re-checks its socket first.
+inline SocketWaitSet::Flags PollReadyFlags(short revents)
+{
+    SocketWaitSet::Flags ready { SocketWaitSet::NONE };
+    if((revents & POLLIN) != 0)
+    {
+        ready |= SocketWaitSet::RECV;
+    }
+    if((revents & POLLOUT) != 0)
+    {
+        ready |= SocketWaitSet::SEND;
+    }
+    if((revents & (POLLERR | POLLHUP | POLLNVAL)) != 0)
+    {
+        ready |= SocketWaitSet::ERR;
+    }
+    return ready;
+}
+#endif // USE_POLL

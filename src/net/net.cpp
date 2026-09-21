@@ -1444,9 +1444,60 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket)
 // writability, and how long the loop sleeps after a wait failure.
 static constexpr std::chrono::milliseconds SOCKET_HANDLER_TICK {50};
 
+#ifdef USE_POLL
 void CConnman::WaitForSockets(SocketWaitSet& waitSet)
 {
-    // select() backend.
+    // poll() backend: no FD_SETSIZE limit on socket numbers.
+    mPollFds.clear();
+    mPollFds.reserve(waitSet.Entries().size());
+    for (const SocketWaitSet::Entry& entry : waitSet.Entries()) {
+        // Registered even when no events are requested: POLLERR, POLLHUP and
+        // POLLNVAL are always reported, which gives idle or paused streams
+        // error detection they would not otherwise get.
+        mPollFds.push_back(pollfd{entry.socket, PollRequestedEvents(entry.wanted), 0});
+    }
+
+    // With nothing registered poll() simply acts as a sleep for one tick.
+    const int nPoll { poll(mPollFds.data(), static_cast<nfds_t>(mPollFds.size()),
+                           static_cast<int>(SOCKET_HANDLER_TICK.count())) };
+    if (interruptNet) {
+        return;
+    }
+
+    if (nPoll < 0) {
+        const int nErr { WSAGetLastError() };
+        if (nErr != EINTR) {
+            LogPrint(BCLog::NETCONN, "socket poll error %s\n", NetworkErrorString(nErr));
+            // Nothing is marked ready. Throttle so a persistent failure cannot
+            // spin the loop; the caller checks interruptNet for itself.
+            (void)interruptNet.sleep_for(SOCKET_HANDLER_TICK);
+        }
+        return;
+    }
+
+    bool onlyInvalid { nPoll > 0 };
+    // mPollFds is parallel to waitSet.Entries(): position i in one is
+    // position i in the other.
+    for (size_t i { 0 }; i < mPollFds.size(); ++i) {
+        const short revents { mPollFds[i].revents };
+        waitSet.SetReadyAt(i, PollReadyFlags(revents));
+        if ((revents & ~POLLNVAL) != 0) {
+            onlyInvalid = false;
+        }
+    }
+    if (onlyInvalid) {
+        // Everything reported was POLLNVAL: sockets closed by another thread
+        // between the fill pass and the wait. There is nothing to service and
+        // poll() would return immediately again, so throttle to one tick as
+        // the select() EBADF path always did.
+        (void)interruptNet.sleep_for(SOCKET_HANDLER_TICK);
+    }
+}
+#else
+void CConnman::WaitForSockets(SocketWaitSet& waitSet)
+{
+    // select() backend: only usable with sockets numbered below FD_SETSIZE,
+    // which IsSelectableSocket() guarantees at socket creation.
     struct timeval timeout {};
     timeout.tv_sec = 0;
     timeout.tv_usec = static_cast<decltype(timeout.tv_usec)>(
@@ -1520,8 +1571,14 @@ void CConnman::WaitForSockets(SocketWaitSet& waitSet)
         waitSet.SetReadyAt(i, ready);
     }
 }
+#endif // USE_POLL
 
 void CConnman::ThreadSocketHandler() {
+#ifdef USE_POLL
+    LogPrintf("P2P socket handler waiting with poll()\n");
+#else
+    LogPrintf("P2P socket handler waiting with select()\n");
+#endif
     unsigned int nPrevNodeCount = 0;
     while (!interruptNet) {
         //
@@ -1618,8 +1675,11 @@ void CConnman::ThreadSocketHandler() {
         // Accept new connections
         //
         for (const ListenSocket &hListenSocket : vhListenSocket) {
+            // Any reported event, not just RECV: a listen socket in error
+            // (POLLERR/POLLHUP/POLLNVAL under poll) is then surfaced through
+            // accept()'s own error logging instead of never firing.
             if (hListenSocket.socket != INVALID_SOCKET &&
-                mSocketWaitSet.IsReady(hListenSocket.socket, SocketWaitSet::RECV)) {
+                mSocketWaitSet.Ready(hListenSocket.socket) != SocketWaitSet::NONE) {
                 AcceptConnection(hListenSocket);
             }
         }

@@ -209,13 +209,23 @@ static bool InterruptibleRecv(uint8_t* data,
                 if (!IsSelectableSocket(hSocket)) {
                     return false;
                 }
-                struct timeval tval =
-                    MillisToTimeval(std::min(endTime - curTime, maxWait));
+                const int64_t waitMillis { std::min(endTime - curTime, maxWait) };
+#ifdef USE_POLL
+                pollfd pfd {};
+                pfd.fd = hSocket;
+                pfd.events = POLLIN;
+                const int nRet { poll(&pfd, 1, static_cast<int>(waitMillis)) };
+#else
+                struct timeval tval = MillisToTimeval(waitMillis);
                 fd_set fdset;
                 FD_ZERO(&fdset);
                 FD_SET(hSocket, &fdset);
-                int nRet = select(hSocket + 1, &fdset, nullptr, nullptr, &tval);
-                if (nRet == SOCKET_ERROR) {
+                const int nRet { select(hSocket + 1, &fdset, nullptr, nullptr, &tval) };
+#endif
+                // An interrupted wait (a signal such as SIGHUP for log
+                // rotation) is not a failure: fall through and retry, the
+                // deadline and interruptSocks5Recv are checked below.
+                if (nRet == SOCKET_ERROR && WSAGetLastError() != WSAEINTR) {
                     return false;
                 }
             } else {
@@ -476,18 +486,40 @@ static bool ConnectSocketDirectly(const CService &addrConnect,
         // WSAEINVAL is here because some legacy version of winsock uses it
         if (nErr == WSAEINPROGRESS || nErr == WSAEWOULDBLOCK ||
             nErr == WSAEINVAL) {
-            struct timeval timeout = MillisToTimeval(nTimeout);
-            fd_set fdset;
-            FD_ZERO(&fdset);
-            FD_SET(hSocket, &fdset);
-            int nRet = select(hSocket + 1, nullptr, &fdset, nullptr, &timeout);
+            // Wait for the connect to complete. A signal (SIGHUP for log
+            // rotation, say) interrupts the wait; retry with the remaining
+            // time rather than abandon the attempt, treating nTimeout as a
+            // deadline. Falling through on EINTR would be wrong: SO_ERROR
+            // reads 0 while the connect is still pending. A failed connect is
+            // reported as an error condition on the socket (POLLERR/POLLHUP
+            // under poll, with or without POLLOUT depending on the kernel),
+            // so the outcome is always read back through SO_ERROR below
+            // rather than inferred from the wait itself.
+            const int64_t deadline { GetTimeMillis() + nTimeout };
+            int nRet {};
+            do {
+                const int remaining {
+                    static_cast<int>(std::max<int64_t>(deadline - GetTimeMillis(), 0)) };
+#ifdef USE_POLL
+                pollfd pfd {};
+                pfd.fd = hSocket;
+                pfd.events = POLLOUT;
+                nRet = poll(&pfd, 1, remaining);
+#else
+                struct timeval timeout = MillisToTimeval(remaining);
+                fd_set fdset;
+                FD_ZERO(&fdset);
+                FD_SET(hSocket, &fdset);
+                nRet = select(hSocket + 1, nullptr, &fdset, nullptr, &timeout);
+#endif
+            } while (nRet == SOCKET_ERROR && WSAGetLastError() == WSAEINTR);
             if (nRet == 0) {
                 LogPrint(BCLog::NETCONN, "connection to %s timeout\n", addrConnect.ToString());
                 CloseSocket(hSocket);
                 return false;
             }
             if (nRet == SOCKET_ERROR) {
-                LogPrint(BCLog::NETCONN, "select() for %s failed: %s\n",
+                LogPrint(BCLog::NETCONN, "waiting for connection to %s failed: %s\n",
                          addrConnect.ToString(),
                          NetworkErrorString(WSAGetLastError()));
                 CloseSocket(hSocket);
@@ -509,7 +541,7 @@ static bool ConnectSocketDirectly(const CService &addrConnect,
                 return false;
             }
             if (nRet != 0) {
-                LogPrint(BCLog::NETCONN, "connect() to %s failed after select(): %s\n",
+                LogPrint(BCLog::NETCONN, "connect() to %s failed: %s\n",
                          addrConnect.ToString(), NetworkErrorString(nRet));
                 CloseSocket(hSocket);
                 return false;
