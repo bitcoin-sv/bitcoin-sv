@@ -1055,18 +1055,18 @@ int CNode::GetSendVersion() const {
     return nSendVersion;
 }
 
-bool CNode::SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError, SOCKET& socketMax) const
+bool CNode::RegisterSockets(SocketWaitSet& waitSet) const
 {
     // Get all sockets from our association
-    return mAssociation.SetSocketsForSelect(setRecv, setSend, setError, socketMax);
+    return mAssociation.RegisterSockets(waitSet);
 }
 
-void CNode::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, CConnman& connman,
+void CNode::ServiceSockets(const SocketWaitSet& waitSet, CConnman& connman,
                            const Config& config, uint64_t& bytesRecv, uint64_t& bytesSent)
 {
     // Let association service its sockets
     bool newMsgs {false};
-    mAssociation.ServiceSockets(setRecv, setSend, setError, connman, config, newMsgs, bytesRecv, bytesSent);
+    mAssociation.ServiceSockets(waitSet, connman, config, newMsgs, bytesRecv, bytesSent);
     if(newMsgs)
     {
         connman.WakeMessageHandler();
@@ -1436,6 +1436,88 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket)
     }
 }
 
+// Period of one iteration of the socket handler loop. This bounds how long a
+// message queued for sending waits before the socket is checked for
+// writability, and how long the loop sleeps after a wait failure.
+static constexpr std::chrono::milliseconds SOCKET_HANDLER_TICK {50};
+
+void CConnman::WaitForSockets(SocketWaitSet& waitSet)
+{
+    // select() backend.
+    struct timeval timeout {};
+    timeout.tv_sec = 0;
+    timeout.tv_usec = static_cast<decltype(timeout.tv_usec)>(
+        std::chrono::duration_cast<std::chrono::microseconds>(SOCKET_HANDLER_TICK).count());
+
+    fd_set fdsetRecv;
+    fd_set fdsetSend;
+    fd_set fdsetError;
+    FD_ZERO(&fdsetRecv);
+    FD_ZERO(&fdsetSend);
+    FD_ZERO(&fdsetError);
+    SOCKET hSocketMax {0};
+
+    for (const SocketWaitSet::Entry& entry : waitSet.Entries()) {
+        if ((entry.wanted & SocketWaitSet::RECV) != SocketWaitSet::NONE) {
+            FD_SET(entry.socket, &fdsetRecv);
+        }
+        if ((entry.wanted & SocketWaitSet::SEND) != SocketWaitSet::NONE) {
+            FD_SET(entry.socket, &fdsetSend);
+        }
+        if ((entry.wanted & SocketWaitSet::ERR) != SocketWaitSet::NONE) {
+            FD_SET(entry.socket, &fdsetError);
+        }
+        hSocketMax = std::max(hSocketMax, entry.socket);
+    }
+
+    // With nothing registered select() simply acts as a sleep for one tick.
+    const bool haveFds { !waitSet.Entries().empty() };
+    const int nSelect { select(haveFds ? hSocketMax + 1 : 0, &fdsetRecv,
+                               &fdsetSend, &fdsetError, &timeout) };
+    if (interruptNet) {
+        return;
+    }
+
+    if (nSelect == SOCKET_ERROR) {
+        const int nErr { WSAGetLastError() };
+        if (nErr == WSAEINTR) {
+            // Interrupted by a signal, not a socket error: the sets are
+            // unmodified so nothing is ready, and there is no bad socket to
+            // flush out. Return and let the loop wait again (the caller checks
+            // interruptNet first). Same handling as the poll() backend.
+            return;
+        }
+        if (haveFds) {
+            LogPrint(BCLog::NETCONN, "socket select error %s\n", NetworkErrorString(nErr));
+            // Mark every registered socket readable so that recv() on the bad
+            // one reports the error and it gets closed.
+            for (size_t i { 0 }; i < waitSet.Entries().size(); ++i) {
+                waitSet.SetReadyAt(i, SocketWaitSet::RECV);
+            }
+        }
+        // The return value only tells us whether we were interrupted, which the
+        // caller checks for itself.
+        (void)interruptNet.sleep_for(SOCKET_HANDLER_TICK);
+        return;
+    }
+
+    const std::span<const SocketWaitSet::Entry> entries { waitSet.Entries() };
+    for (size_t i { 0 }; i < entries.size(); ++i) {
+        const SOCKET socket { entries[i].socket };
+        SocketWaitSet::Flags ready { SocketWaitSet::NONE };
+        if (FD_ISSET(socket, &fdsetRecv)) {
+            ready |= SocketWaitSet::RECV;
+        }
+        if (FD_ISSET(socket, &fdsetSend)) {
+            ready |= SocketWaitSet::SEND;
+        }
+        if (FD_ISSET(socket, &fdsetError)) {
+            ready |= SocketWaitSet::ERR;
+        }
+        waitSet.SetReadyAt(i, ready);
+    }
+}
+
 void CConnman::ThreadSocketHandler() {
     unsigned int nPrevNodeCount = 0;
     while (!interruptNet) {
@@ -1508,56 +1590,25 @@ void CConnman::ThreadSocketHandler() {
         //
         // Find which sockets have data to receive
         //
-        //NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-        struct timeval timeout;
-        timeout.tv_sec = 0;
-        // Frequency to poll pnode->vSend
-        timeout.tv_usec = 50000;
-
-        fd_set fdsetRecv;
-        fd_set fdsetSend;
-        fd_set fdsetError;
-        FD_ZERO(&fdsetRecv);
-        FD_ZERO(&fdsetSend);
-        FD_ZERO(&fdsetError);
-        SOCKET hSocketMax = 0;
-        bool have_fds = false;
-
+        mSocketWaitSet.Clear();
         for (const ListenSocket &hListenSocket : vhListenSocket) {
-            FD_SET(hListenSocket.socket, &fdsetRecv);
-            hSocketMax = std::max(hSocketMax, hListenSocket.socket);
-            have_fds = true;
+            if (hListenSocket.socket != INVALID_SOCKET) {
+                mSocketWaitSet.Add(hListenSocket.socket, SocketWaitSet::RECV);
+            }
         }
 
         {
             bsv::lock_guard lock{cs_vNodes};
             for(const CNodePtr& pnode : vNodes)
             {
-                // Get sockets to select on
-                have_fds |= pnode->SetSocketsForSelect(fdsetRecv, fdsetSend, fdsetError, hSocketMax);
+                // Get sockets to wait on
+                pnode->RegisterSockets(mSocketWaitSet);
             }
         }
 
-        int nSelect = select(have_fds ? hSocketMax + 1 : 0, &fdsetRecv,
-                             &fdsetSend, &fdsetError, &timeout);
+        WaitForSockets(mSocketWaitSet);
         if (interruptNet) {
             return;
-        }
-
-        if (nSelect == SOCKET_ERROR) {
-            if (have_fds) {
-                int nErr = WSAGetLastError();
-                LogPrint(BCLog::NETCONN, "socket select error %s\n", NetworkErrorString(nErr));
-                for (SOCKET i = 0; i <= hSocketMax; i++) {
-                    FD_SET(i, &fdsetRecv);
-                }
-            }
-            FD_ZERO(&fdsetSend);
-            FD_ZERO(&fdsetError);
-            if (!interruptNet.sleep_for(
-                    std::chrono::milliseconds(timeout.tv_usec / 1000))) {
-                return;
-            }
         }
 
         //
@@ -1565,7 +1616,7 @@ void CConnman::ThreadSocketHandler() {
         //
         for (const ListenSocket &hListenSocket : vhListenSocket) {
             if (hListenSocket.socket != INVALID_SOCKET &&
-                FD_ISSET(hListenSocket.socket, &fdsetRecv)) {
+                mSocketWaitSet.IsReady(hListenSocket.socket, SocketWaitSet::RECV)) {
                 AcceptConnection(hListenSocket);
             }
         }
@@ -1587,7 +1638,7 @@ void CConnman::ThreadSocketHandler() {
 
             uint64_t bytesRecv {0};
             uint64_t bytesSent {0};
-            pnode->ServiceSockets(fdsetRecv, fdsetSend, fdsetError, *this, *config_, bytesRecv, bytesSent);
+            pnode->ServiceSockets(mSocketWaitSet, *this, *config_, bytesRecv, bytesSent);
 
             if(bytesRecv > 0) {
                 RecordBytesRecv(bytesRecv);

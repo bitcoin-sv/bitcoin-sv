@@ -361,8 +361,7 @@ bool Association::GetPausedForReceiving(PausedFor anyAll) const
     }
 }
 
-bool Association::SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
-                                      SOCKET& socketMax) const
+bool Association::RegisterSockets(SocketWaitSet& waitSet) const
 {
     bool havefds {false};
 
@@ -370,7 +369,7 @@ bool Association::SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& 
     LOCK(cs_mStreams);
     for(const auto& stream : mStreams)
     {
-        havefds |= stream.second->SetSocketForSelect(setRecv, setSend, setError, socketMax);
+        havefds |= stream.second->RegisterSockets(waitSet);
     }
 
     return havefds;
@@ -382,8 +381,8 @@ std::pair<Stream::QueuedNetMessage, bool> Association::GetNextMessage()
     return mStreamPolicy->GetNextMessage(mStreams);
 }
 
-void Association::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError,
-                                  CConnman& connman, const Config& config, bool& gotNewMsgs,
+void Association::ServiceSockets(const SocketWaitSet& waitSet, CConnman& connman,
+                                  const Config& config, bool& gotNewMsgs,
                                   uint64_t& bytesRecv, uint64_t& bytesSent)
 {
     bytesRecv = bytesSent = 0;
@@ -392,8 +391,7 @@ void Association::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setEr
     try
     {
         LOCK(cs_mStreams);
-        mStreamPolicy->ServiceSockets(mStreams, setRecv, setSend, setError, config,
-            gotNewMsgs, bytesRecv, bytesSent);
+        mStreamPolicy->ServiceSockets(mStreams, waitSet, config, gotNewMsgs, bytesRecv, bytesSent);
     }
     catch(const BanPeer& e)
     {

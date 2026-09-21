@@ -25,6 +25,7 @@
 #include "net/net_message.h"
 #include "net/net_types.h"
 #include "net/node_stats.h"
+#include "net/socket_wait_set.h"
 #include "net/stream_policy_factory.h"
 #include "netaddress.h"
 #include "protocol.h"
@@ -665,6 +666,9 @@ private:
     void ThreadMessageHandler();
     void AcceptConnection(const ListenSocket &hListenSocket);
     void ThreadSocketHandler();
+    // Wait for at most one socket handler tick for any registered socket to
+    // become ready, recording the result in waitSet.
+    void WaitForSockets(SocketWaitSet& waitSet);
     void ThreadDNSAddressSeed();
 
     uint64_t CalculateKeyedNetGroup(const CAddress &ad) const;
@@ -748,6 +752,11 @@ private:
     // Single-thread-confined: only accessed from ThreadSocketHandler and from
     // Stop() after that thread is joined. No mutex required.
     std::list<CNodePtr> vNodesDisconnected;
+
+    // Sockets registered for waiting on and their readiness, rebuilt every
+    // iteration of ThreadSocketHandler. Single-thread-confined to that thread;
+    // kept as a member only so its allocations are reused between iterations.
+    SocketWaitSet mSocketWaitSet;
 
     mutable bsv::recursive_mutex cs_vNodes;
     std::atomic<NodeId> nLastNodeId{};
@@ -1221,8 +1230,10 @@ public:
 
     int32_t GetMyStartingHeight() const { return nMyStartingHeight; }
 
-    bool SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError, SOCKET& socketMax) const;
-    void ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, CConnman& connman,
+    // Register our sockets and the events we want to wait for.
+    // Returns true if any socket was registered.
+    bool RegisterSockets(SocketWaitSet& waitSet) const;
+    void ServiceSockets(const SocketWaitSet& waitSet, CConnman& connman,
                         const Config& config, uint64_t& bytesRecv, uint64_t& bytesSent);
 
     bool GetDisconnect() const { return fDisconnect; }

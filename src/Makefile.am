@@ -212,6 +212,7 @@ BITCOIN_CORE_H = \
   net/p2p_msg_lengths.h \
   net/send_queue_bytes.h \
   net/single_seg_parser.h \
+  net/socket_wait_set.h \
   net/stream.h \
   net/stream_policy.h \
   net/stream_policy_factory.h \

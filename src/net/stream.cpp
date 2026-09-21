@@ -98,48 +98,38 @@ void Stream::Shutdown()
     }
 }
 
-//NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-bool Stream::SetSocketForSelect(fd_set& setRecv,
-                                fd_set& setSend,
-                                fd_set& setError,
-                                SOCKET& socketMax) const
+bool Stream::RegisterSockets(SocketWaitSet& waitSet) const
 {
     // Implement the following logic:
-    // * If there is data to send select() for sending data.
-    // * If there is space left in the receive buffer select() for receiving data.
+    // * If there is data to send, wait for the socket to become writable.
+    // * If there is space left in the receive buffer, wait for it to become readable.
+    // * Always wait for error conditions.
 
-    bool select_recv = !mPauseRecv;
-    bool select_send{};
-    {   
+    SocketWaitSet::Flags wanted { SocketWaitSet::ERR };
+    if(!mPauseRecv)
+    {
+        wanted |= SocketWaitSet::RECV;
+    }
+    {
         LOCK(cs_mSendMsgQueue);
-        select_send = !mSendMsgQueue.empty();
+        if(!mSendMsgQueue.empty())
+        {
+            wanted |= SocketWaitSet::SEND;
+        }
     }
 
     LOCK(cs_mSocket);
     if(mSocket == INVALID_SOCKET)
-    {   
+    {
         return false;
     }
 
-    FD_SET(mSocket, &setError);
-    socketMax = std::max(socketMax, mSocket);
-
-    if(select_send)
-    {   
-        FD_SET(mSocket, &setSend);
-    }
-    if(select_recv)
-    {   
-        FD_SET(mSocket, &setRecv);
-    }
-
+    waitSet.Add(mSocket, wanted);
     return true;
 }
 
 //NOLINTBEGIN(bugprone-easily-swappable-parameters)
-void Stream::ServiceSocket(fd_set& setRecv,
-                           fd_set& setSend,
-                           fd_set& setError,
+void Stream::ServiceSocket(const SocketWaitSet& waitSet,
                            const Config& config,
                            bool& gotNewMsgs,
                            uint64_t& bytesRecv,
@@ -161,9 +151,14 @@ void Stream::ServiceSocket(fd_set& setRecv,
             {   
                 return;
             }
-            recvSet = FD_ISSET(mSocket, &setRecv);
-            sendSet = FD_ISSET(mSocket, &setSend);
-            errorSet = FD_ISSET(mSocket, &setError);
+            // Readiness is only a hint; recv()/send() below decide what actually
+            // happened. The socket may have been closed and its number reused
+            // between the fill pass and now, in which case waitSet knows nothing
+            // about the new socket and reports NONE.
+            const SocketWaitSet::Flags ready { waitSet.Ready(mSocket) };
+            recvSet = (ready & SocketWaitSet::RECV) != SocketWaitSet::NONE;
+            sendSet = (ready & SocketWaitSet::SEND) != SocketWaitSet::NONE;
+            errorSet = (ready & SocketWaitSet::ERR) != SocketWaitSet::NONE;
         }
         if (recvSet || errorSet)
         {   

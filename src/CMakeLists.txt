@@ -400,6 +400,7 @@ add_library(common
     net/p2p_msg_lengths.h
     net/array_parser.h
 	net/send_queue_bytes.h
+	net/socket_wait_set.h
 	net/stream.h
 	net/stream_policy.h
 	net/stream_policy_factory.h
