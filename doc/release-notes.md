@@ -16,6 +16,21 @@ Important fixes and improvements in 1.2.3
   a larger default file size, a dynamically calculated limit on open files,
   and a dedicated cache setting. See the configuration section below and
   the file [ibd-performance.md](ibd-performance.md) for more details.
+* TCP socket improvements:
+  - The P2P socket loop now waits with poll() instead of select() on Linux and
+    BSD. Windows and macOS remain on select().
+  - **-maxconnections** is no longer silently capped near 865 on poll() builds;
+    it is bounded only by the process file descriptor limit. select() builds
+    keep a cap, now about 428 with default settings, since each peer may hold
+    two sockets and all of them must stay below FD_SETSIZE.
+  - When the system file descriptor limit is too low for the requested
+    configuration, the coins database file budget (**-maxcoinsdbfiles**) is
+    reduced before the connection count, and startup now fails with a clear
+    error rather than a warning if no connections at all would be possible.
+  - Running out of file descriptors on accept() or connect() is now reported in
+    the log at the default level, and a block that cannot be read from disk,
+    whether while answering a filtered block request or while announcing a new
+    block as a compact block, is logged instead of aborting the node.
 * Improved parallelism during block validation by grouping transactions less
   pessimistically and reducing the default validation batch size.
 * Accelerated SHA-256 and merkle root computation using SHA-NI instructions
