@@ -699,6 +699,19 @@ fi
 
 AC_CHECK_HEADERS([endian.h sys/endian.h byteswap.h stdio.h stdlib.h unistd.h strings.h sys/types.h sys/stat.h sys/select.h sys/prctl.h])
 
+dnl Check for poll(2). The P2P socket loop uses it in preference to select() so
+dnl that socket descriptors are not limited to values below FD_SETSIZE. Not used
+dnl on Windows (WSAPoll is not declared at the _WIN32_WINNT we target, and the
+dnl Windows fd_set has no such limit anyway) or darwin (following Bitcoin Core,
+dnl which found poll() unreliable there and where there is no CI coverage).
+use_poll=no
+if test x$TARGET_OS != xwindows && test x$TARGET_OS != xdarwin; then
+  AC_CHECK_DECLS([poll],[
+    AC_DEFINE([USE_POLL],[1],[Define this symbol to use poll(2) instead of select(2) in the P2P socket loop])
+    use_poll=yes
+  ],[],[[#include <poll.h>]])
+fi
+
 AC_CHECK_DECLS([strnlen])
 
 # Check for daemon(3), unrelated to --with-daemon (although used by it)
@@ -1434,6 +1447,7 @@ echo "       jemalloc     = $use_jemalloc"
 echo
 echo "  target os         = $TARGET_OS"
 echo "  build os          = $BUILD_OS"
+echo "  P2P socket wait   = $(if test x$use_poll = xyes; then echo poll; else echo select; fi)"
 echo
 echo "  CC                = $CC"
 echo "  CFLAGS            = $CFLAGS"

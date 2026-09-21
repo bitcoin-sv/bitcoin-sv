@@ -117,6 +117,16 @@ check_builtin_exist(__builtin_clzll HAVE_DECL___BUILTIN_CLZLL)
 check_symbol_exists(strnlen "string.h" HAVE_DECL_STRNLEN)
 check_symbol_exists(daemon "unistd.h" HAVE_DECL_DAEMON)
 
+# poll(2) for the P2P socket loop (see USE_POLL in src/compat.h). Not used on
+# Windows (WSAPoll is not declared at our _WIN32_WINNT) or Darwin (following
+# Bitcoin Core; no CI coverage). Must stay in step with configure.ac.
+if(NOT CMAKE_SYSTEM_NAME MATCHES "Windows|Darwin")
+	check_symbol_exists(poll "poll.h" HAVE_DECL_POLL)
+	if(HAVE_DECL_POLL)
+		set(USE_POLL 1)
+	endif()
+endif()
+
 # OpenSSL functionality
 set(CMAKE_REQUIRED_INCLUDES ${OPENSSL_CRYPTO_INCLUDES})
 set(CMAKE_REQUIRED_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY})

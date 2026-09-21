@@ -398,6 +398,9 @@ CNodePtr CConnman::ConnectNode(NodeConnectInfo& connect)
                                       nConnectTimeout, &proxyConnectionFailed)
                 : ConnectSocket(connect.addrConnect, hSocket, nConnectTimeout,
                                 &proxyConnectionFailed)) {
+        // Belt-and-braces repeat of the check in ConnectSocketDirectly, which
+        // every connect path (direct or via proxy) has already passed. Both
+        // compile to nothing on USE_POLL builds; see IsSelectableSocket.
         if (!IsSelectableSocket(hSocket)) {
             LogPrint(BCLog::NETCONN, "Cannot create connection: "
                      "non-selectable socket created (fd [%d] >= FD_SETSIZE ?)\n",

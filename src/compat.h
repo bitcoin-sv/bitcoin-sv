@@ -44,6 +44,9 @@
 #include <sys/mman.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#ifdef USE_POLL
+#include <poll.h>
+#endif
 #include <sys/types.h>
 #include <unistd.h>
 #endif
@@ -95,8 +98,20 @@ using ssize_t = int32_t;
 size_t strnlen(const char *start, size_t max_len);
 #endif // HAVE_DECL_STRNLEN
 
-static bool inline IsSelectableSocket(SOCKET s) {
-#ifdef WIN32
+// Whether the P2P layer is able to wait on this socket.
+//
+// With select() only sockets numbered below FD_SETSIZE can be placed in an
+// fd_set (and fortified glibc builds abort if a larger one is), so any socket
+// that receives a higher number must be rejected as soon as it is created.
+// With poll() (USE_POLL, POSIX) there is no such limit, and on Windows fd_set
+// is an array of handles rather than a bitmap so there is none there either.
+//
+// This is the only place the FD_SETSIZE rule lives. The callers in net.cpp
+// and netbase.cpp must stay in place for the select() fallback; on USE_POLL
+// builds they compile to dead branches. The body depends on the config
+// header, so this must only ever be compiled with HAVE_CONFIG_H defined.
+static bool inline IsSelectableSocket([[maybe_unused]] SOCKET s) {
+#if defined(WIN32) || defined(USE_POLL)
     return true;
 #else
     return (s < FD_SETSIZE);
