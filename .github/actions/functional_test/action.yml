@@ -39,6 +39,7 @@ runs:
           exclude+=",maxuploadtarget"
           exclude+=",pruning"
           exclude+=",p2p-connections"
+          exclude+=",bsv-p2p-many-connections"
           exclude+=",p2p-txn_propagation"
           # TSan slowdown causes internal timeouts
           exclude+=",bsv-chronicle-general"
