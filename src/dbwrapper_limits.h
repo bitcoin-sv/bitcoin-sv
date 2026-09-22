@@ -23,6 +23,13 @@ class MaxFiles
     // Default budget = min(AbsoluteMax, system FD hard limit - ReservedFds).
     static constexpr size_t ReservedFds { 512 };
     static constexpr size_t AbsoluteMax { 8192 };
+    // Ceiling for the coins DB default on builds whose P2P socket loop still
+    // uses select() (no USE_POLL: Windows, darwin). There every descriptor in
+    // the process must stay below FD_SETSIZE (1024) for sockets to remain
+    // usable, so the coins budget has to leave room for the peer sockets, the
+    // core reserve and the other databases inside that range. init.cpp
+    // additionally clamps the value against the actual connection budget.
+    static constexpr size_t SelectMax { 256 };
     // LevelDB's own internal cap on max_open_files
     // (see src/leveldb/db/db_impl.cc ClipToRange call).
     static constexpr size_t LevelDbMax { 50'000 };

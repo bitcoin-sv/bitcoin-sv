@@ -143,7 +143,12 @@ dbwrapper_limits::MaxFiles dbwrapper_limits::MaxFiles::Default()
 #endif
 
     const size_t budget = (systemMax > ReservedFds) ? systemMax - ReservedFds : 0;
+#ifdef USE_POLL
     return MaxFiles{std::min(AbsoluteMax, budget)};
+#else
+    // select() build: the whole process must fit below FD_SETSIZE.
+    return MaxFiles{std::min({AbsoluteMax, budget, SelectMax})};
+#endif
 }
 
 CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize,

@@ -1493,12 +1493,17 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-maxcoinsdbfiles=<n>",
         strprintf(_("Set maximum number of files used by coins leveldb "
-                    "(default: min(%d, RLIMIT_NOFILE_hard - %d); "
+                    "(default: min(%d, RLIMIT_NOFILE_hard - %d%s); "
                     "currently %d). Counts against the file descriptor limit "
                     "together with -maxconnections; if the system limit is too "
                     "low this value is reduced first. "),
                   CoinsDB::MaxFiles::AbsoluteMax,
                   CoinsDB::MaxFiles::ReservedFds,
+#ifdef USE_POLL
+                  "",
+#else
+                  strprintf(", %d on this select() build", CoinsDB::MaxFiles::SelectMax),
+#endif
                   CoinsDB::MaxFiles::Default().Get()));
     strUsage += HelpMessageOpt(
         "-maxcoinsdbfilesize=<n>",
@@ -2201,6 +2206,32 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     // policy for actually keeping descriptors happens to be in this version.
     // NOLINTNEXTLINE(*-narrowing-conversions)
     int coinsDbFiles = config.GetMaxCoinsDbOpenFiles();
+#ifndef USE_POLL
+    // select() build: sockets are only usable while numbered below FD_SETSIZE,
+    // and the kernel hands out the lowest free number, so the whole budget,
+    // not just the connection count, has to fit inside FD_SETSIZE. Trim the
+    // coins files to whatever the sockets and core reserve leave.
+    {
+        const int64_t selectableCoinsFiles {
+            static_cast<int64_t>(FD_SETSIZE) - fdBudget(nMaxConnections, 0) };
+        // An explicit -maxcoinsdbfiles below the floor is left alone (and
+        // keeps std::clamp's lo <= hi precondition intact).
+        const int minCoinsFiles { static_cast<int>(CoinsDB::MaxFiles::DefaultFallback) };
+        const int capped { coinsDbFiles > minCoinsFiles
+            ? static_cast<int>(std::clamp<int64_t>(selectableCoinsFiles, minCoinsFiles, coinsDbFiles))
+            : coinsDbFiles };
+        if (capped < coinsDbFiles) {
+            InitWarning(strprintf(_("Reducing -maxcoinsdbfiles from %d to %d, to keep file "
+                                    "descriptors below FD_SETSIZE on this select() build."),
+                                  coinsDbFiles, capped));
+            coinsDbFiles = capped;
+            if(std::string err; !config.SetMaxCoinsDbOpenFiles(coinsDbFiles, &err))
+            {
+                return InitError(err);
+            }
+        }
+    }
+#endif
     // LevelDB sizes some of its own internal limits from the soft limit at
     // the moment the first database is opened (in AppInitMain), so the limit
     // must be raised here, before any of them.
