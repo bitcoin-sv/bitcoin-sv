@@ -28,6 +28,12 @@ class MaxFiles
     static constexpr size_t LevelDbMax { 50'000 };
     // Default to use in the absence of any system FD limit information
     static constexpr size_t DefaultFallback { 64 };
+    // Default for databases that are not sized by the file descriptor budget
+    // in init.cpp (block index, mempool transaction DB, merkle tree, frozen
+    // TXO, miner ID, dataref). This is the value every database had before
+    // 1.2.3; only the coins DB takes the large dynamic Default(), through
+    // -maxcoinsdbfiles, and is budgeted for accordingly.
+    static constexpr size_t DefaultUnbudgeted { 64 };
 
   private:
     size_t maxFiles { DefaultFallback };

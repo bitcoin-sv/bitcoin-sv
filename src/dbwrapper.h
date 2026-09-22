@@ -379,9 +379,12 @@ public:
     CDBWrapper& operator=(const CDBWrapper&) = delete;
     CDBWrapper(CDBWrapper&&) = delete;
     CDBWrapper& operator=(CDBWrapper&&) = delete;
+    // The default file budget is the small pre-1.2.3 value. Databases that
+    // hold many files open must pass an explicit budget and be accounted for
+    // in the file descriptor budget in init.cpp, as the coins DB is.
     CDBWrapper(const fs::path &path, size_t nCacheSize,
                bool fMemory = false, bool fWipe = false, bool obfuscate = false,
-               MaxFiles nMaxFiles = MaxFiles::Default(),
+               MaxFiles nMaxFiles = MaxFiles{MaxFiles::DefaultUnbudgeted},
                size_t nMaxFileSize = MaxFileSize);
     ~CDBWrapper();
 

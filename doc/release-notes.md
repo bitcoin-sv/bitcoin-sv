@@ -31,6 +31,11 @@ Important fixes and improvements in 1.2.3
     the log at the default level, and a block that cannot be read from disk,
     whether while answering a filtered block request or while announcing a new
     block as a compact block, is logged instead of aborting the node.
+  - The block index, mempool transaction, merkle tree, frozen TXO, miner ID
+    and dataref databases return to the previous default of 64 open files.
+    Only the coins database uses the large dynamic default, controlled by
+    **-maxcoinsdbfiles**, and only it is reserved for in the file descriptor
+    budget.
 * Improved parallelism during block validation by grouping transactions less
   pessimistically and reducing the default validation batch size.
 * Accelerated SHA-256 and merkle root computation using SHA-NI instructions
