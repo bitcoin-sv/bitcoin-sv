@@ -5,6 +5,7 @@
 
 #include "chainparams.h"
 #include "consensus/consensus.h"
+#include "dbwrapper_limits.h"
 #include "double_spend/dsdetected_defaults.h"
 #include "merkletree.h"
 #include "miner_id/miner_id_db_defaults.h"
@@ -67,7 +68,11 @@ void GlobalConfig::Reset()
     data->mPTVTaskScheduleStrategy = DEFAULT_PTV_TASK_SCHEDULE_STRATEGY;
 
     data->mMaxCoinsViewCacheSize = 0;
-    data->mMaxCoinsProviderCacheSize = DEFAULT_COINS_PROVIDER_CACHE_SIZE;
+    const auto coinsDBSplit = CoinsDBDefaults::ComputeCoinsDbCacheSplit(CoinsDBDefaults::DEFAULT_COINSDB_CACHE_SIZE);
+    data->mCoinsDBCacheSize = coinsDBSplit.first;
+    data->mCoinsCacheSize = coinsDBSplit.second;
+    data->mMaxCoinsProviderCacheSize = data->mCoinsCacheSize;
+    data->mMaxCoinsDbOpenFiles = dbwrapper_limits::MaxFiles::DefaultFallback;
     data->mMaxCoinsDBFileSize = CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE;
 
     data->maxProtocolRecvPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
@@ -93,6 +98,7 @@ void GlobalConfig::Reset()
     data->assumeWhitelistedBlockDepth = DEFAULT_ASSUME_WHITELISTED_BLOCK_DEPTH;
 
     data->minBlocksToKeep = DEFAULT_MIN_BLOCKS_TO_KEEP;
+    data->pruneHysteresis = DEFAULT_PRUNE_HYSTERESIS;
     data->blockValidationTxBatchSize = DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE;
 
     // Block download
@@ -889,7 +895,49 @@ bool GlobalConfig::SetMaxCoinsProviderCacheSize(int64_t max, std::string* err)
         return false;
     }
 
+    if (static_cast<uint64_t>(max) > data->mCoinsCacheSize)
+    {
+        if (err)
+        {
+            *err = "Maximum coins provider cache size must not exceed the coins cache size ("
+                + std::to_string(data->mCoinsCacheSize) + " bytes)";
+        }
+        return false;
+    }
+
     data->mMaxCoinsProviderCacheSize = static_cast<uint64_t>(max);
+
+    return true;
+}
+
+bool GlobalConfig::SetCoinsCacheSize(int64_t bytes, std::string* err)
+{
+    if (bytes <= 0)
+    {
+        if(err)
+        {
+            *err = "Coins cache size must be greater than 0.";
+        }
+        return false;
+    }
+
+    data->mCoinsCacheSize = static_cast<uint64_t>(bytes);
+
+    return true;
+}
+
+bool GlobalConfig::SetCoinsDBCacheSize(int64_t bytes, std::string* err)
+{
+    if (bytes <= 0)
+    {
+        if(err)
+        {
+            *err = "Coins DB cache size must be greater than 0.";
+        }
+        return false;
+    }
+
+    data->mCoinsDBCacheSize = static_cast<uint64_t>(bytes);
 
     return true;
 }
@@ -898,6 +946,16 @@ bool GlobalConfig::SetMaxCoinsDbOpenFiles(int64_t max, std::string* err)
 {
     if (LessThanZero(max - 1, err, "Minimum value for max number of leveldb open files for coinsdb size must not be less than 1."))
     {
+        return false;
+    }
+
+    if (static_cast<uint64_t>(max) > dbwrapper_limits::MaxFiles::LevelDbMax)
+    {
+        if (err)
+        {
+            *err = "Maximum number of leveldb open files for coinsdb must not exceed "
+                + std::to_string(dbwrapper_limits::MaxFiles::LevelDbMax);
+        }
         return false;
     }
 
@@ -1165,6 +1223,25 @@ bool GlobalConfig::SetMinBlocksToKeep(int32_t minblocks, std::string* err)
 int32_t GlobalConfig::GetMinBlocksToKeep() const
 {
     return data->minBlocksToKeep;
+}
+
+bool GlobalConfig::SetPruneHysteresis(int32_t hysteresis, std::string* err)
+{
+    if(hysteresis < 0 || hysteresis > 99)
+    {
+        if(err)
+        {
+            *err = "Prune hysteresis must be in range [0, 99]";
+        }
+        return false;
+    }
+
+    data->pruneHysteresis = hysteresis;
+    return true;
+}
+int32_t GlobalConfig::GetPruneHysteresis() const
+{
+    return data->pruneHysteresis;
 }
 
 // Block download

@@ -5,6 +5,9 @@
 #include "net/net.h"
 #include "util.h"
 
+#include <algorithm>
+#include <iterator>
+
 // When we get C++17 we should loose this redundant definition, until then it's required.
 constexpr unsigned CTxnPropagator::DEFAULT_RUN_FREQUENCY_MILLIS;
 
@@ -62,32 +65,54 @@ void CTxnPropagator::removeTransactions(const std::vector<CTransactionRef>& txns
 {
     LogPrint(BCLog::TXNPROP, "Purging %d transactions\n", txns.size());
 
-    // Create set of objects to use it as lookup when deleting 
-    std::set<CInv> toRemove {};
-    for(const CTransactionRef& txn : txns)
-    {   
-        toRemove.emplace(MSG_TX, txn->GetId());
+    // When nothing is queued for announcement anywhere - the norm during IBD,
+    // there is nothing to purge, so don't pay for building it.
+    if(getNewTxnQueueLength() == 0)
+    {
+        bool anyQueued{};
+        g_connman->ForEachNode([&anyQueued](const CNodePtr& node)
+        {
+            anyQueued = anyQueued || node->HasTxnsInInventory();
+        });
+        if(!anyQueued)
+            return;
     }
-   
+
+    const std::vector<CInv> toRemove{[&txns]
+    {
+        std::vector<CInv> v;
+        v.reserve(txns.size());
+        std::ranges::transform(txns,
+                               std::back_inserter(v),
+                               [](const CTransactionRef& txn)
+                               {
+                                   return CInv{MSG_TX, txn->GetId()};
+                               });
+        std::ranges::sort(v);
+        return v;
+    }()};
+
     // Filter list of new transactions
     {
-        std::unique_lock<std::mutex> lock { mNewTxnsMtx };
+        std::lock_guard lock{mNewTxnsMtx};
 
         mNewTxns.erase(
-            std::remove_if(mNewTxns.begin(), mNewTxns.end(), 
+            std::remove_if(mNewTxns.begin(), mNewTxns.end(),
                 [&toRemove](const CTxnSendingDetails& i) {
-                    return toRemove.find(i.getInv()) != toRemove.end(); 
-                }), 
+                    return std::binary_search(toRemove.begin(), toRemove.end(), i.getInv());
+                }),
             mNewTxns.end());
     }
 
     // Update lists of pending transactions for each node
-    auto results { g_connman->ParallelForEachNode([&toRemove](const CNodePtr& node) { node->RemoveTxnsFromInventory(toRemove); }) };
+    const auto results { g_connman->ParallelForEachNode([&toRemove](const CNodePtr& node)
+    {
+        node->RemoveTxnsFromInventory(toRemove);
+    })};
 
     // Wait for all nodes to finish since they depend on local variable txnDetails
     for(auto& result : results)
          result.wait();
-
 }
 
 /** Shutdown and clean up */

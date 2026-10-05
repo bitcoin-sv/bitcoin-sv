@@ -425,6 +425,7 @@ void DSAttemptHandler::ProcessDoubleSpend()
                 {
                     // Someone sent us an invalid double-spend; ban them
                     LogPrint(BCLog::DOUBLESPEND, "Script verification for double-spend failed\n");
+                    //NOLINTNEXTLINE(*-narrowing-conversions)
                     Misbehaving(doubleSpendTxnDetails.sender, mConfig.GetBanScoreThreshold(), "double-spend-validation-failed");
                     return;
                 }
@@ -440,6 +441,7 @@ void DSAttemptHandler::ProcessDoubleSpend()
                     std::lock_guard lock { mMtx };
                     if(auto it { mSuspensionTracker.find(doubleSpendTxnDetails.sender) }; it != mSuspensionTracker.end())
                     {
+                        //NOLINTNEXTLINE(bugprone-assignment-in-if-condition)
                         if(it->second += SUSPENSION_SCORE_INCREASE)
                         {
                             LogPrint(BCLog::DOUBLESPEND, "Suspension score exceeded for peer=%d\n", doubleSpendTxnDetails.sender);
@@ -450,7 +452,7 @@ void DSAttemptHandler::ProcessDoubleSpend()
                     {
                         using namespace std::chrono_literals;
                         SuspensionScore score { SUSPENSION_SCORE_MAX, SUSPENSION_SCORE_INCREASE, 1s };
-                        mSuspensionTracker.insert( { doubleSpendTxnDetails.sender, std::move(score) } );
+                        mSuspensionTracker.insert( { doubleSpendTxnDetails.sender, score } );
                     }
                 }
             }
@@ -699,6 +701,7 @@ bool DSAttemptHandler::QueryAndSubmitProof(
     const NotificationDetails& notificationDetails,
     const DSTxnSerialiser::TxnHandleSPtr& handle,
     int httpTimeout,
+    //NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     bool& wantsProof,
     bool& retry)
 {

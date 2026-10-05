@@ -35,6 +35,7 @@ do
     case ${option,,} in
         asan) args+=(-Denable_asan=ON); args+=(-DCRYPTO_USE_ASM=OFF) ;;
         cov)  args+=(-DENABLE_COVERAGE=ON) ;;
+        fp)   args+=(-Denable_frame_pointers=ON) ;;
         tsan) args+=(-Denable_tsan=ON) ;;
         usan) args+=(-Denable_ubsan=ON) ;;
     esac

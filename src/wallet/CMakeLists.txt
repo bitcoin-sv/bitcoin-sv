@@ -11,10 +11,12 @@ add_library(wallet
 	crypter.cpp
 	db.cpp
 	finaltx.cpp
+	merkle_tx.cpp
 	rpcdump.cpp
 	rpcwallet.cpp
 	wallet.cpp
 	walletdb.cpp
+	wallet_tx.cpp
 )
 
 enable_coverage(wallet)

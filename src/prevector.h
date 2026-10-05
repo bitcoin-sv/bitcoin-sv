@@ -11,6 +11,8 @@
 #include <cstring>
 
 #include <iterator>
+#include <memory>
+#include <type_traits>
 
 #include "compiler_warnings.h"
 
@@ -41,15 +43,15 @@
  *   - Size capacity: the number of allocated elements
  *   - T* indirect: a pointer to an array of capacity elements of type T
  *     (only the first _size are initialized).
- *
- * The data type T must be movable by memmove/realloc(). Once we switch to C++,
- * move constructors can be used instead.
  */
 // NOLINTBEGIN(bugprone-multi-level-implicit-pointer-conversion)
 // NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
 // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-template <unsigned int N, typename T, typename Size = uint64_t,
-          typename Diff = int64_t>
+template<unsigned int N,
+        typename T,
+        typename Size = uint64_t,
+        typename Diff = int64_t>
+    requires std::is_trivially_copyable_v<T>
 class prevector {
 public:
     typedef Size size_type;
@@ -249,15 +251,15 @@ public:
     };
 
 private:
-    size_type _size;
+    size_type _size{};
     union direct_or_indirect {
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
         char direct[sizeof(T) * N];
         struct {
             size_type capacity;
-            char *indirect;
+            char* indirect;
         } other;
-    } _union;
+    } _union{};
 
     T *direct_ptr(difference_type pos) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
@@ -352,11 +354,12 @@ public:
         }
     }
 
-    prevector() : _size(0) {}
+    prevector() = default;
 
-    explicit prevector(size_type n) : _size(0) { resize(n); }
+    explicit prevector(size_type n) { resize(n); }
 
-    explicit prevector(size_type n, const T &val = T()) : _size(0) {
+    explicit prevector(size_type n, const T& val = T())
+    {
         change_capacity(n);
         while (size() < n) {
             _size++;
@@ -364,8 +367,9 @@ public:
         }
     }
 
-    template <typename InputIterator>
-    prevector(InputIterator first, InputIterator last) : _size(0) {
+    template<typename InputIterator>
+    prevector(InputIterator first, InputIterator last)
+    {
         size_type n = static_cast<size_type>(last - first);
         change_capacity(n);
         while (first != last) {
@@ -375,36 +379,30 @@ public:
         }
     }
 
-    prevector(const prevector<N, T, Size, Diff> &other) : _size(0) {
+    prevector(const prevector& other)
+    {
         change_capacity(other.size());
-        const_iterator it = other.begin();
-        while (it != other.end()) {
-            _size++;
-            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T(*it);
-            ++it;
-        }
+        std::uninitialized_copy_n(other.item_ptr(0), other.size(), item_ptr(0));
+        _size += other.size();
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
-    prevector(prevector<N, T, Size, Diff> &&other) : _size(0) { swap(other); }
+    prevector(prevector&& other) noexcept
+    { swap(other); }
 
-    prevector &operator=(const prevector<N, T, Size, Diff> &other) {
-        if (&other == this) {
+    prevector& operator=(const prevector& other)
+    {
+        if(&other == this)
             return *this;
-        }
+
         resize(0);
         change_capacity(other.size());
-        const_iterator it = other.begin();
-        while (it != other.end()) {
-            _size++;
-            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T(*it);
-            ++it;
-        }
+        std::uninitialized_copy_n(other.item_ptr(0), other.size(), item_ptr(0));
+        _size += other.size();
         return *this;
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-move-operations, performance-noexcept-move-constructor)
-    prevector &operator=(prevector<N, T, Size, Diff> &&other) {
+    prevector& operator=(prevector&& other) noexcept
+    {
         swap(other);
         return *this;
     }
@@ -537,8 +535,8 @@ public:
 
     const T &back() const { return *item_ptr(size() - 1); }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-noexcept-swap, performance-noexcept-swap)
-    void swap(prevector<N, T, Size, Diff> &other) {
+    void swap(prevector& other) noexcept
+    {
         std::swap(_union, other._union);
         std::swap(_size, other._size);
     }
@@ -552,10 +550,11 @@ public:
         }
     }
 
-    bool operator==(const prevector<N, T, Size, Diff> &other) const {
-        if (other.size() != size()) {
+    bool operator==(const prevector& other) const
+    {
+        if(other.size() != size())
             return false;
-        }
+
         const_iterator b1 = begin();
         const_iterator b2 = other.begin();
         const_iterator e1 = end();
@@ -569,13 +568,14 @@ public:
         return true;
     }
 
-    bool operator<(const prevector<N, T, Size, Diff> &other) const {
-        if (size() < other.size()) {
+    bool operator<(const prevector& other) const
+    {
+        if(size() < other.size())
             return true;
-        }
-        if (size() > other.size()) {
+
+        if(size() > other.size())
             return false;
-        }
+
         const_iterator b1 = begin();
         const_iterator b2 = other.begin();
         const_iterator e1 = end();

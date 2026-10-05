@@ -38,7 +38,13 @@ public:
                    .Finalize(hash);
     }
 
-    CHash256 &Write(const uint8_t *data, size_t len) {
+    CHash256& Write(const std::span<const uint8_t> data)
+    {
+        return Write(data.data(), data.size_bytes());
+    }
+
+    CHash256& Write(const uint8_t* data, size_t len)
+    {
         sha.Write(data, len);
         return *this;
     }
@@ -107,6 +113,15 @@ inline uint256 Hash(const T1 p1begin, const T1 p1end, const T2 p2begin, const T2
         .Finalize(CHash256::span{result.begin(), CHash256::OUTPUT_SIZE});
         //NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     return result;
+}
+
+/** Double-SHA-256 of two concatenated 256-bit values. */
+inline uint256 Sha256d(const uint256& a, const uint256& b)
+{
+    uint256 r;
+    CHash256().Write(a.begin(), 32).Write(b.begin(), 32)
+              .Finalize(CHash256::span{r.begin(), CHash256::OUTPUT_SIZE});
+    return r;
 }
 
 /** Compute the 256-bit hash of the concatenation of three objects. */

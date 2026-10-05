@@ -70,15 +70,16 @@ class Association
     // Copy out current statistics
     void CopyStats(AssociationStats& stats) const;
 
-    // Add our sockets to the sets for reading and writing
-    bool SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError, SOCKET& socketMax) const;
+    // Register our sockets and the events we want to wait for.
+    // Returns true if any socket was registered.
+    bool RegisterSockets(SocketWaitSet& waitSet) const;
 
     // Fetch the next message for processing
     std::pair<Stream::QueuedNetMessage, bool> GetNextMessage();
 
     // Service all sockets that are ready
-    void ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, CConnman& connman,
-                        const Config& config, bool& gotNewMsgs, uint64_t& bytesRecv, uint64_t& bytesSent);
+    void ServiceSockets(const SocketWaitSet& waitSet, CConnman& connman, const Config& config,
+                        bool& gotNewMsgs, uint64_t& bytesRecv, uint64_t& bytesSent);
 
     // Get current total send queue size
     uint64_t GetTotalSendQueueSize() const;

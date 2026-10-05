@@ -12,6 +12,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "blockchain.h"
+#include "usdt.h"
 #include <univalue.h>
 #include <boost/bind/bind.hpp>
 #include <boost/signals2/signal.hpp>
@@ -522,6 +523,38 @@ UniValue CRPCCommand::call(Config& config,
     return result;
 }
 
+//NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
+TRACEPOINT_SEMAPHORE(rpc, request_entry);
+TRACEPOINT_SEMAPHORE(rpc, request_exit);
+//NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
+
+namespace
+{
+    class usdt_guard
+    {
+        [[maybe_unused]] const char* method_{};
+        bool committed_{};
+
+    public:
+        explicit usdt_guard(const char* method): method_{method}
+        {
+            TRACEPOINT(rpc, request_entry, method);
+        }
+
+        ~usdt_guard()
+        {
+            TRACEPOINT(rpc, request_exit, method_, committed_);
+        }
+
+        void commit() { committed_ = true; }
+
+        usdt_guard(const usdt_guard&) = delete;
+        usdt_guard& operator=(const usdt_guard&) = delete;
+        usdt_guard(usdt_guard&&) = delete;
+        usdt_guard& operator=(usdt_guard&&) = delete;
+    };
+}
+
 void CRPCTable::execute(Config &config,
                             const JSONRPCRequest &request,
                             HTTPRequest *httpReq,
@@ -538,18 +571,23 @@ void CRPCTable::execute(Config &config,
 
     g_rpcSignals.PreCommand(*pcmd);
 
-    try {
-        // Execute, convert arguments to array if necessary
-        if (request.params.isObject()) {
-            pcmd->call(config,
-                       transformNamedArguments(request, pcmd->argNames),
-                       httpReq,
-                       processedInBatch);
-        } else {
-            pcmd->call(config, request, httpReq, processedInBatch);
+    {
+        usdt_guard guard{request.strMethod.c_str()};
+        try {
+            // Execute, convert arguments to array if necessary
+            if (request.params.isObject()) {
+                pcmd->call(config,
+                           transformNamedArguments(request, pcmd->argNames),
+                           httpReq,
+                           processedInBatch);
+            } else {
+                pcmd->call(config, request, httpReq, processedInBatch);
+            }
+            guard.commit();
         }
-    } catch (const std::exception &e) {
-        throw JSONRPCError(RPC_MISC_ERROR, e.what());
+        catch(const std::exception& e){
+            throw JSONRPCError(RPC_MISC_ERROR, e.what());
+        }
     }
 
     g_rpcSignals.PostCommand(*pcmd);

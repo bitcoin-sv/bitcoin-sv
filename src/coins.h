@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <unordered_map>
 #include <mutex>
+#include <numeric>
 #include <optional>
 #include <thread>
 #include <type_traits>
@@ -458,6 +459,10 @@ public:
 
     size_t CachedCoinsCount() const { return cacheCoins.size(); }
 
+    size_t CachedCoinsUsage() const { return cachedCoinsUsage; }
+
+    void ReserveCoins(size_t n) { cacheCoins.reserve(n); }
+
     std::optional<CoinImpl> FetchCoin(const COutPoint& outpoint) const;
 
     CCoinsMap MoveOutCoins()
@@ -476,7 +481,7 @@ public:
     bool SpendCoin(const COutPoint& outpoint);
     void Uncache(const std::vector<COutPoint>& vOutpoints);
     void BatchWrite(CCoinsMap& mapCoins);
-    void BatchWriteUnchecked(CCoinsMap& mapCoins);
+    void BatchWriteUnchecked(CCoinsMap& mapCoins, size_t addedUsage);
 
     const CoinImpl& ReplaceWithCoinWithScript(const COutPoint& outpoint, CoinImpl&& newCoin)
     {
@@ -819,11 +824,20 @@ public:
                 {
                     // Re-fold shards back into a single coherent cache
                     int64_t startFoldTime { GetTimeMicros() };
+                    // Pre-size the destination once so that the per-shard merge() calls do
+                    // not trigger incremental rehashes.
+                    const size_t total = std::accumulate(mShards.begin(), mShards.end(), size_t{0},
+                        [](size_t sum, const Shard& shard) { return sum + shard.GetCache().CachedCoinsCount(); });
+                    mShards[0].GetCache().ReserveCoins(total);
                     while(mShards.size() > 1)
                     {
                         Shard& shard { mShards.back() };
+                        // Capture the source's tracked usage before
+                        // MoveOutCoins zeroes it, then forward it to the
+                        // destination so cachedCoinsUsage stays accurate.
+                        size_t shardUsage { shard.GetCache().CachedCoinsUsage() };
                         auto shardCache { shard.GetCache().MoveOutCoins() };
-                        mShards[0].GetCache().BatchWriteUnchecked(shardCache);
+                        mShards[0].GetCache().BatchWriteUnchecked(shardCache, shardUsage);
                         mShards.pop_back();
                     }
                     int64_t foldTime { GetTimeMicros() - startFoldTime };

@@ -39,9 +39,10 @@ jobs:
           clean: ''
       - name: Build Bitcoin
         uses: ./.github/actions/build_bitcoin_cmake
-        with: 
+        with:
           build_type: Release
           targets: bitcoind bitcoin-cli
+          options: fp
       - name: Initial Block Download
         uses: ./.github/actions/ibd
         with:

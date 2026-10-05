@@ -8,24 +8,69 @@ inputs:
     description: Docker image tag e.g. Ubuntu_22.04
     required: true
   toolset:
-    description: Toolset e.g. gcc, clang 
+    description: Toolset e.g. gcc, clang
     required: true
+  options:
+    description: Build options (asan/tsan/usan/cov)
+    required: false
 runs:
   using: "composite"
   steps:
     - run: |
+        tsan_args=""
+        # IPv6 not detected reliably on GitHub runners
+        exclude="rpcbind_test"
+        if [[ "${{ inputs.options }}" == *tsan* ]]; then
+          mkdir -p tsan_logs
+          export TSAN_OPTIONS="\
+            suppressions=contrib/tsan.suppressions \
+            exitcode=0 \
+            external_symbolizer_path=/usr/bin/llvm-symbolizer-21 \
+            second_deadlock_stack=1 \
+            history_size=7 \
+            print_suppressions=1 \
+            fast_unwind_on_fatal=1 \
+            log_path=tsan_logs/func"
+          # Each TSan-instrumented bitcoind uses ~1GB RSS.
+          # Limit parallelism to avoid OOM on CI runners.
+          tsan_args="--jobs=2 --timeoutfactor=5"
+          # Exclude tests that spawn many nodes (5+)
+          exclude+=",bsv-addnode"
+          exclude+=",maxuploadtarget"
+          exclude+=",pruning"
+          exclude+=",p2p-connections"
+          exclude+=",bsv-p2p-many-connections"
+          exclude+=",p2p-txn_propagation"
+          # TSan slowdown causes internal timeouts
+          exclude+=",bsv-chronicle-general"
+          exclude+=",bsv-dump-invalid-tx"
+          exclude+=",bsv-factorMaxSendQueuesBytes"
+          exclude+=",bsv-ptv-rpc-sendrawtransactions"
+          exclude+=",bsv-script-op_pushdata"
+          exclude+=",dbcrash"
+          exclude+=",mining_journal"
+          # Known unsuppressed TSan issues (see contrib/tsan_issues/)
+          exclude+=",rawtransactions"                    # wallet/BDB lock-order inversions
+          exclude+=",bsv-sendrawtransactions_skipflags"  # wallet/BDB lock-order inversions
+          exclude+=",mempool_eviction_priority"          # mempool priority/eviction lock-order inversion
+          exclude+=",mempool_limit"                      # mempool lock-order inversion
+          exclude+=",bsv-genesis-nLocktime-nSequence"    # CTxnValidator<->CTxMemPool::Expire cycle
+          exclude+=",bsv-merkle-pruned-block"            # CBlockFileInfoStore::FindUndoPos cycle
+          exclude+=",bsv-txindex-pruned"                 # txindex recursive-mutex inversion
+          exclude+=",mining_api"                         # TSan deadlock detector cycle overflow
+        fi
         ./test/functional/test_runner.py --failfast \
                                          --extended \
-                                         --jobs=10 \
+                                         ${tsan_args:---jobs=10} \
                                          --output-type=0 \
-                                         --exclude=rpcbind_test # IPv6 not detected reliably
-                                                                # on GitHub runners
+                                         --exclude="$exclude"
       shell: bash
     - name: Artifact upload
       if: failure()
       uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
       with:
-        name: ${{ inputs.tag }}-${{ inputs.toolset }}
+        name: ${{ inputs.tag }}-${{ inputs.toolset }}-${{ inputs.options }}
         path: |
           /tmp/bitcoin_test_runner_*
           !/tmp/bitcoin_test_runner_*/.lock
+          tsan_logs/

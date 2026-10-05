@@ -2,7 +2,7 @@ dnl require autoconf 2.60 (AS_ECHO/AS_ECHO_N)
 AC_PREREQ([2.60])
 define(_CLIENT_VERSION_MAJOR, 1)
 define(_CLIENT_VERSION_MINOR, 2)
-define(_CLIENT_VERSION_REVISION, 2)
+define(_CLIENT_VERSION_REVISION, 3)
 define(_CLIENT_VERSION_BUILD, 0)
 define(_COPYRIGHT_YEAR, 2026)
 define(_COPYRIGHT_HOLDERS,[The %s Association])
@@ -18,6 +18,14 @@ BITCOIN_CLI_NAME=bitcoin-cli
 BITCOIN_TX_NAME=bitcoin-tx
 
 AC_CANONICAL_HOST
+
+dnl Detect x86_64 / amd64 so the SHA-NI convenience archive can gate
+dnl ENABLE_X86_SHANI on architecture without touching the vendored source.
+case $host_cpu in
+  x86_64|amd64) host_is_x86_64=yes ;;
+  *)            host_is_x86_64=no  ;;
+esac
+AM_CONDITIONAL([HOST_IS_X86_64], [test "x$host_is_x86_64" = "xyes"])
 
 AH_TOP([#ifndef BITCOIN_BITCOIN_CONFIG_H])
 AH_TOP([#define BITCOIN_BITCOIN_CONFIG_H])
@@ -127,6 +135,11 @@ AC_ARG_ENABLE([extended-functional-tests],
     AS_HELP_STRING([--enable-extended-functional-tests],[enable expensive functional tests when using lcov (default no)]),
     [use_extended_functional_tests=$enableval],
     [use_extended_functional_tests=no])
+
+AC_ARG_ENABLE([usdt],
+    AS_HELP_STRING([--enable-usdt],[enable USDT instrumentation, requires systemtap sys/sdt.h (default no)]),
+    [use_usdt=$enableval],
+    [use_usdt=no])
 
 AC_ARG_ENABLE([hardening],
   [AS_HELP_STRING([--disable-hardening],
@@ -244,6 +257,13 @@ AC_ARG_ENABLE([ubsan],
     [enable_ubsan=$enableval],
     [enable_ubsan=no])
 
+# Enable frame pointers
+AC_ARG_ENABLE([frame-pointers],
+    [AS_HELP_STRING([--enable-frame-pointers],
+                    [build with frame pointers for accurate profiling/flamegraphs (default is no)])],
+    [enable_frame_pointers=$enableval],
+    [enable_frame_pointers=no])
+
 # Turn warnings into errors
 AC_ARG_ENABLE([werror],
     [AS_HELP_STRING([--enable-werror],
@@ -316,6 +336,13 @@ if test "x$enable_ubsan" = xyes; then
   if test "x$ubsan_failed" = xyes; then
     AC_MSG_ERROR("UBSAN is not supported")
   fi
+fi
+
+if test "x$enable_frame_pointers" = xyes; then
+  AX_CHECK_COMPILE_FLAG([-fno-omit-frame-pointer],
+    [CFLAGS="$CFLAGS -fno-omit-frame-pointer"
+     CXXFLAGS="$CXXFLAGS -fno-omit-frame-pointer"],
+    [AC_MSG_ERROR("frame pointers are not supported by the compiler")])
 fi
 
 if test "x$enable_debug" = xyes; then
@@ -671,6 +698,19 @@ if test x$TARGET_OS = xdarwin; then
 fi
 
 AC_CHECK_HEADERS([endian.h sys/endian.h byteswap.h stdio.h stdlib.h unistd.h strings.h sys/types.h sys/stat.h sys/select.h sys/prctl.h])
+
+dnl Check for poll(2). The P2P socket loop uses it in preference to select() so
+dnl that socket descriptors are not limited to values below FD_SETSIZE. Not used
+dnl on Windows (WSAPoll is not declared at the _WIN32_WINNT we target, and the
+dnl Windows fd_set has no such limit anyway) or darwin (following Bitcoin Core,
+dnl which found poll() unreliable there and where there is no CI coverage).
+use_poll=no
+if test x$TARGET_OS != xwindows && test x$TARGET_OS != xdarwin; then
+  AC_CHECK_DECLS([poll],[
+    AC_DEFINE([USE_POLL],[1],[Define this symbol to use poll(2) instead of select(2) in the P2P socket loop])
+    use_poll=yes
+  ],[],[[#include <poll.h>]])
+fi
 
 AC_CHECK_DECLS([strnlen])
 
@@ -1234,6 +1274,12 @@ fi
 
 AM_CONDITIONAL([ENABLE_ZMQ], [test "x$use_zmq" = "xyes"])
 
+if test "x$use_usdt" = "xyes"; then
+  AC_CHECK_HEADER([sys/sdt.h],
+    [AC_DEFINE([ENABLE_USDT],[1],[Define to 1 to compile in USDT instrumentation])],
+    [AC_MSG_ERROR([--enable-usdt given but sys/sdt.h not found; install the systemtap SDT development headers (e.g. systemtap-sdt-dev / systemtap-sdt-devel)])])
+fi
+
 AC_MSG_CHECKING([whether to build test_bitcoin])
 if test x$use_tests = xyes; then
   AC_MSG_RESULT([yes])
@@ -1379,6 +1425,7 @@ esac
 echo
 echo "Options used to compile and link:"
 echo "  prod build        = $enable_prod_build"
+echo "  with usdt         = $use_usdt"
 echo "  with wallet       = $enable_wallet"
 echo "  with zmq          = $use_zmq"
 echo "  with test         = $use_tests"
@@ -1387,6 +1434,7 @@ echo "  with upnp         = $use_upnp"
 echo "  use asm           = $use_asm"
 echo "  debug enabled     = $enable_debug"
 echo "  werror            = $enable_werror"
+echo "  frame pointers    = $enable_frame_pointers"
 echo
 echo "  sanitizers"
 echo "          asan      = $enable_asan"
@@ -1399,6 +1447,7 @@ echo "       jemalloc     = $use_jemalloc"
 echo
 echo "  target os         = $TARGET_OS"
 echo "  build os          = $BUILD_OS"
+echo "  P2P socket wait   = $(if test x$use_poll = xyes; then echo poll; else echo select; fi)"
 echo
 echo "  CC                = $CC"
 echo "  CFLAGS            = $CFLAGS"

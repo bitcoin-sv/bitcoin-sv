@@ -49,7 +49,9 @@ DSCallbackMsg::DSCallbackMsg(uint8_t version, const std::vector<std::string>& ad
                 struct in_addr ip4addr {};
                 if(addr.GetInAddr(&ip4addr))
                 {
+                    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                     const uint8_t* bytes { reinterpret_cast<uint8_t*>(&ip4addr) };
+                    //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                     std::vector<uint8_t> addrBin { bytes, bytes + 4 };
                     mIPAddrs.push_back(addrBin);
                 }
@@ -66,7 +68,9 @@ DSCallbackMsg::DSCallbackMsg(uint8_t version, const std::vector<std::string>& ad
                 struct in6_addr ip6addr {};
                 if(addr.GetIn6Addr(&ip6addr))
                 {
+                    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                     const uint8_t* bytes { reinterpret_cast<uint8_t*>(&ip6addr) };
+                    //NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                     std::vector<uint8_t> addrBin { bytes, bytes + 16 };
                     mIPAddrs.push_back(addrBin);
                 }

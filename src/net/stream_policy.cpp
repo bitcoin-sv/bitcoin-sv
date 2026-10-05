@@ -37,9 +37,7 @@ namespace
 /*************************/
 
 void BasicStreamPolicy::ServiceSockets(StreamMap& streams,
-                                       fd_set& setRecv,
-                                       fd_set& setSend,
-                                       fd_set& setError,
+                                       const SocketWaitSet& waitSet,
                                        const Config& config,
                                        bool& gotNewMsgs, //NOLINT(bugprone-easily-swappable-parameters)
                                        uint64_t& bytesRecv,
@@ -50,8 +48,7 @@ void BasicStreamPolicy::ServiceSockets(StreamMap& streams,
     {   
         uint64_t streamBytesRecv {0};
         uint64_t streamBytesSent {0};
-        stream.second->ServiceSocket(setRecv, setSend, setError, config, gotNewMsgs,
-            streamBytesRecv, streamBytesSent);
+        stream.second->ServiceSocket(waitSet, config, gotNewMsgs, streamBytesRecv, streamBytesSent);
         bytesRecv += streamBytesRecv;
         bytesSent += streamBytesSent;
     }

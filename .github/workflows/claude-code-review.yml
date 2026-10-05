@@ -52,6 +52,14 @@ jobs:
   claude-review:
     runs-on: ubuntu-latest
     if: '!github.event.pull_request.draft'
+    env:
+      # Single source of truth for the review model — used by the
+      # claude-code-action step and claude-code-review-rereview.sh
+      CLAUDE_REVIEW_MODEL: claude-sonnet-4-6
+      # Claude Code CLI version installed by claude-code-review-rereview.sh.
+      # Keep in sync with the version bundled in the pinned
+      # anthropics/claude-code-action commit used by the claude-review step.
+      CLAUDE_CODE_VERSION: "2.1.170"
     permissions:
       contents: write
       pull-requests: write
@@ -111,8 +119,8 @@ jobs:
         if: steps.classify_issues.outputs.blocking_count == '0'
           && (steps.rereview.outcome == 'skipped'
            || steps.rereview.outputs.outstanding_count == '0')
-        # v1.0.27 - Pinned to specific commit for security
-        uses: anthropics/claude-code-action@7145c3e0510bcdbdd29f67cc4a8c1958f1acfa2f
+        # v1.0.142 - Pinned to specific commit for security
+        uses: anthropics/claude-code-action@11ba60486e4aec9ddfeafcf4bb3f00b028ac2c16
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ github.token }}
@@ -143,6 +151,7 @@ jobs:
           # For available options see:
           # https://docs.claude.com/en/docs/claude-code/cli-reference
           claude_args: >-
+            --model ${{ env.CLAUDE_REVIEW_MODEL }}
             --allowed-tools
             "mcp__github_inline_comment__create_inline_comment,
             Glob,

@@ -1483,26 +1483,36 @@ BOOST_FIXTURE_TEST_CASE(sharding, TestingSetup)
         TestCoinsSpanCache span { provider };
         span.SetBestBlock(blockHash);
 
-        // A lambda to call sharded which will receive the shard index, the shard itself, and additional test arguments
+        // Result collected per-shard to avoid calling non-thread-safe
+        // BOOST_CHECK from parallel threads.
+        struct ShardResult {
+            bool hadCoin;
+            bool spentCoin;
+            bool coinGone;
+            bool hasNew1;
+            bool hasNew2;
+            uint256 newTxId;
+        };
+
         auto shardedTarget = [blockHeight](uint16_t shardIndex,
                                            CCoinsViewCache::Shard& shard,
                                            const TxIdArray& tx_ids,
-                                           const TxIdArray& pre_gen_tx_ids,
-                                           TxIdArray& new_tx_ids)
+                                           const TxIdArray& pre_gen_tx_ids)
         {
+            ShardResult result {};
+
             // Check coin exists via shard
             const COutPoint spendCoin { tx_ids[shardIndex], 0 };
-            BOOST_CHECK(shard.HaveCoin(spendCoin));
+            result.hadCoin = shard.HaveCoin(spendCoin);
 
             // Spend coin via shard
-            BOOST_CHECK(shard.SpendCoin(spendCoin));
-            BOOST_CHECK(! shard.HaveCoin(spendCoin));
+            result.spentCoin = shard.SpendCoin(spendCoin);
+            result.coinGone = ! shard.HaveCoin(spendCoin);
 
             // Create 2 new coins
-            auto& newTxId = pre_gen_tx_ids[shardIndex];
-            new_tx_ids[shardIndex] = newTxId;
-            COutPoint newCoin1 { newTxId, 0 };
-            COutPoint newCoin2 { newTxId, 1 };
+            result.newTxId = pre_gen_tx_ids[shardIndex];
+            COutPoint newCoin1 { result.newTxId, 0 };
+            COutPoint newCoin2 { result.newTxId, 1 };
             CScript scr { OP_RETURN };
             {
                 CTxOut txo { Amount{123}, scr };
@@ -1512,16 +1522,27 @@ BOOST_FIXTURE_TEST_CASE(sharding, TestingSetup)
                 CTxOut txo { Amount{123}, scr };
                 shard.AddCoin(newCoin2, CoinWithScript::MakeOwning(std::move(txo), blockHeight + 1, false, false), false, 0);
             }
-            BOOST_CHECK(shard.HaveCoin(newCoin1));
-            BOOST_CHECK(shard.HaveCoin(newCoin2));
+            result.hasNew1 = shard.HaveCoin(newCoin1);
+            result.hasNew2 = shard.HaveCoin(newCoin2);
 
-            return true;
+            return result;
         };
 
         BOOST_CHECK_EQUAL(span.GetShards().size(), 1U);
         BOOST_CHECK_EQUAL(span.GetShards()[0].GetCache().CachedCoinsCount(), 0U);
 
-        auto results = span.RunSharded(NumThreads, shardedTarget, std::cref(txIds), std::cref(pregenTxIds), std::ref(newTxIds));
+        auto results = span.RunSharded(NumThreads, shardedTarget, std::cref(txIds), std::cref(pregenTxIds));
+
+        // Verify results and collect newTxIds on the main thread
+        for(uint16_t i = 0; i < NumThreads; ++i)
+        {
+            BOOST_CHECK(results[i].hadCoin);
+            BOOST_CHECK(results[i].spentCoin);
+            BOOST_CHECK(results[i].coinGone);
+            BOOST_CHECK(results[i].hasNew1);
+            BOOST_CHECK(results[i].hasNew2);
+            newTxIds[i] = results[i].newTxId;
+        }
 
         BOOST_CHECK_EQUAL(span.GetShards().size(), 1U);
         BOOST_CHECK_EQUAL(span.GetShards()[0].GetCache().CachedCoinsCount(), newTxIds.size() * 3);  // The original coin and the 2 new created coins

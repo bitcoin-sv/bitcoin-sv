@@ -233,10 +233,10 @@ NodeId BlockDownloadTracker::GetPeerForBlock(const uint256& hash) const
 {
     std::lock_guard lock { mMtx };
 
-    const auto rangeBegin = mMapBlocksInFlight.equal_range(hash).first;
-    if(rangeBegin != mMapBlocksInFlight.end())
+    const auto it { mMapBlocksInFlight.find(hash) };
+    if(it != mMapBlocksInFlight.end())
     {
-        return rangeBegin->second.block.GetNode();
+        return it->second.block.GetNode();
     }
 
     // No peer found for that block

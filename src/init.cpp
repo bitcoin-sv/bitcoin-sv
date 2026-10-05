@@ -8,6 +8,7 @@
 #endif
 
 #include "init.h"
+
 #include "addrman.h"
 #include "amount.h"
 #include "block_index_store.h"
@@ -18,8 +19,9 @@
 #include "chainparams.h"
 #include "compat/sanity.h"
 #include "config.h"
-#include "consensus/validation.h"
 #include "consensus/consensus.h"
+#include "consensus/validation.h"
+#include "crypto/sha256_dispatch.h"
 #include "double_spend/dsattempt_handler.h"
 #include "double_spend/dsdetected_defaults.h"
 #include "fs.h"
@@ -28,9 +30,9 @@
 #include "invalid_txn_publisher.h"
 #include "key.h"
 #include "miner_id/dataref_index.h"
-#include "miner_id/miner_info_tracker.h"
 #include "miner_id/miner_id_db.h"
 #include "miner_id/miner_id_db_defaults.h"
+#include "miner_id/miner_info_tracker.h"
 #include "mining/journaling_block_assembler.h"
 #include "net/disk_backed_parser.h"
 #include "net/net.h"
@@ -64,13 +66,14 @@
 
 #ifdef ENABLE_WALLET
 #include "wallet/rpcdump.h"
-#include "wallet/wallet.h"
+#include "wallet/wallet_tx.h"
 #endif
 #include "warnings.h"
 
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <memory>
 #include <cinttypes>
 #include <chrono>
@@ -108,8 +111,14 @@ std::unique_ptr<CZMQNotificationInterface> pzmqNotificationInterface;
 // block files don't count towards the fd_set size limit anyway.
 #define MIN_CORE_FILEDESCRIPTORS 0
 #else
+// Descriptors reserved for everything that is neither a peer socket nor a
+// coins database file: block files, the other LevelDB instances, RPC, ZMQ,
+// logs.
 #define MIN_CORE_FILEDESCRIPTORS 150
 #endif
+// Sockets a single peer may hold open: the default stream policy opens a
+// second (DATA1) stream alongside the GENERAL one (BlockPriorityStreamPolicy).
+static constexpr int SOCKETS_PER_PEER {2};
 
 /** Used to pass flags to the Bind() function */
 enum BindFlags // NOLINT(cppcoreguidelines-use-enum-class)
@@ -382,8 +391,22 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-dbcache=<n>",
         strprintf(
-            _("Set database cache size in megabytes (%d to %d, default: %d). The value may be given in megabytes or with unit (B, KiB, MiB, GiB)."),
+            _("Set the cache size in megabytes for all databases except the CoinsDB (%d to %d, default: %d). "
+              "CoinsDB cache sizing is controlled separately by -coinsdbcache. "
+              "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
             nMinDbCache, nMaxDbCache, nDefaultDbCache));
+
+    strUsage += HelpMessageOpt(
+        "-coinsdbcache=<n>",
+        strprintf(
+            _("Set the total CoinsDB cache budget in megabytes (%d to %d, default: %d). "
+              "1/8 of this value is used as the LevelDB chainstate cache (capped at %d), "
+              "and the remainder becomes the in-memory UTXO flush threshold. "
+              "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+            CoinsDBDefaults::MIN_COINSDB_CACHE_SIZE / ONE_MEBIBYTE,
+            CoinsDBDefaults::MAX_COINSDB_CACHE_SIZE / ONE_MEBIBYTE,
+            CoinsDBDefaults::DEFAULT_COINSDB_CACHE_SIZE / ONE_MEBIBYTE,
+            CoinsDBDefaults::MAX_COINS_LEVELDB_CACHE_SIZE / ONE_MEBIBYTE));
 
     strUsage += HelpMessageOpt(
         "-frozentxodbcache=<n>",
@@ -410,10 +433,9 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
 
     strUsage += HelpMessageOpt("-maxmempool=<n>",
                    strprintf(_("Keep the resident size of the transaction memory pool below <n> megabytes "
-                               "(default: %u%s,  must be at least %d). "
+                               "(default: %u, must be at least %d). "
                                "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
                              DEFAULT_MAX_MEMPOOL_SIZE,
-                             showDebug ? ", 0 to turn off mempool memory sharing with dbcache" : "",
                              std::ceil(DEFAULT_MAX_MEMPOOL_SIZE*0.3)));
     if (showDebug) 
     {
@@ -560,6 +582,19 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                   "It should only be used for a limited time to help a node with very limited "
                   "disk space make progress downloading the blockchain "
                   "(default: %d, minimum value: %d)."), DEFAULT_MIN_BLOCKS_TO_KEEP, MIN_MIN_BLOCKS_TO_KEEP)
+        );
+        strUsage += HelpMessageOpt(
+            "-prunehysteresis=<n>",
+            strprintf(
+                _("Width of the automatic-prune hysteresis band, as a percentage of "
+                  "-prune. When pruning runs, block files are removed until on-disk "
+                  "usage is at least this many percent below the target, creating "
+                  "that much headroom before pruning is triggered again. Larger "
+                  "values prune less frequently but more aggressively, which can "
+                  "reduce the frequency of forced UTXO cache flushes triggered by "
+                  "disk pressure. Set to 0 to retain the legacy behaviour of pruning "
+                  "only as far as the target (range: 0..99, default: %d)."),
+                DEFAULT_PRUNE_HYSTERESIS)
         );
     }
 
@@ -1450,14 +1485,26 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             "The value may be given in bytes or with unit (B, kB, MB, GB)."));
     strUsage += HelpMessageOpt(
         "-maxcoinsprovidercachesize=<n>",
-        strprintf(_("Set soft maximum limit of cached coin tip buffer size (default: %d GB, minimum: %d MB). "
+        strprintf(_("Set soft maximum limit of cached coin tip buffer size (minimum: %d MB). "
+            "If unset, defaults to the in-memory portion of -coinsdbcache. "
+            "Must not exceed that value if specified. "
             "The value may be given in bytes or with unit (B, kB, MB, GB)."),
-            DEFAULT_COINS_PROVIDER_CACHE_SIZE / ONE_GIGABYTE,
             MIN_COINS_PROVIDER_CACHE_SIZE / ONE_MEGABYTE));
     strUsage += HelpMessageOpt(
         "-maxcoinsdbfiles=<n>",
-        strprintf(_("Set maximum number of files used by coins leveldb (default: %d). "),
-                  CoinsDB::MaxFiles::Default().maxFiles));
+        strprintf(_("Set maximum number of files used by coins leveldb "
+                    "(default: min(%d, RLIMIT_NOFILE_hard - %d%s); "
+                    "currently %d). Counts against the file descriptor limit "
+                    "together with -maxconnections; if the system limit is too "
+                    "low this value is reduced first. "),
+                  CoinsDB::MaxFiles::AbsoluteMax,
+                  CoinsDB::MaxFiles::ReservedFds,
+#ifdef USE_POLL
+                  "",
+#else
+                  strprintf(", %d on this select() build", CoinsDB::MaxFiles::SelectMax),
+#endif
+                  CoinsDB::MaxFiles::Default().Get()));
     strUsage += HelpMessageOpt(
         "-maxcoinsdbfilesize=<n>",
         strprintf(_("Set maximum file size used by the coins leveldb (default: %d MB). "
@@ -2102,13 +2149,6 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     }
 
     // Make sure enough file descriptors are available
-    // NOLINTNEXTLINE(*-narrowing-conversions)
-    const int nBind = std::max(
-        (gArgs.IsArgSet("-bind") ? gArgs.GetArgs("-bind").size() : 0) +
-            (gArgs.IsArgSet("-whitebind") ? gArgs.GetArgs("-whitebind").size()
-                                          : 0),
-        size_t(1));
-
     const int nUserMaxConnections =
         static_cast<int>(gArgs.GetArg("-maxconnections", DEFAULT_MAX_PEER_CONNECTIONS));
     nMaxConnections = std::max(nUserMaxConnections, 0);
@@ -2123,19 +2163,114 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
     const uint16_t maxAddNodeConnections { config.GetMaxAddNodeConnections() };
-    nMaxConnections =
-        std::max(std::min(nMaxConnections,
-                          (int)(FD_SETSIZE - nBind - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections)),
-                 0);
-    nFD = RaiseFileDescriptorLimit(nMaxConnections + MIN_CORE_FILEDESCRIPTORS + maxAddNodeConnections);
+    // Listen sockets: one per -bind/-whitebind address, at least one.
+    // NOLINTNEXTLINE(*-narrowing-conversions)
+    const int nBind = std::max(
+        (gArgs.IsArgSet("-bind") ? gArgs.GetArgs("-bind").size() : 0) +
+            (gArgs.IsArgSet("-whitebind") ? gArgs.GetArgs("-whitebind").size()
+                                          : 0),
+        size_t(1));
+    // Everything the budget counts explicitly: peer and addnode sockets, the
+    // listen sockets, the core reserve and the coins files. Used identically
+    // by both backends and by every clamp below so the accounting agrees.
+    // int64_t: under poll() -maxconnections is not pre-clamped, so the request
+    // must not overflow int before RaiseFileDescriptorLimit bounds it.
+    const auto fdBudget = [&maxAddNodeConnections, nBind](int connections, int coinsFiles) -> int64_t {
+        return (static_cast<int64_t>(connections) + maxAddNodeConnections) * SOCKETS_PER_PEER +
+               nBind + MIN_CORE_FILEDESCRIPTORS + coinsFiles;
+    };
+#ifndef USE_POLL
+    // select() can only wait on sockets numbered below FD_SETSIZE, so with
+    // that backend the connection count is capped so that the whole budget,
+    // before any coins files, fits inside that range. With poll() (USE_POLL)
+    // the only bound is the descriptor limit applied below.
+    {
+        const int selectableConnections { static_cast<int>(
+            std::max<int64_t>(static_cast<int64_t>(FD_SETSIZE) - fdBudget(0, 0), 0) / SOCKETS_PER_PEER) };
+        nMaxConnections = std::clamp(nMaxConnections, 0, selectableConnections);
+    }
+#endif
+    if(std::string err; !config.SetMaxCoinsDbOpenFiles(
+        // NOLINTNEXTLINE(*-narrowing-conversions)
+        gArgs.GetArg("-maxcoinsdbfiles", CoinsDB::MaxFiles::Default().Get()), &err))
+    {
+        return InitError(err);
+    }
+    LogPrintf("Using -maxcoinsdbfiles=%d (default: %d)\n",
+              config.GetMaxCoinsDbOpenFiles(),
+              CoinsDB::MaxFiles::Default().Get());
+    // Reserve FDs for the coins leveldb on top of the connection/core budget,
+    // otherwise a large -maxcoinsdbfiles value can be promised but unusable.
+    // The full value is reserved: we have told LevelDB it may hold that many
+    // files open, so budget for it doing exactly that, whatever its internal
+    // policy for actually keeping descriptors happens to be in this version.
+    // NOLINTNEXTLINE(*-narrowing-conversions)
+    int coinsDbFiles = config.GetMaxCoinsDbOpenFiles();
+#ifndef USE_POLL
+    // select() build: sockets are only usable while numbered below FD_SETSIZE,
+    // and the kernel hands out the lowest free number, so the whole budget,
+    // not just the connection count, has to fit inside FD_SETSIZE. Trim the
+    // coins files to whatever the sockets and core reserve leave.
+    {
+        const int64_t selectableCoinsFiles {
+            static_cast<int64_t>(FD_SETSIZE) - fdBudget(nMaxConnections, 0) };
+        // An explicit -maxcoinsdbfiles below the floor is left alone (and
+        // keeps std::clamp's lo <= hi precondition intact).
+        const int minCoinsFiles { static_cast<int>(CoinsDB::MaxFiles::DefaultFallback) };
+        const int capped { coinsDbFiles > minCoinsFiles
+            ? static_cast<int>(std::clamp<int64_t>(selectableCoinsFiles, minCoinsFiles, coinsDbFiles))
+            : coinsDbFiles };
+        if (capped < coinsDbFiles) {
+            InitWarning(strprintf(_("Reducing -maxcoinsdbfiles from %d to %d, to keep file "
+                                    "descriptors below FD_SETSIZE on this select() build."),
+                                  coinsDbFiles, capped));
+            coinsDbFiles = capped;
+            if(std::string err; !config.SetMaxCoinsDbOpenFiles(coinsDbFiles, &err))
+            {
+                return InitError(err);
+            }
+        }
+    }
+#endif
+    // LevelDB sizes some of its own internal limits from the soft limit at
+    // the moment the first database is opened (in AppInitMain), so the limit
+    // must be raised here, before any of them.
+    nFD = RaiseFileDescriptorLimit(static_cast<int>(
+        std::min<int64_t>(fdBudget(nMaxConnections, coinsDbFiles), std::numeric_limits<int>::max())));
     if (nFD < MIN_CORE_FILEDESCRIPTORS)
         return InitError(_("Not enough file descriptors available."));
-    nMaxConnections =
-        std::max(std::min(nFD - MIN_CORE_FILEDESCRIPTORS - maxAddNodeConnections, nMaxConnections), 0);
-    if (nMaxConnections < nUserMaxConnections)
+    if (nFD < fdBudget(nMaxConnections, coinsDbFiles)) {
+        // The limit was clipped. Connections take priority: shrink the coins
+        // file budget first, down to the fixed fallback default at most, and
+        // only then take any remaining shortfall out of the connection count.
+        const int minCoinsFiles { static_cast<int>(CoinsDB::MaxFiles::DefaultFallback) };
+        if (coinsDbFiles > minCoinsFiles) {
+            const int64_t shortfall { fdBudget(nMaxConnections, coinsDbFiles) - nFD };
+            // Bounded above by coinsDbFiles and below by minCoinsFiles, so it fits an int.
+            const int reduced { static_cast<int>(std::max<int64_t>(coinsDbFiles - shortfall, minCoinsFiles)) };
+            InitWarning(strprintf(_("Reducing -maxcoinsdbfiles from %d to %d, "
+                                    "because of system limitations."),
+                                  coinsDbFiles, reduced));
+            coinsDbFiles = reduced;
+            if(std::string err; !config.SetMaxCoinsDbOpenFiles(coinsDbFiles, &err))
+            {
+                return InitError(err);
+            }
+        }
+        const int connectionFds {
+            nFD - MIN_CORE_FILEDESCRIPTORS - nBind - coinsDbFiles - maxAddNodeConnections * SOCKETS_PER_PEER };
+        nMaxConnections = std::clamp(connectionFds / SOCKETS_PER_PEER, 0, nMaxConnections);
+    }
+    if (nMaxConnections < nUserMaxConnections) {
+        if (nMaxConnections == 0 && nUserMaxConnections > 0) {
+            return InitError(strprintf(_("Not enough file descriptors available for any "
+                                         "connections (limit %d). Raise the limit or lower "
+                                         "-maxcoinsdbfiles."), nFD));
+        }
         InitWarning(strprintf(_("Reducing -maxconnections from %d to %d, "
                                 "because of system limitations."),
                               nUserMaxConnections, nMaxConnections));
+    }
 
     nMaxOutboundConnections = std::clamp(nUserMaxOutboundConnections, 0, nMaxConnections);
     if(nMaxOutboundConnections < nUserMaxOutboundConnections) 
@@ -2707,6 +2842,11 @@ bool AppInitParameterInteraction(ConfigInit &config) {
         return InitError(err);
     }
 
+    // NOLINTNEXTLINE(*-narrowing-conversions)
+    if(std::string err; !config.SetPruneHysteresis(gArgs.GetArg("-prunehysteresis", DEFAULT_PRUNE_HYSTERESIS), &err)) {
+        return InitError(err);
+    }
+
     if(std::string err; !config.SetMaxStdTxnValidationDuration(
         // NOLINTNEXTLINE(*-narrowing-conversions)
         gArgs.GetArg(
@@ -2775,18 +2915,35 @@ bool AppInitParameterInteraction(ConfigInit &config) {
     {
         return InitError(err);
     }
-    if(std::string err; !config.SetMaxCoinsProviderCacheSize(
-        gArgs.GetArgAsBytes("-maxcoinsprovidercachesize", DEFAULT_COINS_PROVIDER_CACHE_SIZE),
-        &err))
+
+    // -coinsdbcache: total CoinsDB budget. Split 1/8 to LevelDB (capped at
+    // MAX_COINS_LEVELDB_CACHE_SIZE), remainder to the in-memory UTXO flush
+    // threshold.
     {
-        return InitError(err);
+        const int64_t coinsTotal = gArgs.GetArgAsBytes(
+            "-coinsdbcache", CoinsDBDefaults::DEFAULT_COINSDB_CACHE_SIZE / ONE_MEBIBYTE, ONE_MEBIBYTE);
+        const auto split = CoinsDBDefaults::ComputeCoinsDbCacheSplit(coinsTotal);
+        if(std::string err; !config.SetCoinsDBCacheSize(split.first, &err))
+        {
+            return InitError(err);
+        }
+        if(std::string err; !config.SetCoinsCacheSize(split.second, &err))
+        {
+            return InitError(err);
+        }
+
+        // -maxcoinsprovidercachesize: defaults to the in-memory portion of
+        // -coinsdbcache; if user-set, must not exceed it (cross-checked in
+        // SetMaxCoinsProviderCacheSize against the value just stored above).
+        const int64_t providerCacheSize = gArgs.IsArgSet("-maxcoinsprovidercachesize")
+            ? gArgs.GetArgAsBytes("-maxcoinsprovidercachesize", 0)
+            : split.second;
+        if(std::string err; !config.SetMaxCoinsProviderCacheSize(providerCacheSize, &err))
+        {
+            return InitError(err);
+        }
     }
-    if(std::string err; !config.SetMaxCoinsDbOpenFiles(
-        // NOLINTNEXTLINE(*-narrowing-conversions)
-        gArgs.GetArg("-maxcoinsdbfiles", CoinsDB::MaxFiles::Default().maxFiles), &err))
-    {
-        return InitError(err);
-    }
+
     if(std::string err; !config.SetCoinsDBMaxFileSize(
         gArgs.GetArgAsBytes("-maxcoinsdbfilesize", CoinsDBDefaults::DEFAULT_MAX_LEVELDB_FILE_SIZE), &err))
     {
@@ -3236,7 +3393,7 @@ bool AppInitSanityChecks() {
     // Step 4: sanity checks
 
     // Initialize elliptic curve code
-    std::string sha256_algo = SHA256AutoDetect();
+    std::string sha256_algo = sha256_dispatch::AutoDetect();
     LogPrintf("Using the '%s' SHA256 implementation\n", sha256_algo);
     RandomInit();
 
@@ -3369,8 +3526,8 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
         "Using config file %s\n",
         GetConfigFile(gArgs.GetArg("-conf", BITCOIN_CONF_FILENAME)).string());
     LogPrintf("Using at most %i automatic connections (%i file descriptors "
-              "available)\n",
-              nMaxConnections, nFD);
+              "available, %i reserved for coins database files)\n",
+              nMaxConnections, nFD, config.GetMaxCoinsDbOpenFiles());
 
     InitSignatureCache();
     InitScriptExecutionCache();
@@ -3385,6 +3542,9 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     // Late configuration for globaly constructed objects
     mempool.SuspendSanityCheck();
     mempool.getNonFinalPool().loadConfig();
+    // First LevelDB open in the process. LevelDB sizes internal limits from
+    // the soft descriptor limit at this point, so RaiseFileDescriptorLimit
+    // (AppInitParameterInteraction) must already have run. Keep that ordering.
     mempool.InitMempoolTxDB();
     if (!gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
         mempool.ResumeSanityCheck();
@@ -3627,43 +3787,41 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
     fReindex = gArgs.GetBoolArg("-reindex", false);
     bool fReindexChainState = gArgs.GetBoolArg("-reindex-chainstate", false);
 
-    // cache size calculations
+    // -- Block-tree + Merkle-tree budget (-dbcache)
     int64_t nTotalCache = gArgs.GetArgAsBytes("-dbcache", nDefaultDbCache, ONE_MEBIBYTE);
-    // total cache cannot be less than nMinDbCache
-    nTotalCache = std::max(nTotalCache, nMinDbCache << 20);
-    // total cache cannot be greater than nMaxDbcache
-    nTotalCache = std::min(nTotalCache, nMaxDbCache << 20);
-    int64_t nBlockTreeDBCache = nTotalCache / 8;
-    nBlockTreeDBCache = std::min(nBlockTreeDBCache,
-                                 (gArgs.GetBoolArg("-txindex", DEFAULT_TXINDEX)
-                                      ? nMaxBlockDBAndTxIndexCache
-                                      : nMaxBlockDBCache)
-                                     << 20);
-    nTotalCache -= nBlockTreeDBCache;
-    // use 25%-50% of the remainder for disk cache
-    int64_t nCoinDBCache =
-        std::min(nTotalCache / 2, (nTotalCache / 4) + (1 << 23));
-    // cap total coins db cache
-    nCoinDBCache = std::min(nCoinDBCache, nMaxCoinsDBCache << 20);
-    nTotalCache -= nCoinDBCache;
-    // calculate cache for Merkle Tree database
-    int64_t nMerkleTreeIndexDBCache = nBlockTreeDBCache / 4;
-    nTotalCache -= nMerkleTreeIndexDBCache;
-    // the rest goes to in-memory cache
-    nCoinCacheUsage = nTotalCache;
+    nTotalCache = std::clamp(nTotalCache, nMinDbCache << 20, nMaxDbCache << 20);
+    // Block-tree DB has the whole -dbcache budget available, capped by its
+    // own per-component max (txindex on/off).
+    int64_t nBlockTreeDBCache = std::min(
+        nTotalCache,
+        (gArgs.GetBoolArg("-txindex", DEFAULT_TXINDEX)
+            ? nMaxBlockDBAndTxIndexCache
+            : nMaxBlockDBCache) << 20);
+    // Merkle-tree DB gets either 1/4 of the block-tree allocation or
+    // whatever is left of the -dbcache budget, whichever is smaller.
+    int64_t nMerkleTreeIndexDBCache = std::min(
+        nBlockTreeDBCache / 4,
+        nTotalCache - nBlockTreeDBCache);
+
+    // -- Coins budget
+    const int64_t nCoinDBCache = static_cast<int64_t>(config.GetCoinsDBCacheSize());
+    const int64_t nCoinsInMemory = static_cast<int64_t>(config.GetCoinsCacheSize());
+
     MempoolSizeLimits limits = MempoolSizeLimits::FromConfig();
     LogPrintf("Cache configuration:\n");
     LogPrintf("* Using %.1fMiB for block index database\n",
               nBlockTreeDBCache * (1.0 / ONE_MEBIBYTE));
     LogPrintf("* Using %.1fMiB for Merkle Tree index database\n",
               nMerkleTreeIndexDBCache * (1.0 / ONE_MEBIBYTE));
-    LogPrintf("* Using %.1fMiB for chain state database\n",
+    LogPrintf("* Using %.1fMiB for chain state database (LevelDB cache)\n",
               nCoinDBCache * (1.0 / ONE_MEBIBYTE));
-    LogPrintf("* Using %.1fMiB for in-memory UTXO set (plus up to %.1fMiB of "
-              "unused mempool space and %.1fMiB of disk space)\n",
-              nCoinCacheUsage * (1.0 / 1024 / 1024),
-              limits.Memory() * (1.0 / 1024 / 1024),
-              limits.Disk() * (1.0 / 1024 / 1024));
+    LogPrintf("* Using %.1fMiB for in-memory UTXO set (plus %.1fMiB of disk space)\n",
+              nCoinsInMemory * (1.0 / ONE_MEBIBYTE),
+              limits.Disk() * (1.0 / ONE_MEBIBYTE));
+    LogPrintf("* CoinsDB total budget %.1fMiB (LevelDB %.1fMiB + in-memory %.1fMiB)\n",
+              (nCoinDBCache + nCoinsInMemory) * (1.0 / ONE_MEBIBYTE),
+              nCoinDBCache * (1.0 / ONE_MEBIBYTE),
+              nCoinsInMemory * (1.0 / ONE_MEBIBYTE));
 
     std::int64_t frozen_txo_db_cache_size = gArgs.GetArg("-frozentxodbcache", static_cast<std::int64_t>(DEFAULT_FROZEN_TXO_DB_CACHE));
     if(frozen_txo_db_cache_size<0)

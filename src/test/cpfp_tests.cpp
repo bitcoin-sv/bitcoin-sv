@@ -777,4 +777,93 @@ BOOST_AUTO_TEST_CASE(double_spend_notifications)
                                   validator.notifications_.end());
 }
 
+// Regression test for a heap-use-after-free in CTxMemPool::removeUncheckedNL.
+//
+// Once TrimToSize has instantiated the (permanent) eviction tracker,
+// removeUncheckedNL captures each removed entry's parents set and hands it to
+// CEvictionCandidateTracker::EntryRemoved, which dereferences those parent
+// txiters (IsCPFPGroupMember(), and the salted hash of the txid in links.at()).
+//
+// When a parent P and one of its children are removed in the same stage,
+// removeStagedNL must sever the P->child link before the bulk erase. If it does
+// not, and the unordered stage iteration frees P before a child is processed,
+// that child's captured parents set still holds the now-dangling txiter to P,
+// which EntryRemoved then dereferences -> use-after-free.
+//
+// To reach the P-before-child ordering we give P many children: the stage is
+// then a large unordered_set whose iteration order is scrambled by the salted
+// hash (with only two elements libstdc++ would deterministically iterate the
+// last-inserted child first, which is the safe order and never hits the bug).
+// With many children P almost always precedes at least one of them. We also
+// repeat over several rounds with unique txids. The failure is detected by
+// AddressSanitizer; with the fix in place the P->child links are severed during
+// teardown, so the captured parents sets only ever reference surviving entries.
+BOOST_AUTO_TEST_CASE(remove_staged_parent_before_child_no_use_after_free)
+{
+    mempool.Clear();
+    mempool.SetSanityCheck(0);
+
+    CTxMemPoolTestAccess testAccess(mempool);
+
+    // Every entry gets a distinct OP_RETURN payload so that its txid is unique
+    // (the MakeId test helper used for confirmed inputs collides easily, which
+    // would otherwise produce duplicate transactions).
+    size_t uniqueTag = 0;
+
+    // 1) Put some transactions in the mempool and trim it, so that the (from
+    //    now on permanent) eviction tracker gets instantiated. TrimToSize
+    //    always creates the tracker, regardless of how much it actually evicts.
+    std::vector<CTxMemPoolEntry> filler;
+    for(int i = 0; i < 8; ++i)
+    {
+        filler.push_back(
+            MakeEntry(DefaultFeeRate(), MakeConfirmedInputs(1, Amount{1000000}), {}, 1, 0,
+                      ++uniqueTag));
+        AddToMempool(filler.back());
+    }
+    mempool.TrimToSize(mempool.DynamicMemoryUsage() / 2, mining::CJournalChangeSetPtr{});
+
+    // 2) Repeatedly build a parent P (paying, so it lands in the primary
+    //    mempool) with many children, each child spending a distinct output of
+    //    P, then remove the whole family together via the reorg path
+    //    (removeRecursiveNL stages P plus all of its descendants). With many
+    //    children, the staged unordered_set iteration is very likely to process
+    //    P before at least one of its children.
+    constexpr size_t nChildren = 32;
+    for(int round = 0; round < 16; ++round)
+    {
+        auto parent =
+            MakeEntry(DefaultFeeRate(), MakeConfirmedInputs(1, Amount{100000000}), {}, nChildren,
+                      0, ++uniqueTag);
+        AddToMempool(parent);
+        BOOST_REQUIRE(testAccess.mapTx().find(parent.GetTxId()) != testAccess.mapTx().end());
+
+        std::vector<CTxMemPoolEntry> children;
+        for(size_t c = 0; c < nChildren; ++c)
+        {
+            // Each child spends a distinct output of P, so every child has P in
+            // its parents set -- exactly what removeUncheckedNL captures and
+            // EntryRemoved dereferences.
+            children.push_back(
+                MakeEntry(DefaultFeeRate(), {}, {std::make_tuple(parent.GetSharedTx(), int(c))}, 1,
+                          0, ++uniqueTag));
+            AddToMempool(children.back());
+        }
+
+        // Remove P recursively -> stages {P, children...} and runs them through
+        // removeStagedNL -> removeUncheckedNL with the eviction tracker live.
+        auto changeSet =
+            testAccess.getJournalBuilder().getNewChangeSet(mining::JournalUpdateReason::UNKNOWN);
+        testAccess.RemoveRecursive(*parent.GetSharedTx(), changeSet,
+                                   MemPoolRemovalReason::REORG);
+        changeSet->apply();
+
+        BOOST_CHECK(testAccess.mapTx().find(parent.GetTxId()) == testAccess.mapTx().end());
+        for(const auto& child : children)
+        {
+            BOOST_CHECK(testAccess.mapTx().find(child.GetTxId()) == testAccess.mapTx().end());
+        }
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

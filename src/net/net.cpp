@@ -21,6 +21,7 @@
 #include "netmessagemaker.h"
 #include "primitives/transaction.h"
 #include "scheduler.h"
+#include "sync.h"
 #include "taskcancellation.h"
 #include "txn_propagator.h"
 #include "txn_validator.h"
@@ -301,51 +302,65 @@ bool IsReachable(const CNetAddr &addr) {
     return IsReachable(net);
 }
 
-CNodePtr CConnman::FindNode(const CNetAddr &ip) {
-    LOCK(cs_vNodes);
-    for (const CNodePtr& pnode : vNodes) {
-        if (pnode->GetAssociation().GetPeerAddr() == ip) {
+CNodePtr CConnman::FindNode(const CNetAddr& ip)
+{
+    bsv::lock_guard lock{cs_vNodes};
+    for(const CNodePtr& pnode : vNodes)
+    {
+        if(pnode->GetAssociation().GetPeerAddr() == ip)
+        {
             return pnode;
         }
     }
     return nullptr;
 }
 
-CNodePtr CConnman::FindNode(const CSubNet &subNet) {
-    LOCK(cs_vNodes);
-    for (const CNodePtr& pnode : vNodes) {
-        if (subNet.Match(pnode->GetAssociation().GetPeerAddr())) {
+CNodePtr CConnman::FindNode(const CSubNet& subNet)
+{
+    bsv::lock_guard lock{cs_vNodes};
+    for(const CNodePtr& pnode : vNodes)
+    {
+        if(subNet.Match(pnode->GetAssociation().GetPeerAddr()))
+        {
             return pnode;
         }
     }
     return nullptr;
 }
 
-CNodePtr CConnman::FindNode(const std::string &addrName) {
-    LOCK(cs_vNodes);
-    for (const CNodePtr& pnode : vNodes) {
-        if (pnode->GetAddrName() == addrName) {
+CNodePtr CConnman::FindNode(const std::string& addrName)
+{
+    bsv::lock_guard lock{cs_vNodes};
+    for(const CNodePtr& pnode : vNodes)
+    {
+        if(pnode->GetAddrName() == addrName)
+        {
             return pnode;
         }
     }
     return nullptr;
 }
 
-CNodePtr CConnman::FindNode(const CService &addr) {
-    LOCK(cs_vNodes);
-    for (const CNodePtr& pnode : vNodes) {
-        if (pnode->GetAssociation().GetPeerAddr() == addr) {
+CNodePtr CConnman::FindNode(const CService& addr)
+{
+    bsv::lock_guard lock{cs_vNodes};
+    for(const CNodePtr& pnode : vNodes)
+    {
+        if(pnode->GetAssociation().GetPeerAddr() == addr)
+        {
             return pnode;
         }
     }
     return nullptr;
 }
 
-bool CConnman::CheckIncomingNonce(uint64_t nonce) {
-    LOCK(cs_vNodes);
-    for (const CNodePtr& pnode : vNodes) {
-        if (!pnode->fSuccessfullyConnected && !pnode->fInbound &&
-            pnode->GetLocalNonce() == nonce)
+bool CConnman::CheckIncomingNonce(uint64_t nonce)
+{
+    bsv::lock_guard lock{cs_vNodes};
+    for(const CNodePtr& pnode : vNodes)
+    {
+        if(!pnode->fSuccessfullyConnected && !pnode->fInbound &&
+           pnode->GetLocalNonce() == nonce)
             return false;
     }
     return true;
@@ -383,6 +398,9 @@ CNodePtr CConnman::ConnectNode(NodeConnectInfo& connect)
                                       nConnectTimeout, &proxyConnectionFailed)
                 : ConnectSocket(connect.addrConnect, hSocket, nConnectTimeout,
                                 &proxyConnectionFailed)) {
+        // Belt-and-braces repeat of the check in ConnectSocketDirectly, which
+        // every connect path (direct or via proxy) has already passed. Both
+        // compile to nothing on USE_POLL builds; see IsSelectableSocket.
         if (!IsSelectableSocket(hSocket)) {
             LogPrint(BCLog::NETCONN, "Cannot create connection: "
                      "non-selectable socket created (fd [%d] >= FD_SETSIZE ?)\n",
@@ -391,13 +409,14 @@ CNodePtr CConnman::ConnectNode(NodeConnectInfo& connect)
             return nullptr;
         }
 
-        if (!connect.fNewStream && connect.pszDest && connect.addrConnect.IsValid()) {
+        if(!connect.fNewStream && connect.pszDest && connect.addrConnect.IsValid())
+        {
             // It is possible that we already have a connection to the IP/port
             // pszDest resolved to. In that case, drop the connection that was
             // just created, and return the existing CNode instead. Also store
             // the name we used to connect in that CNode, so that future
             // FindNode() calls to that name catch this early.
-            LOCK(cs_vNodes);
+            bsv::lock_guard lock{cs_vNodes};
             CNodePtr pnode = FindNode(connect.addrConnect);
             if (pnode) {
                 pnode->MaybeSetAddrName(std::string(connect.pszDest));
@@ -544,7 +563,7 @@ void CConnman::Ban(const CSubNet &subNet, const BanReason &banReason,
     }
 
     {
-        LOCK(cs_vNodes);
+        bsv::lock_guard lock{cs_vNodes};
         for(const CNodePtr& pnode : vNodes)
         {
             if(subNet.Match(pnode->GetAssociation().GetPeerAddr()))
@@ -804,7 +823,7 @@ void CNode::copyStats(NodeStats &stats)
 
     {
         // Fetch size of inventory queue
-        LOCK(cs_mInvList);
+        bsv::lock_guard lock{cs_mInvList};
         stats.nInvQueueSize = mInvList.size();
     }
 }
@@ -828,7 +847,7 @@ void CNode::AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns)
     // inventory before cs_filter to prevent deadlocks
     LOCK(cs_inventory);
     LOCK(cs_filter);
-    LOCK(cs_mInvList);
+    bsv::lock_guard lock{cs_mInvList};
 
     if(!fRelayTxes)
     {
@@ -860,21 +879,28 @@ void CNode::AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns)
 
 /**
 * Remove some transactions from our pending inventory list.
+* pre-condition: toRemove must be sorted
 * Assumes the caller has taken care of locking access to the mempool,
 * and so can be called in parallel.
 */
-void CNode::RemoveTxnsFromInventory(const std::set<CInv>& toRemove)
+void CNode::RemoveTxnsFromInventory(const std::vector<CInv>& toRemove)
 {
-    // Remove them
-    LOCK(cs_mInvList);
+    bsv::lock_guard lock{cs_mInvList};
 
     mInvList.erase(
         std::remove_if(
-            mInvList.begin(), mInvList.end(), 
+            mInvList.begin(), mInvList.end(),
             [&toRemove](const CTxnSendingDetails& i) {
-                return toRemove.find(i.getInv()) != toRemove.end(); 
-            }), 
-        mInvList.end());    
+                return std::binary_search(toRemove.begin(), toRemove.end(), i.getInv());
+            }),
+        mInvList.end());
+}
+
+/** Check whether our pending inventory list contains any transactions */
+bool CNode::HasTxnsInInventory() const
+{
+    bsv::lock_guard lock{cs_mInvList};
+    return !mInvList.empty();
 }
 
 /** Fetch the next N items from our inventory */
@@ -1032,18 +1058,18 @@ int CNode::GetSendVersion() const {
     return nSendVersion;
 }
 
-bool CNode::SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError, SOCKET& socketMax) const
+bool CNode::RegisterSockets(SocketWaitSet& waitSet) const
 {
     // Get all sockets from our association
-    return mAssociation.SetSocketsForSelect(setRecv, setSend, setError, socketMax);
+    return mAssociation.RegisterSockets(waitSet);
 }
 
-void CNode::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, CConnman& connman,
+void CNode::ServiceSockets(const SocketWaitSet& waitSet, CConnman& connman,
                            const Config& config, uint64_t& bytesRecv, uint64_t& bytesSent)
 {
     // Let association service its sockets
     bool newMsgs {false};
-    mAssociation.ServiceSockets(setRecv, setSend, setError, connman, config, newMsgs, bytesRecv, bytesSent);
+    mAssociation.ServiceSockets(waitSet, connman, config, newMsgs, bytesRecv, bytesSent);
     if(newMsgs)
     {
         connman.WakeMessageHandler();
@@ -1148,10 +1174,11 @@ static bool CompareNodeTXTime(const NodeEvictionCandidate &a,
  * partition a node the attacker must be simultaneously better at all of them
  * than honest peers.
  */
-bool CConnman::AttemptToEvictConnection() {
+bool CConnman::AttemptToEvictConnection()
+{
     std::vector<NodeEvictionCandidate> vEvictionCandidates;
     {
-        LOCK(cs_vNodes);
+        bsv::lock_guard lock{cs_vNodes};
 
         for (const CNodePtr& node : vNodes) {
             if (node->fWhitelisted || !node->fInbound || node->fDisconnect) {
@@ -1271,9 +1298,11 @@ bool CConnman::AttemptToEvictConnection() {
 
     // Disconnect from the network group with the most connections
     NodeId evicted = vEvictionCandidates.front().id;
-    LOCK(cs_vNodes);
-    for(const CNodePtr& node : vNodes) {
-        if (node->GetId() == evicted) {
+    bsv::lock_guard lock{cs_vNodes};
+    for(const CNodePtr& node : vNodes)
+    {
+        if(node->GetId() == evicted)
+        {
             node->fDisconnect = true;
             return true;
         }
@@ -1306,13 +1335,18 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket)
     int nConnectionsFromAddr = 0;
     bool whitelisted = hListenSocket.whitelisted || IsWhitelistedRange(addr);
     {
-        LOCK(cs_vNodes);
-        for (const CNodePtr& pnode : vNodes) {
-            if (pnode->fInbound) {
+        bsv::lock_guard lock{cs_vNodes};
+        for(const CNodePtr& pnode : vNodes)
+        {
+            if(pnode->fInbound)
+            {
                 nInbound++;
-                if (!whitelisted) {
+                if(!whitelisted)
+                {
                     auto& nodeAddr = pnode->GetAssociation().GetPeerAddr();
-                    if (static_cast<const CNetAddr&>(nodeAddr) == static_cast<const CNetAddr&>(addr)) {
+                    if(static_cast<const CNetAddr&>(nodeAddr) ==
+                       static_cast<const CNetAddr&>(addr))
+                    {
                         nConnectionsFromAddr++;
                     }
                 }
@@ -1321,8 +1355,16 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket)
     }
 
     if (hSocket == INVALID_SOCKET) {
-        int nErr = WSAGetLastError();
-        if (nErr != WSAEWOULDBLOCK) {
+        const int nErr { WSAGetLastError() };
+        if (IsOutOfFileDescriptorsError(nErr)) {
+            // An operator problem rather than a peer one, so report it at the
+            // default log level. The listen socket stays readable while its
+            // backlog is unserved, so back off for one tick rather than spin
+            // on accept().
+            ReportOutOfFileDescriptors("accept()", nErr);
+            (void)interruptNet.sleep_for(SOCKET_HANDLER_TICK);
+        }
+        else if (nErr != WSAEWOULDBLOCK) {
             LogPrint(BCLog::NETCONN, "socket error accept failed: %s\n",
                       NetworkErrorString(nErr));
         }
@@ -1400,19 +1442,153 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket)
     LogPrint(BCLog::NETCONN, "connection from %s accepted\n", addr.ToString());
 
     {
-        LOCK(cs_vNodes);
+        bsv::lock_guard lock{cs_vNodes};
         vNodes.push_back(pnode);
     }
 }
 
+#ifdef USE_POLL
+void CConnman::WaitForSockets(SocketWaitSet& waitSet)
+{
+    // poll() backend: no FD_SETSIZE limit on socket numbers.
+    mPollFds.clear();
+    mPollFds.reserve(waitSet.Entries().size());
+    for (const SocketWaitSet::Entry& entry : waitSet.Entries()) {
+        // Registered even when no events are requested: POLLERR, POLLHUP and
+        // POLLNVAL are always reported, which gives idle or paused streams
+        // error detection they would not otherwise get.
+        mPollFds.push_back(pollfd{entry.socket, PollRequestedEvents(entry.wanted), 0});
+    }
+
+    // With nothing registered poll() simply acts as a sleep for one tick.
+    const int nPoll { poll(mPollFds.data(), static_cast<nfds_t>(mPollFds.size()),
+                           static_cast<int>(SOCKET_HANDLER_TICK.count())) };
+    if (interruptNet) {
+        return;
+    }
+
+    if (nPoll < 0) {
+        const int nErr { WSAGetLastError() };
+        if (nErr != EINTR) {
+            LogPrint(BCLog::NETCONN, "socket poll error %s\n", NetworkErrorString(nErr));
+            // Nothing is marked ready. Throttle so a persistent failure cannot
+            // spin the loop; the caller checks interruptNet for itself.
+            (void)interruptNet.sleep_for(SOCKET_HANDLER_TICK);
+        }
+        return;
+    }
+
+    bool onlyInvalid { nPoll > 0 };
+    // mPollFds is parallel to waitSet.Entries(): position i in one is
+    // position i in the other.
+    for (size_t i { 0 }; i < mPollFds.size(); ++i) {
+        const short revents { mPollFds[i].revents };
+        waitSet.SetReadyAt(i, PollReadyFlags(revents));
+        if ((revents & ~POLLNVAL) != 0) {
+            onlyInvalid = false;
+        }
+    }
+    if (onlyInvalid) {
+        // Everything reported was POLLNVAL: sockets closed by another thread
+        // between the fill pass and the wait. There is nothing to service and
+        // poll() would return immediately again, so throttle to one tick as
+        // the select() EBADF path always did.
+        (void)interruptNet.sleep_for(SOCKET_HANDLER_TICK);
+    }
+}
+#else
+void CConnman::WaitForSockets(SocketWaitSet& waitSet)
+{
+    // select() backend: only usable with sockets numbered below FD_SETSIZE,
+    // which IsSelectableSocket() guarantees at socket creation.
+    struct timeval timeout {};
+    timeout.tv_sec = 0;
+    timeout.tv_usec = static_cast<decltype(timeout.tv_usec)>(
+        std::chrono::duration_cast<std::chrono::microseconds>(SOCKET_HANDLER_TICK).count());
+
+    fd_set fdsetRecv;
+    fd_set fdsetSend;
+    fd_set fdsetError;
+    FD_ZERO(&fdsetRecv);
+    FD_ZERO(&fdsetSend);
+    FD_ZERO(&fdsetError);
+    SOCKET hSocketMax {0};
+
+    for (const SocketWaitSet::Entry& entry : waitSet.Entries()) {
+        if ((entry.wanted & SocketWaitSet::RECV) != SocketWaitSet::NONE) {
+            FD_SET(entry.socket, &fdsetRecv);
+        }
+        if ((entry.wanted & SocketWaitSet::SEND) != SocketWaitSet::NONE) {
+            FD_SET(entry.socket, &fdsetSend);
+        }
+        if ((entry.wanted & SocketWaitSet::ERR) != SocketWaitSet::NONE) {
+            FD_SET(entry.socket, &fdsetError);
+        }
+        hSocketMax = std::max(hSocketMax, entry.socket);
+    }
+
+    // With nothing registered select() simply acts as a sleep for one tick.
+    const bool haveFds { !waitSet.Entries().empty() };
+    const int nSelect { select(haveFds ? hSocketMax + 1 : 0, &fdsetRecv,
+                               &fdsetSend, &fdsetError, &timeout) };
+    if (interruptNet) {
+        return;
+    }
+
+    if (nSelect == SOCKET_ERROR) {
+        const int nErr { WSAGetLastError() };
+        if (nErr == WSAEINTR) {
+            // Interrupted by a signal, not a socket error: the sets are
+            // unmodified so nothing is ready, and there is no bad socket to
+            // flush out. Return and let the loop wait again (the caller checks
+            // interruptNet first). Same handling as the poll() backend.
+            return;
+        }
+        if (haveFds) {
+            LogPrint(BCLog::NETCONN, "socket select error %s\n", NetworkErrorString(nErr));
+            // Mark every registered socket readable so that recv() on the bad
+            // one reports the error and it gets closed.
+            for (size_t i { 0 }; i < waitSet.Entries().size(); ++i) {
+                waitSet.SetReadyAt(i, SocketWaitSet::RECV);
+            }
+        }
+        // The return value only tells us whether we were interrupted, which the
+        // caller checks for itself.
+        (void)interruptNet.sleep_for(SOCKET_HANDLER_TICK);
+        return;
+    }
+
+    const std::span<const SocketWaitSet::Entry> entries { waitSet.Entries() };
+    for (size_t i { 0 }; i < entries.size(); ++i) {
+        const SOCKET socket { entries[i].socket };
+        SocketWaitSet::Flags ready { SocketWaitSet::NONE };
+        if (FD_ISSET(socket, &fdsetRecv)) {
+            ready |= SocketWaitSet::RECV;
+        }
+        if (FD_ISSET(socket, &fdsetSend)) {
+            ready |= SocketWaitSet::SEND;
+        }
+        if (FD_ISSET(socket, &fdsetError)) {
+            ready |= SocketWaitSet::ERR;
+        }
+        waitSet.SetReadyAt(i, ready);
+    }
+}
+#endif // USE_POLL
+
 void CConnman::ThreadSocketHandler() {
+#ifdef USE_POLL
+    LogPrintf("P2P socket handler waiting with poll()\n");
+#else
+    LogPrintf("P2P socket handler waiting with select()\n");
+#endif
     unsigned int nPrevNodeCount = 0;
     while (!interruptNet) {
         //
         // Disconnect nodes
         //
         {
-            LOCK(cs_vNodes);
+            bsv::lock_guard lock{cs_vNodes};
             // Disconnect unused nodes
             auto pred = [](const CNodePtr& node) { return node->fDisconnect.load(); };
             std::vector<CNodePtr> toBeRemoved {};
@@ -1464,7 +1640,7 @@ void CConnman::ThreadSocketHandler() {
 
         const size_t vNodesSize{[this]
                                 {
-                                    LOCK(cs_vNodes);
+                                    bsv::lock_guard lock{cs_vNodes};
                                     return vNodes.size();
                                 }()};
         if (vNodesSize != nPrevNodeCount) {
@@ -1477,63 +1653,36 @@ void CConnman::ThreadSocketHandler() {
         //
         // Find which sockets have data to receive
         //
-        //NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-        struct timeval timeout;
-        timeout.tv_sec = 0;
-        // Frequency to poll pnode->vSend
-        timeout.tv_usec = 50000;
-
-        fd_set fdsetRecv;
-        fd_set fdsetSend;
-        fd_set fdsetError;
-        FD_ZERO(&fdsetRecv);
-        FD_ZERO(&fdsetSend);
-        FD_ZERO(&fdsetError);
-        SOCKET hSocketMax = 0;
-        bool have_fds = false;
-
+        mSocketWaitSet.Clear();
         for (const ListenSocket &hListenSocket : vhListenSocket) {
-            FD_SET(hListenSocket.socket, &fdsetRecv);
-            hSocketMax = std::max(hSocketMax, hListenSocket.socket);
-            have_fds = true;
+            if (hListenSocket.socket != INVALID_SOCKET) {
+                mSocketWaitSet.Add(hListenSocket.socket, SocketWaitSet::RECV);
+            }
         }
 
         {
-            LOCK(cs_vNodes);
-            for (const CNodePtr& pnode : vNodes) {
-                // Get sockets to select on
-                have_fds |= pnode->SetSocketsForSelect(fdsetRecv, fdsetSend, fdsetError, hSocketMax);
+            bsv::lock_guard lock{cs_vNodes};
+            for(const CNodePtr& pnode : vNodes)
+            {
+                // Get sockets to wait on
+                pnode->RegisterSockets(mSocketWaitSet);
             }
         }
 
-        int nSelect = select(have_fds ? hSocketMax + 1 : 0, &fdsetRecv,
-                             &fdsetSend, &fdsetError, &timeout);
+        WaitForSockets(mSocketWaitSet);
         if (interruptNet) {
             return;
-        }
-
-        if (nSelect == SOCKET_ERROR) {
-            if (have_fds) {
-                int nErr = WSAGetLastError();
-                LogPrint(BCLog::NETCONN, "socket select error %s\n", NetworkErrorString(nErr));
-                for (SOCKET i = 0; i <= hSocketMax; i++) {
-                    FD_SET(i, &fdsetRecv);
-                }
-            }
-            FD_ZERO(&fdsetSend);
-            FD_ZERO(&fdsetError);
-            if (!interruptNet.sleep_for(
-                    std::chrono::milliseconds(timeout.tv_usec / 1000))) {
-                return;
-            }
         }
 
         //
         // Accept new connections
         //
         for (const ListenSocket &hListenSocket : vhListenSocket) {
+            // Any reported event, not just RECV: a listen socket in error
+            // (POLLERR/POLLHUP/POLLNVAL under poll) is then surfaced through
+            // accept()'s own error logging instead of never firing.
             if (hListenSocket.socket != INVALID_SOCKET &&
-                FD_ISSET(hListenSocket.socket, &fdsetRecv)) {
+                mSocketWaitSet.Ready(hListenSocket.socket) != SocketWaitSet::NONE) {
                 AcceptConnection(hListenSocket);
             }
         }
@@ -1543,17 +1692,19 @@ void CConnman::ThreadSocketHandler() {
         //
         std::vector<CNodePtr> vNodesCopy;
         {
-            LOCK(cs_vNodes);
+            bsv::lock_guard lock{cs_vNodes};
             vNodesCopy = vNodes;
         }
-        for (const CNodePtr& pnode : vNodesCopy) {
+
+        for(const CNodePtr& pnode : vNodesCopy)
+        {
             if (interruptNet) {
                 return;
             }
 
             uint64_t bytesRecv {0};
             uint64_t bytesSent {0};
-            pnode->ServiceSockets(fdsetRecv, fdsetSend, fdsetError, *this, *config_, bytesRecv, bytesSent);
+            pnode->ServiceSockets(mSocketWaitSet, *this, *config_, bytesRecv, bytesSent);
 
             if(bytesRecv > 0) {
                 RecordBytesRecv(bytesRecv);
@@ -1721,7 +1872,7 @@ void CConnman::ThreadDNSAddressSeed() {
             return;
         }
 
-        LOCK(cs_vNodes);
+        bsv::lock_guard lock{cs_vNodes};
         int nRelevant = 0;
         for(const auto& pnode : vNodes)
         {
@@ -1878,8 +2029,9 @@ void CConnman::ThreadOpenConnections() {
         int nOutbound = 0;
         std::set<std::vector<uint8_t>> setConnected;
         {
-            LOCK(cs_vNodes);
-            for (const CNodePtr& pnode : vNodes) {
+            bsv::lock_guard lock{cs_vNodes};
+            for (const CNodePtr& pnode : vNodes)
+            {
                 if (!pnode->fInbound && !pnode->fAddnode) {
                     // Netgroups for inbound and addnode peers are not excluded
                     // because our goal here is to not use multiple of our
@@ -2008,7 +2160,7 @@ std::vector<AddedNodeInfo> CConnman::GetAddedNodeInfo() {
     std::map<CService, bool> mapConnected;
     std::map<std::string, std::pair<bool, CService>> mapConnectedByName;
     {
-        LOCK(cs_vNodes);
+        bsv::lock_guard lock{cs_vNodes};
         for (const CNodePtr& pnode : vNodes) {
             const CAddress& peerAddr { pnode->GetAssociation().GetPeerAddr() };
             if (peerAddr.IsValid()) {
@@ -2188,7 +2340,7 @@ bool CConnman::OpenNetworkConnection(NodeConnectInfo& connectInfo,
 
     GetNodeSignals().InitializeNode(pnode, *this, &connectInfo);
     {
-        LOCK(cs_vNodes);
+        bsv::lock_guard lock{cs_vNodes};
         vNodes.push_back(pnode);
     }
 
@@ -2204,7 +2356,7 @@ void CConnman::ThreadMessageHandler()
         vNodesCopy.clear();
 
         {
-            LOCK(cs_vNodes);
+            bsv::lock_guard lock{cs_vNodes};
             vNodesCopy = vNodes;
         }
 
@@ -2232,7 +2384,7 @@ void CConnman::ThreadMessageHandler()
 
             // Send messages
             {
-                LOCK(pnode->cs_sendProcessing);
+                bsv::lock_guard lock{pnode->cs_sendProcessing};
                 GetNodeSignals().SendMessages(*config_, pnode, *this,
                                               flagInterruptMsgProc);
             }
@@ -2435,18 +2587,23 @@ void Discover()
 #endif
 }
 
-void CConnman::SetNetworkActive(bool active) {
+void CConnman::SetNetworkActive(bool active)
+{
     LogPrint(BCLog::NETCONN, "SetNetworkActive: %s\n", active);
 
-    if (!active) {
+    if(!active)
+    {
         fNetworkActive = false;
 
-        LOCK(cs_vNodes);
+        bsv::lock_guard lock{cs_vNodes};
         // Close sockets to all nodes
-        for (const CNodePtr& pnode : vNodes) {
+        for(const CNodePtr& pnode : vNodes)
+        {
             pnode->CloseSocketDisconnect();
         }
-    } else {
+    }
+    else
+    {
         fNetworkActive = true;
     }
 
@@ -2725,61 +2882,71 @@ void CConnman::Interrupt() {
     }
 }
 
-void CConnman::Stop() {
-    if (threadMessageHandler.joinable()) {
+void CConnman::Stop()
+{
+    if(threadMessageHandler.joinable())
         threadMessageHandler.join();
-    }
-    if (threadOpenConnections.joinable()) {
-        threadOpenConnections.join();
-    }
-    if (threadOpenAddedConnections.joinable()) {
-        threadOpenAddedConnections.join();
-    }
-    if (threadOpenNewStreamConnections.joinable()) {
-        threadOpenNewStreamConnections.join();
-    }
-    if (threadDNSAddressSeed.joinable()) {
-        threadDNSAddressSeed.join();
-    }
-    if (threadSocketHandler.joinable()) {
-        threadSocketHandler.join();
-    }
 
-    if (fAddressesInitialized) {
+    if(threadOpenConnections.joinable())
+        threadOpenConnections.join();
+
+    if(threadOpenAddedConnections.joinable())
+        threadOpenAddedConnections.join();
+
+    if(threadOpenNewStreamConnections.joinable())
+        threadOpenNewStreamConnections.join();
+
+    if(threadDNSAddressSeed.joinable())
+        threadDNSAddressSeed.join();
+
+    if(threadSocketHandler.joinable())
+        threadSocketHandler.join();
+
+    if(fAddressesInitialized)
+    {
         DumpData();
         fAddressesInitialized = false;
     }
-    
+
     mRawTxnValidator = nullptr;
 
-   mTxnValidator->shutdown();
-   mTxnPropagator->shutdown();
+    mTxnValidator->shutdown();
+    mTxnPropagator->shutdown();
 
-    // Close sockets
-    for (const CNodePtr& pnode : vNodes) {
-        pnode->CloseSocketDisconnect();
+    {
+        // Close sockets
+        bsv::lock_guard lock{cs_vNodes};
+        for(const CNodePtr& pnode : vNodes)
+            pnode->CloseSocketDisconnect();
     }
-    for (ListenSocket &hListenSocket : vhListenSocket) {
-        if (hListenSocket.socket != INVALID_SOCKET) {
-            if (!CloseSocket(hListenSocket.socket)) {
-                LogPrint(BCLog::NETCONN, "CloseSocket(hListenSocket) failed with error %s\n",
-                    NetworkErrorString(WSAGetLastError()));
+
+    for(ListenSocket& hListenSocket : vhListenSocket)
+    {
+        if(hListenSocket.socket != INVALID_SOCKET)
+        {
+            if(!CloseSocket(hListenSocket.socket))
+            {
+                LogPrint(BCLog::NETCONN,
+                         "CloseSocket(hListenSocket) failed with error %s\n",
+                         NetworkErrorString(WSAGetLastError()));
             }
         }
     }
 
     // Clean up some globals (to help leak detection)
     {
-        // Lock cs_main for FinalizeNode()
-        LOCK(cs_main);
-        for (const CNodePtr& pnode : vNodes) {
-            DeleteNode(pnode);
+        bsv::lock_guard lock{cs_main};  // Lock cs_main for FinalizeNode()
+        {
+            bsv::lock_guard lck{cs_vNodes};
+            for(const CNodePtr& pnode : vNodes)
+                DeleteNode(pnode);
+
+            vNodes.clear();
         }
-        for (const CNodePtr& pnode : vNodesDisconnected) {
+
+        for(const CNodePtr& pnode : vNodesDisconnected)
             DeleteNode(pnode);
-        }
     }
-    vNodes.clear();
     vNodesDisconnected.clear();
     vhListenSocket.clear();
     semOutbound = nullptr;
@@ -2846,16 +3013,20 @@ bool CConnman::RemoveAddedNode(const std::string &strNode) {
     return false;
 }
 
-size_t CConnman::GetNodeCount(NumConnections flags) {
-    LOCK(cs_vNodes);
+size_t CConnman::GetNodeCount(NumConnections flags)
+{
+    bsv::lock_guard lock{cs_vNodes};
     // Shortcut if we want total
-    if (flags == CConnman::CONNECTIONS_ALL) {
+    if(flags == CConnman::CONNECTIONS_ALL)
+    {
         return vNodes.size();
     }
 
     int nNum = 0;
-    for(const CNodePtr& node : vNodes) {
-        if (flags & (node->fInbound ? CONNECTIONS_IN : CONNECTIONS_OUT)) {
+    for(const CNodePtr& node : vNodes)
+    {
+        if(flags & (node->fInbound ? CONNECTIONS_IN : CONNECTIONS_OUT))
+        {
             nNum++;
         }
     }
@@ -2863,28 +3034,36 @@ size_t CConnman::GetNodeCount(NumConnections flags) {
     return nNum;
 }
 
-void CConnman::GetNodeStats(std::vector<NodeStats> &vstats) {
+void CConnman::GetNodeStats(std::vector<NodeStats>& vstats)
+{
     vstats.clear();
-    LOCK(cs_vNodes);
+    bsv::lock_guard lock{cs_vNodes};
     vstats.reserve(vNodes.size());
-    for (const CNodePtr& pnode : vNodes) {
+    for(const CNodePtr& pnode : vNodes)
+    {
         vstats.emplace_back();
         pnode->copyStats(vstats.back());
     }
 }
 
-bool CConnman::DisconnectNode(const std::string &strNode) {
-    LOCK(cs_vNodes);
-    if (const CNodePtr& pnode = FindNode(strNode)) {
+bool CConnman::DisconnectNode(const std::string& strNode)
+{
+    bsv::lock_guard lock{cs_vNodes};
+    if(const CNodePtr& pnode = FindNode(strNode))
+    {
         pnode->fDisconnect = true;
         return true;
     }
     return false;
 }
-bool CConnman::DisconnectNode(NodeId id) {
-    LOCK(cs_vNodes);
-    for (const CNodePtr& pnode : vNodes) {
-        if (id == pnode->id) {
+
+bool CConnman::DisconnectNode(NodeId id)
+{
+    bsv::lock_guard lock{cs_vNodes};
+    for(const CNodePtr& pnode : vNodes)
+    {
+        if(id == pnode->id)
+        {
             pnode->fDisconnect = true;
             return true;
         }
@@ -3015,7 +3194,7 @@ unsigned int CConnman::GetSendBufferSize() const {
 // Calculate average bandwidth for our peers
 void CConnman::PeerAvgBandwithCalc()
 {
-    LOCK(cs_vNodes);
+    bsv::lock_guard lock{cs_vNodes};
     for(const CNodePtr& pnode : vNodes)
     {
         pnode->GetAssociation().AvgBandwithCalc();
@@ -3185,10 +3364,12 @@ uint64_t CNode::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerialized
 }
 
 /** Transfer ownership of a stream from one peer's association to another */
-CNodePtr CConnman::MoveStream(NodeId from, const AssociationIDPtr& newAssocID, StreamType newStreamType,
-    const std::string& streamPolicyName)
+CNodePtr CConnman::MoveStream(NodeId from,
+                              const AssociationIDPtr& newAssocID,
+                              StreamType newStreamType,
+                              const std::string& streamPolicyName)
 {
-    LOCK(cs_vNodes);
+    bsv::lock_guard lock{cs_vNodes};
 
     // Lookup node we're moving this stream to
     CNodePtr toNode {nullptr};
@@ -3271,10 +3452,13 @@ void CConnman::EnqueueTxnForValidator(std::vector<TxInputDataSPtr> vTxInputData)
 }
 
 /* Find node by it's id */
-CNodePtr CConnman::FindNodeById(int64_t nodeId) {
-    LOCK(cs_vNodes);
-    for (const CNodePtr& pnode : vNodes) {
-        if (pnode->id == nodeId) {
+CNodePtr CConnman::FindNodeById(int64_t nodeId)
+{
+    bsv::lock_guard lock{cs_vNodes};
+    for(const CNodePtr& pnode : vNodes)
+    {
+        if(pnode->id == nodeId)
+        {
             return pnode;
         }
     }
@@ -3407,9 +3591,11 @@ bool CConnman::ForNode(NodeId id,
                        const std::function<bool(const CNodePtr& pnode)>& func)
 {
     CNodePtr found{nullptr};
-    LOCK(cs_vNodes);
-    for (const CNodePtr& pnode : vNodes) {
-        if (pnode->id == id) {
+    bsv::lock_guard lock{cs_vNodes};
+    for(const CNodePtr& pnode : vNodes)
+    {
+        if(pnode->id == id)
+        {
             found = pnode;
             break;
         }

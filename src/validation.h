@@ -105,7 +105,7 @@ static const int DEFAULT_SCRIPTCHECK_THREADS = 0;
 /** -txnthreadsperblock default (number of block txn-checking threads, 0 = auto) */
 static const int DEFAULT_TXNCHECK_THREADS = 0;
 /** Default batch size for PTV during block validation */
-static const unsigned DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE = 100;
+static const unsigned DEFAULT_BLOCK_VALIDATION_TX_BATCH_SIZE = 10;
 /** Number of blocks that can be requested at any given time from a single peer.
  */
 static const int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 16;
@@ -234,7 +234,6 @@ extern std::atomic_bool fReindex;
 extern bool fTxIndex;
 extern bool fCheckBlockIndex;
 extern bool fCheckpointsEnabled;
-extern size_t nCoinCacheUsage;
 
 /**
  * Absolute maximum transaction fee (in satoshis) used by wallet and mempool
@@ -273,6 +272,12 @@ extern uint64_t nPruneTarget;
 static const int32_t DEFAULT_MIN_BLOCKS_TO_KEEP = 288;
 /** Lowest value of MIN_BLOCKS_TO_KEEP */
 static const int32_t MIN_MIN_BLOCKS_TO_KEEP = 6;
+/** Default width of the automatic-prune hysteresis band, as a percentage
+ *  of -prune=<n>. When auto-pruning runs it removes block files until
+ *  on-disk usage falls below nPruneTarget * (100 - hysteresis) / 100,
+ *  creating that much headroom so the next allocation does not
+ *  re-trigger pruning. */
+static const int32_t DEFAULT_PRUNE_HYSTERESIS = 25;
 
 static const signed int DEFAULT_CHECKBLOCKS = 6;
 static const unsigned int DEFAULT_CHECKLEVEL = 3;

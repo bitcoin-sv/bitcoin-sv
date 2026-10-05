@@ -20,6 +20,7 @@ option(BUILD_BITCOIN_BENCH "Build benchmarks" ON)
 
 option(ENABLE_TCMALLOC "Use TCMAlloc" ON)
 option(ENABLE_CLANG_TIDY "Use ClangTidy" OFF)
+option(ENABLE_USDT "Compile in USDT instrumentation (requires systemtap sys/sdt.h)" OFF)
 
 option(CMAKE_UNITY_BUILD "Enable Unity build")
 
@@ -176,9 +177,12 @@ target_compile_options(leveldb
                        -Wno-suggest-override
                        -Wno-unused-parameter)
 
-# Suppress Clang 21+ warning for intentionally non-null-terminated string in testrand_impl.h
-set(SECP256K1_APPEND_CFLAGS "${SECP256K1_APPEND_CFLAGS} -Wno-unterminated-string-initialization"
-    CACHE STRING "Extra flags appended to secp256k1 compile commands" FORCE)
+# Suppress Clang 21+ warning for intentionally non-null-terminated string in testrand_impl.h.
+# Guarded so the self-referenced FORCE cache set doesn't re-append on every reconfigure.
+if(NOT SECP256K1_APPEND_CFLAGS MATCHES "unterminated-string-initialization")
+    set(SECP256K1_APPEND_CFLAGS "${SECP256K1_APPEND_CFLAGS} -Wno-unterminated-string-initialization"
+        CACHE STRING "Extra flags appended to secp256k1 compile commands" FORCE)
+endif()
 add_subdirectory(secp256k1)
 add_subdirectory(univalue)
 
@@ -191,6 +195,9 @@ add_subdirectory(univalue)
 # Various completely unrelated features shared by all executables.
 add_library(util
 	amount.h
+	attributes.h
+	binary_counter.cpp
+	binary_counter.h
 	cfile_util.cpp
 	cfile_util.h
 	chainparamsbase.cpp
@@ -236,6 +243,7 @@ add_library(util
 	threadpriority.h
 	threadsafety.h
 	tinyformat.h
+	uint256.cpp
 	uint256.h
 	util.cpp
 	util.h
@@ -332,6 +340,7 @@ add_library(common
 	core_memusage.h
 	core_read.cpp
 	core_write.cpp
+	dbwrapper_limits.h
 	dirty_block_index_store.h
 	disk_block_pos.h
 	dstencode.cpp
@@ -391,6 +400,7 @@ add_library(common
     net/p2p_msg_lengths.h
     net/array_parser.h
 	net/send_queue_bytes.h
+	net/socket_wait_set.h
 	net/stream.h
 	net/stream_policy.h
 	net/stream_policy_factory.h

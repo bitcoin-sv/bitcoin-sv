@@ -1014,6 +1014,7 @@ std::pair<MinerIdDatabase::MinerUUId, uint256> MinerIdDatabase::ProcessRevocatio
     const uint256& blockhash)
 {
     // Get revocation message and key from the coinbase doc
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     const CoinbaseDocument::RevocationMessage& revocationMessage { cbDoc.GetRevocationMessage().value() };
     const CPubKey& revocationKey { cbDoc.GetRevocationKey() };
 
@@ -1031,6 +1032,7 @@ std::pair<MinerIdDatabase::MinerUUId, uint256> MinerIdDatabase::ProcessRevocatio
     if(partialRevocation)
     {
         const auto& prevMinerIdEntry { GetMinerIdFromDatabaseNL(prevIdHash) };
+        //NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         MinerUUId minerUUId { prevMinerIdEntry->mUUId };
         auto minerEntry { GetMinerUUIdFromDatabaseNL(minerUUId) };
 
@@ -1053,16 +1055,19 @@ std::pair<MinerIdDatabase::MinerUUId, uint256> MinerIdDatabase::ProcessRevocatio
 
             // If this revoked ID is one that caused us to void the miner's reputation,
             // then restore their reputation but increase their target M.
+            // NOLINTBEGIN(bugprone-unchecked-optional-access)
             if(minerEntry->mReputation.mVoid && minerEntry->mReputation.mVoidingId.value() == minerId.mPubKey)
             {
                 minerEntry->mReputation.mVoid = false;
                 minerEntry->mReputation.mVoidingId = std::nullopt;
+                //NOLINTNEXTLINE(*-narrowing-conversions)
                 minerEntry->mReputation.mM *= mConfig.GetMinerIdReputationMScale();
                 UpdateMinerUUIdInDatabaseNL(minerUUId, *minerEntry);
 
                 LogPrint(BCLog::MINERID, "Restored reputation for miner %s and set them a new target M %d\n",
                     boost::uuids::to_string(minerUUId), minerEntry->mReputation.mM);
             }
+            // NOLINTEND(bugprone-unchecked-optional-access)
 
             if(HexStr(minerId.mPubKey) == revocationMessage.mCompromisedId)
             {
@@ -1097,6 +1102,7 @@ std::pair<MinerIdDatabase::MinerUUId, uint256> MinerIdDatabase::ProcessRevocatio
     {
         // Full revocation: revoke all IDs for this miner
         const auto& curMinerIdEntry { GetMinerIdFromDatabaseNL(curIdHash) };
+        //NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         MinerUUId minerUUId { curMinerIdEntry->mUUId };
         for(auto& minerId : GetMinerIdsForMinerNL(minerUUId))
         {

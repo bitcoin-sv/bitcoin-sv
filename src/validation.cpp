@@ -98,7 +98,6 @@ bool fHavePruned = false;
 bool fPruneMode = false;
 bool fCheckBlockIndex = false;
 bool fCheckpointsEnabled = DEFAULT_CHECKPOINTS_ENABLED;
-size_t nCoinCacheUsage = 5000 * 300;
 uint64_t nPruneTarget = 0;
 int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
 
@@ -3801,7 +3800,6 @@ static bool ConnectBlock(
     return connector.Connect( token );
 }
 
-
 /**
  * Update the on-disk chain state.
  */
@@ -3809,38 +3807,75 @@ bool FlushStateToDisk(
     const CChainParams &chainparams,
     CValidationState &state,
     FlushStateMode mode,
-    int32_t nManualPruneHeight) {
-
-    // NOLINTNEXTLINE(*-narrowing-conversions)
-    int64_t nMempoolUsage = mempool.DynamicMemoryUsage();
+    int32_t nManualPruneHeight)
+{
     LOCK(cs_main);
+    // pcoinsTip may be null during startup (before block index is loaded)
+    // or during reinit. Nothing to flush in that case.
+    if(!pcoinsTip)
+        return true;
+
     static int64_t nLastWrite = 0;
     static int64_t nLastFlush = 0;
     static int64_t nLastSetChain = 0;
     std::set<int> setFilesToPrune;
-    bool fFlushForPrune = false;
+    enum class PruneReason { Undefined, Manual, Auto } pruneReason { PruneReason::Undefined };
     bool fDoFullFlush = false;
+    bool fNeedUtxoFlushForPrune = false;
     int64_t nNow = 0;
     try {
+        // Resolve on-disk UTXO best block to a height. This is the height
+        // of the last block whose UTXO changes were persisted by Flush(),
+        // and is used to constrain automatic pruning so that all blocks
+        // needed for crash recovery remain on disk.
+        int32_t nCoinDBFlushedHeight = 0;
+        if (const uint256 hashFlushed = pcoinsTip->DBGetBestBlock(); !hashFlushed.IsNull()) {
+            if (const auto* pindex = mapBlockIndex.Get(hashFlushed)) {
+                nCoinDBFlushedHeight = pindex->GetHeight();
+            }
+        }
+
         {
             LOCK(pBlockFileInfoStore->GetLock());
-            if (fPruneMode && (fCheckForPruning || nManualPruneHeight > 0) &&
-                !fReindex) {
+            if (fPruneMode && (fCheckForPruning || nManualPruneHeight > 0) && !fReindex) {
                 if (nManualPruneHeight > 0) {
                     pBlockFileInfoStore->FindFilesToPruneManual(GlobalConfig::GetConfig(), setFilesToPrune, nManualPruneHeight);
-                } else {
+                }
+                else {
                     pBlockFileInfoStore->FindFilesToPrune(GlobalConfig::GetConfig(), setFilesToPrune,
-                                     chainparams.PruneAfterHeight());
+                                     chainparams.PruneAfterHeight(), nCoinDBFlushedHeight);
                     fCheckForPruning = false;
                 }
                 if (!setFilesToPrune.empty()) {
-                    fFlushForPrune = true;
+                    if (nManualPruneHeight > 0) {
+                        pruneReason = PruneReason::Manual;
+                    }
+                    else {
+                        pruneReason = PruneReason::Auto;
+                    }
                     if (!fHavePruned) {
                         pblocktree->WriteFlag("prunedblockfiles", true);
                         fHavePruned = true;
                     }
                 }
-            }
+                // Fallback: if auto-pruning was triggered but found no files
+                // (because nCoinDBFlushedHeight constrains the prune window)
+                // and disk usage is still above the prune target, force a
+                // UTXO flush to advance DB_BEST_BLOCK and unblock future pruning.
+                if (nManualPruneHeight == 0 && setFilesToPrune.empty() &&
+                    nPruneTarget > 0 &&
+                    chainActive.Tip() != nullptr &&
+                    nCoinDBFlushedHeight < chainActive.Tip()->GetHeight() -
+                                           GlobalConfig::GetConfig().GetMinBlocksToKeep())
+                {
+                    uint64_t nCurrentUsage = pBlockFileInfoStore->CalculateCurrentUsage();
+                    if (nCurrentUsage + BLOCKFILE_CHUNK_SIZE + UNDOFILE_CHUNK_SIZE >= nPruneTarget) {
+                        LogPrint(BCLog::PRUNE, "Prune: disk usage above target but coin DB flush "
+                            "height %d prevents pruning; forcing UTXO flush\n", nCoinDBFlushedHeight);
+                        fNeedUtxoFlushForPrune = true;
+                    }
+                }
+                            }
             nNow = GetTimeMicros();
             // Avoid writing/flushing immediately after startup.
             if (nLastWrite == 0) {
@@ -3853,11 +3888,8 @@ bool FlushStateToDisk(
                 nLastSetChain = nNow;
             }
             // NOLINTBEGIN(*-narrowing-conversions)
-            int64_t nMempoolSizeMax = GlobalConfig::GetConfig().GetMaxMempool();
             int64_t cacheSize = pcoinsTip->DynamicMemoryUsage();
-            int64_t nTotalSpace =
-                nCoinCacheUsage +
-                std::max<int64_t>(nMempoolSizeMax - nMempoolUsage, 0);
+            int64_t nTotalSpace = static_cast<int64_t>(GlobalConfig::GetConfig().GetCoinsCacheSize());
             // NOLINTEND(*-narrowing-conversions)
 
             // The cache is large and we're within 10% and 10 MiB of the limit,
@@ -3880,10 +3912,19 @@ bool FlushStateToDisk(
                 mode == FLUSH_STATE_PERIODIC &&
                 nNow > nLastFlush + (int64_t)DATABASE_FLUSH_INTERVAL * 1000000;
             // Combine all conditions that result in a full cache flush.
+            // Note: PruneReason::Auto is deliberately excluded — automatic
+            // pruning is constrained to blocks at or below DB_BEST_BLOCK,
+            // so a UTXO flush is not needed for crash recovery safety.
+            // Manual pruning and the disk-tight fallback still force a flush.
             fDoFullFlush = (mode == FLUSH_STATE_ALWAYS) || fCacheLarge ||
-                           fCacheCritical || fPeriodicFlush || fFlushForPrune;
+                           fCacheCritical || fPeriodicFlush ||
+                           pruneReason == PruneReason::Manual || fNeedUtxoFlushForPrune;
             // Write blocks and block index to disk.
-            if (fDoFullFlush || fPeriodicWrite) {
+            // PruneReason::Auto enters this path for block index updates and
+            // file unlinking without triggering the UTXO flush below.
+            // PruneReason::Manual does not need to appear here because it
+            // sets fDoFullFlush above, which is already the first term.
+            if (fDoFullFlush || fPeriodicWrite || pruneReason == PruneReason::Auto) {
                 // Depend on nMinDiskSpace to ensure we can write block index
                 if (!CheckDiskSpace(0)) {
                     return state.Error("out of disk space");
@@ -3895,18 +3936,17 @@ bool FlushStateToDisk(
                 //
                 // NOTE: This must happen before dirty block info write to disk
                 // below (pblocktree->WriteBatchSync)
-                if (fFlushForPrune) UnlinkPrunedFiles(setFilesToPrune);
+                if (pruneReason != PruneReason::Undefined) {
+                    UnlinkPrunedFiles(setFilesToPrune);
+                }
 
                 // Then update all block file information (which may refer to
                 // block and undo files).
                 {
-                    
                     std::vector<std::pair<int, const CBlockFileInfo *>> vFiles = pBlockFileInfoStore->GetAndClearDirtyFileInfo();
                     auto vBlocks = mapBlockIndex.ExtractDirtyBlockIndices();
-                    if (!pblocktree->WriteBatchSync(vFiles, pBlockFileInfoStore->GetnLastBlockFile(),
-                                                    vBlocks)) {
-                        return AbortNode(
-                            state, "Failed to write to block index database");
+                    if (!pblocktree->WriteBatchSync(vFiles, pBlockFileInfoStore->GetnLastBlockFile(), vBlocks)) {
+                        return AbortNode(state, "Failed to write to block index database");
                     }
                 }
                 nLastWrite = nNow;
@@ -3945,7 +3985,8 @@ bool FlushStateToDisk(
             GetMainSignals().SetBestChain(chainActive.GetLocator());
             nLastSetChain = nNow;
         }
-    } catch (const std::runtime_error &e) {
+    }
+    catch (const std::runtime_error &e) {
         return AbortNode(
             state, std::string("System error while flushing: ") + e.what());
     }
@@ -4699,7 +4740,7 @@ static bool ActivateBestChainStep(
                     if (state.IsInvalid()) {
                         // The block violates a consensus rule.
                         if (!state.CorruptionPossible()) {
-                            InvalidChainFound(config, vpindexToConnect.back());
+                            InvalidChainFound(config, vpindexToConnect.front());
                         }
                         state = CValidationState();
                         fInvalidFound = true;
@@ -5710,7 +5751,11 @@ bool CheckBlock(const Config &config, const CBlock &block,
                 int32_t blockHeight,
                 BlockValidationOptions validationOptions) {
     // These are checks that are independent of context.
-    if (block.fChecked) {
+    // fChecked is a benign idempotent caching hint that may be read/written from
+    // multiple threads under parallel block validation, so access it through
+    // std::atomic_ref to avoid a data race (UB). Relaxed ordering is sufficient:
+    // the flag publishes no other state, and recomputing CheckBlock() is harmless.
+    if (std::atomic_ref<bool>(block.fChecked).load(std::memory_order_relaxed)) {
         return true;
     }
 
@@ -5847,7 +5892,9 @@ bool CheckBlock(const Config &config, const CBlock &block,
     if ((validationOptions.shouldValidatePoW() && validationOptions.shouldValidateMerkleRoot()) ||
          validationOptions.shouldMarkChecked())
     {
-        block.fChecked = true;
+        // See note at the fChecked read above: write through atomic_ref to avoid
+        // a data race under parallel block validation.
+        std::atomic_ref<bool>(block.fChecked).store(true, std::memory_order_relaxed);
     }
 
     return true;
@@ -6272,6 +6319,14 @@ static bool AcceptBlock(const Config& config,
 
         // Block height is too high.
         if (fTooFarAhead) {
+            return true;
+        }
+
+        // Protect against DoS attacks from low-work chains.
+        // If our tip is behind, a peer could try to send us
+        // low-work blocks on a fake chain that we would never
+        // request; don't process these.
+        if (pindex->GetChainWork() < nMinimumChainWork) {
             return true;
         }
     }
@@ -6828,7 +6883,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
         // disconnect of tip blocks
         if (nCheckLevel >= 3 && pindex == pindexState &&
             (coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <=
-                nCoinCacheUsage) {
+                GlobalConfig::GetConfig().GetCoinsCacheSize()) {
             assert(coins.GetBestBlock() == pindex->GetBlockHash());
             DisconnectResult res = ProcessingBlockIndex(*pindex).DisconnectBlock(block, coins, shutdownToken);
             if (res == DISCONNECT_FAILED && !shutdownToken.IsCanceled()) {

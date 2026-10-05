@@ -8,6 +8,7 @@
 #include <net/net_message.h>
 #include <net/net_types.h>
 #include <net/send_queue_bytes.h>
+#include <net/socket_wait_set.h>
 #include <streams.h>
 #include <sync.h>
 #include <utiltime.h>
@@ -72,11 +73,12 @@ class Stream
     // Shutdown the stream
     void Shutdown();
 
-    // Add our socket to the sets for reading and writing
-    bool SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError, SOCKET& socketMax) const;
+    // Register our socket and the events we want to wait for.
+    // Returns true if a socket was registered.
+    bool RegisterSockets(SocketWaitSet& waitSet) const;
 
     // Service our socket for reading and writing
-    void ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, const Config& config,
+    void ServiceSocket(const SocketWaitSet& waitSet, const Config& config,
                        bool& gotNewMsgs, uint64_t& bytesRecv, uint64_t& bytesSent);
 
 

@@ -230,7 +230,8 @@ void CBlockFileInfoStore::FindFilesToPruneManual(
 void CBlockFileInfoStore::FindFilesToPrune(
     const Config& config,
     std::set<int> &setFilesToPrune,
-    int32_t nPruneAfterHeight)
+    int32_t nPruneAfterHeight,
+    int32_t nCoinDBFlushedHeight)
 {
     LOCK2(cs_main, cs_LastBlockFile);
     if (chainActive.Tip() == nullptr || nPruneTarget == 0) {
@@ -240,13 +241,24 @@ void CBlockFileInfoStore::FindFilesToPrune(
         return;
     }
 
-    int32_t nLastBlockWeCanPrune =
-        chainActive.Tip()->GetHeight() - config.GetMinBlocksToKeep();
+    // Constrain pruning to blocks at or below nCoinDBFlushedHeight so that
+    // all blocks needed for UTXO crash recovery (from DB_BEST_BLOCK forward)
+    // remain on disk. This allows automatic pruning to proceed without
+    // forcing an expensive pcoinsTip->Flush().
+    int32_t nLastBlockWeCanPrune = std::min(
+        chainActive.Tip()->GetHeight() - config.GetMinBlocksToKeep(),
+        nCoinDBFlushedHeight);
     uint64_t nCurrentUsage = pBlockFileInfoStore->CalculateCurrentUsage();
     // We don't check to prune until after we've allocated new space for files,
     // so we should leave a buffer under our target to account for another
     // allocation before the next pruning.
     uint64_t nBuffer = BLOCKFILE_CHUNK_SIZE + UNDOFILE_CHUNK_SIZE;
+    // Stop-threshold: when pruning runs, continue past the target down to this
+    // value so that subsequent block allocations don't immediately re-trigger
+    // pruning (and, when coin DB flush height lags, the disk-pressure UTXO
+    // flush fallback in FlushStateToDisk). The hysteresis setting is the
+    // width of the band below the target, expressed as a percentage.
+    uint64_t nPruneStopThreshold = static_cast<uint64_t>(static_cast<double>(nPruneTarget) * ((100 - config.GetPruneHysteresis()) / 100.0));
     uint64_t nBytesToPrune{};
     int count = 0;
 
@@ -260,8 +272,8 @@ void CBlockFileInfoStore::FindFilesToPrune(
                 continue;
             }
 
-            // are we below our target?
-            if (nCurrentUsage + nBuffer < nPruneTarget) {
+            // Have we pruned past the stop-threshold?
+            if (nCurrentUsage < nPruneStopThreshold) {
                 break;
             }
 
@@ -278,11 +290,13 @@ void CBlockFileInfoStore::FindFilesToPrune(
         }
     }
 
-    LogPrint(BCLog::PRUNE, "Prune: target=%dMiB actual=%dMiB diff=%dMiB "
-        "max_prune_height=%d found %d blk/rev pairs for removal\n",
-        nPruneTarget / ONE_MEBIBYTE, nCurrentUsage / ONE_MEBIBYTE,
+    LogPrint(BCLog::PRUNE, "Prune: target=%dMiB stop_threshold=%dMiB actual=%dMiB diff=%dMiB "
+        "max_prune_height=%d coin_db_flushed_height=%d "
+        "found %d blk/rev pairs for removal\n",
+        nPruneTarget / ONE_MEBIBYTE, nPruneStopThreshold / ONE_MEBIBYTE,
+        nCurrentUsage / ONE_MEBIBYTE,
         ((int64_t)nPruneTarget - (int64_t)nCurrentUsage) / ONE_MEBIBYTE,
-        nLastBlockWeCanPrune, count);
+        nLastBlockWeCanPrune, nCoinDBFlushedHeight, count);
 }
 
 void CBlockFileInfoStore::LoadBlockFileInfo(int nLastBlockFile, CBlockTreeDB& blockTreeDb)

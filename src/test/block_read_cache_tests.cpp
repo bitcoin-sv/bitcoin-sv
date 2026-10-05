@@ -24,13 +24,13 @@ namespace
 template<>
 struct BlockReadCache::UnitTestAccess<tests_id>
 {
-    static const std::optional<BlockReadCache::BlockWithHash>& GetNextBlock(const BlockReadCache& cache)
+    static std::optional<BlockReadCache::BlockWithHash> GetNextBlock(const BlockReadCache& cache)
     {
         std::lock_guard lock { cache.mMtx };
         return cache.mNextBlock;
     }
 
-    static const std::optional<uint256>& GetHashReading(const BlockReadCache& cache)
+    static std::optional<uint256> GetHashReading(const BlockReadCache& cache)
     {
         std::lock_guard lock { cache.mMtx };
         return cache.mHashReading;
@@ -54,7 +54,7 @@ BOOST_FIXTURE_TEST_CASE(block_read_cache_test, TestChain100Setup)
     // Lambda for checking we have the required block cached
     auto GotCachedBlock = [&cache](const uint256& block)
     {
-        const auto& cached { UnitTestAccess::GetNextBlock(cache) };
+        const auto cached { UnitTestAccess::GetNextBlock(cache) };
         return cached && cached->hash == block;
     };
 

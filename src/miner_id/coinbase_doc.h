@@ -34,6 +34,7 @@ static const std::set<std::string> SUPPORTED_VERSIONS = {"0.1", "0.2", "0.3"};
 class CoinbaseDocument
 {
 public:
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
     struct DataRef
     {
         // Allow serialisation/deserialisation
@@ -81,9 +82,11 @@ public:
 
     CoinbaseDocument() = default;
     CoinbaseDocument(
+        // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
         const std::string& rawJSON,
         const std::string& version,
         const int32_t height,
+        // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
         const std::string& prevMinerId,
         const std::string& prevMinerIdSig,
         const std::string& minerId,

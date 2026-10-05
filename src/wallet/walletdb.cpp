@@ -16,7 +16,7 @@
 #include "util.h"
 #include "utiltime.h"
 #include "validation.h" // For CheckRegularTransaction
-#include "wallet/wallet.h"
+#include "wallet/wallet_tx.h"
 #include "config.h"
 
 #include <atomic>
@@ -265,9 +265,13 @@ public:
     std::vector<uint256> vWalletUpgrade;
 };
 
-bool ReadKeyValue(CWallet *pwallet, CDataStream &ssKey, CDataStream &ssValue,
-                  CWalletScanState &wss, std::string &strType,
-                  std::string &strErr) {
+bool ReadKeyValue(CWallet* pwallet,
+                  CDataStream& ssKey,
+                  CDataStream& ssValue,
+                  CWalletScanState& wss,
+                  std::string& strType,
+                  std::string& strErr) REQUIRES(pwallet->cs_wallet)
+{
     try {
         // Unserialize
         // Taking advantage of the fact that pair serialization is just the two

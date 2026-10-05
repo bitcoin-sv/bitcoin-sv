@@ -68,6 +68,22 @@ class TxnPropagationAfterBlock(ComparisonTestFramework):
         assert_equal(self.nodes[0].getpeerinfo()[0]['txninvsize'], 10)
         assert_equal(self.nodes[0].getmempoolinfo()['size'], 20)
 
+        # Drain the remaining propagator-queue txns into the peer's inventory
+        # queue, leaving the propagator queue empty. The purge for the next
+        # block is then only reachable through the per-peer inventory check.
+        self.nodes[0].settxnpropagationfreq(1)
+        wait_until(lambda: self.nodes[0].getnetworkinfo()['txnpropagationqlen'] == 0)
+        wait_until(lambda: self.nodes[0].getpeerinfo()[0]['txninvsize'] == 20)
+        self.nodes[0].settxnpropagationfreq(50000)
+
+        # Mine the second new block
+        yield TestInstance([[block2, True]])
+
+        # Check the mined txns have gone from the peer's inventory queue
+        assert_equal(self.nodes[0].getnetworkinfo()['txnpropagationqlen'], 0)
+        assert_equal(self.nodes[0].getpeerinfo()[0]['txninvsize'], 0)
+        assert_equal(self.nodes[0].getmempoolinfo()['size'], 0)
+
 
 if __name__ == '__main__':
     TxnPropagationAfterBlock().main()

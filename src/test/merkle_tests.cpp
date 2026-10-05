@@ -2,22 +2,20 @@
 // Copyright (c) 2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 #include <algorithm>
-#include <stdexcept>
+#include <random>
 #include <string>
 #include <tuple>
-#include <iostream>
 
 #include "boost/algorithm/hex.hpp"
 #include <boost/test/tools/old/interface.hpp>
 #include <boost/test/unit_test.hpp>
 
 #include "consensus/merkle.h"
-#include "double_spend/dsdetected_message.h"
+#include "crypto/sha256_dispatch.h"
 #include "merkleproof.h"
 #include "merkletree.h"
 #include "serialize.h"
 #include "support/allocators/zeroafterfree.h"
-#include "task_helpers.h"
 #include "test/test_bitcoin.h"
 #include "uint256.h"
 
@@ -233,6 +231,208 @@ BOOST_AUTO_TEST_CASE(merkle_tree_test)
     }
 }
 
+BOOST_AUTO_TEST_CASE(ComputeMerkleRoot_large_inputs)
+{
+    // Deterministic sizes straddling 16384 = 2^14 leaves give boundary coverage.
+    // Cross-check against ComputeMerkleRootFromBranch(ComputeMerkleBranch(...)),
+    // which goes through the independent MerkleComputation path.
+    // NOLINTNEXTLINE(cert-msc32-c, cert-msc51-cpp)
+    std::mt19937 gen{0xC0FFEE};
+    std::uniform_int_distribution<int> byte_dist{0, 255};
+
+    constexpr size_t k{16'384};
+    for(const size_t n : {k - 1, k, k + 1, 2 * k, 2 * k + 7, 3 * k + 1})
+    {
+        std::vector<uint256> leaves(n);
+        for(auto& h : leaves)
+        {
+            std::generate(h.begin(), h.end(),
+                [&]{ return static_cast<std::uint8_t>(byte_dist(gen)); });
+        }
+
+        bool mutated{};
+        const uint256 root{ComputeMerkleRoot(leaves, &mutated)};
+        BOOST_CHECK(!mutated);
+
+        // Independent reference: derive the root from a branch for
+        // position 0 via MerkleComputation.
+        const std::vector<uint256> branch{ComputeMerkleBranch(leaves, 0)};
+        const uint256 root_from_branch{ComputeMerkleRootFromBranch(leaves[0],
+                                                                   branch,
+                                                                   0)};
+        BOOST_CHECK_EQUAL(root, root_from_branch);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(ComputeMerkleRoot_branch_cross_check)
+{
+    // Property-based check that ComputeMerkleRoot and the
+    // MerkleComputation-based ComputeMerkleBranch/ComputeMerkleRootFromBranch
+    // pair agree across random inputs. Sweeps a wide size range; for each
+    // size verifies a handful of random branch positions reconstruct the
+    // same root.
+    // NOLINTNEXTLINE(cert-msc32-c, cert-msc51-cpp)
+    std::mt19937 gen{0xDEADBEEF};
+    std::uniform_int_distribution<int> byte_dist{0, 255};
+    std::uniform_int_distribution<size_t> size_dist{1, 50'000};
+
+    for(size_t i{}; i < 30; ++i)
+    {
+        const size_t n{size_dist(gen)};
+        std::vector<uint256> leaves(n);
+        for(auto& h : leaves)
+        {
+            std::generate(h.begin(), h.end(),
+                [&]{ return static_cast<std::uint8_t>(byte_dist(gen)); });
+        }
+
+        const uint256 root{ComputeMerkleRoot(leaves)};
+
+        std::uniform_int_distribution<size_t> pos_dist{0, n - 1};
+        const size_t positions_to_check{std::min<size_t>(4, n)};
+        for(size_t p{}; p < positions_to_check; ++p)
+        {
+            const size_t pos{pos_dist(gen)};
+            const std::vector<uint256> branch{ComputeMerkleBranch(leaves, pos)};
+            BOOST_CHECK_EQUAL(root, ComputeMerkleRootFromBranch(leaves[pos],
+                                                                branch,
+                                                                pos));
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(zero_sentinel_collision)
+{
+    // Check that a default constructed uint256 (all-zero) adjacent leaf pair
+    // is processed correctly. Ensures that binary_counter is instantiated with
+    // std::optional.
+    const std::vector<uint256> leaves{uint256S("11"),
+                                      uint256S("22"),
+                                      uint256{},
+                                      uint256{}};
+    const uint256 oracle{ ComputeMerkleRootFromBranch(leaves[0],
+                                                      ComputeMerkleBranch(leaves, 0), 0)};
+    BOOST_CHECK_EQUAL(ComputeMerkleRoot(leaves), oracle);
+}
+
+// --- SHA256D64 transform tests ----------------------------------------------
+//
+// Direct tests of the underlying double-SHA256 transforms (1-way scalar,
+// 2-way SHA-NI). The production caller is SHA256D64_2way (used by
+// ComputeMerkleRoot's `combine`).
+
+BOOST_AUTO_TEST_CASE(d_block_1way_direct_matches_naive)
+{
+    using sha256_dispatch::hash_bytes;
+    using sha256_dispatch::d_pair_bytes;
+    using sha256_dispatch::d_block_1way;
+
+    // Call the scalar 1-way transform directly. Verifies the universal
+    // fallback in isolation; SHA256D64_2way relies on this when SHA-NI
+    // 2-way is unavailable.
+    BOOST_REQUIRE(d_block_1way != nullptr);
+
+    // NOLINTNEXTLINE(cert-msc32-c, cert-msc51-cpp) for reproducible tests
+    std::mt19937 gen{0xC0FFEE};
+    std::uniform_int_distribution<int> byte_dist{0, 255};
+    std::array<std::uint8_t, d_pair_bytes> ip{};
+    std::ranges::generate(ip,
+        [&]{ return static_cast<std::uint8_t>(byte_dist(gen)); });
+
+    // Reference: naive CHash256 over the single 64-byte pair.
+    std::array<std::uint8_t, hash_bytes> expected{};
+    const std::span<const std::uint8_t, d_pair_bytes> in_span{ip};
+    CHash256()
+        .Write(in_span.first<hash_bytes>())
+        .Write(in_span.subspan<hash_bytes, hash_bytes>())
+        .Finalize(std::span<std::uint8_t, hash_bytes>{expected});
+
+    // Direct call to the scalar transform.
+    std::array<std::uint8_t, hash_bytes> op{};
+    d_block_1way(ip, op);
+
+    BOOST_CHECK_EQUAL_COLLECTIONS(expected.begin(), expected.end(),
+                                  op.begin(), op.end());
+}
+
+#if defined(__x86_64__) || defined(__amd64__)
+BOOST_AUTO_TEST_CASE(d_block_2way_direct_matches_naive)
+{
+    using sha256_dispatch::hash_bytes;
+    using sha256_dispatch::d_pair_bytes;
+    using sha256_dispatch::d_block_2way;
+
+    // Call the SHA-NI 2-way transform directly. SHA256D64_2way relies on
+    // this when available. Skips silently on hosts without SHA-NI.
+    if(d_block_2way == nullptr)
+        return;
+
+    // NOLINTNEXTLINE(cert-msc32-c, cert-msc51-cpp) for reproducible tests
+    std::mt19937 gen{0xC0FFEE};
+    std::uniform_int_distribution<int> byte_dist{0, 255};
+    std::array<std::uint8_t, 2 * d_pair_bytes> ip{};
+    std::ranges::generate(ip,
+        [&]{ return static_cast<std::uint8_t>(byte_dist(gen)); });
+
+    // Reference: naive CHash256 over each of the 2 pairs.
+    std::array<std::uint8_t, 2 * hash_bytes> expected{};
+    std::span<const std::uint8_t> ip_remaining{ip};
+    std::span<std::uint8_t> op_remaining{expected};
+    while(!ip_remaining.empty())
+    {
+        CHash256()
+            .Write(ip_remaining.first<hash_bytes>())
+            .Write(ip_remaining.subspan<hash_bytes, hash_bytes>())
+            .Finalize(op_remaining.first<hash_bytes>());
+        ip_remaining = ip_remaining.subspan(d_pair_bytes);
+        op_remaining = op_remaining.subspan(hash_bytes);
+    }
+
+    // Direct call to the SHA-NI transform.
+    std::array<std::uint8_t, 2 * hash_bytes> op{};
+    d_block_2way(ip, op);
+
+    BOOST_CHECK_EQUAL_COLLECTIONS(expected.begin(), expected.end(),
+                                  op.begin(), op.end());
+}
+#endif
+
+BOOST_AUTO_TEST_CASE(SHA256D64_2way_kat)
+{
+    // Known-answer test for the SHA256D64_2way wrapper. Catches bugs that
+    // CHash256 and the underlying transforms would share (the consistency
+    // tests above hash both sides via CHash256). Vector is the first 128
+    // input bytes / 64 output bytes of Bitcoin Core's TransformD64 self-test
+    // (Lorem ipsum), exercising whichever path SHA256D64_2way takes —
+    // SHA-NI 2-way when available, scalar 1-way fallback otherwise.
+    static constexpr std::array<std::uint8_t, 128> kInput{
+        'L','o','r','e','m',' ','i','p','s','u','m',' ','d','o','l','o',
+        'r',' ','s','i','t',' ','a','m','e','t',',',' ','c','o','n','s',
+        'e','c','t','e','t','u','r',' ','a','d','i','p','i','s','c','i',
+        'n','g',' ','e','l','i','t',',',' ','s','e','d',' ','d','o',' ',
+        'e','i','u','s','m','o','d',' ','t','e','m','p','o','r',' ','i',
+        'n','c','i','d','i','d','u','n','t',' ','u','t',' ','l','a','b',
+        'o','r','e',' ','e','t',' ','d','o','l','o','r','e',' ','m','a',
+        'g','n','a',' ','a','l','i','q','u','a','.',' ','E','t',' ','m',
+    };
+    static constexpr std::array<std::uint8_t, 64> kExpected{
+        0x09, 0x3a, 0xc4, 0xd0, 0x0f, 0xf7, 0x57, 0xe1, 0x72, 0x85, 0x79, 0x42, 0xfe, 0xe7, 0xe0, 0xa0,
+        0xfc, 0x52, 0xd7, 0xdb, 0x07, 0x63, 0x45, 0xfb, 0x53, 0x14, 0x7d, 0x17, 0x22, 0x86, 0xf0, 0x52,
+        0x48, 0xb6, 0x11, 0x9e, 0x6e, 0x48, 0x81, 0x6d, 0xcc, 0x57, 0x1f, 0xb2, 0x97, 0xa8, 0xd5, 0x25,
+        0x9b, 0x82, 0xaa, 0x89, 0xe2, 0xfd, 0x2d, 0x56, 0xe8, 0x28, 0x83, 0x0b, 0xe2, 0xfa, 0x53, 0xb7,
+    };
+
+    std::array<uint256, 4> input;
+    std::memcpy(input.data(), kInput.data(), kInput.size());
+
+    std::array<uint256, 2> output;
+    SHA256D64_2way(input, output);
+
+    const auto* output_bytes = reinterpret_cast<const std::uint8_t*>(output.data());
+    BOOST_CHECK_EQUAL_COLLECTIONS(output_bytes, output_bytes + kExpected.size(),
+                                  kExpected.begin(), kExpected.end());
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(merkle_proof_tests)
@@ -251,7 +451,7 @@ BOOST_AUTO_TEST_CASE(default_construction)
     BOOST_CHECK(contains_txid(mp));
     BOOST_CHECK(contains_coinbase_tx(mp));
 }
-            
+
 BOOST_AUTO_TEST_CASE(txid_construction)
 {
     const TxId txid{uint256S("1")};

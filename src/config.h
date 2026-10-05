@@ -88,6 +88,8 @@ public:
     virtual bool GetAcceptNonStandardOutput(ProtocolEra era) const = 0;
     virtual uint64_t GetMaxCoinsViewCacheSize() const = 0;
     virtual uint64_t GetMaxCoinsProviderCacheSize() const = 0;
+    virtual uint64_t GetCoinsCacheSize() const = 0;
+    virtual uint64_t GetCoinsDBCacheSize() const = 0;
     virtual const std::set<uint256>& GetInvalidBlocks() const = 0;
     virtual bool IsBlockInvalidated(const uint256& hash) const = 0;
     virtual bool IsClientUABanned(const std::string uaClient) const = 0;
@@ -110,6 +112,7 @@ public:
     virtual int32_t GetAssumeWhitelistedBlockDepth() const = 0;
 
     virtual int32_t GetMinBlocksToKeep() const = 0;
+    virtual int32_t GetPruneHysteresis() const = 0;
 
     // Block download
     virtual uint64_t GetBlockStallingMinDownloadSpeed() const = 0;
@@ -267,6 +270,8 @@ public:
     virtual void SetRequireStandard(bool require) = 0;
     virtual bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) = 0;
     virtual bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) = 0;
+    virtual bool SetCoinsCacheSize(int64_t bytes, std::string* err) = 0;
+    virtual bool SetCoinsDBCacheSize(int64_t bytes, std::string* err) = 0;
     virtual bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) = 0;
     virtual bool SetCoinsDBMaxFileSize(int64_t max, std::string* err) = 0;
     virtual void SetInvalidBlocks(const std::set<uint256>& hashes) = 0;
@@ -291,6 +296,7 @@ public:
     virtual bool SetAssumeWhitelistedBlockDepth(int64_t depth, std::string* err = nullptr) = 0;
 
     virtual bool SetMinBlocksToKeep(int32_t minblocks, std::string* err = nullptr) = 0;
+    virtual bool SetPruneHysteresis(int32_t hysteresis, std::string* err = nullptr) = 0;
     virtual bool SetBlockValidationTxBatchSize(int64_t size, std::string* err = nullptr) = 0;
 
     // Block download
@@ -555,6 +561,12 @@ public:
     bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) override;
     uint64_t GetMaxCoinsProviderCacheSize() const override {return data->mMaxCoinsProviderCacheSize;}
 
+    bool SetCoinsCacheSize(int64_t bytes, std::string* err) override;
+    uint64_t GetCoinsCacheSize() const override {return data->mCoinsCacheSize;}
+
+    bool SetCoinsDBCacheSize(int64_t bytes, std::string* err) override;
+    uint64_t GetCoinsDBCacheSize() const override {return data->mCoinsDBCacheSize;}
+
     bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) override;
     uint64_t GetMaxCoinsDbOpenFiles() const override {return data->mMaxCoinsDbOpenFiles; }
 
@@ -620,6 +632,8 @@ public:
 
     bool SetMinBlocksToKeep(int32_t minblocks, std::string* err = nullptr) override;
     int32_t GetMinBlocksToKeep() const override;
+    bool SetPruneHysteresis(int32_t hysteresis, std::string* err = nullptr) override;
+    int32_t GetPruneHysteresis() const override;
     bool SetBlockValidationTxBatchSize(int64_t size, std::string* err = nullptr) override;
     uint64_t GetBlockValidationTxBatchSize() const override;
 
@@ -845,6 +859,8 @@ private:
 
         uint64_t mMaxCoinsViewCacheSize;
         uint64_t mMaxCoinsProviderCacheSize;
+        uint64_t mCoinsCacheSize;
+        uint64_t mCoinsDBCacheSize;
 
         uint64_t mMaxCoinsDbOpenFiles;
         uint64_t mMaxCoinsDBFileSize;
@@ -876,6 +892,7 @@ private:
         InvalidTxEvictionPolicy invalidTxFileSinkEvictionPolicy;
 
         int32_t minBlocksToKeep;
+        int32_t pruneHysteresis;
         uint64_t blockValidationTxBatchSize;
 
         // Block download

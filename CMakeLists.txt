@@ -44,6 +44,12 @@ if(enable_metrics)
   add_definitions(-DCOLLECT_METRICS)
 endif()
 
+option(enable_frame_pointers "Build with frame pointers for accurate profiling" OFF)
+if(enable_frame_pointers)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-omit-frame-pointer")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer")
+endif()
+
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
    CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 

@@ -2,7 +2,6 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include "wallet/wallet.h"
 
 #include "block_index_store.h"
 #include "chainparams.h"
@@ -13,6 +12,7 @@
 #include "validation.h"
 #include "wallet/rpcdump.h"
 #include "wallet/test/wallet_test_fixture.h"
+#include "wallet/wallet_tx.h"
 #include "blockfileinfostore.h"
 
 #include <univalue.h>
@@ -468,26 +468,31 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChain100Setup) {
     CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
     CBlockIndex *newTip = chainActive.Tip();
 
-    // Verify ScanForWalletTransactions picks up transactions in both the old
-    // and new block files.
+    // Verify ScanForWalletTransactions returns null when scan succeeds, and
+    // picks up transactions in both block files.
     {
         CWallet wallet(Params());
         LOCK(wallet.cs_wallet);
         wallet.AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey());
-        BOOST_CHECK_EQUAL(oldTip, wallet.ScanForWalletTransactions(oldTip));
+        WalletRescanReserver reserver { &wallet };
+        BOOST_CHECK(reserver.reserve());
+        BOOST_CHECK(wallet.ScanForWalletTransactions(oldTip, nullptr, reserver) == nullptr);
         BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), 100 * COIN);
     }
 
     // Prune the older block file.
     UnlinkPrunedFiles({oldTip->GetBlockPos().File()});
 
-    // Verify ScanForWalletTransactions only picks transactions in the new block
-    // file.
+    // Verify ScanForWalletTransactions returns oldTip (the unreadable block)
+    // and still picks transactions from the readable newer block file.
     {
         CWallet wallet(Params());
         LOCK(wallet.cs_wallet);
         wallet.AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey());
-        BOOST_CHECK_EQUAL(newTip, wallet.ScanForWalletTransactions(oldTip));
+        WalletRescanReserver reserver { &wallet };
+        BOOST_CHECK(reserver.reserve());
+        BOOST_CHECK_EQUAL(oldTip,
+                          wallet.ScanForWalletTransactions(oldTip, nullptr, reserver));
         BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), 50 * COIN);
     }
 
@@ -512,7 +517,7 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChain100Setup) {
         futureKey.MakeNewKey(true);
         key.pushKV("scriptPubKey",
                    HexStr(GetScriptForRawPubKey(futureKey.GetPubKey())));
-        key.pushKV("timestamp", newTip->GetBlockTimeMax() + TIMESTAMP_WINDOW);
+        key.pushKV("timestamp", newTip->GetBlockTimeMax() + TIMESTAMP_WINDOW + 1);
         key.pushKV("internal", UniValue(true));
         keys.push_back(key);
         JSONRPCRequest request;
@@ -523,22 +528,85 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChain100Setup) {
         BOOST_CHECK_EQUAL(
             response.write(),
             strprintf("[{\"success\":false,\"error\":{\"code\":-1,\"message\":"
-                      "\"Failed to rescan before time %d, transactions may be "
-                      "missing.\"}},{\"success\":true}]",
-                      newTip->GetBlockTimeMax()));
+                      "\"Rescan failed for key with creation timestamp %d. "
+                      "There was an error reading a block from time %d, which "
+                      "is after or within %d seconds of key creation, and "
+                      "could contain transactions pertaining to the key. As a "
+                      "result, transactions and coins using this key may not "
+                      "appear in the wallet. This error could be caused by "
+                      "pruning or data corruption (see bitcoind log for "
+                      "details) and could be dealt with by downloading and "
+                      "rescanning the relevant blocks (see -reindex and "
+                      "-rescan options).\"}},{\"success\":true}]",
+                      0, oldTip->GetBlockTimeMax(), TIMESTAMP_WINDOW));
         vpwallets.erase(vpwallets.begin());
     }
 
-    // Verify ScanForWalletTransactions does not return null when the scan is
-    // elided due to the nTimeFirstKey optimization.
+    // Verify the nTimeFirstKey skip-ahead optimization: with the wallet
+    // birthday set past the chain tip, scanning from oldTip should skip every
+    // block (including the pruned oldTip — proving the skip happened before
+    // any disk read was attempted) and return null. If the skip-ahead were
+    // broken, the scanner would attempt to read pruned oldTip, return oldTip
+    // as the failure block, and pick up newTip's 50 BSV coinbase.
     {
         CWallet wallet(Params());
-        {
-            LOCK(wallet.cs_wallet);
-            wallet.UpdateTimeFirstKey(newTip->GetBlockTime() + 7200 + 1);
-        }
-        BOOST_CHECK_EQUAL(newTip, wallet.ScanForWalletTransactions(newTip));
+        LOCK(wallet.cs_wallet);
+        wallet.AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey());
+        wallet.UpdateTimeFirstKey(newTip->GetBlockTime() + 7200 + 1);
+        WalletRescanReserver reserver { &wallet };
+        BOOST_CHECK(reserver.reserve());
+        BOOST_CHECK(wallet.ScanForWalletTransactions(oldTip, nullptr, reserver) == nullptr);
+        BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), Amount(0));
     }
+}
+
+// Verify ScanForWalletTransactions respects the pindexStop bound.
+BOOST_FIXTURE_TEST_CASE(rescan_range, TestChain100Setup)
+{
+    LOCK(cs_main);
+
+    // Cap last block file size, and mine new block in a new block file.
+    CBlockIndex *oldTip = chainActive.Tip();
+    pBlockFileInfoStore
+        ->GetBlockFileInfo(oldTip->GetBlockPos().File())
+        ->AddNewBlock(1, 1, DEFAULT_PREFERRED_BLOCKFILE_SIZE);
+    CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
+    CBlockIndex *newTip = chainActive.Tip();
+
+    // Run a bounded ScanForWalletTransactions in a fresh wallet that knows
+    // only coinbaseKey, and assert both the scan's return value (the
+    // failure block, or nullptr on full success) and the resulting
+    // immature balance.
+    auto rescan = [this](const CBlockIndex *start,
+                         const CBlockIndex *stop,
+                         const CBlockIndex *expectedRet,
+                         Amount expectedBalance) {
+        CWallet wallet(Params());
+        LOCK(wallet.cs_wallet);
+        wallet.AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey());
+        WalletRescanReserver reserver { &wallet };
+        BOOST_CHECK(reserver.reserve());
+        BOOST_CHECK_EQUAL(expectedRet,
+                          wallet.ScanForWalletTransactions(start, stop, reserver));
+        BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), expectedBalance);
+    };
+
+    // Bounded rescan [oldTip, oldTip] picks up only oldTip's coinbase (50 BSV
+    // immature) and returns null on success.
+    rescan(oldTip, oldTip, nullptr, 50 * COIN);
+
+    // Bounded rescan [oldTip, newTip] picks up both coinbases.
+    rescan(oldTip, newTip, nullptr, 100 * COIN);
+
+    // Prune the older block file.
+    UnlinkPrunedFiles({oldTip->GetBlockPos().File()});
+
+    // Bounded rescan [oldTip, oldTip] now fails: oldTip is the failure block.
+    rescan(oldTip, oldTip, oldTip, Amount(0));
+
+    // Bounded rescan [oldTip, newTip] still reports oldTip as the failure
+    // block, but the loop continues and picks up newTip's coinbase.
+    rescan(oldTip, newTip, oldTip, 50 * COIN);
 }
 
 // Verify importwallet RPC starts rescan at earliest block with timestamp
@@ -596,6 +664,7 @@ BOOST_FIXTURE_TEST_CASE(importwallet_rescan, TestChain100Setup) {
         vpwallets[0] = std::move(wallet);
         ::importwallet(GlobalConfig::GetConfig(), request);
 
+        bsv::lock_guard lock{vpwallets[0]->cs_wallet};
         BOOST_CHECK_EQUAL(vpwallets[0]->mapWallet.size(), 3U);
         BOOST_CHECK_EQUAL(coinbaseTxns.size(), 103U);
         for(size_t i = 0; i < coinbaseTxns.size(); ++i)
@@ -656,6 +725,7 @@ static int64_t AddTx(CWallet &wallet, uint32_t lockTime, int64_t mockTime,
         wtx.SetMerkleBranch(block, 0);
     }
     wallet.AddToWallet(wtx);
+    bsv::lock_guard lock{wallet.cs_wallet};
     return wallet.mapWallet.at(wtx.GetId()).nTimeSmart;
 }
 

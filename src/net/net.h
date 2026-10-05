@@ -25,6 +25,7 @@
 #include "net/net_message.h"
 #include "net/net_types.h"
 #include "net/node_stats.h"
+#include "net/socket_wait_set.h"
 #include "net/stream_policy_factory.h"
 #include "netaddress.h"
 #include "protocol.h"
@@ -375,7 +376,7 @@ public:
     template<typename Callable>
     void ForEachNode(const Callable& func) const
     { 
-        LOCK(cs_vNodes);
+        bsv::lock_guard lock{cs_vNodes};
         for(const CNodePtr& node : vNodes)
         {
             if(NodeFullyConnected(node))
@@ -392,7 +393,7 @@ public:
         using resultType = std::invoke_result_t<Callable, const CNodePtr&>;
         std::vector<std::future<resultType>> results {};
 
-        LOCK(cs_vNodes);
+        bsv::lock_guard lock{cs_vNodes};
         results.reserve(vNodes.size());
         for(const CNodePtr& node : vNodes) {
             if(NodeFullyConnected(node))
@@ -665,6 +666,14 @@ private:
     void ThreadMessageHandler();
     void AcceptConnection(const ListenSocket &hListenSocket);
     void ThreadSocketHandler();
+    // Period of one iteration of the socket handler loop. Bounds how long a
+    // queued message waits before its socket is checked for writability, and
+    // how long the loop backs off after a wait failure or descriptor
+    // exhaustion.
+    static constexpr std::chrono::milliseconds SOCKET_HANDLER_TICK {50};
+    // Wait for at most one socket handler tick for any registered socket to
+    // become ready, recording the result in waitSet.
+    void WaitForSockets(SocketWaitSet& waitSet);
     void ThreadDNSAddressSeed();
 
     uint64_t CalculateKeyedNetGroup(const CAddress &ad) const;
@@ -743,9 +752,23 @@ private:
     CCriticalSection cs_vOneShots;
     std::vector<std::string> vAddedNodes;
     CCriticalSection cs_vAddedNodes;
-    std::vector<CNodePtr> vNodes;
+    std::vector<CNodePtr> vNodes GUARDED_BY(cs_vNodes);
+
+    // Single-thread-confined: only accessed from ThreadSocketHandler and from
+    // Stop() after that thread is joined. No mutex required.
     std::list<CNodePtr> vNodesDisconnected;
-    mutable CCriticalSection cs_vNodes;
+
+    // Sockets registered for waiting on and their readiness, rebuilt every
+    // iteration of ThreadSocketHandler. Single-thread-confined to that thread;
+    // kept as a member only so its allocations are reused between iterations.
+    SocketWaitSet mSocketWaitSet;
+#ifdef USE_POLL
+    // Scratch array handed to poll(), parallel to mSocketWaitSet.Entries().
+    // Same thread confinement as mSocketWaitSet.
+    std::vector<pollfd> mPollFds;
+#endif
+
+    mutable bsv::recursive_mutex cs_vNodes;
     std::atomic<NodeId> nLastNodeId{};
 
     /** Additional streams we want to open to peers */
@@ -1175,9 +1198,9 @@ private:
     mutable CCriticalSection cs_addrName {};
     std::string addrName {};
 
+    mutable CCriticalSection cs_mInvList {};
     /** Deque of inventory msgs for transactions to send */
-    std::deque<CTxnSendingDetails> mInvList;
-    CCriticalSection cs_mInvList {};
+    std::deque<CTxnSendingDetails> mInvList GUARDED_BY(cs_mInvList);
 
     CConnman::CAsyncTaskPool& mAsyncTaskPool;
 
@@ -1194,11 +1217,10 @@ private:
 
 public:
 
-    /** Add some new transactions to our pending inventory list */
     void AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns);
-    /** Remove some transactions from our pending inventroy list */
-    void RemoveTxnsFromInventory(const std::set<CInv>& toRemove);
-    /** Fetch the next N items from our inventory */
+    // pre-condition: toRemove must be sorted
+    void RemoveTxnsFromInventory(const std::vector<CInv>& toRemove);
+    bool HasTxnsInInventory() const;
     std::vector<CTxnSendingDetails> FetchNInventory(size_t n);
 
     NodeId GetId() const { return id; }
@@ -1218,8 +1240,10 @@ public:
 
     int32_t GetMyStartingHeight() const { return nMyStartingHeight; }
 
-    bool SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError, SOCKET& socketMax) const;
-    void ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, CConnman& connman,
+    // Register our sockets and the events we want to wait for.
+    // Returns true if any socket was registered.
+    bool RegisterSockets(SocketWaitSet& waitSet) const;
+    void ServiceSockets(const SocketWaitSet& waitSet, CConnman& connman,
                         const Config& config, uint64_t& bytesRecv, uint64_t& bytesSent);
 
     bool GetDisconnect() const { return fDisconnect; }

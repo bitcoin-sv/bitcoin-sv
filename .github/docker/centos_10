@@ -22,6 +22,7 @@ RUN set -xeu \
     cppzmq-devel \
     sysbench \
     gperftools-devel \
+    systemtap-sdt-devel \
     && pip install --no-cache-dir bip32utils ecdsa pyzmq \
     && dnf clean all -y \
     && rm -rf /var/cache/dnf /var/log/dnf* /tmp/* /var/tmp/* /root/.cache

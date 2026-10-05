@@ -21,6 +21,7 @@ using namespace std;
 
 miner_info_doc::miner_info_doc(supported_version version,
                                int32_t height,
+                               // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                const key_set& mi_keys,
                                const key_set& revocation_keys,
                                vector<data_ref> data_refs,
@@ -86,6 +87,7 @@ std::string to_json(const miner_info_doc& doc)
     return oss.str();
 }
 
+//NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 key_set::key_set(const std::string& key,
                  const std::string& prev_key,
                  const std::string& prev_key_sig)
@@ -110,6 +112,7 @@ std::ostream& operator<<(std::ostream& os, const key_set& t)
     return os;
 }
 
+//NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 revocation_msg::revocation_msg(const string& compromised_miner_id,
                                const string& sig_1,
                                const string& sig_2)

@@ -70,6 +70,13 @@ bool SetSocketNonBlocking(SOCKET &hSocket, bool fNonBlocking);
  * Convert milliseconds to a struct timeval for e.g. select.
  */
 struct timeval MillisToTimeval(int64_t nTimeout);
+
+// Whether a socket-layer error code means the process is out of file
+// descriptors (EMFILE/ENFILE, WSAEMFILE on Windows).
+bool IsOutOfFileDescriptorsError(int err);
+// Log descriptor exhaustion at the default level, rate limited, naming the
+// operation that failed (for example "accept()").
+void ReportOutOfFileDescriptors(const char* operation, int err);
 void InterruptSocks5(bool interrupt);
 
 #endif // BITCOIN_NETBASE_H

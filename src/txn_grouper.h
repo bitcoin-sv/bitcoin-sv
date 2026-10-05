@@ -31,6 +31,15 @@ class TxnGrouper
 
   private:
 
+    // Cheap hasher for outpoints used by our transient per-block lookup below.
+    struct OutpointHasher
+    {
+        size_t operator()(const COutPoint& outpoint) const
+        {
+            return outpoint.GetTxId().GetCheapHash() ^ outpoint.GetN();
+        }
+    };
+
     // A node within the dependency graph.
     // Tracks transaction indexes (if they came from the block),
     // and maintains a list of other transaction IDs that either it depends on
@@ -74,6 +83,12 @@ class TxnGrouper
 
     // All nodes in the dependency graph
     std::unordered_multimap<TxId, Node> mNodes {};
+
+    // First in-block transaction seen to spend each outpoint. Used to link
+    // transactions that spend the exact same output directly to each other, so
+    // that double-spends are grouped at outpoint precision (rather than grouping
+    // every transaction that merely spends the same parent txid).
+    std::unordered_map<COutPoint, TxId, OutpointHasher> mOutpointSpenders {};
 
     void ScanDependencies(const std::vector<CTransactionRef>& vtx);
     void BuildGroupNonRecursive(const TxId& txid, TxnGroup& group);

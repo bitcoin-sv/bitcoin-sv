@@ -43,8 +43,8 @@ class StreamPolicy
     virtual std::pair<Stream::QueuedNetMessage, bool> GetNextMessage(StreamMap& streams) = 0;
 
     // Service the sockets of the streams
-    virtual void ServiceSockets(StreamMap& streams, fd_set& setRecv, fd_set& setSend,
-                                fd_set& setError, const Config& config, bool& gotNewMsgs,
+    virtual void ServiceSockets(StreamMap& streams, const SocketWaitSet& waitSet,
+                                const Config& config, bool& gotNewMsgs,
                                 uint64_t& bytesRecv, uint64_t& bytesSent) = 0;
 
     // Queue an outgoing message on the appropriate stream
@@ -67,8 +67,8 @@ class BasicStreamPolicy : public StreamPolicy
     BasicStreamPolicy() = default;
 
     // Service the sockets of the streams
-    void ServiceSockets(StreamMap& streams, fd_set& setRecv, fd_set& setSend,
-                        fd_set& setError, const Config& config, bool& gotNewMsgs,
+    void ServiceSockets(StreamMap& streams, const SocketWaitSet& waitSet,
+                        const Config& config, bool& gotNewMsgs,
                         uint64_t& bytesRecv, uint64_t& bytesSent) override;
 
   protected:

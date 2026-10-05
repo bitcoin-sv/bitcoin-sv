@@ -88,8 +88,10 @@ namespace
                 const vector<uint8_t>& pub_key,
                 const std::span<const uint8_t> sig)
     {
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
         std::array<uint8_t, CSHA256::OUTPUT_SIZE> hash;
         CSHA256()
+            //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
             .Write(reinterpret_cast<const uint8_t*>(msg.data()), msg.size())
             .Finalize(hash);
 

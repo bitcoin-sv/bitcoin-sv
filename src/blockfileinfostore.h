@@ -31,7 +31,8 @@ public:
 
     void FindFilesToPrune(const Config& config,
         std::set<int> &setFilesToPrune,
-        int32_t nPruneAfterHeight);
+        int32_t nPruneAfterHeight,
+        int32_t nCoinDBFlushedHeight);
 
     void FindFilesToPruneManual(const Config& config,
         std::set<int> &setFilesToPrune,

@@ -67,22 +67,25 @@ BOOST_AUTO_TEST_CASE(TestBlockTracking)
     CNodePtr pDummyNode3 { MakeDummyNode(CAddress { ip(0xa0b0c003), NODE_NONE }, asyncTaskPool) };
     GetNodeSignals().InitializeNode(pDummyNode3, *connman, nullptr);
 
-    // Non-thread-safe pointers to node states (but we're not using threads here so it's fine)
+    // Get raw node state pointers. GetState returns a CLockedRef that holds
+    // both mapNodeStateMtx and per-node mMtx. Holding multiple CLockedRefs
+    // simultaneously creates a lock-order inversion (mMtx -> mapNodeStateMtx
+    // on the second GetState call). Since the test is single-threaded we can
+    // extract the shared_ptr under the lock and work with it directly.
+    CNodeStatePtr nodeState1, nodeState2, nodeState3;
+    { auto ref = GetState(pDummyNode1->id); nodeState1 = ref.get(); }
+    { auto ref = GetState(pDummyNode2->id); nodeState2 = ref.get(); }
+    { auto ref = GetState(pDummyNode3->id); nodeState3 = ref.get(); }
+
     // Check initial node states
-    const CNodeStateRef stateRef1 { GetState(pDummyNode1->id) };
-    const CNodeStatePtr& nodeState1 { stateRef1.get() };
     BOOST_CHECK_EQUAL(nodeState1->nBlocksInFlight, 0);
     BOOST_CHECK_EQUAL(nodeState1->vBlocksInFlight.size(), 0U);
     BOOST_CHECK_EQUAL(nodeState1->rejects.size(), 0U);
 
-    const CNodeStateRef stateRef2 { GetState(pDummyNode2->id) };
-    const CNodeStatePtr& nodeState2 { stateRef2.get() };
     BOOST_CHECK_EQUAL(nodeState2->nBlocksInFlight, 0);
     BOOST_CHECK_EQUAL(nodeState2->vBlocksInFlight.size(), 0U);
     BOOST_CHECK_EQUAL(nodeState2->rejects.size(), 0U);
 
-    const CNodeStateRef stateRef3 { GetState(pDummyNode3->id) };
-    const CNodeStatePtr& nodeState3 { stateRef3.get() };
     BOOST_CHECK_EQUAL(nodeState3->nBlocksInFlight, 0);
     BOOST_CHECK_EQUAL(nodeState3->vBlocksInFlight.size(), 0U);
     BOOST_CHECK_EQUAL(nodeState3->rejects.size(), 0U);

@@ -11,7 +11,7 @@
 #include <vector>
 
 
-namespace { class Unique; }
+namespace { class ThreadSafeQueueTag; }
 template<class T>
 template<class U>
 struct CThreadSafeQueue<T>::UnitTestAccess
@@ -75,13 +75,13 @@ bool CheckNumberOfRunningThreads(const std::vector<std::future<T>>& threads, int
 template<class T>
 auto get_Count(const CThreadSafeQueue<T>& theQueue)
 {
-    return CThreadSafeQueue<T>::template UnitTestAccess<Unique>::Count(theQueue);;
+    return CThreadSafeQueue<T>::template UnitTestAccess<ThreadSafeQueueTag>::Count(theQueue);
 }
 
 template<class T>
 auto get_Size(const CThreadSafeQueue<T>& theQueue)
 {
-    return CThreadSafeQueue<T>::template UnitTestAccess<Unique>::Size(theQueue);;
+    return CThreadSafeQueue<T>::template UnitTestAccess<ThreadSafeQueueTag>::Size(theQueue);
 }
 
 

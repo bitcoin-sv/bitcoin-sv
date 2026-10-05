@@ -14,6 +14,8 @@
 #include <boost/thread/recursive_mutex.hpp>
 
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
 
 /////////////////////////////////////////////////
 //                                             //
@@ -308,9 +310,33 @@ namespace bsv
         std::mutex mtx_;
 
     public:
-        void lock() EXCLUSIVE_LOCK_FUNCTION() { mtx_.lock(); }
-        void unlock() UNLOCK_FUNCTION() { mtx_.unlock(); }
-        bool try_lock() EXCLUSIVE_TRYLOCK_FUNCTION(true) { return mtx_.try_lock(); }
+        void lock() ACQUIRE() { mtx_.lock(); }
+        void unlock() RELEASE() { mtx_.unlock(); }
+        bool try_lock() noexcept TRY_ACQUIRE(true) { return mtx_.try_lock(); }
+    };
+
+    class CAPABILITY("mutex") REENTRANT_CAPABILITY recursive_mutex
+    {
+        std::recursive_mutex mtx_;
+
+    public:
+        void lock() ACQUIRE() { mtx_.lock(); }
+        void unlock() RELEASE() { mtx_.unlock(); }
+        bool try_lock() noexcept TRY_ACQUIRE(true) { return mtx_.try_lock(); }
+    };
+
+    class CAPABILITY("shared_mutex") shared_mutex
+    {
+        std::shared_mutex mtx_;
+
+    public:
+        void lock() ACQUIRE() { mtx_.lock(); }
+        void unlock() RELEASE() { mtx_.unlock(); }
+        bool try_lock() noexcept TRY_ACQUIRE(true) { return mtx_.try_lock(); }
+
+        void lock_shared() ACQUIRE_SHARED() { mtx_.lock_shared(); }
+        bool try_lock_shared() TRY_ACQUIRE_SHARED(true) { return mtx_.try_lock_shared(); }
+        void unlock_shared() RELEASE_SHARED() { mtx_.unlock_shared(); }
     };
 
     // Matches the C++ std::BasicLockable named requirement
@@ -327,7 +353,7 @@ namespace bsv
         std::lock_guard<M> guard_;
 
     public:
-        lock_guard(M& mtx) EXCLUSIVE_LOCK_FUNCTION(mtx) : guard_{mtx} {}
+        lock_guard(M& mtx) ACQUIRE(mtx) : guard_{mtx} {}
 
         lock_guard(const lock_guard&) = delete;
         lock_guard& operator=(const lock_guard&) = delete;
@@ -335,16 +361,16 @@ namespace bsv
         lock_guard(lock_guard&&) = delete;
         lock_guard& operator=(lock_guard&&) = delete;
 
-        ~lock_guard() UNLOCK_FUNCTION() {}
+        ~lock_guard() RELEASE() {}
     };
 
     template<BasicLockable M>
-    class SCOPED_LOCKABLE unique_lock
+    class SCOPED_CAPABILITY unique_lock
     {
         std::unique_lock<M> lock_;
 
     public:
-        unique_lock(M& m) EXCLUSIVE_LOCK_FUNCTION(m) : lock_{m} {}
+        unique_lock(M& m) ACQUIRE(m) : lock_{m} {}
 
         unique_lock(const unique_lock&) = delete;
         unique_lock& operator=(const unique_lock&) = delete;
@@ -352,10 +378,47 @@ namespace bsv
         unique_lock(unique_lock&&) = default;
         unique_lock& operator=(unique_lock&&) = default;
 
-        ~unique_lock() UNLOCK_FUNCTION() {}
+        ~unique_lock() RELEASE() {}
 
-        void lock() EXCLUSIVE_LOCK_FUNCTION() { lock_.lock(); }
-        void unlock() UNLOCK_FUNCTION() { lock_.unlock(); }
+        void lock() ACQUIRE() { lock_.lock(); }
+        void unlock() RELEASE() { lock_.unlock(); }
+    };
+
+    template<BasicLockable M>
+    class SCOPED_CAPABILITY shared_lock
+    {
+        std::shared_lock<M> lock_;
+
+    public:
+        explicit shared_lock(M& m) ACQUIRE_SHARED(m) : lock_{m} {}
+
+        shared_lock(const shared_lock&) = delete;
+        shared_lock& operator=(const shared_lock&) = delete;
+
+        shared_lock(shared_lock&&) = default;
+        shared_lock& operator=(shared_lock&&) = default;
+
+        ~shared_lock() RELEASE() {}
+
+        void lock() ACQUIRE_SHARED() { lock_.lock(); }
+        void unlock() RELEASE() { lock_.unlock(); }
+    };
+
+    template<BasicLockable... Ms>
+    class SCOPED_CAPABILITY scoped_lock
+    {
+        std::scoped_lock<Ms...> guard_;
+
+    public:
+        explicit scoped_lock(Ms&... ms) ACQUIRE(ms...) : guard_{ms...} {}
+
+        scoped_lock(const scoped_lock&) = delete;
+        scoped_lock& operator=(const scoped_lock&) = delete;
+
+        scoped_lock(scoped_lock&&) = delete;
+        scoped_lock& operator=(scoped_lock&&) = delete;
+
+        ~scoped_lock() RELEASE() {}
     };
 }
 

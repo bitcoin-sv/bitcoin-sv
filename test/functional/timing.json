@@ -516,6 +516,14 @@
   "time": 5
  },
  {
+  "name": "bsv-p2p-high-fd-numbers.py",
+  "time": 10
+ },
+ {
+  "name": "bsv-p2p-many-connections.py",
+  "time": 15
+ },
+ {
   "name": "bsv-p2p-max-pending-responses.py",
   "time": 48
  },

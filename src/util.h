@@ -286,7 +286,9 @@ std::string GetThreadName();
 /**
  * .. and a wrapper that just calls func once
  */
-template <typename Callable> void TraceThread(const char *name, Callable func) {
+template<typename Callable>
+void TraceThread(const char* name, const Callable& func)
+{
     std::string s = strprintf("%s", name);
     RenameThread(s.c_str());
     try {

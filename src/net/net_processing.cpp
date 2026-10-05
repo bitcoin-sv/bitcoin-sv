@@ -46,6 +46,7 @@
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
+#include "usdt.h"
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validation.h"
@@ -1133,7 +1134,16 @@ static void SendUnseenTransactions(
 
     auto stream = index.GetDiskBlockStreamReader();
     if (!stream) {
-        assert(!"can not load block from disk");
+        // Not the peer's doing: the block file could not be opened, most
+        // likely because the node is out of file descriptors, or the block
+        // was pruned meanwhile. Send nothing further and let the peer ask
+        // again. Never assert here: this runs on behalf of a remote peer and
+        // asserts are live in release builds. Debug category only: a peer
+        // can trigger this once per filtered-block request, and descriptor
+        // exhaustion is already reported at the default level elsewhere.
+        LogPrint(BCLog::NETMSG, "Unable to read block %s from disk to serve its transactions to peer=%d\n",
+                 index.GetBlockHash().ToString(), pfrom->GetId());
+        return;
     }
 
     size_t currentTransactionNumber = 0;
@@ -3696,9 +3706,12 @@ static void ProcessBlockTxnMessage(const Config& config,
         // Since we requested this block (it was in mapBlocksInFlight),
         // force it to be processed, even if it would not be a candidate for
         // new tip (missing previous block, chain not long enough, etc)
+        // This bypasses some anti-DoS logic in AcceptBlock (eg to prevent
+        // disk-space attacks), but this is safe because the block was
+        // explicitly requested (confirmed by blockDownloadTracker above).
         auto bestChainActivation =
             ProcessNewBlockWithAsyncBestChainActivation(
-                task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, true, &fNewBlock, CBlockSource::MakeP2P(pfrom->GetAssociation().GetPeerAddr().ToString()));
+                task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, /*fForceProcessing=*/true, &fNewBlock, CBlockSource::MakeP2P(pfrom->GetAssociation().GetPeerAddr().ToString()));
         if(!bestChainActivation)
         {
             // something went wrong before we need to activate best chain
@@ -3991,9 +4004,19 @@ static bool ProcessCompactBlockMessage(
             "ProcessCompactBlock",
             pfrom->GetAddrName(),
             pfrom->GetId());
+
+        // Setting fForceProcessing to true means that we bypass some of
+        // our anti-DoS protections in AcceptBlock, which filters
+        // unrequested blocks that might be trying to waste our resources
+        // (eg disk space). Because we only try to reconstruct blocks when
+        // we're close to caught up (via the CanDirectFetch() requirement
+        // above, combined with the behavior of not requesting blocks until
+        // we have a chain with at least nMinimumChainWork), and we ignore
+        // compact blocks with less work than our tip, it is safe to treat
+        // reconstructed compact blocks as having been requested.
         auto bestChainActivation =
             ProcessNewBlockWithAsyncBestChainActivation(
-                task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, true, &fNewBlock, CBlockSource::MakeP2P(pfrom->GetAssociation().GetPeerAddr().ToString()));
+                task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, /*fForceProcessing=*/true, &fNewBlock, CBlockSource::MakeP2P(pfrom->GetAssociation().GetPeerAddr().ToString()));
         if(bestChainActivation)
         {
             pfrom->RunAsyncProcessing(
@@ -4897,6 +4920,41 @@ static bool SendRejectsAndCheckIfBanned(const CNodePtr& pnode, CConnman &connman
     return false;
 }
 
+//NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
+TRACEPOINT_SEMAPHORE(p2p, msg_process_entry);
+TRACEPOINT_SEMAPHORE(p2p, msg_process_exit);
+//NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
+
+namespace
+{
+    class usdt_guard
+    {
+        [[maybe_unused]] NodeId node_id_{};
+        [[maybe_unused]] const char* cmd_{};
+
+    public:
+        explicit usdt_guard(NodeId node_id,
+                            const char* cmd,
+                            [[maybe_unused]] uint64_t msg_size):
+            node_id_{node_id},
+            cmd_{cmd}
+        {
+            TRACEPOINT(p2p, msg_process_entry, node_id, cmd, msg_size);
+        }
+
+        ~usdt_guard()
+        {
+            TRACEPOINT(p2p, msg_process_exit, node_id_, cmd_);
+        }
+
+        usdt_guard(const usdt_guard&) = delete;
+        usdt_guard& operator=(const usdt_guard&) = delete;
+
+        usdt_guard(usdt_guard&&) = delete;
+        usdt_guard& operator=(usdt_guard&&) = delete;
+    };
+}
+
 bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &connman,
                      const std::atomic<bool> &interruptMsgProc,
                      std::chrono::milliseconds debugP2PTheadStallsThreshold)
@@ -5032,6 +5090,9 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     }
 
     // Process message
+    [[maybe_unused]] const usdt_guard guard{pfrom->GetId(),
+                                            strCommand.c_str(),
+                                            nPayloadLength};
     bool fRet = false;
     try {
         fRet = ProcessMessage(config, pfrom, strCommand, msg.GetData(), msg.GetTime(),
@@ -5343,16 +5404,30 @@ void SendBlockHeaders(const Config& config, const CNodePtr& pto, CConnman &connm
                 // FIXME pBestIndex could be null... what to do in that case?
                 auto reader =
                     pBestIndex->GetDiskBlockStreamReader( config );
-                if (!reader) {
-                    assert(!"cannot load block from disk");
+                if (reader) {
+                    SendCompactBlock(
+                        config,
+                        true,
+                        pto,
+                        connman,
+                        msgMaker,
+                        *reader);
                 }
-                SendCompactBlock(
-                    config,
-                    true,
-                    pto,
-                    connman,
-                    msgMaker,
-                    *reader);
+                else {
+                    // The block file could not be opened, most likely because
+                    // the node is out of file descriptors. Announce the block
+                    // with a plain header instead: a compact-block peer accepts
+                    // that like any headers-first announcement and fetches the
+                    // block itself. Never assert here: asserts are live in
+                    // release builds and this runs on every new tip for every
+                    // such peer, so it would turn descriptor exhaustion into a
+                    // crash.
+                    LogPrint(BCLog::NETMSG,
+                             "%s: cannot read block %s from disk to announce it as a compact "
+                             "block, sending header instead to peer=%d\n",
+                             __func__, pBestIndex->GetBlockHash().ToString(), pto->id);
+                    connman.PushMessage(pto, msgMaker.Make(NetMsgType::HEADERS, vHeaders));
+                }
             }
             state->pindexBestHeaderSent = pBestIndex;
         }

@@ -87,7 +87,7 @@ The blockchain serialized representation is little-endian, with the most
 significant bit indicating the sign (0 if positive, 1 if negative). An
 additional byte may be required to hold the sign. Little endianess of the
 representations means that numbers are non-unique. 
-E.g. Zero = {}, { 0x00 }, { 0x08 }, { 0x00, 0x08 }, ...
+E.g. Zero = {}, { 0x00 }, { 0x80 }, { 0x00, 0x80 }, ...
 
 Positive Number Serialized Representation
 

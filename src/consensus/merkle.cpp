@@ -3,9 +3,17 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "merkle.h"
+
+#include "binary_counter.h"
+#include "crypto/sha256_dispatch.h"
 #include "hash.h"
 #include "utilstrencodings.h"
+
+#include <array>
+#include <cassert>
+#include <cstddef>
 #include <cstdint>
+#include <optional>
 
 /*     WARNING! If you're reading this because you're learning about crypto
        and/or designing a new system that will use merkle trees, keep in mind
@@ -147,10 +155,130 @@ static void MerkleComputation(const std::vector<uint256> &leaves,
 }
 // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
 
-uint256 ComputeMerkleRoot(const std::vector<uint256> &leaves, bool *mutated) {
-    uint256 hash;
-    MerkleComputation(leaves, &hash, mutated, -1, nullptr);
-    return hash;
+void SHA256D64_2way(std::span<const uint256, 4> ip, std::span<uint256, 2> op)
+{
+    using sha256_dispatch::hash_bytes;
+    using sha256_dispatch::d_pair_bytes;
+
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+    const std::span<const std::uint8_t, 2 * d_pair_bytes> ip_bytes{reinterpret_cast<const std::uint8_t*>(ip.data()),
+                                                                                                         2 * d_pair_bytes};
+    const std::span<std::uint8_t, 2 * hash_bytes> op_bytes{reinterpret_cast<std::uint8_t*>(op.data()),
+                                                                                           2 * hash_bytes};
+    // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
+
+    if(sha256_dispatch::d_block_2way)
+    {
+        sha256_dispatch::d_block_2way(ip_bytes, op_bytes);
+    }
+    else
+    {
+        sha256_dispatch::d_block_1way(ip_bytes.first<d_pair_bytes>(), op_bytes.first<hash_bytes>());
+        sha256_dispatch::d_block_1way(ip_bytes.last<d_pair_bytes>(),  op_bytes.last<hash_bytes>());
+    }
+}
+
+namespace
+{
+    enum class odd_rule : uint8_t { no, yes };
+
+    class MerkleSiblings
+    {
+        std::array<uint256, 2> siblings_{};
+        std::uint8_t level_{};
+        odd_rule odd_rule_{odd_rule::no};
+        bool mutated_{};
+
+    public:
+        MerkleSiblings() = default;
+        MerkleSiblings(const uint256& lhs,
+                       const uint256& rhs,
+                       std::uint8_t level = 0,
+                       odd_rule rule = odd_rule::no,
+                       bool mutated = false):
+            siblings_{lhs, rhs},
+            level_{level},
+            odd_rule_{rule},
+            mutated_{mutated}
+        {}
+
+        const uint256& lhs() const { return siblings_[0]; }
+        const uint256& rhs() const { return siblings_[1]; }
+
+        std::uint8_t level() const { return level_; }
+
+        bool mutated() const
+        {
+            return mutated_ || (lhs() == rhs() && odd_rule_ == odd_rule::no);
+        }
+
+        MerkleSiblings lift() const
+        {
+            const uint256 parent{Sha256d(lhs(), rhs())};
+            return MerkleSiblings{parent, parent,
+                                  static_cast<uint8_t>(level_ + 1),
+                                  odd_rule::yes,
+                                  mutated()};
+        }
+
+        bool operator==(const MerkleSiblings&) const = default;
+    };
+
+    MerkleSiblings combine(const MerkleSiblings& a, const MerkleSiblings& b)
+    {
+        const std::array<uint256, 4> ip{a.lhs(), a.rhs(),
+                                        b.lhs(), b.rhs()};
+        std::array<uint256, 2> op;
+        SHA256D64_2way(ip, op);
+        return MerkleSiblings{op[0], op[1],
+                              static_cast<uint8_t>(a.level() + 1),
+                              odd_rule::no,
+                              a.mutated() || b.mutated()};
+    }
+
+    MerkleSiblings lift_combine(const MerkleSiblings& a, MerkleSiblings b)
+    {
+        while(b.level() < a.level())
+            b = b.lift();
+        return combine(a, b);
+    }
+}
+
+uint256 ComputeMerkleRoot(const std::vector<uint256>& leaves, bool* mutated)
+{
+    if(leaves.size() <= 1)
+    {
+        if(mutated != nullptr)
+            *mutated = false;
+
+        return leaves.empty() ? uint256{} : leaves[0];
+    }
+
+    using opt_ms = std::optional<MerkleSiblings>;
+
+    const auto combine_opt = [](const opt_ms& a, const opt_ms& b) -> opt_ms 
+                               { return combine(*a, *b); };
+    binary_counter bc{combine_opt};
+
+    for(size_t i{}; i < leaves.size() / 2; ++i)
+    {
+        const size_t idx{2 * i};
+        bc(opt_ms{MerkleSiblings{leaves[idx], leaves[idx + 1]}});
+    }
+
+    if(leaves.size() & 1)
+        bc(opt_ms{MerkleSiblings{leaves.back(), leaves.back(), 0, odd_rule::yes}});
+    
+    const auto lift_combine_opt = [](const opt_ms& a, const opt_ms& b) -> opt_ms
+                                    { return lift_combine(*a, *b); };
+    const opt_ms result{reduce_counter(bc.begin(), bc.end(),
+                                       lift_combine_opt,
+                                       opt_ms{})};
+    assert(result.has_value());
+    if(mutated != nullptr)
+        *mutated = result->mutated();
+
+    return Sha256d(result->lhs(), result->rhs());
 }
 
 std::vector<uint256> ComputeMerkleBranch(const std::vector<uint256> &leaves,

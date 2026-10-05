@@ -1715,7 +1715,7 @@ std::optional<ScriptError> EvalScript(
                         // Make sure the split point is apropriate.
                         const auto& top{stack.stacktop(-1).GetElement()};
                         const CScriptNum n{top, requireMinimal, params.MaxScriptNumLength(), utxo_after_genesis};
-                        if(n < 0 || n > data.size()) //NOLINT(*-narrowing-conversions)
+                        if(n < 0 || n > std::numeric_limits<int32_t>::max() || n > std::ssize(data))
                             return SCRIPT_ERR_INVALID_SPLIT_RANGE;
 
                         const auto position{n.to_size_t_limited()};

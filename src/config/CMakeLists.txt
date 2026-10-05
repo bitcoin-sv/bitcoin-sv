@@ -14,7 +14,7 @@ set(PACKAGE_NAME "Bitcoin SV")
 # Version
 set(CLIENT_VERSION_MAJOR 1)
 set(CLIENT_VERSION_MINOR 2)
-set(CLIENT_VERSION_REVISION 2)
+set(CLIENT_VERSION_REVISION 3)
 set(CLIENT_VERSION_BUILD 0)
 
 if(ENABLE_PROD_BUILD)
@@ -117,16 +117,40 @@ check_builtin_exist(__builtin_clzll HAVE_DECL___BUILTIN_CLZLL)
 check_symbol_exists(strnlen "string.h" HAVE_DECL_STRNLEN)
 check_symbol_exists(daemon "unistd.h" HAVE_DECL_DAEMON)
 
+# poll(2) for the P2P socket loop (see USE_POLL in src/compat.h). Not used on
+# Windows (WSAPoll is not declared at our _WIN32_WINNT) or Darwin (following
+# Bitcoin Core; no CI coverage). Must stay in step with configure.ac.
+if(NOT CMAKE_SYSTEM_NAME MATCHES "Windows|Darwin")
+	check_symbol_exists(poll "poll.h" HAVE_DECL_POLL)
+	if(HAVE_DECL_POLL)
+		set(USE_POLL 1)
+	endif()
+endif()
+
 # OpenSSL functionality
 set(CMAKE_REQUIRED_INCLUDES ${OPENSSL_CRYPTO_INCLUDES})
 set(CMAKE_REQUIRED_LIBRARIES ${OPENSSL_CRYPTO_LIBRARY})
 check_symbol_exists(EVP_MD_CTX_new "openssl/evp.h" HAVE_DECL_EVP_MD_CTX_NEW)
+# Restore the default (empty) check state so these OpenSSL include/lib
+# requirements do not leak into subsequent check_*() calls below.
+unset(CMAKE_REQUIRED_INCLUDES)
+unset(CMAKE_REQUIRED_LIBRARIES)
 
 # Activate wallet
 set(ENABLE_WALLET ${BUILD_BITCOIN_WALLET})
 
 # Activate ZeroMQ
 set(ENABLE_ZMQ ${BUILD_BITCOIN_ZMQ})
+
+if(ENABLE_USDT)
+	check_include_files("sys/sdt.h" HAVE_SYS_SDT_H)
+	if(NOT HAVE_SYS_SDT_H)
+		message(FATAL_ERROR
+			"ENABLE_USDT=ON but sys/sdt.h was not found. Install the systemtap "
+			"SDT development headers (e.g. systemtap-sdt-dev / systemtap-sdt-devel) "
+			"or configure with -DENABLE_USDT=OFF.")
+	endif()
+endif()
 
 # Generate the config
 configure_file(bitcoin-config.h.cmake.in bitcoin-config.h ESCAPE_QUOTES)

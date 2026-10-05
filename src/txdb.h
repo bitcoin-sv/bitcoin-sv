@@ -27,8 +27,10 @@ class uint256;
 
 //! No need to periodic flush if at least this much space still available.
 static constexpr int MAX_BLOCK_COINSDB_USAGE = 10;
-//! -dbcache default (MiB)
-static const int64_t nDefaultDbCache = 2048;
+//! -dbcache default (MiB). Sizes only the block-tree-DB and Merkle-tree-index-DB
+//! caches; the residue after those two is unused. Coins cache sizing is
+//! controlled separately by -coinsdbcache.
+static const int64_t nDefaultDbCache = 512;
 //! -dbbatchsize default (bytes)
 static const int64_t nDefaultDbBatchSize = 16 << 20;
 //! max. -dbcache (MiB)
@@ -42,8 +44,6 @@ static const int64_t nMaxBlockDBCache = 2;
 // a meaningful difference:
 // https://github.com/bitcoin/bitcoin/pull/8273#issuecomment-229601991
 static const int64_t nMaxBlockDBAndTxIndexCache = 1024;
-//! Max memory allocated to coin DB specific cache (MiB)
-static const int64_t nMaxCoinsDBCache = 256;
 
 /** Iterate over coins in DB */
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
@@ -157,6 +157,14 @@ public:
      */
     void Uncache(const std::vector<COutPoint>& vOutpoints);
 
+    /**
+     * Read the best block hash from the on-disk database (DB_BEST_BLOCK).
+     * Unlike GetBestBlock(), which returns the in-memory cached value
+     * (updated on every block connect/disconnect), this returns the value
+     * that was last persisted by Flush().
+     */
+    uint256 DBGetBestBlock() const;
+
 private:
     uint256 GetBestBlock() const;
 
@@ -186,7 +194,6 @@ private:
 
     std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const;
     std::optional<CoinImpl> DBGetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const;
-    uint256 DBGetBestBlock() const;
     std::vector<uint256> GetHeadBlocks() const;
     bool DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock);
 

@@ -1,7 +1,0 @@
-Checks: '-*,
-         clang-analyzer-*,
-      '
-
-InheritParentConfig: true
-...
-

@@ -1915,7 +1915,7 @@ BOOST_AUTO_TEST_CASE(op_substr_post_chronicle)
     using test_args = tuple<vector<uint8_t>,            // script
                             ScriptError,                // expected scriptError
                             LimitedStack::size_type,    // expected stack size 
-                            exp_stack_top_type>;             // expected top of stack
+                            exp_stack_top_type>;        // expected top of stack
     const uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_UTXO_AFTER_CHRONICLE};
     const vector<test_args> test_data
     {
@@ -1964,6 +1964,41 @@ BOOST_AUTO_TEST_CASE(op_substr_post_chronicle)
             SCRIPT_ERR_OK, 1, exp_stack_top_type{{0, 1}} },
       { {OP_PUSHDATA1, 3, 0, 1, 2, OP_1, OP_2, OP_SUBSTR},
             SCRIPT_ERR_OK, 1, exp_stack_top_type{{1, 2}} },
+
+      // length 9
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0,
+         9, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, OP_SUBSTR},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0}} },
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0,
+         9, 0x01, 0, 0, 0, 0, 0, 0, 0, 0x80, OP_SUBSTR},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3,
+            exp_stack_top_type{{0x01, 0, 0, 0, 0, 0, 0, 0, 0x80}} },
+      // 9-byte length whose magnitude is out of int64 range -> overflow
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0,
+         9, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, OP_SUBSTR},
+            SCRIPT_ERR_SCRIPTNUM_OVERFLOW, 3,
+            exp_stack_top_type{{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00}} },
+
+      // length 10
+      { {OP_PUSHDATA1, 3, 0, 1, 2, OP_0,
+         10, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, OP_SUBSTR},
+            SCRIPT_ERR_SCRIPTNUM_OVERFLOW, 3,
+            exp_stack_top_type{{0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0}} },
+      { {OP_PUSHDATA1, 3, 0, 1, 2,
+         10, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, OP_1, OP_SUBSTR},
+            SCRIPT_ERR_SCRIPTNUM_OVERFLOW, 3, exp_stack_top_type{{1}} },
+
+      // 9-byte start-position (offset) operand
+      { {OP_PUSHDATA1, 3, 0, 1, 2,
+         9, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, OP_1, OP_SUBSTR},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{1}} },
+      { {OP_PUSHDATA1, 3, 0, 1, 2,
+         9, 0x01, 0, 0, 0, 0, 0, 0, 0, 0x80, OP_1, OP_SUBSTR},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 3, exp_stack_top_type{{1}} },
+      // 9-byte offset whose magnitude is out of int64 range -> overflow
+      { {OP_PUSHDATA1, 3, 0, 1, 2,
+         9, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, OP_1, OP_SUBSTR},
+            SCRIPT_ERR_SCRIPTNUM_OVERFLOW, 3, exp_stack_top_type{{1}} },
     };
 
     for(const auto& [script,
@@ -2084,6 +2119,26 @@ BOOST_AUTO_TEST_CASE(op_left_post_chronicle)
             SCRIPT_ERR_OK, 1, exp_stack_top_type{{0, 1}} },
       { {OP_PUSHDATA1, 2, 0, 1, OP_3, OP_LEFT}, // length out-of-bounds
             SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{3}} },
+
+      // 9-byte length
+      { {OP_PUSHDATA1, 2, 0, 1,
+         9, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, OP_LEFT},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{0}} },
+      { {OP_PUSHDATA1, 2, 0, 1,
+         9, 0x01, 0, 0, 0, 0, 0, 0, 0, 0x80, OP_LEFT},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2,
+            exp_stack_top_type{{0x01, 0, 0, 0, 0, 0, 0, 0, 0x80}} },
+      // 9-byte length whose magnitude is out of int64 range -> overflow
+      { {OP_PUSHDATA1, 2, 0, 1,
+         9, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, OP_LEFT},
+            SCRIPT_ERR_SCRIPTNUM_OVERFLOW, 2,
+            exp_stack_top_type{{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00}} },
+
+      // 10-byte length
+      { {OP_PUSHDATA1, 2, 0, 1,
+         10, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, OP_LEFT},
+            SCRIPT_ERR_SCRIPTNUM_OVERFLOW, 2,
+            exp_stack_top_type{{0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0}} },
     };
 
     for(const auto& [script,
@@ -2204,6 +2259,26 @@ BOOST_AUTO_TEST_CASE(op_right_post_chronicle)
             SCRIPT_ERR_OK, 1, exp_stack_top_type{{0, 1}} },
       { {OP_PUSHDATA1, 2, 0, 1, OP_3, OP_RIGHT},
             SCRIPT_ERR_INVALID_NUMBER_RANGE, 2, exp_stack_top_type{{3}} },
+
+      // 9-byte length
+      { {OP_PUSHDATA1, 2, 0, 1,
+         9, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, OP_RIGHT},
+            SCRIPT_ERR_OK, 1, exp_stack_top_type{{1}} },
+      { {OP_PUSHDATA1, 2, 0, 1,
+         9, 0x01, 0, 0, 0, 0, 0, 0, 0, 0x80, OP_RIGHT},
+            SCRIPT_ERR_INVALID_NUMBER_RANGE, 2,
+            exp_stack_top_type{{0x01, 0, 0, 0, 0, 0, 0, 0, 0x80}} },
+      // 9-byte length whose magnitude is out of int64 range -> overflow
+      { {OP_PUSHDATA1, 2, 0, 1,
+         9, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, OP_RIGHT},
+            SCRIPT_ERR_SCRIPTNUM_OVERFLOW, 2,
+            exp_stack_top_type{{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00}} },
+
+      // 10-byte length
+      { {OP_PUSHDATA1, 2, 0, 1,
+         10, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, OP_RIGHT},
+            SCRIPT_ERR_SCRIPTNUM_OVERFLOW, 2,
+            exp_stack_top_type{{0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0}} },
     };
 
     for(const auto& [script,
@@ -2712,6 +2787,62 @@ BOOST_AUTO_TEST_CASE(op_2rot)
         for(auto i=1u; i <= exp_stack.size(); ++i)
             BOOST_CHECK_EQUAL(exp_stack[i-1],
                               stack.stacktop(-1 * i).front());
+    }
+}
+
+// Post-Genesis a stack element may exceed INT32_MAX bytes (the stack-memory limit
+// is INT64_MAX). OP_SPLIT originally guarded the position only with
+//     if(n < 0 || n > data.size())
+// i.e. it bounded n by the *element size*, not by INT32_MAX
+//
+// This exercises both sides of the fixed guard against the same oversized element:
+//   - n == INT32_MAX     : the largest position the guard must ADMIT (valid split).
+//   - n == INT32_MAX + 1 : exceeds INT32_MAX yet is still < data.size().
+BOOST_AUTO_TEST_CASE(op_split_int32_max)
+{
+    Config& config = GlobalConfig::GetConfig();
+
+    // Stack element larger than INT32_MAX bytes (2^31 == INT32_MAX + 1, +16 so the
+    // positions below are genuine in-range splits, not at-the-end splits).
+    const size_t bigSize = (size_t(1) << 31) + 16; // ~2 GiB, > INT32_MAX
+    const valtype data(bigSize, 0x00);
+
+    constexpr uint32_t flags{SCRIPT_UTXO_AFTER_GENESIS};
+    const auto params{
+        make_eval_script_params(config.GetConfigScriptPolicy(), flags, true)};
+
+    // Run OP_SPLIT on { data, position }: it reads stacktop(-2)=data,
+    // stacktop(-1)=position, minimal little-endian CScriptNum encoding.
+    const auto splitAt = [&](const valtype& position) {
+        LimitedStack stack = LimitedStack({data, position}, INT64_MAX);
+        auto source = task::CCancellationSource::Make();
+        const auto r = EvalScript(params,
+                                  source->GetToken(),
+                                  stack,
+                                  CScript() << OP_SPLIT,
+                                  flags,
+                                  BaseSignatureChecker{});
+        return std::make_pair(r, std::move(stack));
+    };
+
+    // n == INT32_MAX (0x7fffffff): valid split into INT32_MAX and bigSize-INT32_MAX.
+    {
+        auto [r, stack] = splitAt({0xff, 0xff, 0xff, 0x7f});
+        BOOST_REQUIRE(r);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, r.value());
+        BOOST_CHECK_EQUAL(2U, stack.size());
+        BOOST_CHECK_EQUAL(size_t(INT32_MAX),
+                          stack.stacktop(-2).GetElement().size());
+        BOOST_CHECK_EQUAL(bigSize - INT32_MAX,
+                          stack.stacktop(-1).GetElement().size());
+    }
+
+    // n == INT32_MAX + 1 (2^31, 0x80000000): rejected, not aborted. The trailing
+    // 0x00 keeps the value positive past the sign bit of 0x80.
+    {
+        auto [r, stack] = splitAt({0x00, 0x00, 0x00, 0x80, 0x00});
+        BOOST_REQUIRE(r);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_INVALID_SPLIT_RANGE, r.value());
     }
 }
 

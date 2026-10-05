@@ -234,9 +234,9 @@ class CTxnValidator final
     inline bool isSpaceForTxnNL(const TxInputDataSPtr& txn, const std::atomic<uint64_t>& currMemUsage) const;
 
     /** Add a standard txn to the queue */
-    bool enqueueStdTxnNL(const TxInputDataSPtr& txn);
+    bool enqueueStdTxnNL(const TxInputDataSPtr&) REQUIRES(mStdTxnsMtx);
     /** Add a non-standard txn to the queue */
-    bool enqueueNonStdTxnNL(const TxInputDataSPtr& txn);
+    bool enqueueNonStdTxnNL(const TxInputDataSPtr&) REQUIRES(mNonStdTxnsMtx);
 
     /** Add some txns (standard or non-standard) to the queue */
     template<typename Iterator, typename Callable>
@@ -275,19 +275,19 @@ class CTxnValidator final
     }
 
     /** List of new transactions that need processing */
-    std::deque<TxInputDataSPtr> mStdTxns {};
+    std::deque<TxInputDataSPtr> mStdTxns GUARDED_BY(mStdTxnsMtx) {};
     std::atomic<uint64_t> mStdTxnsMemSize {0};
     /** A dedicated mutex to protect an exclusive access to mStdTxns */
-    mutable std::shared_mutex mStdTxnsMtx {};
+    mutable bsv::shared_mutex mStdTxnsMtx {};
     /** List of new non-standard transactions that need processing */
-    std::deque<TxInputDataSPtr> mNonStdTxns {};
+    std::deque<TxInputDataSPtr> mNonStdTxns GUARDED_BY(mNonStdTxnsMtx) {};
     std::atomic<uint64_t> mNonStdTxnsMemSize {0};
     /** A dedicated mutex to protect an exclusive access to mStdTxns */
-    mutable std::shared_mutex mNonStdTxnsMtx {};
+    mutable bsv::shared_mutex mNonStdTxnsMtx {};
     /** A vector of txns which are currently being processed */
-    std::vector<TxInputDataSPtr> mProcessingQueue {};
+    std::vector<TxInputDataSPtr> mProcessingQueue GUARDED_BY(mProcessingQueueMtx) {};
     /** A dedicated mutex to protect an access to mTxnsProcessingQueue */
-    mutable std::shared_mutex mProcessingQueueMtx {};
+    mutable bsv::shared_mutex mProcessingQueueMtx {};
 
     /** A common mutex used for:
      * - protecting mAsynchRunFrequency
@@ -295,10 +295,10 @@ class CTxnValidator final
      * - controlling sync and async validation mode
      *   (only one can run at the same time)
      */
-    mutable std::shared_mutex mMainMtx {};
-    std::condition_variable_any mMainCV {};
+    mutable bsv::shared_mutex mMainMtx {};
+    std::condition_variable_any mMainCV GUARDED_BY(mMainMtx) {};
     // A condition variable used to signal when all currently queued txns were processed.
-    std::condition_variable_any mTxnsProcessedCV {} ;
+    std::condition_variable_any mTxnsProcessedCV GUARDED_BY(mProcessingQueueMtx) {};
 
     // A reference to the configuration
     const Config& mConfig;
@@ -323,5 +323,5 @@ class CTxnValidator final
     std::atomic<bool> mRunning {true};
 
     /** Frequency we run in asynchronous mode */
-    std::chrono::milliseconds mAsynchRunFrequency {DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS};
+    std::chrono::milliseconds mAsynchRunFrequency GUARDED_BY(mMainMtx) {DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS};
 };

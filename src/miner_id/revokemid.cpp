@@ -63,8 +63,10 @@ namespace
     uint256 HashRevocationMessage(const RevokeMid& msg)
     {
         const auto& revocationMessage { msg.GetEncodedRevocationMessage() };
+        //NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
         std::array<uint8_t, CSHA256::OUTPUT_SIZE> hashRevocationMessage;
         CSHA256()
+            //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
             .Write(reinterpret_cast<const uint8_t *>(revocationMessage.data()),
                    revocationMessage.size())
             .Finalize(hashRevocationMessage);
@@ -90,10 +92,17 @@ RevokeMid::RevokeMid(const CKey& revocationKey, const CKey& minerId, const CPubK
     mEncodedRevocationMessageSig = HexEncodeRevocationMessageSig(*this);
 }
 
-RevokeMid::RevokeMid(const CPubKey& revocationKey, const CPubKey& minerId, const CPubKey& idToRevoke,
-    const std::vector<uint8_t>& sig1, const std::vector<uint8_t>& sig2)
-: mRevocationKey{revocationKey}, mMinerId{minerId}, mRevocationMessage{idToRevoke},
-  mSig1{sig1}, mSig2{sig2}
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+RevokeMid::RevokeMid(const CPubKey& revocationKey,
+                     const CPubKey& minerId,
+                     const CPubKey& idToRevoke,
+                     const std::vector<uint8_t>& sig1,
+                     const std::vector<uint8_t>& sig2)
+    : mRevocationKey{revocationKey},
+      mMinerId{minerId},
+      mRevocationMessage{idToRevoke},
+      mSig1{sig1},
+      mSig2{sig2}
 {
     // Hex encode key fields
     EncodeHexKey(mRevocationKey, mEncodedRevocationKey);
@@ -115,16 +124,16 @@ bool RevokeMid::VerifySignatures() const
 // Stream output
 std::ostream& operator<<(std::ostream& str, const RevokeMid& msg)
 {
-    str << "Version: " << msg.GetVersion() << std::endl;
-    str << "RevocationKey: " << msg.GetRevocationKey().GetHash().ToString() << std::endl;
-    str << "EncodedRevocationKey: " << HexStr(msg.GetEncodedRevocationKey()) << std::endl;
-    str << "MinerId: " << msg.GetMinerId().GetHash().ToString() << std::endl;
-    str << "EncodedMinerId: " << HexStr(msg.GetEncodedMinerId()) << std::endl;
-    str << "RevocationMessage: " << msg.GetRevocationMessage().GetHash().ToString() << std::endl;
-    str << "EncodedRevocationMessage: " << HexStr(msg.GetEncodedRevocationMessage()) << std::endl;
-    str << "Sig1: " << HexStr(msg.GetSig1()) << std::endl;
-    str << "Sig2: " << HexStr(msg.GetSig2()) << std::endl;
-    str << "EncodedRevocationMessageSig: " << HexStr(msg.GetEncodedRevocationMessageSig()) << std::endl;
+    str << "Version: " << msg.GetVersion() << '\n';
+    str << "RevocationKey: " << msg.GetRevocationKey().GetHash().ToString() << '\n';
+    str << "EncodedRevocationKey: " << HexStr(msg.GetEncodedRevocationKey()) << '\n';
+    str << "MinerId: " << msg.GetMinerId().GetHash().ToString() << '\n';
+    str << "EncodedMinerId: " << HexStr(msg.GetEncodedMinerId()) << '\n';
+    str << "RevocationMessage: " << msg.GetRevocationMessage().GetHash().ToString() << '\n';
+    str << "EncodedRevocationMessage: " << HexStr(msg.GetEncodedRevocationMessage()) << '\n';
+    str << "Sig1: " << HexStr(msg.GetSig1()) << '\n';
+    str << "Sig2: " << HexStr(msg.GetSig2()) << '\n';
+    str << "EncodedRevocationMessageSig: " << HexStr(msg.GetEncodedRevocationMessageSig()) << '\n';
     return str;
 }
 
@@ -144,17 +153,14 @@ bool operator==(const RevokeMid& msg1, const RevokeMid& msg2)
 }
 
 // Specialise std::hash
-namespace std
-{
-    size_t hash<RevokeMid>::operator()(const RevokeMid& rmid) const
-    {   
-        size_t seed {0};
-        boost::hash_combine(seed, rmid.GetVersion());
-        boost::hash_range(seed, rmid.GetEncodedRevocationKey().begin(), rmid.GetEncodedRevocationKey().end());
-        boost::hash_range(seed, rmid.GetEncodedMinerId().begin(), rmid.GetEncodedMinerId().end());
-        boost::hash_range(seed, rmid.GetEncodedRevocationMessage().begin(), rmid.GetEncodedRevocationMessage().end());
-        boost::hash_range(seed, rmid.GetEncodedRevocationMessageSig().begin(), rmid.GetEncodedRevocationMessageSig().end());
-        return seed;
-    };
+size_t std::hash<RevokeMid>::operator()(const RevokeMid& rmid) const
+{   
+    size_t seed {0};
+    boost::hash_combine(seed, rmid.GetVersion());
+    boost::hash_range(seed, rmid.GetEncodedRevocationKey().begin(), rmid.GetEncodedRevocationKey().end());
+    boost::hash_range(seed, rmid.GetEncodedMinerId().begin(), rmid.GetEncodedMinerId().end());
+    boost::hash_range(seed, rmid.GetEncodedRevocationMessage().begin(), rmid.GetEncodedRevocationMessage().end());
+    boost::hash_range(seed, rmid.GetEncodedRevocationMessageSig().begin(), rmid.GetEncodedRevocationMessageSig().end());
+    return seed;
 }
 

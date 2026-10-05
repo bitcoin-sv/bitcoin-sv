@@ -10,6 +10,10 @@
 #include <array>
 #include <cstdint>
 
+#ifndef WIN32
+#include <sys/resource.h>
+#endif
+
 #include <boost/filesystem.hpp>
 
 #include <leveldb/cache.h>
@@ -123,6 +127,30 @@ static std::vector<uint8_t> CreateObfuscateKey()
     return buff;
 }
 
+dbwrapper_limits::MaxFiles dbwrapper_limits::MaxFiles::Default()
+{
+    // Reserve room for everything else the node opens (sockets, block files,
+    // other leveldb instances, log files, etc.) and cap the budget.
+#if defined(WIN32)
+    // Win32 LevelDB doesn't use file descriptors; pick a sensible fixed value.
+    static constexpr size_t systemMax = 2048;
+#else
+    size_t systemMax = ReservedFds; // safe fallback if getrlimit fails
+    struct rlimit lim{};
+    if (getrlimit(RLIMIT_NOFILE, &lim) != -1) {
+        systemMax = static_cast<size_t>(lim.rlim_max);
+    }
+#endif
+
+    const size_t budget = (systemMax > ReservedFds) ? systemMax - ReservedFds : 0;
+#ifdef USE_POLL
+    return MaxFiles{std::min(AbsoluteMax, budget)};
+#else
+    // select() build: the whole process must fit below FD_SETSIZE.
+    return MaxFiles{std::min({AbsoluteMax, budget, SelectMax})};
+#endif
+}
+
 CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize,
                        bool fMemory, bool fWipe, bool obfuscate,
                        MaxFiles maxFiles, size_t nMaxFileSize)
@@ -131,7 +159,7 @@ CDBWrapper::CDBWrapper(const fs::path &path, size_t nCacheSize,
     iteroptions.verify_checksums = true;
     iteroptions.fill_cache = false;
     syncoptions.sync = true;
-    options = GetOptions(nCacheSize, nMaxFileSize, maxFiles.maxFiles);
+    options = GetOptions(nCacheSize, nMaxFileSize, maxFiles.Get());
     options.create_if_missing = true;
     if (fMemory) {
         penv = leveldb::NewMemEnv(leveldb::Env::Default());

@@ -61,7 +61,9 @@ add_test_to_suite(bitcoin test_bitcoin
 	base58data_tests.cpp
 	base64_tests.cpp
     big_int_tests.cpp
+    binary_counter_tests.cpp
 	bip32_tests.cpp
+	bitcoinconsensus_tests.cpp
 	blockcheck_tests.cpp
     block_download_tracking_tests.cpp
 	blockencodings_tests.cpp
@@ -155,6 +157,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	multisig_tests.cpp
     net_message_maker_tests.cpp
     net_association_tests.cpp
+    net_socket_wait_set_tests.cpp
 	net_tests.cpp
     disk_backed_parser_tests.cpp
     net_message_disk_tests.cpp
@@ -182,6 +185,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	scriptflags.cpp
 	scriptnum_tests.cpp
 	serialize_tests.cpp
+	sha256_dispatch_tests.cpp
 	sighash_tests.cpp
 	sighashtype_tests.cpp
 	sigopcount_tests.cpp

@@ -21,7 +21,7 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "validation.h"
-#include "wallet.h"
+#include "wallet_tx.h"
 #include "walletdb.h"
 #include "coincontrol.h"
 
@@ -107,35 +107,6 @@ void EnsureWalletIsUnlocked(CWallet *const pwallet) {
     }
 }
 
-void WalletTxToJSON(const CWalletTx &wtx, UniValue &entry) {
-    int confirms = wtx.GetDepthInMainChain();
-    entry.push_back(Pair("confirmations", confirms));
-    if (wtx.IsCoinBase()) {
-        entry.push_back(Pair("generated", true));
-    }
-    if (confirms > 0) {
-        entry.push_back(Pair("blockhash", wtx.hashBlock.GetHex()));
-        entry.push_back(Pair("blockindex", wtx.nIndex));
-        entry.push_back(
-            Pair("blocktime", mapBlockIndex.Get(wtx.hashBlock)->GetBlockTime()));
-    } else {
-        entry.push_back(Pair("trusted", wtx.IsTrusted()));
-    }
-    uint256 hash = wtx.GetId();
-    entry.push_back(Pair("txid", hash.GetHex()));
-    UniValue conflicts(UniValue::VARR);
-    for (const uint256 &conflict : wtx.GetConflicts()) {
-        conflicts.push_back(conflict.GetHex());
-    }
-    entry.push_back(Pair("walletconflicts", conflicts));
-    entry.push_back(Pair("time", wtx.GetTxTime()));
-    entry.push_back(Pair("timereceived", (int64_t)wtx.nTimeReceived));
-
-    for (const auto& item : wtx.mapValue) {
-        entry.push_back(Pair(item.first, item.second));
-    }
-}
-
 std::string AccountFromValue(const UniValue &value) {
     std::string strAccount = value.get_str();
     if (strAccount == "*") {
@@ -200,9 +171,9 @@ static UniValue getnewaddress(const Config&, const JSONRPCRequest& request)
     return EncodeDestination(keyID);
 }
 
-CTxDestination GetAccountAddress(CWallet* const  pwallet,
+CTxDestination GetAccountAddress(CWallet* const pwallet,
                                  const std::string& strAccount,
-                                 bool bForceNew = false)
+                                 bool bForceNew = false) REQUIRES(pwallet->cs_wallet)
 {
     CPubKey pubKey;
     if (!pwallet->GetAccountPubkey(pubKey, strAccount, bForceNew)) {
@@ -1390,13 +1361,13 @@ struct tallyitem
     bool fIsWatchonly{false};
 };
 
-static UniValue ListReceived(
-    const Config &config,
-    CWallet *const pwallet,
-    const UniValue &params,
-    bool fByAccounts,
-    int32_t nChainActiveHeight,
-    int nMedianTimePast) {
+static UniValue ListReceived(const Config& config,
+                             CWallet* const pwallet,
+                             const UniValue& params,
+                             bool fByAccounts,
+                             int32_t nChainActiveHeight,
+                             int nMedianTimePast) REQUIRES(pwallet->cs_wallet)
+{
 
     // Minimum confirmations
     int nMinDepth = 1;
@@ -1643,92 +1614,6 @@ static UniValue listreceivedbyaccount(const Config &config,
                 chainActive.Tip()->GetMedianTimePast());
 }
 
-static void MaybePushAddress(UniValue &entry, const CTxDestination &dest) {
-    if (IsValidDestination(dest)) {
-        entry.push_back(Pair("address", EncodeDestination(dest)));
-    }
-}
-
-void ListTransactions(CWallet *const pwallet, const CWalletTx &wtx,
-                      const std::string &strAccount, int nMinDepth, bool fLong,
-                      UniValue &ret, const isminefilter &filter) {
-    Amount nFee;
-    std::string strSentAccount;
-    std::list<COutputEntry> listReceived;
-    std::list<COutputEntry> listSent;
-
-    wtx.GetAmounts(listReceived, listSent, nFee, strSentAccount, filter);
-
-    bool fAllAccounts = (strAccount == std::string("*"));
-    bool involvesWatchonly = wtx.IsFromMe(ISMINE_WATCH_ONLY);
-
-    // Sent
-    if ((!listSent.empty() || nFee != Amount(0)) &&
-        (fAllAccounts || strAccount == strSentAccount)) {
-        for (const COutputEntry &s : listSent) {
-            UniValue entry(UniValue::VOBJ);
-            if (involvesWatchonly ||
-                (::IsMine(*pwallet, s.destination) & ISMINE_WATCH_ONLY)) {
-                entry.push_back(Pair("involvesWatchonly", true));
-            }
-            entry.push_back(Pair("account", strSentAccount));
-            MaybePushAddress(entry, s.destination);
-            entry.push_back(Pair("category", "send"));
-            entry.push_back(Pair("amount", ValueFromAmount(-s.amount)));
-            if (pwallet->mapAddressBook.count(s.destination)) {
-                entry.push_back(
-                    Pair("label", pwallet->mapAddressBook[s.destination].name));
-            }
-            entry.push_back(Pair("vout", s.vout));
-            entry.push_back(Pair("fee", ValueFromAmount(-1 * nFee)));
-            if (fLong) {
-                WalletTxToJSON(wtx, entry);
-            }
-            entry.push_back(Pair("abandoned", wtx.isAbandoned()));
-            ret.push_back(entry);
-        }
-    }
-
-    // Received
-    if (listReceived.size() > 0 && wtx.GetDepthInMainChain() >= nMinDepth) {
-        for (const COutputEntry &r : listReceived) {
-            std::string account;
-            if (pwallet->mapAddressBook.count(r.destination)) {
-                account = pwallet->mapAddressBook[r.destination].name;
-            }
-            if (fAllAccounts || (account == strAccount)) {
-                UniValue entry(UniValue::VOBJ);
-                if (involvesWatchonly ||
-                    (::IsMine(*pwallet, r.destination) & ISMINE_WATCH_ONLY)) {
-                    entry.push_back(Pair("involvesWatchonly", true));
-                }
-                entry.push_back(Pair("account", account));
-                MaybePushAddress(entry, r.destination);
-                if (wtx.IsCoinBase()) {
-                    if (wtx.GetDepthInMainChain() < 1) {
-                        entry.push_back(Pair("category", "orphan"));
-                    } else if (wtx.GetBlocksToMaturity() > 0) {
-                        entry.push_back(Pair("category", "immature"));
-                    } else {
-                        entry.push_back(Pair("category", "generate"));
-                    }
-                } else {
-                    entry.push_back(Pair("category", "receive"));
-                }
-                entry.push_back(Pair("amount", ValueFromAmount(r.amount)));
-                if (pwallet->mapAddressBook.count(r.destination)) {
-                    entry.push_back(Pair("label", account));
-                }
-                entry.push_back(Pair("vout", r.vout));
-                if (fLong) {
-                    WalletTxToJSON(wtx, entry);
-                }
-                ret.push_back(entry);
-            }
-        }
-    }
-}
-
 void AcentryToJSON(const CAccountingEntry &acentry,
                    const std::string &strAccount, UniValue &ret) {
     bool fAllAccounts = (strAccount == std::string("*"));
@@ -1889,7 +1774,7 @@ static UniValue listtransactions(const Config&, const JSONRPCRequest& request)
          it != txOrdered.rend(); ++it) {
         CWalletTx *const pwtx = (*it).second.first;
         if (pwtx != 0) {
-            ListTransactions(pwallet, *pwtx, strAccount, 0, true, ret, filter);
+            pwallet->ListTransactions(*pwtx, strAccount, 0, true, ret, filter);
         }
         CAccountingEntry *const pacentry = (*it).second.second;
         if (pacentry != 0) {
@@ -2158,7 +2043,7 @@ static UniValue listsinceblock(const Config&, const JSONRPCRequest& request)
         CWalletTx tx = pairWtx.second;
 
         if (depth == -1 || tx.GetDepthInMainChain() < depth) {
-            ListTransactions(pwallet, tx, "*", 0, true, transactions, filter);
+            pwallet->ListTransactions(tx, "*", 0, true, transactions, filter);
         }
     }
 
@@ -2288,10 +2173,10 @@ static UniValue gettransaction(const Config&, const JSONRPCRequest& request)
         entry.push_back(Pair("fee", ValueFromAmount(nFee)));
     }
 
-    WalletTxToJSON(wtx, entry);
+    pwallet->ToJSON(wtx, entry);
 
     UniValue details(UniValue::VARR);
-    ListTransactions(pwallet, wtx, "*", 0, false, details, filter);
+    pwallet->ListTransactions(wtx, "*", 0, false, details, filter);
     entry.push_back(Pair("details", details));
 
     std::string strHex =
@@ -3510,13 +3395,120 @@ static UniValue generate(const Config &config, const JSONRPCRequest &request) {
                           true);
 }
 
+static UniValue rescanblockchain(const Config&, const JSONRPCRequest& request)
+{
+    CWallet *const pwallet = GetWalletForJSONRPCRequest(request);
+    if(!EnsureWalletIsAvailable(pwallet, request.fHelp))
+    {
+        return NullUniValue;
+    }
+
+    if(request.fHelp || request.params.size() > 2)
+    {
+        throw std::runtime_error(
+            "rescanblockchain (\"start_height\") (\"stop_height\")\n"
+            "\nRescan the local blockchain for wallet related transactions.\n"
+            "\nArguments:\n"
+            "1. \"start_height\"    (numeric, optional) block height where the rescan should start\n"
+            "2. \"stop_height\"     (numeric, optional) the last block height that should be scanned\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"start_height\"     (numeric) The block height where the rescan has started. If omitted, rescan started from the genesis block.\n"
+            "  \"stop_height\"      (numeric) The height of the last rescanned block. If omitted, rescan stopped at the chain tip.\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("rescanblockchain", "100000 120000")
+            + HelpExampleRpc("rescanblockchain", "100000, 120000")
+            );
+    }
+
+    WalletRescanReserver reserver { pwallet };
+    if(!reserver.reserve())
+    {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet is currently rescanning. Abort existing rescan or wait.");
+    }
+
+    const CBlockIndex* pindexStart = nullptr;
+    const CBlockIndex* pindexStop = nullptr;
+    const CBlockIndex* pTip = nullptr;
+    {
+        LOCK(cs_main);
+
+        pindexStart = chainActive.Genesis();
+        pTip = chainActive.Tip();
+
+        if(request.params.size() > 0 && !request.params[0].isNull())
+        {
+            const int startHeight = request.params[0].get_int();
+            if(startHeight < 0)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid negative start_height");
+            }
+            pindexStart = chainActive[startHeight];
+            if(!pindexStart)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start_height");
+            }
+        }
+
+        if(request.params.size() > 1 && !request.params[1].isNull())
+        {
+            const int stopHeight = request.params[1].get_int();
+            if(stopHeight < 0)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid negative stop_height");
+            }
+            pindexStop = chainActive[stopHeight];
+            if(!pindexStop)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid stop_height");
+            }
+            else if(pindexStop->GetHeight() < pindexStart->GetHeight())
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "stop_height must be greater than or equal to start_height");
+            }
+        }
+
+        // We can't rescan beyond non-pruned blocks, stop and throw an error
+        if(fPruneMode)
+        {
+            const CBlockIndex* block = pindexStop ? pindexStop : pTip;
+            while(block && block->GetHeight() >= pindexStart->GetHeight())
+            {
+                if(!(block->getStatus().hasData()))
+                {
+                    throw JSONRPCError(RPC_MISC_ERROR,
+                                       "Can't rescan beyond pruned data. Use RPC call getblockchaininfo to determine your pruned height.");
+                }
+                block = block->GetPrev();
+            }
+        }
+    }
+
+    const CBlockIndex* stopBlock = pwallet->ScanForWalletTransactions(pindexStart, pindexStop, reserver, true);
+    if(!stopBlock)
+    {
+        // ScanForWalletTransactions scanned up to the requested stopindex
+        stopBlock = pindexStop ? pindexStop : pTip;
+    }
+    else
+    {
+        throw JSONRPCError(RPC_MISC_ERROR, "Rescan failed. Potentially corrupted data files.");
+    }
+
+    UniValue response(UniValue::VOBJ);
+    response.pushKV("start_height", pindexStart->GetHeight());
+    response.pushKV("stop_height", stopBlock->GetHeight());
+    return response;
+}
+
 void RegisterWalletRPCCommands(CRPCTable& t)
 {
     if(gArgs.GetBoolArg("-disablewallet", false))
         return;
 
     // clang-format off
-    static const std::array<CRPCCommand, 39> commands{{
+    static const std::array<CRPCCommand, 40> commands{{
         //  category            name                        actor (function)          okSafeMode
         //  ------------------- ------------------------    ----------------------    ----------
         { "rawtransactions",    "fundrawtransaction",       fundrawtransaction,       false,  {"hexstring","options"} },
@@ -3548,6 +3540,7 @@ void RegisterWalletRPCCommands(CRPCTable& t)
         { "wallet",             "listwallets",              listwallets,              true,   {} },
         { "wallet",             "lockunspent",              lockunspent,              true,   {"unlock","transactions"} },
         { "wallet",             "move",                     movecmd,                  false,  {"fromaccount","toaccount","amount","minconf","comment"} },
+        { "wallet",             "rescanblockchain",         rescanblockchain,         false,  {"start_height","stop_height"} },
         { "wallet",             "sendfrom",                 sendfrom,                 false,  {"fromaccount","toaddress","amount","minconf","comment","comment_to"} },
         { "wallet",             "sendmany",                 sendmany,                 false,  {"fromaccount","amounts","minconf","comment","subtractfeefrom"} },
         { "wallet",             "sendtoaddress",            sendtoaddress,            false,  {"address","amount","comment","comment_to","subtractfeefromamount"} },

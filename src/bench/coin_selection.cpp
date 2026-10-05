@@ -5,7 +5,7 @@
 #include "bench.h"
 #include "chainparams.h"
 #include "config.h"
-#include "wallet/wallet.h"
+#include "wallet/wallet_tx.h"
 
 #include <set>
 

@@ -11,6 +11,10 @@ auto TxnGrouper::GetGroups(const std::vector<CTransactionRef>& vtx) -> std::vect
 {
     // Clear state
     mNodes.clear();
+    mOutpointSpenders.clear();
+
+    // Assume average of 2 dependencies per transaction to save on rehashes
+    mOutpointSpenders.reserve(vtx.size() * 2);
 
     // Build dependency graph
     ScanDependencies(vtx);
@@ -130,6 +134,10 @@ void TxnGrouper::ScanDependencies(const std::vector<CTransactionRef>& vtx)
             txnNode = mNodes.emplace(txid, Node{index});
         }
 
+        // Hold a reference to the node for this transaction to update dependencies below
+        // because the iterator may be invalidated by insertions into the graph.
+        Node& txnNodeRef { txnNode->second };
+
         // Scan inputs for this transaction
         for(const auto& input : txn->vin)
         {
@@ -154,7 +162,22 @@ void TxnGrouper::ScanDependencies(const std::vector<CTransactionRef>& vtx)
             }
 
             // Update our node to add this as a dependency of ours
-            txnNode->second.AddDependency(inputId);
+            txnNodeRef.AddDependency(inputId);
+
+            // Link transactions that spend the exact same output directly to each
+            // other. This keeps double-spends in the same group at outpoint precision.
+            const auto& [spender, inserted] { mOutpointSpenders.try_emplace(input.prevout, txid) };
+            if(! inserted)
+            {
+                // Another transaction already spends this output; tie us together
+                const TxId& spenderTxid { spender->second };
+                const auto& spenderRange { mNodes.equal_range(spenderTxid) };
+                for(auto spenderNode = spenderRange.first; spenderNode != spenderRange.second; ++spenderNode)
+                {
+                    spenderNode->second.AddDependency(txid);
+                }
+                txnNodeRef.AddDependency(spenderTxid);
+            }
         }
     }
 }
@@ -177,15 +200,18 @@ void TxnGrouper::BuildGroupNonRecursive(const TxId& initialTxid, TxnGroup& group
         const auto& range { mNodes.equal_range(txid) };
         for(auto txnNode = range.first; txnNode != range.second; ++txnNode)
         {
-            if(txnNode != mNodes.end())
+            // If this node represents a txn from the block, add it to the group
+            if(txnNode->second.HasTransaction())
             {
-                // If this node represents a txn from the block, add it to the group
-                if(txnNode->second.HasTransaction())
-                {
-                    group.push_back(txnNode->second.GetTransaction());
-                }
+                group.push_back(txnNode->second.GetTransaction());
 
-                // Add all additional dependencies from this node to the scan list
+                // Only propagate dependencies through nodes that represent a
+                // transaction in this block. A node without a transaction is a
+                // placeholder for a parent that is not in this block; its
+                // dependents merely spend (different outputs of) that external
+                // parent and must not be grouped together on that basis alone.
+                // Genuine double-spends of the same external output are still
+                // grouped via the direct links added in ScanDependencies.
                 const auto& nodeDependencies { txnNode->second.GetAllDependencies() };
                 dependencies.insert(dependencies.end(), nodeDependencies.begin(), nodeDependencies.end());
             }

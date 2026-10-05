@@ -661,7 +661,7 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                                             args + self.default_args,
                                             number_of_connections=1) as (conn,):
             # Run test case.
-            self.run_scenario3(conn, num_of_chains, chain_length, out, timeout=30)
+            self.run_scenario3(conn, num_of_chains, chain_length, out, timeout=int(30 * self.options.timeoutfactor))
 
         # Scenario 6_1 (TS6_1).
         #
@@ -681,14 +681,14 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                                             args + self.default_args,
                                             number_of_connections=1) as (conn,):
             # Run test case.
-            self.run_scenario3_1(conn, chain_length, out, timeout=30)
+            self.run_scenario3_1(conn, chain_length, out, timeout=int(30 * self.options.timeoutfactor))
         # dontcheckfee=True
         with self.run_node_with_connections('TS6_1: {} chains of length {}. Process duplicates received through rpc (dontcheckfee=True)'.format(1, chain_length),
                                             0,
                                             args + self.default_args,
                                             number_of_connections=1) as (conn,):
             # Run test case.
-            self.run_scenario3_1(conn, chain_length, out, dontcheckfee=True, timeout=30)
+            self.run_scenario3_1(conn, chain_length, out, dontcheckfee=True, timeout=int(30 * self.options.timeoutfactor))
 
         # Scenario 6_2 (TS6_2).
         #
@@ -710,14 +710,14 @@ class RPCSendRawTransactions(ComparisonTestFramework):
                                             args + self.default_args,
                                             number_of_connections=1) as (conn,):
             # Run test case.
-            self.run_scenario3_2(conn, chain_length, out, timeout=30)
+            self.run_scenario3_2(conn, chain_length, out, timeout=int(30 * self.options.timeoutfactor))
         # dontcheckfee=True
         with self.run_node_with_connections('TS6_2: {} chains of length {}. Process duplicates received through rpc (dontcheckfee=True)'.format(1, chain_length),
                                             0,
                                             args + self.default_args,
                                             number_of_connections=1) as (conn,):
             # Run test case.
-            self.run_scenario3_2(conn, chain_length, out, dontcheckfee=True, timeout=30)
+            self.run_scenario3_2(conn, chain_length, out, dontcheckfee=True, timeout=int(30 * self.options.timeoutfactor))
 
         #====================================================================
         # Invalid test cases and non-empty rejects

@@ -54,6 +54,7 @@ DSTxnSerialiser::TxnHandle::~TxnHandle()
 // Open the underlying file for reading and return a descriptor to it.
 UniqueFileDescriptor DSTxnSerialiser::TxnHandle::OpenFile() const
 {
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
     UniqueFileDescriptor fd { open(mTxnFile.string().c_str(), O_RDONLY) };
     if(fd.Get() < 0)
     {

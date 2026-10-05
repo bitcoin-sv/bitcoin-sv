@@ -8,7 +8,7 @@
 #include "rpc/server.h"
 #include "wallet/db.h"
 #include "wallet/rpcdump.h"
-#include "wallet/wallet.h"
+#include "wallet/wallet_tx.h"
 
 CWallet *pwalletMain; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 

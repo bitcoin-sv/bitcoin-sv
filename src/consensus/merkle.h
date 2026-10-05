@@ -6,10 +6,14 @@
 #define BITCOIN_MERKLE
 
 #include <cstdint>
+#include <span>
 #include <vector>
 
 #include "primitives/block.h"
 #include "uint256.h"
+
+// SHA-256 double-hash of exactly two consecutive Merkle pairs
+void SHA256D64_2way(std::span<const uint256, 4> ip, std::span<uint256, 2> op);
 
 uint256 ComputeMerkleRoot(const std::vector<uint256> &leaves,
                           bool *mutated = nullptr);

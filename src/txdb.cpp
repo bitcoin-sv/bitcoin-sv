@@ -17,9 +17,13 @@
 #include "uint256.h"
 #include "util.h"
 #include "ui_interface.h"
-#include <boost/thread.hpp>
+
 #include <string>
+#include <unordered_set>
 #include <vector>
+
+#include <boost/thread.hpp>
+#include <boost/sort/sort.hpp>
 
 static const char DB_COIN = 'C';
 static const char DB_COINS = 'c';
@@ -201,10 +205,9 @@ std::vector<uint256> CoinsDB::GetHeadBlocks() const {
     return vhashHeadBlocks;
 }
 
-bool CoinsDB::DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
+bool CoinsDB::DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock)
+{
     CDBBatch batch(db);
-    size_t count = 0;
-    size_t changed = 0;
     size_t batch_size =
         (size_t)gArgs.GetArgAsBytes("-dbbatchsize", nDefaultDbBatchSize);
     // NOLINTNEXTLINE(*-narrowing-conversions)
@@ -228,25 +231,43 @@ bool CoinsDB::DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
     batch.Erase(DB_BEST_BLOCK);
     batch.Write(DB_HEAD_BLOCKS, std::vector<uint256>{hashBlock, old_tip});
 
+    // Collect iterators for dirty entries; drop non-dirty entries now to free
+    // memory before the sort and batch writes.
+    std::vector<CCoinsMap::iterator> dirtyIts;
+    size_t count = mapCoins.size();
+    dirtyIts.reserve(count);
     for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();) {
         if (it->second.flags & CCoinsCacheEntry::DIRTY) {
-            CoinEntry entry(&it->first);
-            if (it->second.GetCoin().IsSpent()) {
-                batch.Erase(entry);
-            } else {
-                auto coinWithScript = it->second.GetCoinWithScript();
-
-                // coin entries that have DIRTY flag set and are not spent must
-                // always contain the script
-                assert(coinWithScript.has_value());
-
-                batch.Write(entry, coinWithScript.value());
-            }
-            changed++;
+            dirtyIts.push_back(it);
+            ++it;
+        } else {
+            it = mapCoins.erase(it);
         }
-        count++;
-        CCoinsMap::iterator itOld = it++;
-        mapCoins.erase(itOld);
+    }
+    size_t changed = dirtyIts.size();
+
+    // Sort so batch inserts reach LevelDB in on-disk key order (same ordering
+    // as DBCacheAllInputs). LevelDB produces tighter L0 SSTs and cheaper
+    // compactions when batch writes arrive sorted.
+    boost::sort::block_indirect_sort(dirtyIts.begin(), dirtyIts.end(),
+              [](const CCoinsMap::iterator& a, const CCoinsMap::iterator& b) {
+                  return a->first < b->first;
+              });
+
+    for (const CCoinsMap::iterator& it : dirtyIts) {
+        CoinEntry entry(&it->first);
+        if (it->second.GetCoin().IsSpent()) {
+            batch.Erase(entry);
+        } else {
+            auto coinWithScript = it->second.GetCoinWithScript();
+
+            // coin entries that have DIRTY flag set and are not spent must
+            // always contain the script
+            assert(coinWithScript.has_value());
+
+            batch.Write(entry, coinWithScript.value());
+        }
+        mapCoins.erase(it);
         if (batch.SizeEstimate() > batch_size) {
             LogPrint(BCLog::COINDB, "Writing partial batch of %.2f MiB\n",
                      batch.SizeEstimate() * (1.0 / 1048576.0));
@@ -502,27 +523,29 @@ size_t CoinsDB::DynamicMemoryUsage() const {
 
 void CoinsDB::DBCacheAllInputs(const std::vector<CTransactionRef>& txns) const
 {
-    // Sort inputs; leveldb seems to prefer it that way
-    auto Sort = [](const COutPoint& out1, const COutPoint& out2)
-    {
-        if(out1.GetTxId() == out2.GetTxId())
-        {
-            return out1.GetN() < out2.GetN();
-        }
-        return out1.GetTxId() < out2.GetTxId();
-    };
-
     std::vector<COutPoint> allInputs {};
+    allInputs.reserve(txns.size() * 2); // Assume average number of inputs per transaction is around 2
+    std::unordered_set<TxId> txIds {};
+    txIds.reserve(txns.size());
+
     for(size_t i = 1; i < txns.size(); ++i)
     {
         for(const auto& in: txns[i]->vin)
         {
-            allInputs.push_back(in.prevout);
+            // Skip inputs that are from transactions within the same block
+            // as they cannot be cached from the DB.
+            if(! txIds.contains(in.prevout.GetTxId()))
+            {
+                allInputs.push_back(in.prevout);
+            }
         }
+
+        txIds.insert(txns[i]->GetId());
     }
-    // FIXME: Consider using parallel sort when it beconmes available
-    // NOTE: parallel sorting requires -ltbb in few GCC versions
-    std::sort(allInputs.begin(), allInputs.end(), Sort);
+
+    // Sort inputs; leveldb seems to prefer it that way
+    // FIXME: Consider using parallel sort.
+    std::sort(allInputs.begin(), allInputs.end());
 
     for(const auto& outpoint : allInputs)
     {
@@ -530,7 +553,8 @@ void CoinsDB::DBCacheAllInputs(const std::vector<CTransactionRef>& txns) const
     }
 }
 
-std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const {
+std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const
+{
     std::optional<CoinImpl> coinFromCache;
     size_t maxScriptLoadingSize = 0;
 
@@ -701,6 +725,8 @@ bool CoinsDB::BatchWrite(
 
 bool CoinsDB::Flush()
 {
+    int64_t startTime { GetTimeMillis() };
+
     WPUSMutex::Lock writeLock = mMutex.WriteLock();
     std::unique_lock lock { mCoinsViewCacheMtx };
 
@@ -711,8 +737,12 @@ bool CoinsDB::Flush()
     }
 
     auto coins = mCache.MoveOutCoins();
+    size_t numCoins { coins.size() };
+    bool res = DBBatchWrite(coins, hashBlock_);
 
-    return DBBatchWrite(coins, hashBlock_);
+    LogPrint(BCLog::BENCH, "    - Flushing %ld coins to database: %.2fms\n",
+        numCoins, GetTimeMillis() - startTime);
+    return res;
 }
 
 void CoinsDB::Uncache(const std::vector<COutPoint>& vOutpoints)
